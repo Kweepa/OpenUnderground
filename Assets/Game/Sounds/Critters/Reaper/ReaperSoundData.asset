@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: ReaperSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: 0cf767ad02fb04647ada0c5cabee2e87, type: 3}
+    - {fileID: 8300000, guid: f7e008c5007566b4aac35c27f78638c1, type: 3}
+    - {fileID: 8300000, guid: 0cf896b64919dda4aaed08baef736727, type: 3}
+    - {fileID: 8300000, guid: 9e048d021c4b3c343b5880b4adc6565e, type: 3}
+    volume: 0.511
+    pitch: 1
+    pitchVariation: 0.088
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 4a3afc0e61fe37b4bb2b333692c45792, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: f89bac8dc839b7a4ba449083392a78be, type: 3}
+    volume: 1
+    pitch: 1.076
+    pitchVariation: 0.149
+    chance: 1
+  - soundType: 20
+    clips:
+    - {fileID: 8300000, guid: 0bf7973a945b6d34babe61579bd4a0ba, type: 3}
+    volume: 1
+    pitch: 1.1
+    pitchVariation: 0.205
+    chance: 1
+  - soundType: 4
+    clips:
+    - {fileID: 8300000, guid: 4788e4a888710044e953ccdf043cd9c1, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.106
+    chance: 1

@@ -1,0 +1,55 @@
+0.0 block 3074
+
+0.0 cut 1
+0.0 fade in
+0.0 pause 1
+
+1.0 voc 0 // doomed
+1.0 cut 1 matchVoc
+1.0 sub 0 matchVoc
+5.0 voc 1 // ritual
+5.0 cut 2 matchVoc
+5.0 sub 1 matchVoc
+9.0 voc 2 // bind
+9.0 cut 2 matchVoc
+9.0 sub 2 matchVoc
+13.0 voc 3 // first part
+13.0 cut 2 matchVoc
+13.0 sub 3 matchVoc
+18.0 voc 4 // own fault
+18.0 cut 1 matchVoc
+18.0 sub 4 matchVoc
+20.0 voc 5 // brother gone
+20.0 cut 2 matchVoc
+20.0 sub 5 matchVoc
+24.0 voc 6 // alas
+24.0 cut 3 matchVoc
+24.0 sub 6 matchVoc
+30.0 voc 7 // ironic
+30.0 cut 1 matchVoc
+30.0 sub 7 matchVoc
+32.0 voc 8 // stood ready
+32.0 cut 3 matchVoc
+32.0 sub 8 matchVoc
+38.0 voc 9 // creature
+38.0 cut 3 matchVoc
+38.0 sub 9 matchVoc
+44.0 voc 10 // suffer
+44.0 cut 1 matchVoc
+44.0 sub 10 matchVoc
+47.0 voc 11 // no weapon
+47.0 cut 3 matchVoc
+47.0 sub 11 matchVoc
+53.0 voc 12 // ambitions
+53.0 cut 1 matchVoc
+53.0 sub 12 matchVoc
+57.0 voc 13 // earned
+57.0 cut 1 matchVoc
+57.0 sub 13 matchVoc
+60.0 voc 14 // not be here
+60.0 cut 2 matchVoc
+60.0 sub 14 matchVoc
+
+64.0 cut 4
+69.0 fade out
+71.0 end 0

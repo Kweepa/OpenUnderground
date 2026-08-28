@@ -1,0 +1,19 @@
+0.0 fade in
+0.0 cut cs000.n02 loop
+3.0 voc 0 // unleash
+3.0 blur 1
+3.0 cut cs000.n03 matchVoc
+3.0 newsub 0 matchVoc
+10.0 voc 1 // slew me
+10.0 cut cs000.n04 matchVoc
+10.0 newsub 1 matchVoc
+16.0 voc 2 // help thee
+16.0 cut cs000.n05 matchVoc
+16.0 newsub 2 matchVoc
+18.0 voc 3 // wits and virtue
+18.0 cut cs000.n04 matchVoc
+18.0 newsub 3 matchVoc
+21.0 blur 0
+21.0 cut cs000.n02 loop
+23.0 fade out
+24.0 end 0

@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &620786827848010886
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 151741389012371424}
+  - component: {fileID: 2765802635894196705}
+  m_Layer: 0
+  m_Name: DataLoader
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 4294967295
+  m_IsActive: 1
+--- !u!4 &151741389012371424
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 620786827848010886}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2765802635894196705
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 620786827848010886}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 520f1016d2746bd4c891965e4d6e7c21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  impact: {fileID: 8300000, guid: c86ed3d098e5d9542b429e58d4190c2b, type: 3}
+  splash: {fileID: 8300000, guid: ddd5a5b0dd808f44d909f07150b38729, type: 3}
+  lavaSplash: {fileID: 8300000, guid: 03e3b3abc7568a44ea66485d0dcdcbc0, type: 3}
+  lavaBurn: {fileID: 8300000, guid: ced5352a6ad255042b092dbeb8121b53, type: 3}
+  waterSplashParticle: {fileID: 3323387954473017891, guid: 0b912e9003fba894faa88cf964a6fb8a,
+    type: 3}
+  lavaSplashParticle: {fileID: 2429798741970317516, guid: bc4026d28b6678642a2e4a33ef6267f5,
+    type: 3}
+  objTex: []
+  cursorTex: []
+  mapCursorTex: []
+  tmFlatTex: []
+  tmObjTex: []
+  doorTex: []
+  panelsTex: []
+  eyesTex: []
+  flasksTex: []
+  armor_fTex: []
+  armor_mTex: []
+  bodiesTex: []
+  compassTex: []
+  opbtnTex: []
+  spellsTex: []
+  animoTex: []
+  invTex: []
+  _3dwinTex: []
+  converseTex: []
+  dragonsTex: []
+  chainsTex: []
+  weaponsTex: []
+  lftiTex: []
+  litTorchTex: []
+  litCandleTex: []
+  litTaperTex: []
+  lightSpellTex: []
+  auxPals: 

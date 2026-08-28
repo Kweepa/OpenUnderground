@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3669353030418702750
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1913303218795319262}
+  - component: {fileID: 4368076233610805485}
+  m_Layer: 0
+  m_Name: LevelLoader
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1913303218795319262
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3669353030418702750}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4368076233610805485
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3669353030418702750}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26d2fedc88c05b94294d858aafd039de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sprite: {fileID: 11486462, guid: 0b2281648fed64c46bf87a0380f2f9b0, type: 3}
+  critter: {fileID: 11470860, guid: aac84f7e2c8c521429433352aae8a852, type: 3}
+  lavaLight: {fileID: 7969368520346656655, guid: bd056bcbc7e4eef478e381551af3f45b,
+    type: 3}
+  splat: {fileID: -5132783501895153164, guid: c7021c6e4f773524db3e8aca6dff2bb7, type: 3}
+  movableTile: {fileID: 4160510404416170345, guid: d376973e3b42d6b40b9c33357a06e572,
+    type: 3}
+  shelf: {fileID: 841866268155009639, guid: 62d32653983a96f49929f13d526c5eba, type: 3}
+  wallMat: []
+  floorMat: []
+  objMat: []
+  objectModelMap: {fileID: 11413120, guid: dcfa85d6274fed94bbd9c0eb5605259b, type: 3}
+  loadedLevel: 0
+  levelLoadedTime: 0
+  chunkOffsets: 
+  mazePathMaterial: {fileID: 0}
+  sentPostLoadInitialize: 0

@@ -1,0 +1,13 @@
+0.0 fade in
+0.0 cut cs000.n02 loop
+3.0 voc 0 // not yet found
+3.0 blur 1
+3.0 cut cs000.n03 matchVoc
+3.0 newsub 0 matchVoc
+8.0 voc 1 // double thy efforts
+8.0 cut cs000.n04 matchVoc
+8.0 newsub 1 matchVoc
+11.0 blur 0
+11.0 cut cs000.n02 loop
+13.0 fade out
+14.0 end 0

@@ -1,0 +1,100 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2596316671177871567
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8208071579380445731}
+  - component: {fileID: 2519692773826693502}
+  m_Layer: 0
+  m_Name: ParticleSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8208071579380445731
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2596316671177871567}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2519692773826693502
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2596316671177871567}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 14d35dce1d85e7c40b30a6908bdc7915, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  particleBlueprints:
+  - {fileID: 6677926303954326323, guid: a5a10de17a45c994daa084125e134df0, type: 3}
+  - {fileID: 6672635708614121219, guid: f0ccba727935345459ac36af3586341b, type: 3}
+  - {fileID: 5233387143101813808, guid: ae4fd7aa10c003b4594ce5016aa90701, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 6677926303954326323, guid: 81fcc55f71c145942a32d073778d17e0, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 6428362613075659350, guid: a6866dbaa3ea44c469b62a645b64781a, type: 3}
+  - {fileID: 4143032563870903588, guid: 854b46687f10ac44c82d280fc4b340a3, type: 3}
+  - {fileID: 4143032563870903588, guid: 54af3932b04485f45ab17b0d55af3c8c, type: 3}
+  - {fileID: 6672635708614121219, guid: ccccd96811249794d9daa6b5abe02bc8, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 3624670889104731359, guid: a354641b5ce1edd4e8965bb586c188e6, type: 3}
+  - {fileID: 6110192985775785307, guid: f003f8cd442d36b4791f89dadd4df914, type: 3}
+  - {fileID: 6110192985775785307, guid: 5ad4808588bb914418ab40f678633307, type: 3}
+  - {fileID: 6110192985775785307, guid: 860b0e3a5593b894eaae3ffd1e869f26, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 7882219232132690684, guid: 9fcd5fd4d04f3ed4891c3ab712789790, type: 3}
+  - {fileID: 0}
+  - {fileID: 7064371753176135352, guid: 4eaa49b5b91a1194582ae56205cf540a, type: 3}
+  - {fileID: 0}
+  - {fileID: 1119070841507728534, guid: 82c4995c5bc95ea4db709384ab7e8c1a, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 5023353015567381922, guid: e747544088e0b8842a0eca8697a4f65a, type: 3}
+  - {fileID: 4564014853589572552, guid: 54bf2e5d0475c39438dd66828bff5dd4, type: 3}
+  - {fileID: 1835174905073365006, guid: adfd6c86cf180e64aaaa1bece2395926, type: 3}
+  - {fileID: 1835174905073365006, guid: adfd6c86cf180e64aaaa1bece2395926, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 2030986282190870375, guid: 4f7b3eccb2caeb746aca0c1312f09c0b, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 6110192985775785307, guid: eda7d22dfc9168b479991ad76a40b4df, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 3052617425163652690, guid: 46abdc4f40b79a94483bd9771069297c, type: 3}
+  - {fileID: 3052617425163652690, guid: 6a5ddc70ca4d8a740ac93fd5cce8abfc, type: 3}
+  - {fileID: 1119070841507728534, guid: 8142fe38ceb93d645ac4aab0c9e10ef8, type: 3}
+  - {fileID: 1119070841507728534, guid: 8142fe38ceb93d645ac4aab0c9e10ef8, type: 3}
+  - {fileID: 1119070841507728534, guid: 7366593a5b91d564dbcfa153edb40cc0, type: 3}
+  - {fileID: 1119070841507728534, guid: 7366593a5b91d564dbcfa153edb40cc0, type: 3}

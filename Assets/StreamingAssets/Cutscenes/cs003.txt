@@ -1,0 +1,24 @@
+0.0 block 3075
+
+0.0 fade in
+0.0 cut 1
+0.0 pause 1
+
+1.0 voc 0 // at last
+1.0 cut 1 matchVoc
+1.0 sub 0 matchVoc
+
+7.0 voc 1 // now I'm free
+7.0 cut 2 matchVoc
+7.0 sub 1 matchVoc
+
+12.0 voc 2 // we must
+12.0 cut 1 matchVoc
+12.0 sub 2 matchVoc
+
+18.0 voc 3 // would that
+18.0 cut 2 matchVoc
+18.0 sub 3 matchVoc
+
+23.0 fade out
+24.0 end 0

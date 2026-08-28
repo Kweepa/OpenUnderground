@@ -1,0 +1,53 @@
+# --- Unity Folders to Ignore ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Uu]i[Ee]lements[Ss]chema/
+MemoryCaptures/
+Packages/com.unity.asset-store-tools/
+Assets/Packages/
+
+# --- Standard C# / IDE Ignore ---
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.unityproj
+*.csproj.user
+*.designer.cs
+*.cache
+*.manifest
+*.tmp
+*.log
+.vs/
+.idea/
+.gradle/
+ExportedObj/
+.vsconfig
+
+# --- Keep Meta Files ---
+# Never ignore meta files; they are the glue of Unity
+!*.meta
+
+# --- DLL Handling ---
+# Only ignore DLLs if they are in specific "Build" or "Temp" folders.
+# If you have DLLs in Assets/, you likely want to track them.
+# *.dll (REMOVED: better to track these if they are in Assets)
+
+# Project specific
+# CRIT/*
+# CUTS/*
+# DATA/*
+# SOUND/*
+LargeObjectPNGs/*
+ObjectPNGs/*
+Conversations/*
+Critters/*

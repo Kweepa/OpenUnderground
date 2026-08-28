@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-3627527262060743700
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 639247ca83abc874e893eb93af2b5e44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 0
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Skull Material 1
+  m_Shader: {fileID: -6465566751694194690, guid: 56644bf0cde030541a70d541474a69fe, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _SampleTexture2D_0275c195b8794f64802e779ec12a201b_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: ecb56d7a98f90e84eb0fefa2f3d8c26e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_3e2cf266178a4f12aaf1a9e01db5a1e5_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: c8dd0a878c523a84f8ab1194438600b3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_51013020e9d848199200b1b3fecdeffc_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: cc02c7b4f4d4cca43b83d9bb1ca3aa32, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_ec0bc64dccd84ff89bec8cf1d52d9f49_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 378554442bf2b9540aff8874a0fa5d04, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Texture2D:
+        m_Texture: {fileID: 2800000, guid: 8de2431ff750b204c9131c92761e0d36, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BUILTIN_QueueControl: 0
+    - _BUILTIN_QueueOffset: 0
+    - _MaxEmission: 1
+    - _Min_Emission: 0.1
+    - _Speed: 2
+    m_Colors:
+    - _Emissive_Color: {r: 0.5644784, g: 1.319508, b: 0, a: 0}
+  m_BuildTextureStacks: []

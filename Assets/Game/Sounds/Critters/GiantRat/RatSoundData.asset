@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: RatSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 7
+    clips:
+    - {fileID: 8300000, guid: 0431107e4f236dd40b2d741a346e2dfd, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 1
+    clips:
+    - {fileID: 8300000, guid: 27306f22051e5b5418584ef27e472fc8, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: cd70286885f8e8d429debabb7df3e4ba, type: 3}
+    - {fileID: 8300000, guid: 5c1a924ce0e646844a4add019ee36508, type: 3}
+    - {fileID: 8300000, guid: c5187b169d90baa4aba8f098afc67de3, type: 3}
+    - {fileID: 8300000, guid: 3739d3a215f719a458e8ae7db9ffc76f, type: 3}
+    volume: 0.1
+    pitch: 1
+    chance: 1
+  - soundType: 10
+    clips:
+    - {fileID: 8300000, guid: dbee08329b8a3d04eae8421ab536f26b, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 61666137dca2c954f9bfca5ad1c5e772, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 605a4c7363523e04b98f93fb4e87ecaf, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: 93dd632783a242e4bb1b04225041e8bf, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1

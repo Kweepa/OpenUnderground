@@ -1,0 +1,251 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7124883573381720437
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7291774962929351013}
+  - component: {fileID: 1775635540174906429}
+  m_Layer: 0
+  m_Name: Messages
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7291774962929351013
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7124883573381720437}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 99.27543, y: -11.73381, z: -314.90265}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1775635540174906429
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7124883573381720437}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd7463c01539b4e41ba318b0a69fbd36, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fontStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 1, g: 1, b: 1, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+    m_FontSize: 25
+    m_FontStyle: 0
+    m_Alignment: 6
+    m_WordWrap: 1
+    m_RichText: 1
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0
+  newMessage: {fileID: 8300000, guid: 1ee951a59057b6141a6a10438dc9a5c4, type: 3}
+  clips:
+  - contains: chant HUNN
+    clip: {fileID: 8300000, guid: fc46b74789661b8419ebf55af0701347, type: 3}
+  - contains: chanting UN
+    clip: {fileID: 8300000, guid: c57f0b0f5279bca48a4f9e94ddaf31a7, type: 3}
+  - contains: dim witted
+    clip: {fileID: 8300000, guid: 78241ab0751c053469457b79c93394a8, type: 3}
+  - contains: remove Bet
+    clip: {fileID: 8300000, guid: 1c6a5b33fe8461544b1534b85d3005b2, type: 3}
+  - contains: mantra RA
+    clip: {fileID: 8300000, guid: 9f22fa1c0ddd79a4bbbf84e04545eeca, type: 3}
+  - contains: My dearest Alfred
+    clip: {fileID: 8300000, guid: 1f4740af922335348ab108eae614c6e7, type: 3}
+  - contains: for large jumps
+    clip: {fileID: 8300000, guid: 0686e054e014fea409217f99ef0eb0e7, type: 3}
+  - contains: Thieves hideout
+    clip: {fileID: 8300000, guid: 9ab64ed4137455f438eeb0f81755fe02, type: 3}
+  - contains: Speak SAHF
+    clip: {fileID: 8300000, guid: 76b04e91237487840968b479e5beb88f, type: 3}
+  - contains: dim witted
+    clip: {fileID: 8300000, guid: 78241ab0751c053469457b79c93394a8, type: 3}
+  - contains: Ghastly ones
+    clip: {fileID: 8300000, guid: 49924cafb3d816a4d8d41390c12fe3e3, type: 3}
+  - contains: indecipherable
+    clip: {fileID: 8300000, guid: f41899b924a86b94fa091132e8f88641, type: 3}
+  - contains: Ossikka,
+    clip: {fileID: 8300000, guid: fc80df6637c1e1a48bc64d624f619c2e, type: 3}
+  - contains: Speaking FAL
+    clip: {fileID: 8300000, guid: a24130ed1323c7d4cb9de1a6f2c1b0da, type: 3}
+  - contains: swim better
+    clip: {fileID: 8300000, guid: 932a0039cbc4e204f9d5ae6c27f0d8cb, type: 3}
+  - contains: mantra LU
+    clip: {fileID: 8300000, guid: 33af10f60cbd6584189de88f287930da, type: 3}
+  - contains: writ of Lorne
+    clip: {fileID: 8300000, guid: 9318c06c0d108a444ac75161abafa75e, type: 3}
+  - contains: can cast Curse
+    clip: {fileID: 8300000, guid: 46aa6ae274c5a594fb43173704d8efe5, type: 3}
+  - contains: Certificate of honor
+    clip: {fileID: 8300000, guid: b3d32e79deb62bb4ba7db1b4ddf9a52c, type: 3}
+  - contains: hereby condemn thee
+    clip: {fileID: 8300000, guid: e27c0a89f94ec1c4480d47683ab792d3, type: 3}
+  - contains: Diary of a Seer
+    clip: {fileID: 8300000, guid: a7dab06a7008e1645a0d922aab336cc0, type: 3}
+  - contains: should be more careful
+    clip: {fileID: 8300000, guid: 06a464a2f51b16245ad02c02e4b20b16, type: 3}
+  - contains: fishing technique
+    clip: {fileID: 8300000, guid: 03bd4a32a89c3cd4a9b763ec1de6f2b6, type: 3}
+  - contains: Gratlashuns
+    clip: {fileID: 8300000, guid: ab493e4b19a407040acd5c8247d36782, type: 3}
+  - contains: hidden counterpart
+    clip: {fileID: 8300000, guid: 33b1e49269730ff4285d85f8b41c909a, type: 3}
+  - contains: Lorne went to the
+    clip: {fileID: 8300000, guid: 838646e06031c6f4388a797363499004, type: 3}
+  - contains: maze conceals
+    clip: {fileID: 8300000, guid: 806b679c3ee4f334aa05aef9e97d6b15, type: 3}
+  - contains: Mondain Strikes Back
+    clip: {fileID: 8300000, guid: 03e0c8b518f006f45991939ac5501940, type: 3}
+  - contains: pass into the unseen
+    clip: {fileID: 8300000, guid: c97bbd1d0eaae214b8ace4e1574b1127, type: 3}
+  - contains: a simple solution
+    clip: {fileID: 8300000, guid: e7cef1c6b857d03419e67e5d163754ce, type: 3}
+  - contains: stirring eulogy
+    clip: {fileID: 8300000, guid: 04a28e135c521e04980e3d1040ba816b, type: 3}
+  - contains: thought to be lost
+    clip: {fileID: 8300000, guid: 958340838d8bd3f458231cfa544f2bb9, type: 3}
+  - contains: Troll fight song
+    clip: {fileID: 8300000, guid: 2a72e02da222cd849a284dffcd268094, type: 3}
+  - contains: writing to discuss
+    clip: {fileID: 8300000, guid: 027bbf0c19d8c0148b024bfc930352ee, type: 3}
+  - contains: Thief's Guide volume 1
+    clip: {fileID: 8300000, guid: a37f19d45e93bc44986066882b7a3aac, type: 3}
+  - contains: Thief's Guide volume 2
+    clip: {fileID: 8300000, guid: 9b9454adba444d948b01d501958c4b6b, type: 3}
+  - contains: Thief's Guide volume 3
+    clip: {fileID: 8300000, guid: 0ac41777bebb2434c873bb6aed2e9a1a, type: 3}
+  - contains: Thief's Guide volume 1
+    clip: {fileID: 8300000, guid: b57d919b5e5632a48b464740d1dcf3dc, type: 3}
+  - contains: An Corp Mani
+    clip: {fileID: 8300000, guid: 8fdc01f835dbc7b4f98d60dd12c5810d, type: 3}
+  - contains: Chanting LAHN
+    clip: {fileID: 8300000, guid: f8a63e90a75bdae4ab3499329f900767, type: 3}
+  - contains: IMU mantra
+    clip: {fileID: 8300000, guid: f5be5128b7d716d44a1bcd82e88adbea, type: 3}
+  - contains: Book of Duplicity
+    clip: {fileID: 8300000, guid: 336291b0208f79c49833dd7ddda6b100, type: 3}
+  - contains: Book of Honesty
+    clip: {fileID: 8300000, guid: d0de553a522026a4ea9781f496413163, type: 3}
+  - contains: Dangers of Mandrake
+    clip: {fileID: 8300000, guid: 841153fb44c924d4791765e7b110537b, type: 3}
+  - contains: Folanae Fanlo
+    clip: {fileID: 8300000, guid: f0a3bf1107a350c469053c8cf3d2af70, type: 3}
+  - contains: History of Britannia
+    clip: {fileID: 8300000, guid: 4a6ff610ff9a1c7428dfa53a4f91dacd, type: 3}
+  - contains: Human-Gargish
+    clip: {fileID: 8300000, guid: 7c3819eac61cf774da26799df611d89e, type: 3}
+  - contains: Properties of Runestones
+    clip: {fileID: 8300000, guid: 9851962f0ed425c41ad482168895e019, type: 3}
+  - contains: Origin of Moongates
+    clip: {fileID: 8300000, guid: 0006795303657d246bf0f004a3361e46, type: 3}
+  - contains: Pointy Caps
+    clip: {fileID: 8300000, guid: 835bbd2bf5abdc74f8545e565fef7d69, type: 3}
+  - contains: Practical Jokes
+    clip: {fileID: 8300000, guid: 478cc6564f96bdb4f9a64eae8f708d44, type: 3}
+  - contains: SOL Mantra
+    clip: {fileID: 8300000, guid: b815fac1b2d3ed543a4d7334abbd415c, type: 3}
+  - contains: the Use of Heat
+    clip: {fileID: 8300000, guid: 325499b95d6a6e04db132c53a1061cd8, type: 3}
+  - contains: Unforeseen Combinations
+    clip: {fileID: 8300000, guid: fc7b4e38c3f1bd74ab9bc6229fad63de, type: 3}
+  - contains: 'Volcanoes: Gates'
+    clip: {fileID: 8300000, guid: da2c4e127adf9114386175403df30db3, type: 3}
+  - contains: Decided to explore
+    clip: {fileID: 8300000, guid: 0a1ca3a9777991243b9dfbdb0c665133, type: 3}
+  - contains: Demonic Summoning
+    clip: {fileID: 8300000, guid: 8bb75328c82f40949b10e45114ba7bf2, type: 3}
+  - contains: Dungeon Design
+    clip: {fileID: 8300000, guid: 1ab3af6758ce4d2438f750ee672ab0f7, type: 3}
+  - contains: Garamon, forgive me
+    clip: {fileID: 8300000, guid: 6d213408cdfec384a874644fe319a48c, type: 3}
+  - contains: Indecipherable runes
+    clip: {fileID: 8300000, guid: ff3bf1a1aa8ba134a969c183a72bd45d, type: 3}
+  - contains: Leblanc
+    clip: {fileID: 8300000, guid: e60ff1a547a5b6444af2cdefbfc91ac7, type: 3}
+  - contains: Mysteries of the Abyss
+    clip: {fileID: 8300000, guid: aae15a663e7c226428e8adfdc4f887ae, type: 3}
+  - contains: Process of Resurrection
+    clip: {fileID: 8300000, guid: 370f62ae2c2c39f47a2b94941c7ec955, type: 3}
+  - contains: Remember to meet
+    clip: {fileID: 8300000, guid: 654dabc93cb94ce40882034035432d59, type: 3}
+  - contains: Tor Mes
+    clip: {fileID: 8300000, guid: e0f52923af4e3be4898c04b3e76b8417, type: 3}
+  - contains: trapped now
+    clip: {fileID: 8300000, guid: 01658426c5135194ca1fa29721099722, type: 3}
+  - contains: TRIED THIS LEVER
+    clip: {fileID: 8300000, guid: 9bd9d38d86029744b85d0f093ef7906d, type: 3}
+  - contains: Ylem Por do
+    clip: {fileID: 8300000, guid: 0eb4d4b589e77924aa0a5937b71384ed, type: 3}

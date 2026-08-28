@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: StoneGolemSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: fafd76aa5accf3d4fad3d963a8f9d4d7, type: 3}
+    - {fileID: 8300000, guid: 682f1dfeeed070749b5913df7c8682fe, type: 3}
+    - {fileID: 8300000, guid: b25e4bee3eabbc1479623c518e0a5c16, type: 3}
+    - {fileID: 8300000, guid: b936c94b811ee754ab0f4f9a111e58c7, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.136
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 3c8372f3afeb37a41a46c8c6ab4c0791, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.193
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 1b65f11d8c867034889e681e2ab53d80, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: c94a61daaff725b4a9e5d6f6b95810c4, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.149
+    chance: 1
+  - soundType: 19
+    clips:
+    - {fileID: 8300000, guid: 2ef11aa001b64b1459cf1d09b0eadfa4, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 6
+    clips:
+    - {fileID: 8300000, guid: fae8ca4bfbe28df4283db8f7a2dea4c4, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.164
+    chance: 1

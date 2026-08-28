@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: LurkerSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: ec1a4552e4ba45d448c181f918319946, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 848c0be57ef72f64fa0d08356a0035da, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 15
+    clips:
+    - {fileID: 8300000, guid: f8febcdf66bbc1b4c9d0d59ff9195326, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 7
+    clips:
+    - {fileID: 8300000, guid: 3ef81da34e5e5ae40b5c5dd158213efb, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 29
+    clips:
+    - {fileID: 8300000, guid: 0e8a8effd31789d429abaa93cef35636, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 5
+    clips:
+    - {fileID: 8300000, guid: 631b53793cf8af34c8d612123b25dc9f, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: 7fec313ce2d3e8d4aa5d156fd8062bd0, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: c7eef57417ad47e4a926be9b4644790a, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1

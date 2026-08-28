@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &196512
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 468264}
+  - component: {fileID: 11429526}
+  m_Layer: 11
+  m_Name: Trap
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &468264
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 196512}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &11429526
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 196512}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c6a687139227a34fa0c03eaf2895e20, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  activeInLevel: 0
+  temporary: 0
+  levelIndex: 0
+  objectIndex: 0
+  originalLevel: 0
+  type: 0
+  typeNum: 0
+  option: 0
+  flags: 0
+  isEnchanted: 0
+  isTurned: 0
+  isInvisible: 0
+  isLinked: 0
+  z: 0
+  angle: 0
+  x: 0
+  y: 0
+  quality: 0
+  qualityClass: 0
+  chainIndex: 0
+  ownerIndex: 0
+  special: 0
+  cachedRenderer: {fileID: 0}
+  contents: []
+  used: 0
+  isStatic: 1
+  alignToFloor: 0
+  loreResult: 0
+  loreResultLoreLevel: -1
+  enchantmentName: 
+  singularArticle: 
+  singularName: 
+  pluralArticle: 
+  pluralName: 
+  inventoryTex: {fileID: 0}
+  textClips:
+  - contains: tons of water falling
+    clip: {fileID: 8300000, guid: f6eab5d3c80028a4fb8392ce14b000db, type: 3}
+    tileX: 47
+    tileY: 10
+  - contains: securely locked
+    clip: {fileID: 8300000, guid: 24baa6274d5d2f14b8a2d8a9c5c2900d, type: 3}
+    tileX: 0
+    tileY: 0
+  - contains: a rumbling sound
+    clip: {fileID: 8300000, guid: 618ca6e5aa530024ab05bcfb49fc1b64, type: 3}
+    tileX: 48
+    tileY: 15
+  - contains: keening noise
+    clip: {fileID: 8300000, guid: 7138128abf9d1b544bea8b19629b0bda, type: 3}
+    tileX: 20
+    tileY: 41
+  - contains: You lift the tile
+    clip: {fileID: 8300000, guid: 22e18c4aa57dc8248a68af797b39e09e, type: 3}
+    tileX: 0
+    tileY: 0
+  - contains: sucked through the pipe
+    clip: {fileID: 8300000, guid: e92fd0d0623a67a44b2ede907e86b6b3, type: 3}
+    tileX: 0
+    tileY: 0
+  teleportSound: {fileID: 8300000, guid: c17361f2dc613ea4681aa0032c223aca, type: 3}
+  movingPlatformSound: {fileID: 8300000, guid: d9d630e44ec51a248b5294d18cd237db, type: 3}

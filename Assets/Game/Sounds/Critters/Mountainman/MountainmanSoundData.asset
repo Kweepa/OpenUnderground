@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: MountainmanSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: 7d9f36d35c5ab7641a0c3e802187d5ad, type: 3}
+    - {fileID: 8300000, guid: c406ddd94edd4fc40ba9d29cc90f1887, type: 3}
+    - {fileID: 8300000, guid: 366cfc23eaa36d4498d46d19f6daef5f, type: 3}
+    - {fileID: 8300000, guid: 0c6cff3e51078034c90a995b19eecc42, type: 3}
+    volume: 0.3
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 0834ceef32d84754c8dd7d5b0d53962a, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 1d57edfc068769a418c6e09fb76afd95, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: cdc5a1b74aba2b44798574fc507c36ab, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 23
+    clips:
+    - {fileID: 8300000, guid: 761a36f7d11694848b3ae0259a9695dd, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 24
+    clips:
+    - {fileID: 8300000, guid: 5f5c1dc74e79d2e4db8e2e95c11ab6bb, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 10
+    clips:
+    - {fileID: 8300000, guid: d04ed05fe9bbff14abe9162d05c8de71, type: 3}
+    volume: 0.1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1

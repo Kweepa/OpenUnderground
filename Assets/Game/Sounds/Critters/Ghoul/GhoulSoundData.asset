@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: GhoulSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: 3ab74d74a7909d74f97640e6a30d99ec, type: 3}
+    - {fileID: 8300000, guid: 2a982769abffd0c4b8d0ae2014ce1713, type: 3}
+    - {fileID: 8300000, guid: 1a6141748c569094ea8954c0813c7d12, type: 3}
+    - {fileID: 8300000, guid: 95e2513ccc2456048abbe640fb84796b, type: 3}
+    volume: 0.2
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: f0109c85fb9f1344391bd4071812bfad, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 5ac28d757e5eaeb43828ad4b33b41d06, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: f3367d0524224ad4994a09db0bcea6c2, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.171
+    chance: 1
+  - soundType: 29
+    clips:
+    - {fileID: 8300000, guid: 6847472e6093e7d4da2d2ab554dfe347, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.2
+    chance: 1
+  - soundType: 5
+    clips:
+    - {fileID: 8300000, guid: c3829ec8034ae5646813384c703fe756, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.176
+    chance: 1

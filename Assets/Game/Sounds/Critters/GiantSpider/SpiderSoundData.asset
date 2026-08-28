@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: SpiderSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: 0458c1c3c6dff9a4690096ecd4cea0a2, type: 3}
+    - {fileID: 8300000, guid: c7d741fa9a50b274c8e42f281306a9aa, type: 3}
+    - {fileID: 8300000, guid: f2ba0693cff9ffd4ab4c0b1218ff2ff4, type: 3}
+    - {fileID: 8300000, guid: c2262cedaaaa0ea4db7f9b85f36ad379, type: 3}
+    volume: 0.33
+    pitch: 1
+    chance: 1
+  - soundType: 10
+    clips:
+    - {fileID: 8300000, guid: e2ae56509a98a884cb92c242424c8346, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: 8dc95802d8b78d043915f8c906b7365b, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 2acbb166961234141824090e5ee9a168, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 6
+    clips:
+    - {fileID: 8300000, guid: 55df6dae8bfc3f644a1ee61b7b3ff6c9, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 7
+    clips:
+    - {fileID: 8300000, guid: af25d48489e0e5d4b9a30bd669690e82, type: 3}
+    volume: 0.303
+    pitch: 1
+    chance: 1
+  - soundType: 17
+    clips:
+    - {fileID: 8300000, guid: 6912f20a82861a546bcace09d9e47908, type: 3}
+    volume: 2
+    pitch: 1
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 22861f78a0ac0c24dbc40125a4fa7514, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 15
+    clips:
+    - {fileID: 8300000, guid: 838bfb0172250844e993f25a2f315023, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 19
+    clips:
+    - {fileID: 8300000, guid: fa2c3f93b3c0d8f46854a70259dae488, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1

@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: GoblinSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: f3f95c20234ec8946b2d5c65544c5f61, type: 3}
+    - {fileID: 8300000, guid: dcd61e8d82fe1ec4db67e10a9158f233, type: 3}
+    - {fileID: 8300000, guid: eee04b032108db148825c0d0a2c954ae, type: 3}
+    - {fileID: 8300000, guid: 123e98ee07ba8fd4d9ff8ce6033a3e79, type: 3}
+    volume: 0.75
+    pitch: 1
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 6d8e949bfe92e8149932c43ea8bd830c, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 22e6bde33b41ff54180703735704c0a5, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: c17a67e0207a6ee4caba3775ad9160bf, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 23
+    clips:
+    - {fileID: 8300000, guid: 314cef55164fbf14c83570e93ee5c29f, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 24
+    clips:
+    - {fileID: 8300000, guid: d218c97dff2be0e47b2414d27c4167ed, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 25
+    clips:
+    - {fileID: 8300000, guid: 3d37879fb0af157448fcf0ed0e0a536e, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 26
+    clips:
+    - {fileID: 8300000, guid: 862e3ef763156f8489fbcc6727d90f29, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 10
+    clips:
+    - {fileID: 8300000, guid: 985e8924908d30643877dd6f05686eaf, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1

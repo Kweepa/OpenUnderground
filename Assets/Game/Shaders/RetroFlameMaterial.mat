@@ -1,0 +1,114 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: RetroFlameMaterial
+  m_Shader: {fileID: 4800000, guid: 06c894d086b008e479a65dcf22edf205, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: 106bf3f6c41c09f4e9da32729806acda, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
+        m_Texture: {fileID: 2800000, guid: 2342d1cd3c5f8014cba4200d4db4af0b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BgGradientCurve: 4
+    - _BgWhitePoint: 0.77
+    - _BumpScale: 1
+    - _Cutoff: 0.5
+    - _DetailNormalMapScale: 1
+    - _DstBlend: 0
+    - _FlameDensity: 2
+    - _FlameDistortion: 0.656
+    - _FlameHeight: 1.5
+    - _FlameMix: 1.347
+    - _FlameSoftness: 0.1
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _GradientMaxY: 0.56
+    - _GradientMinY: 0.4
+    - _KeyThreshold: 0.5
+    - _Metallic: 0
+    - _Mode: 0
+    - _NoiseScale: 4
+    - _OcclusionStrength: 1
+    - _Parallax: 0.02
+    - _ScrollSpeedX: 0.1
+    - _ScrollSpeedY: 0.3
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _UVSec: 0
+    - _VerticalGradientStrength: 1.1
+    - _ZWrite: 1
+    m_Colors:
+    - _BgColorBottom: {r: 1, g: 1, b: 1, a: 1}
+    - _BgColorTop: {r: 0.42336133, g: 0.80346006, b: 0.9685534, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorDark: {r: 0.8392157, g: 0.2, b: 0, a: 1}
+    - _ColorMid: {r: 1, g: 0.7640947, b: 0.19999999, a: 1}
+    - _ColorTop: {r: 0.39937097, g: 0.69968545, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FlameColorBottom: {r: 0.8553459, g: 0, b: 0, a: 1}
+    - _FlameColorBright: {r: 1, g: 0.6, b: 0, a: 1}
+    - _FlameColorDeep: {r: 0.8, g: 0.1, b: 0, a: 1}
+    - _FlameColorTop: {r: 1, g: 0.9774208, b: 0, a: 1}
+    - _FlameCool: {r: 1, g: 0.90335405, b: 0, a: 1}
+    - _FlameHot: {r: 1, g: 0.080313005, b: 0, a: 1}
+    - _FlameMid: {r: 1, g: 0.85309696, b: 0, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

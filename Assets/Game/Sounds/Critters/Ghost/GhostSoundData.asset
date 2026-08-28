@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: GhostSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 070234df84b59cc4a8650fb5298dc1cf, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 65ecb8482138637428f23bdba3720a92, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 27
+    clips:
+    - {fileID: 8300000, guid: f6b0aa9c4ab005544875c921ca79140c, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.188
+    chance: 1
+  - soundType: 28
+    clips:
+    - {fileID: 8300000, guid: f2b937d8db5ca0640ac91a0e5d7009de, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.18
+    chance: 1

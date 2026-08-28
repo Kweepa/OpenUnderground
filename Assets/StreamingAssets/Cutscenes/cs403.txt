@@ -1,0 +1,5 @@
+0.0 cut 1
+6.0 cut 2 // eye twinkle
+7.5 cut 2
+9.0 fade out
+10.0 end 0

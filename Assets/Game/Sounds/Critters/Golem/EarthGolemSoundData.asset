@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: EarthGolemSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: bd0c5adf1a0278b4eb29b4082e54d187, type: 3}
+    - {fileID: 8300000, guid: d494d406f6e033a409b23774b6dec971, type: 3}
+    - {fileID: 8300000, guid: fb8009b5cf94db34f91bf5c230dc92de, type: 3}
+    - {fileID: 8300000, guid: a0d5b41b5f8065e47a36bd83dfcf3a22, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.136
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 3c8372f3afeb37a41a46c8c6ab4c0791, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.193
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 3e7f524d1fab35f46bdd06655d4d9ba6, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: c94a61daaff725b4a9e5d6f6b95810c4, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.149
+    chance: 1
+  - soundType: 19
+    clips:
+    - {fileID: 8300000, guid: 2ef11aa001b64b1459cf1d09b0eadfa4, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 6
+    clips:
+    - {fileID: 8300000, guid: de44130ab3ad32a49a5ad8002afe6276, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.164
+    chance: 1

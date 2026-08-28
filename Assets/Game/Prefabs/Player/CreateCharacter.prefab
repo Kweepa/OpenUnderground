@@ -1,0 +1,471 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4955553080362013523
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1116111269339358144}
+  - component: {fileID: 5993845104424182752}
+  m_Layer: 0
+  m_Name: CreateCharacter
+  m_TagString: MainCamera
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1116111269339358144
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4955553080362013523}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 90.34273, y: 21.546478, z: 92.45128}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5993845104424182752
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4955553080362013523}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1c7aa99977f4a2fa36ea5f98dbdc2bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+  labelStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0.5686275, g: 0.5764706, b: 0.69803923, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+    m_FontSize: 20
+    m_FontStyle: 0
+    m_Alignment: 0
+    m_WordWrap: 0
+    m_RichText: 1
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0
+  highlightedLabelStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 1, g: 0.9411765, b: 0.56078434, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+    m_FontSize: 20
+    m_FontStyle: 0
+    m_Alignment: 0
+    m_WordWrap: 0
+    m_RichText: 1
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0
+  buttonStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0.5686275, g: 0.5764706, b: 0.69803923, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+    m_FontSize: 29
+    m_FontStyle: 0
+    m_Alignment: 4
+    m_WordWrap: 0
+    m_RichText: 1
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0
+  selectedButtonStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 1, g: 0.9019608, b: 0.56078434, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+    m_FontSize: 29
+    m_FontStyle: 0
+    m_Alignment: 4
+    m_WordWrap: 0
+    m_RichText: 1
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0
+  buttons: []
+  headsTex:
+  - {fileID: 2800000, guid: a07b72628048aa54394d7904f2d9a293, type: 3}
+  - {fileID: 2800000, guid: 035952f449a92c3439f354fcdbb3bd80, type: 3}
+  - {fileID: 2800000, guid: 3d706879424c34641890f623c435e2b5, type: 3}
+  - {fileID: 2800000, guid: ec7abb51dfae8254bb848eb33aa5711e, type: 3}
+  - {fileID: 2800000, guid: 8812d7e1e0938f9438a6c5d7694619e9, type: 3}
+  - {fileID: 2800000, guid: fb5067b3fea8f0d4c8bded73ebe7217f, type: 3}
+  - {fileID: 2800000, guid: 0202a68364e78514bacd98ae8d8b7057, type: 3}
+  - {fileID: 2800000, guid: ecfb43f0cc12c61419d360fa78e22975, type: 3}
+  - {fileID: 2800000, guid: 4aaee62ac8cc77f4a9bc3559f890af0b, type: 3}
+  - {fileID: 2800000, guid: 9315a79e138630745ba5d82bbe3b8212, type: 3}
+  moveSelection: {fileID: 8300000, guid: a88270b24a9026049881300617bc5df3, type: 3}
+  makeSelection: {fileID: 8300000, guid: 71c08b128ff975647a8eab647e29722c, type: 3}
+  diceRoll: {fileID: 8300000, guid: 3d1d32a8a98d80a4ab4029b3fec8e28b, type: 3}
+  cancelSelection: {fileID: 8300000, guid: f51d31f4e84a2f2409ec2db198a418cd, type: 3}
+  startGame: {fileID: 8300000, guid: 24221b8b4313efa419fd8c0a6a9f28e8, type: 3}
+  classDescriptions:
+  - 'Fighters devote themselves wholly to all forms of the art of physical combat:
+    unarmed fighting, hand-to-hand weapons and missile weapons.'
+  - Mages devote themselves to the manipulation of magical forces to achieve their
+    ends. Intelligence is the sine qua non of the magic-user, useful for learning
+    and casting magic spells, and also for devising original ways to apply a familiar
+    spell to a knotty problem.
+  - 'Bards travel the land, learning of brave and extraordinary deeds (often committing
+    a few themselves along the way) and preserving their memory in song. Not only
+    are they learned and quick-tongued, but anyone who travels on foot as much as
+    they do should be able to hold their own in a fight, and perhaps hurl a spell
+    or two when the need arises. '
+  - 'A tinker is skilled at all manner of crafts and mechanical tricks. For survival
+    they rely on their thorough knowledge of traps and locks, and their ability to
+    repair damaged weapons and armor. '
+  - 'Because of their devotion to and understanding of nature, druids are a much-needed
+    profession after Britannia''s time of environmental devastation. Most druids
+    do not go heavily armored, and rely instead on their mastery of spell-casting
+    and woodcraft to evade combat, or utilize their surroundings to their own tactical
+    advantage. '
+  - Paladins are a specialized group of fighters, devoted to physical fighting on
+    behalf of the cause of virtue. The ideological basis of their combat training
+    lends them a heroic charisma which often wins others to their cause. Their courage
+    and perseverance in the face of evil often wins them the victory, where warriors
+    of less firm conviction fail.
+  - Rangers tend to be loners, solitary heroes schooled in woodcraft and natural
+    lore. Experts in stealth and tracking, in the wilds they are deadly foes.
+  - Shepherds are drawn from fiercely independent rural peoples. Often forced to
+    fight wild animals and hostile neighbors to defend their flocks, their simplicity
+    and humility can be deceptive. They vary widely in their abilities - some are
+    skilled in folk magic, others in combat, still others in stealth and woodcraft.
+  skillDescriptions:
+  - Your general fighting ability. This skill provides a bonus to your chance to
+    hit when attacking.
+  - Your ability to defend yourself in combat. This skill provides a penalty to foes
+    who are trying to strike you.
+  - Training in unarmed combat. This skill provides a bonus both to your chance to
+    hit and to damage when attacking with only your fist.
+  - Training in swordsmanship. This skill increases your chance of defending against
+    attack and provides a bonus to your chance to hit when striking with swords and
+    daggers.
+  - "Training in the use of axes. This skill increases your ability to de\xADfend
+    against attack and provides a bonus to hit when attacking with any form of axe."
+  - "Training in the use of blunt weapons. This skill increases your de\xADfense
+    against attacks, and gives a bonus to hit when using a mace or cudgel."
+  - Training in the use of missile weapons. This skill increases the damage you inflict
+    in attacks using bows, crossbows, and slings.
+  - Your ability to manipulate magical energy. This skill increases your maximum
+    number of Mana points.
+  - The ability to correctly identify an item. This skill improves the accuracy of
+    the information gained by looking at an object.
+  - The study of spells. This skill improves the likelihood of a spell being successfully
+    cast.
+  - The ability to disable a trap. This skill disarms traps you find.
+  - Training which heightens your perceptions. This skill increases your chance of
+    detecting hidden doors and traps.
+  - The ability to perceive animal tracks. This skill tells you when creatures are
+    near.
+  - The ability to move quietly. This skill automatically reduces the noise you make,
+    making it less likely that creatures will notice you.
+  - The ability to fix weapons and armor. This skill increases your chance of using
+    an anvil to repair items successfully.
+  - Knack of making friends. This skill increases your chances of obtaining a good
+    deal when bartering.
+  - The ability to use lock-picking tools. This skill increases your chances of using
+    a lockpick to open a locked door or chest.
+  - The ability to move with grace. This skill reduces damage taken from falls and
+    collisions.
+  - Training in perceiving the value of goods. This skill aids you in correctly evaluating
+    a deal offered you in barter.
+  - Training in endurance swimming. This skill postpones drowning.
+  skillGoverningStat: 0100000001000000010000000100000001000000010000000100000002000000020000000200000003000000030000000300000003000000030000000300000003000000030000000300000003000000
+  descriptionStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0.5686275, g: 0.5764706, b: 0.69803923, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+    m_FontSize: 0
+    m_FontStyle: 0
+    m_Alignment: 0
+    m_WordWrap: 1
+    m_RichText: 0
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0

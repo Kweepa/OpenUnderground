@@ -1,0 +1,4 @@
+0.0 cut 1
+0.0 fade in
+69.0 fade out
+70.0 end 0

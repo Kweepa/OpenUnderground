@@ -1,0 +1,176 @@
+0.0 cut 1 // black
+0.0 block 3072
+2.0 voc 26 // at last
+2.0 sub 0 matchVoc
+6.0 voc 27 // for three nights
+6.0 sub 1 matchVoc
+
+16.0 fade in
+16.0 cut 2 loop // swirly face
+16.0 voc 28 // deja vu
+16.0 sub 2 matchVoc
+16.0 jump 2
+23.0 voc 23 // treachery and doom
+23.0 blur 1
+23.0 cut 3 matchVoc // talk
+23.0 sub 4 matchVoc
+26.0 voc 24 // my brother will unleash
+26.0 cut 4 matchVoc // talk
+26.0 sub 5 matchVoc
+30.0 voc 25 // britannia is in peril
+30.0 cut 5 matchVoc // talk
+30.0 sub 6 matchVoc
+33.5 cut 7 // swirl
+33.5 voc 30 // sure that the ghost
+33.5 sub 7 matchVoc
+33.5 sound 0
+36.5 fade out
+37.5 blur 0
+
+38.0 fade in
+38.0 cut 10 // bedroom
+38.0 pause 2 
+39.0 voc 31 // aieee
+39.0 sub 8 matchVoc
+41.0 voc 37 // a visitor
+41.0 sub 9 matchVoc
+42.0 pause 6
+44.5 voc 38 // were he not dead
+44.5 sub 10 matchVoc
+47.5 pause 1
+48.0 voc 39 // no matter
+48.0 sub 11 matchVoc
+50.0 sound 3
+57.5 voc 32 // below, a creature
+57.5 sub 12 matchVoc
+59.5 sound 5
+65.5 sound 1 // crash, match light change on window frame
+67.0 voc 12 // what hast thou done
+67.0 sub 13 matchVoc
+67.0 pause 3
+69.5 cut 1 // black
+70.0 voc 13 // dropped her below
+70.0 sub 14 matchVoc
+70.0 cut 15 matchVoc // Corwyn talking
+70.0 jump 1.0
+74.0 voc 14 // well, he'll nay escape
+74.0 sub 15 matchVoc
+74.0 cut 16 matchVoc // Corwyn talking
+74.0 jump 0.5
+80.0 fade out
+
+81.0 fade in
+81.0 cut 11 // Almric wide
+81.0 pause 10
+82.0 voc 33 // several tense hours
+82.0 sub 16 matchVoc
+86.0 voc 34 // ignoring you
+86.0 sub 17 matchVoc
+86.0 jump 1.7
+91.0 cut 11 // Almric wide talk
+91.5 voc 0 // what news, Corwyn?
+91.5 sub 18 matchVoc
+93.5 cut 1 // black
+94.0 voc 15 // forgive us my lord
+94.0 sub 19 matchVoc
+94.0 cut 17 matchVoc // Corwyn talking
+94.0 jump 1.0
+97.0 voc 65 // the foul creature
+97.0 sub 20 matchVoc
+97.0 cut 15 matchVoc // Corwyn talking
+97.0 jump 0.5
+100.0 voc 16 // a score gave chase
+100.0 sub 21 matchVoc
+100.0 cut 16 matchVoc // Corwyn talking
+104.5 voc 17 // we were attacked
+104.5 sub 22 matchVoc
+104.5 cut 17 matchVoc // Corwyn talking
+104.5 jump 2.0
+110.0 voc 18 // only three survived
+110.0 sub 23 matchVoc
+110.0 cut 15 matchVoc // Corwyn talking
+113.0 cut 1 // black
+113.5 cut 11 // Almric wide talk
+114.0 voc 50 // I see
+114.0 sub 24 matchVoc
+115.5 voc 35 // the Baron turns
+115.5 sub 25 matchVoc
+118.5 fade out
+119.0 fade in
+119.0 voc 1 // I was warned
+119.0 sub 26 matchVoc
+119.0 cut 12 matchVoc // Almric close talk
+122.0 voc 2 // last fortnight
+122.0 sub 27 matchVoc
+122.0 cut 13 matchVoc // Almric close talk
+128.0 voc 3 // guard thy daughter
+128.0 sub 28 matchVoc
+128.0 cut 14 matchVoc // Almric close talk
+135.0 voc 4 // I posted guards
+135.0 sub 29 matchVoc
+135.0 cut 12 matchVoc // Almric close talk
+135.0 jump 1.5
+142.0 voc 5 // they say
+142.0 sub 30 matchVoc
+142.0 cut 13 matchVoc // Almric close talk
+148.0 fade out
+148.5 fade in
+148.5 cut 11 // Almric wide
+148.5 pause 5
+149.0 voc 36 // you explain
+149.0 sub 31 matchVoc
+152.5 fade out
+153.0 fade in
+153.0 voc 6 // whether thou speak
+153.0 sub 32 matchVoc
+153.0 cut 14 matchVoc // Almric close talk
+158.0 voc 7 // stories tell
+158.0 sub 33 matchVoc
+158.0 cut 12 matchVoc // Almric close talk
+164.0 voc 8 // if thou art truly
+164.0 sub 34 matchVoc
+164.0 cut 13 matchVoc // Almric close talk
+169.5 vol 0.5
+169.5 voc 58 // none here can survive
+169.5 sub 35 matchVoc
+169.5 cut 14 matchVoc // Almric close talk
+173.5 pause 2
+174.0 vol 1
+174.0 voc 9 // my mind is set
+174.0 sub 36 matchVoc
+174.0 cut 12 matchVoc // Almric close talk
+178.0 voc 10 // return here with
+178.0 sub 37 matchVoc
+178.0 cut 13 matchVoc // Almric close talk
+182.5 voc 11 // if thou dost not
+182.5 sub 38 matchVoc
+182.5 cut 14 matchVoc // Almric close talk
+189.0 fade out
+
+189.5 fade in
+189.5 cut 20 // walk to Abyss
+189.5 jump 2.5
+195.0 sound 6
+198.0 fade out
+
+198.5 fade in
+198.5 cut 22 // door opens
+198.5 sound 4
+201.0 fade out
+201.5 fade in
+201.5 voc 19 // this be the foul pit
+201.5 sub 39 matchVoc
+201.5 cut 24 matchVoc // Corwyn outside Abyss
+207.0 voc 20 // I will shut thee
+207.0 sub 40 matchVoc
+207.0 cut 25 matchVoc // Corwyn outside Abyss
+207.0 jump 1
+213.0 voc 22 // otherwise it will remain
+213.0 sub 41 matchVoc
+213.0 cut 24 matchVoc // Corwyn outside Abyss
+217.0 fade out
+217.5 fade in
+217.5 cut 23 // doors close
+217.5 sound 4
+218.8 sound 2
+221.0 end 0

@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-6969519874153931744
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 639247ca83abc874e893eb93af2b5e44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 0
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Shadow Material 2
+  m_Shader: {fileID: -6465566751694194690, guid: 987efac3dbc9aa24d9b1a50a5d8e6e52, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _SampleTexture2D_202f31e91f684ae0b81c2f6a339acd02_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: afa83aa4234c3e34dbf26811e09056ce, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_2689db24a0514dd286342706d612e73e_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 2342d1cd3c5f8014cba4200d4db4af0b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_46880cc2603640c4a6aa1dabc70e36c8_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 3111b512934962e4480adaa62f717dde, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_5d4168e3fe76411980f353b8cd817170_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: eed53bd96fe8e504f8cae4752074026c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_8f0893c0dab54407a7b14af95082400f_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 82f0e031f61d98a4599a9e1799fde9a0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BUILTIN_QueueControl: 0
+    - _BUILTIN_QueueOffset: 0
+    - _Dissolve: 2
+    - _Dissolve_Contrast: 5
+    - _Emiission_Power: 1
+    - _Fresnel_Power: 1.13
+    - _InteriorSpread: 1.56
+    m_Colors:
+    - _Color: {r: 0.001557493, g: 0.0015589073, b: 0.066037714, a: 1}
+    - _InteriorColor: {r: 0.032246966, g: 0, b: 0.8867924, a: 1}
+    - _InteriorPosition: {r: 0, g: 1.8, b: 0, a: 0}
+  m_BuildTextureStacks: []

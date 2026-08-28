@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: SlasherSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: 01091712fd5e4ed4cb56d3db04e7886f, type: 3}
+    - {fileID: 8300000, guid: c57cf28cc4e268f4e886be8cbf8034b5, type: 3}
+    - {fileID: 8300000, guid: f6b7056d8e00e9646ab2e5a206e88f5a, type: 3}
+    - {fileID: 8300000, guid: 0e23a9a4acbe1cd47ae565f5ad91e8ba, type: 3}
+    volume: 1.615
+    pitch: 1
+    pitchVariation: 0.157
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: f253a346f71db8c49b75950f23f341af, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.169
+    chance: 1
+  - soundType: 29
+    clips:
+    - {fileID: 8300000, guid: b455111606237b64397ad50936490001, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.164
+    chance: 1
+  - soundType: 5
+    clips:
+    - {fileID: 8300000, guid: 68369419280f08645919ee8c0c74f4ce, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.162
+    chance: 1

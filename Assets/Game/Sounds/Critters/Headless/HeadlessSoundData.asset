@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: HeadlessSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: b1571c734fd4b7044af0c4a4fbba7187, type: 3}
+    - {fileID: 8300000, guid: d7b6b4c964f318f4c8032ed8fc33566d, type: 3}
+    - {fileID: 8300000, guid: d45119fe019aee8409246feef6b0a3b2, type: 3}
+    - {fileID: 8300000, guid: 40119a85d7c4d9c45a836fa034492b0d, type: 3}
+    volume: 0.164
+    pitch: 1
+    pitchVariation: 0.247
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 4757777d605f3e6469eb267158df8516, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 77069cfc3fead2c4cbbbb8d9ff3fad92, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 10
+    clips:
+    - {fileID: 8300000, guid: 70140c90eec9e7c4db21454f8d9f8072, type: 3}
+    volume: 0.422
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: a693dcdfd1d6ec34ba089acc3cf56ba1, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 29
+    clips:
+    - {fileID: 8300000, guid: c3db34132d7ac39489e6e14c67756ef0, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 5
+    clips:
+    - {fileID: 8300000, guid: 3144d29d0044ec744b86f51396952532, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.203
+    chance: 1

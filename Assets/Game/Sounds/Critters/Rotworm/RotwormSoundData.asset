@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: RotwormSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 9e47b6c76b129ed4d9eef143bce4f8d9, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 7
+    clips:
+    - {fileID: 8300000, guid: a345d95988ad4924f8b0624b7371046e, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: b1a7f73dce4482240b3fd4621bce65f0, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: a15438eb7369998429888d632f99bfb5, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 10
+    clips:
+    - {fileID: 8300000, guid: 0314ff70c2f4e9446ae433a0a711471b, type: 3}
+    volume: 0.5
+    pitch: 1
+    chance: 1
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: af50d6f0054872048bbf2fb9a3983185, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 15
+    clips:
+    - {fileID: 8300000, guid: bd44e6a98e47b63479d96ddefb15298a, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1

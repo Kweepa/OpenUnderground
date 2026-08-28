@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3573151582674970392
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8577748667207179852}
+  - component: {fileID: 5436196725722722767}
+  m_Layer: 0
+  m_Name: Map
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8577748667207179852
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3573151582674970392}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 14.977825, y: 4.512366, z: 21.457933}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5436196725722722767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3573151582674970392}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07cc291b44324831b8d4872dddf87c76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+  mapPin:
+  - {fileID: 2800000, guid: 19bbe50cb985a8d41b70bc6f373137de, type: 3}
+  - {fileID: 2800000, guid: e2b49b3d92ddf7c41a31af7d5caa030e, type: 3}
+  - {fileID: 2800000, guid: b483e9de6ad41ce45bdf942d9b4655bf, type: 3}
+  - {fileID: 2800000, guid: 4120b120caa62404d8c23fc0486ac5f5, type: 3}
+  - {fileID: 2800000, guid: 451be8223b5690c44b93a682652d718f, type: 3}
+  - {fileID: 2800000, guid: f93f993972e6f7141af5d36fa32c011c, type: 3}
+  - {fileID: 2800000, guid: 54ef6aa820d2bb046958af0ad4555178, type: 3}
+  - {fileID: 2800000, guid: c1d83b17301b13d4d817650c5d8621d7, type: 3}
+  legendIcons:
+  - {fileID: 2800000, guid: b6511337e45c0fb41bcd61af323b2ce9, type: 3}
+  - {fileID: 2800000, guid: fc5689391c16d3542969bd5aa2fc51cf, type: 3}
+  - {fileID: 2800000, guid: bf353cd7224dce1488acaa69c66d2467, type: 3}
+  - {fileID: 2800000, guid: 30ef8c8f932fbcc4c99ee7b9b89dffc8, type: 3}
+  mouseLegendIcons:
+  - {fileID: 2800000, guid: 56aa71cf12da0e7428d12efac92c85d5, type: 3}
+  - {fileID: 2800000, guid: c7063c7e6dd950744ac6ca7c0855a957, type: 3}
+  - {fileID: 2800000, guid: ab70255189063294da9344b595a1bf48, type: 3}

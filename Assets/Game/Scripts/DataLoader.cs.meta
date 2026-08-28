@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 520f1016d2746bd4c891965e4d6e7c21
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - m_Cube: {instanceID: 0}
+  - m_Decal: {instanceID: 0}
+  - m_ObjectModelMapping: {instanceID: 0}
+  - m_InventoryCursor: {instanceID: 0}
+  executionOrder: -20
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: ShadowBeastSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 0
+    clips:
+    - {fileID: 8300000, guid: bd52e831ee2f9454285b320aeaab85ae, type: 3}
+    - {fileID: 8300000, guid: d5a90d1220b3685409e36e3b6674a11d, type: 3}
+    - {fileID: 8300000, guid: a67bdc6a59bfd7649baff6a1b8cfb902, type: 3}
+    - {fileID: 8300000, guid: 4168fbccd24ceb744987a9b019ae894a, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.102
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: 45175186b19f14241bcc8b13f49ada40, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1
+  - soundType: 29
+    clips:
+    - {fileID: 8300000, guid: 548a425b4f205dd4c827c1f47f81c770, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.106
+    chance: 1
+  - soundType: 5
+    clips:
+    - {fileID: 8300000, guid: 696304095a9feae4fa7c65baff3c9dbf, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0.12
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: def2fd7074567cf4a8ac31efee747d8a, type: 3}
+    volume: 1
+    pitch: 1
+    pitchVariation: 0
+    chance: 1

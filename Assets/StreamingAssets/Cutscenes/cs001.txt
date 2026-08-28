@@ -1,0 +1,96 @@
+0.0 block 3073
+
+0.0 cut 1 // lava
+0.0 voc 0 // you dash down
+0.0 sub 0 matchVoc
+5.0 fade out
+5.5 jump 0.5
+
+6.0 fade in
+6.0 cut 2
+6.0 voc 1 // diving into
+6.0 sub 1 matchVoc
+
+10.5 voc 2 // helped aboard
+10.5 sub 2 matchVoc
+15.0 fade out
+
+15.5 fade in
+15.5 voc 3 // thou hast earned
+15.5 cut 3 matchVoc
+15.5 sub 3 matchVoc
+
+18.0 voc 4 // were it not for thee
+18.0 cut 4 matchVoc
+18.0 sub 4 matchVoc
+18.0 jump 1
+
+24.0 voc 5 // truly, I was a fool
+24.0 cut 5 matchVoc
+24.0 sub 5 matchVoc
+
+29.0 fade out
+29.5 fade in
+29.5 voc 6 // thou art the greatest
+29.5 cut 6 matchVoc
+29.5 sub 6 matchVoc
+
+33.0 voc 7 // when I returned
+33.0 cut 7 matchVoc
+33.0 sub 7 matchVoc
+
+40.0 voc 8 // thou hast accomplished
+40.0 cut 6 matchVoc
+40.0 sub 8 matchVoc
+44.0 fade out
+
+44.5 fade in
+44.5 cut 10
+44.5 voc 9 // swiftly, the ship
+44.5 sub 9 matchVoc
+44.5 jump 3
+57.0 fade out
+
+59.0 voc 10 // at last
+59.0 sub 10 matchVoc
+62.0 voc 11 // for the last three nights
+62.0 sub 11 matchVoc
+
+68.0 fade in
+68.0 cut cs000.n06 loop
+68.0 voc 12 // just as you
+68.0 sub 12 matchVoc
+68.0 jump 2
+
+74.0 voc 13 // hail to thee
+74.0 sub 13 matchVoc
+74.0 cut cs000.n03 matchVoc
+74.0 blur 1
+
+78.0 voc 14 // I wish to thank thee
+78.0 sub 14 matchVoc
+78.0 cut cs000.n03 matchVoc
+
+83.0 voc 15 // I regret
+83.0 sub 15 matchVoc
+83.0 cut cs000.n03 matchVoc
+83.0 jump 0.5
+
+87.0 voc 16 // but I was marshalling
+87.0 sub 16 matchVoc
+87.0 cut cs000.n03 matchVoc
+
+92.0 voc 17 // they are now settling
+92.0 sub 17 matchVoc
+92.0 cut cs000.n03 matchVoc
+
+96.5 voc 18 // farewell
+96.5 sub 18 matchVoc
+96.5 cut cs000.n03 matchVoc
+
+102.0 voc 19 // visit next time
+102.0 sub 19 matchVoc
+102.0 cut cs000.n07 matchVoc
+105.0 fade out
+
+106.0 end 0

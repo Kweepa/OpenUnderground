@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273fb0a326376f34188a50a7575a53d3, type: 3}
+  m_Name: BatSoundData
+  m_EditorClassIdentifier: 
+  sounds:
+  - soundType: 22
+    clips:
+    - {fileID: 8300000, guid: 928687f1d9f437b4890b3606286be40d, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 13
+    clips:
+    - {fileID: 8300000, guid: 0d7e6f0a4c51a7d49a5fb4fcc415bf19, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 7
+    clips:
+    - {fileID: 8300000, guid: bed023eb75a0e4a4d8c80a8f2060bde0, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 2
+    clips:
+    - {fileID: 8300000, guid: fa925e170637fc941a568446b1c8701a, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
+  - soundType: 21
+    clips:
+    - {fileID: 8300000, guid: ecec160672ca81147a005d94e06cfe62, type: 3}
+    volume: 0.751
+    pitch: 1
+    chance: 1
+  - soundType: 14
+    clips:
+    - {fileID: 8300000, guid: c8c341e8b7b5cdd40a08c5bc091e7746, type: 3}
+    volume: 1
+    pitch: 1
+    chance: 1
