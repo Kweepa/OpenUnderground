@@ -1,0 +1,26 @@
+# --- UNITY TEXT FILES ---
+# Force LF to prevent the "Modified" ghosting you're seeing
+*.meta   text eol=lf
+*.unity  text eol=lf
+*.prefab text eol=lf
+*.asset  text eol=lf
+*.mat    text eol=lf
+*.controller text eol=lf
+*.overrideController text eol=lf
+*.anim   text eol=lf
+# --- CODE ---
+*.cs     text diff=csharp eol=lf
+*.shader text eol=lf
+*.cginc  text eol=lf
+*.hlsl   text eol=lf
+# --- BINARY ASSETS ---
+*.png    binary
+*.jpg    binary
+*.tga filter=lfs diff=lfs merge=lfs -text
+*.psd    binary
+*.fbx    binary
+*.blend  binary
+*.wav    binary
+*.mp3    binary
+# --- DEFAULTS ---
+* text=auto
