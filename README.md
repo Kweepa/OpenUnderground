@@ -6,7 +6,7 @@ You need to have the data files from a GoG installation of the original game - t
 
 To sync from github, you will need to have git LFS (large file storage) installed, since the character textures are stored in LFS. If you are using GitHub desktop it should be installed already automatically.
 
-The game is built with Unity 6000.0.68f1.
+The game is built with Unity 6000.0.68f1. The root scene is GameDirectoryDialog. Once you have run that scene once you can skip to using World.
 
 I removed a number of store-bought assets before pushing this to github, so it may not work out of the box. Some things I removed were: some audio (a lot of interface clicks); some particles (water splashes mostly I think); and some minor textures and models. I think it should still run, but it might sound sparse and show some pink textures until those are replaced.
 
