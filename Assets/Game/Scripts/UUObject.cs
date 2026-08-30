@@ -597,11 +597,21 @@ public class UUObject : LevelObject
         }
 
         Door door = FindDoorOnTile(initialTile);
-        bool doorSharesWallAxis = door != null
+        // Sharing an axis is not enough: north and south are the same axis but opposite edges of
+        // the tile, and a control on one of them has nothing to do with a door on the other. The
+        // sub tile coordinate says which edge each of them is actually on - 0 to 3 is the low
+        // side, 4 to 7 the high side - so require them to agree before treating the door's face
+        // as the surface to mount on.
+        // Without this, the lever in the secret door niche on level 3 (tile 52,13: door at y = 0
+        // facing south, lever at y = 7 facing north) is dragged three metres across the tile onto
+        // the outside of the door, and ends up hanging in the corridor once the niche opens.
+        bool doorSharesWall = door != null
             && ((angle == 0 || angle == 4) && (door.angle == 0 || door.angle == 4)
-                || (angle == 2 || angle == 6) && (door.angle == 2 || door.angle == 6));
+                    && SameTileEdge(y, door.y)
+                || (angle == 2 || angle == 6) && (door.angle == 2 || door.angle == 6)
+                    && SameTileEdge(x, door.x));
 
-        if (doorSharesWallAxis)
+        if (doorSharesWall)
         {
             // Match Door.CreateDoorGeometry frame half-thickness. Forward points into the wall, so the
             // readable face is on the opposite side of the door center (away along -forward).
@@ -647,6 +657,15 @@ public class UUObject : LevelObject
     /// Finds a door on the tile. Prefers <see cref="Tile.door"/> when already set; otherwise walks the
     /// object chain (needed when this runs before Door.PostLoadInitialize assigns the tile reference).
     /// </summary>
+    /// <summary>
+    /// Whether two sub tile coordinates fall on the same half of the tile, and so on the same
+    /// wall of the pair that share an axis.
+    /// </summary>
+    private static bool SameTileEdge(int a, int b)
+    {
+        return (a < 4) == (b < 4);
+    }
+
     private static Door FindDoorOnTile(Tile tile)
     {
         if (tile == null)
