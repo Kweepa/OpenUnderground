@@ -702,12 +702,19 @@ public class GameDirectoryDialog : MonoBehaviour
         string looseDataPath = Path.Combine(Application.persistentDataPath, "LooseData");
         try
         {
-            // Check if already extracted and valid
-            string existingSoundFile = Path.Combine(looseDataPath, "Sound", "UW01.XMI");
-            if (Directory.Exists(looseDataPath) && File.Exists(existingSoundFile))
+            // Check if already extracted and valid.
+            // This has to search subdirectories the same way the verification at the end of this
+            // method does, and for the same reason: the ISO may hold the game in a subfolder
+            // rather than at its root, which is exactly what Ultima Underworld's game.gog does -
+            // everything sits under UW\. Checking only looseDataPath\Sound\UW01.XMI never matched
+            // for those, so the whole ISO was re-extracted on every pass through this dialog.
+            // Besides being slow, that failed outright whenever another copy of the game was
+            // running and holding the data files open.
+            string alreadyExtracted = GameDataPath.ValidateGameDirectory(looseDataPath);
+            if (alreadyExtracted != null)
             {
-                UnityEngine.Debug.Log($"Using existing extracted data at: {looseDataPath}");
-                return looseDataPath;
+                UnityEngine.Debug.Log($"Using existing extracted data at: {alreadyExtracted}");
+                return alreadyExtracted;
             }
             
             // Create LooseData directory if it doesn't exist
@@ -761,22 +768,13 @@ public class GameDirectoryDialog : MonoBehaviour
                 }
             }
             
-            // Verify extraction by checking for Sound/UW01.XMI
-            string extractedSoundFile = Path.Combine(looseDataPath, "Sound", "UW01.XMI");
-            if (!File.Exists(extractedSoundFile))
+            // Verify extraction by checking for Sound/UW01.XMI, in the extracted folder or one of
+            // its subdirectories. Same call as the cache check above, deliberately: the two must
+            // agree on what counts as extracted game data, or the cache never recognises what the
+            // extraction just produced.
+            string extractedPath = GameDataPath.ValidateGameDirectory(looseDataPath);
+            if (extractedPath == null)
             {
-                // Try to find it in subdirectories (GOG files might have nested structure)
-                string[] subdirs = Directory.GetDirectories(looseDataPath);
-                foreach (string subdir in subdirs)
-                {
-                    string nestedSoundFile = Path.Combine(subdir, "Sound", "UW01.XMI");
-                    if (File.Exists(nestedSoundFile))
-                    {
-                        UnityEngine.Debug.Log($"Found game data in nested directory: {subdir}");
-                        return subdir;
-                    }
-                }
-                
                 lastGogExtractError = StatusMessageTwoLines(
                     "Extracted game.gog but could not find SOUND/UW01.XMI. Try deleting the LooseData folder there and validating again.",
                     looseDataPath);
@@ -784,8 +782,8 @@ public class GameDirectoryDialog : MonoBehaviour
                 return null;
             }
             
-            UnityEngine.Debug.Log($"Successfully extracted GOG file to: {looseDataPath}");
-            return looseDataPath;
+            UnityEngine.Debug.Log($"Successfully extracted GOG file to: {extractedPath}");
+            return extractedPath;
         }
         catch (UnauthorizedAccessException ex)
         {
