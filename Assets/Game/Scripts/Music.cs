@@ -1,5 +1,9 @@
 using UnityEngine;
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using Random = UnityEngine.Random;
 
 public enum EMusicState
 {
@@ -29,6 +33,16 @@ public class Music : MonoBehaviour
 
     [Tooltip("Show track name, time, and voice stats on screen")]
     public bool showMusicDebugHUD = false;
+
+    [Tooltip("Shortest silence between two ambient tracks, in seconds. The longest is the player's own Options_AmbientSilenceMax, and this is capped by it.")]
+    public float minimumSilence = 25.0f;
+
+    [Tooltip("The one silence after the title track has played out, in seconds. Its own number, and a shorter one: nothing has been heard in the dungeon yet at that point. Capped by the player's maximum.")]
+    public float openingSilence = 10.0f;
+
+    [Tooltip("Subfolder of the sound folder scanned for extra ambient tracks, e.g. music ripped from UW2. Leave empty to disable.")]
+    public string extraExploringTracksFolder = "UW2";
+
 
     private EMusicState musicState = EMusicState.ExploringA;
     private float combatTime;
@@ -73,6 +87,22 @@ public class Music : MonoBehaviour
     
     private bool deferMapMusicUntilVictoryEnds;
     
+    // Silence countdown between two ambient tracks. Three distinct meanings:
+    //    0   nothing pending - a track is playing, or one has just been started
+    //   >0   silence in progress, seconds remaining
+    //   -1   the silence has already been served, we are only looking for a track to play
+    // The -1 sentinel is load bearing: StartStateMusic does nothing when the track it drew is
+    // the one already playing, so without it every wasted draw would fall back into the "== 0"
+    // branch and arm a fresh pause, chaining them forever.
+    private float exploringSilenceTimer;
+    
+    // True from the moment the title track is left playing until the first ambient track is due.
+    private bool openingSilencePending;
+    
+    // Ambient tracks found in extraExploringTracksFolder, as paths relative to the sound folder.
+    // null = never scanned, empty = scanned and nothing found, so the disk is hit once per session.
+    private string[] extraExploringTracks;
+    
     private readonly Collider[] cachedColliders = new Collider[32];
     
     void Awake()
@@ -86,6 +116,22 @@ public class Music : MonoBehaviour
             return;
         }
         
+        // Let the title screen track finish instead of cutting it off. Music lives on the Player
+        // prefab, so Awake() runs the moment the game starts - on a new character and on a load
+        // alike - and the menu track is still playing. The original does not cut it either: it
+        // carries on into the dungeon and the ambient rotation only takes over once it ends.
+        // Clearing the loop is what lets it end at all, since the front end started it looping.
+        // From there Update() does the rest: the exploring branch sees nothing playing, serves the
+        // usual stretch of quiet if the player asked for it, and then draws the first track.
+        if (musicPlayer.IsPlaying)
+        {
+            musicPlayer.LetCurrentTrackFinish();
+            musicState = EMusicState.ExploringA;
+            currentPlayingTrack = musicPlayer.currentTrack;
+            openingSilencePending = true;
+            return;
+        }
+
         // Start with random exploring music
         StartExploringMusic();
     }
@@ -317,6 +363,51 @@ public class Music : MonoBehaviour
     }
 
     /// <summary>
+    /// Whether to leave a stretch of quiet between two ambient tracks.
+    /// </summary>
+    /// <remarks>
+    /// The player sets the longest one, in seconds, and zero means none: the tracks run back to
+    /// back the way they used to. A key that has never been written reads as its default, so a
+    /// player carrying preferences over from an older build gets the quiet as well.
+    /// </remarks>
+    private bool SilenceBetweenTracks => PlayerInput.AmbientSilenceMax > 0.0f;
+
+    /// <summary>
+    /// How long the next stretch of quiet lasts, in seconds.
+    /// </summary>
+    /// <remarks>
+    /// Anywhere from minimumSilence up to the longest the player allows, except for the first one
+    /// of a session, which is openingSilence and shorter than the rest. The pause between two
+    /// ambient tracks is minutes long on purpose, but the same wait right after the title track
+    /// has played out lands differently: nothing has been heard in the dungeon yet, so it reads
+    /// as music that is not working rather than as pacing. The two are separate numbers because
+    /// they answer to different things - one to the pacing of the dungeon, the other to a player
+    /// who has just arrived - and tying the opening one to the floor between tracks moves it
+    /// every time that floor is retuned.
+    /// Both are capped by the maximum rather than added to it, so a player who drags the maximum
+    /// down to the shortest it goes gets pauses of exactly that, not a floor above the ceiling.
+    /// At zero this is not called at all.
+    /// </remarks>
+    private float TakeSilenceLength()
+    {
+        float longest = PlayerInput.AmbientSilenceMax;
+
+        if (openingSilencePending)
+        {
+            openingSilencePending = false;
+            return Mathf.Min(openingSilence, longest);
+        }
+
+        return Random.Range(Mathf.Min(minimumSilence, longest), longest);
+    }
+
+    private static bool IsExploringState(EMusicState state)
+    {
+        return state is EMusicState.ExploringA or EMusicState.ExploringB
+            or EMusicState.ExploringC or EMusicState.ExploringD;
+    }
+
+    /// <summary>
     /// Which of the three combat tracks suits the fight right now.
     /// </summary>
     /// <remarks>
@@ -345,6 +436,31 @@ public class Music : MonoBehaviour
 
     private void StartExploringMusic()
     {
+        // Whatever brought us here, the title track is no longer the thing that just stopped, so
+        // the opening pause is off the table. Getting here at all means something else has had
+        // the music - a fight, the map, a level up - or that an ambient track is about to start.
+        // Measured, not guessed: in the log of 17 September 2026 a fight cut the title track 76
+        // seconds in, and without this line the ten seconds meant for the menu handover would
+        // have been spent on the quiet after that fight instead, where minutes are wanted.
+        openingSilencePending = false;
+
+        // Arriving from combat, victory, level up or death: do not snap an ambient track back on
+        // the instant the other music ends - all four of those branches in Update() call straight
+        // in here. Stop, arm the same silence the exploring branch of Update() counts down, and
+        // let that branch start the track when the pause is over. The result is a stretch of
+        // quiet after every fight.
+        // currentPlayingTrack has to be cleared as well: StartStateMusic skips its work when the
+        // track it draws is the one already playing, so a stale combat track name would block the
+        // next selection.
+        if (musicPlayer != null && SilenceBetweenTracks && !IsExploringState(musicState))
+        {
+            musicPlayer.StopMusic();
+            currentPlayingTrack = "";
+            musicState = EMusicState.ExploringA;
+            exploringSilenceTimer = TakeSilenceLength();
+            return;
+        }
+
         // Randomly pick one of the exploring states
         EMusicState[] exploringStates = new EMusicState[] 
         { 
@@ -353,8 +469,133 @@ public class Music : MonoBehaviour
             EMusicState.ExploringC, 
             EMusicState.ExploringD 
         };
+
+        // Extra ambient tracks widen the pool without replacing anything: with no extra folder
+        // present this array is empty and the draw is exactly the vanilla one. Every track,
+        // built in or extra, carries the same weight.
+        string[] extraTracks = GetExtraExploringTracks();
+        int pick = Random.Range(0, exploringStates.Length + extraTracks.Length);
+        if (pick >= exploringStates.Length && musicPlayer != null)
+        {
+            string track = extraTracks[pick - exploringStates.Length];
+            musicPlayer.SwitchTrack(track, false);
+            if (musicPlayer.IsPlaying)
+            {
+                // The extra tracks have no EMusicState of their own, so ExploringA stands in and
+                // Update() carries on treating us as exploring.
+                musicState = EMusicState.ExploringA;
+                currentPlayingTrack = track;
+                return;
+            }
+            // File unreadable or deleted since the scan: fall through to a scene track in the
+            // same frame, so the player never hears a gap.
+        }
+
         musicState = exploringStates[Random.Range(0, exploringStates.Length)];
         StartStateMusic(musicState);
+    }
+
+    /// <summary>
+    /// Extra ambient tracks available right now: the contents of the extra folder, filtered to the
+    /// arrangement that matches the selected soundfont, plus the map track when the map is set to
+    /// keep the music playing. The folder itself is scanned only once per session.
+    /// </summary>
+    private string[] GetExtraExploringTracks()
+    {
+        extraExploringTracks ??= ScanExtraExploringTracks();
+
+        // UW2 ships two arrangements of each track: UWA* for AdLib, UWR* for Roland MT-32. Pick
+        // the set that matches the soundfont selected in the options menu, so switching soundfont
+        // switches the pool immediately with no stale cache. Files matching neither prefix are
+        // always eligible, so any other music dropped in the folder just works.
+        string prefix = PlayerPrefs.GetString("Options_SoundFont", "Soundfonts/MT32.sf2")
+            .ToUpperInvariant().Contains("OPL") ? "UWA" : "UWR";
+        string rejectedPrefix = prefix == "UWA" ? "UWR" : "UWA";
+
+        List<string> pool = new();
+        foreach (string track in extraExploringTracks)
+        {
+            if (!Path.GetFileName(track).ToUpperInvariant().StartsWith(rejectedPrefix))
+            {
+                pool.Add(track);
+            }
+        }
+
+        string mapTrack = GetSpareMapTrack();
+        if (!string.IsNullOrEmpty(mapTrack))
+        {
+            pool.Add(mapTrack);
+        }
+
+        return pool.ToArray();
+    }
+
+    /// <summary>
+    /// The map track, when opening the map no longer plays it and nothing else does either.
+    /// </summary>
+    /// <remarks>
+    /// With the map keeping the music playing, the track the map used to start is the one piece of
+    /// the original score that is never heard: it belongs to no other state. So it joins the
+    /// ambient rotation, where it is one more track and carries the same weight as every other.
+    /// Tied to the option rather than added outright, because with the option off it is still the
+    /// map's own track and hearing it while walking would give the map away.
+    /// The file is checked here for the same reason ShouldLeaveMusicAloneOnMap checks it: the
+    /// names come from the scene and the files come from the player's own copy of the original
+    /// game, so a name in the list is not a track on disk.
+    /// </remarks>
+    private string GetSpareMapTrack()
+    {
+        if (!PlayerInput.KeepMusicOnMap)
+        {
+            return null;
+        }
+
+        string mapTrack = stateMusicTracks[(int)EMusicState.Map];
+        if (string.IsNullOrEmpty(mapTrack))
+        {
+            return null;
+        }
+
+        try
+        {
+            return File.Exists(Path.Combine(GameDataPath.GetSoundPath(), mapTrack)) ? mapTrack : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private string[] ScanExtraExploringTracks()
+    {
+        if (string.IsNullOrEmpty(extraExploringTracksFolder))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            string folder = Path.Combine(GameDataPath.GetSoundPath(), extraExploringTracksFolder);
+            if (!Directory.Exists(folder))
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] files = Directory.GetFiles(folder, "*.xmi");
+            string[] tracks = new string[files.Length];
+            for (int i = 0; i < files.Length; ++i)
+            {
+                // MusicPlayer.SwitchTrack resolves the name against the sound folder, so a
+                // relative path naming the subfolder is all it needs.
+                tracks[i] = Path.Combine(extraExploringTracksFolder, Path.GetFileName(files[i]));
+            }
+            return tracks;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Could not scan '{extraExploringTracksFolder}' for extra ambient tracks: {e.Message}");
+            return Array.Empty<string>();
+        }
     }
     
     /// <summary>
@@ -437,11 +678,30 @@ public class Music : MonoBehaviour
                 break;
             }
 
-            // When exploring track ends, pick a new random track
+            // When the exploring track ends, stay quiet for a while before picking a new one.
+            // Wall to wall music flattens the dungeon; it is the silence that makes the next
+            // track land. Uses unscaledDeltaTime like the rest of Update, so the countdown keeps
+            // running while the game is paused.
             if (!musicPlayer.IsPlaying)
             {
+                if (exploringSilenceTimer == 0.0f && SilenceBetweenTracks)
+                {
+                    exploringSilenceTimer = TakeSilenceLength();
+                }
+                if (exploringSilenceTimer > 0.0f)
+                {
+                    exploringSilenceTimer -= Time.unscaledDeltaTime;
+                    if (exploringSilenceTimer > 0.0f)
+                    {
+                        return;
+                    }
+                    exploringSilenceTimer = -1.0f;
+                }
                 StartExploringMusic();
+                return;
             }
+            // A track is playing, so there is no pause pending.
+            exploringSilenceTimer = 0.0f;
             break;
             
         case EMusicState.Alert:
@@ -546,10 +806,61 @@ public class Music : MonoBehaviour
         return sMusic.musicState;
     }
     
+    /// <summary>
+    /// True when opening the map should leave the music alone: either that is what the player
+    /// asked for, or there is no map track that can actually be played.
+    /// </summary>
+    /// <remarks>
+    /// Switching to a track that cannot play kills the music instead of changing it, and there
+    /// are two ways to get there. With no track configured, StartStateMusic falls through to
+    /// StopMusic(), which nulls the sequencer and sends All Notes Off on every channel. With a
+    /// track configured but absent from the player's data files, MusicPlayer.SwitchTrack stops
+    /// the current track first and only then fails its File.Exists check, which is worse: Music
+    /// still records the track as playing, so the state is a lie as well as silent. The second
+    /// case is real rather than theoretical, because the track names come from the scene and the
+    /// files come from whichever copy of the original game the player owns.
+    /// Either way the map is silent and closing it restarts a random exploring track.
+    /// EnterMapScreen and ExitMapScreen must take this early return together, or the way out
+    /// reads a stateBeforeMap the way in never wrote.
+    /// </remarks>
+    private static bool ShouldLeaveMusicAloneOnMap()
+    {
+        // Options_KeepMusicOnMap, on by default, so the music carries on across the map unless
+        // the player asks for the map's own track. This was a public field on the component until the option
+        // existed, which meant the only way to turn it on was ticking it on Music.prefab: a
+        // tracked asset, so the change showed up in git status, must never reach a commit, and
+        // was lost every time the derived branches were rebuilt.
+        if (PlayerInput.KeepMusicOnMap)
+        {
+            return true;
+        }
+
+        string mapTrack = sMusic.stateMusicTracks[(int)EMusicState.Map];
+        if (string.IsNullOrEmpty(mapTrack))
+        {
+            return true;
+        }
+
+        try
+        {
+            // Same folder MusicPlayer resolves track names against.
+            return !File.Exists(Path.Combine(GameDataPath.GetSoundPath(), mapTrack));
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+    }
+
     public static void EnterMapScreen()
     {
         if (sMusic != null)
         {
+            if (ShouldLeaveMusicAloneOnMap())
+            {
+                return;
+            }
+            
             stateBeforeMap = sMusic.musicState;
             
             if (sMusic.musicState == EMusicState.Victory)
@@ -568,6 +879,11 @@ public class Music : MonoBehaviour
     {
         if (sMusic != null)
         {
+            if (ShouldLeaveMusicAloneOnMap())
+            {
+                return;
+            }
+            
             if (sMusic.deferMapMusicUntilVictoryEnds && sMusic.musicState == EMusicState.Victory)
             {
                 sMusic.deferMapMusicUntilVictoryEnds = false;
