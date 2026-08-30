@@ -722,6 +722,9 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
             
+            // The messages of the game being left, the scrollback with them
+            Messages.ClearAll();
+
             // Check if we need to change levels
             if (LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel != saveData.currentLevel)
             {

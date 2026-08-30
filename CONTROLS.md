@@ -43,6 +43,11 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |Select (Back)|Open / close map (requires a map in your inventory)|
 |Start|Open Save / Load / Options (closes open panels first)|
 |Attack trigger (press)|Also closes open panels|
+|D-pad up / down|Scroll back through recent messages (hold to repeat)|
+
+*Message history:* the d-pad is shared with the panels, the map and the quantity prompt, so it
+scrolls the log only while none of those are open. On keyboard, Page Up and Page Down work at any
+time.
 
 *Left-handed:* use the **right** trigger for stats instead of the left.
 
@@ -161,6 +166,7 @@ Look speed and invert options are in Options.
 |R|Show / hide character stats|
 |Tab|Open / close map (requires a map in your inventory)|
 |Esc|Close open panels; if none are open, open Save / Load / Options|
+|Page Up / Page Down|Scroll back through recent messages (hold to repeat)|
 
 ### Saving
 
