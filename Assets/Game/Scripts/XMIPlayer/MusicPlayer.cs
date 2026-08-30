@@ -269,6 +269,22 @@ public class MusicPlayer : MonoBehaviour
     }
     
     /// <summary>
+    /// Let the track that is playing run to its end instead of looping round again.
+    /// </summary>
+    /// <remarks>
+    /// The title screen track is started looping and has to stop looping when the game begins, so
+    /// that it plays out once and hands over. Nothing else changes: the track keeps playing from
+    /// where it is, and IsPlaying goes false when it ends, the same as any track started unlooped.
+    /// </remarks>
+    public void LetCurrentTrackFinish()
+    {
+        if (sequencer != null)
+        {
+            sequencer.Loop = false;
+        }
+    }
+
+    /// <summary>
     /// Stop music playback completely.
     /// </summary>
     public void StopMusic()

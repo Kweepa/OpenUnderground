@@ -2,6 +2,14 @@
 
 ## Current release
 
+- The exploring music no longer runs wall to wall. A stretch of quiet is left between one track and the next, and after a fight, so the next track lands instead of just carrying on. Options sets how long that quiet can get, and setting it to zero puts the music back the way it was.
+
+- The title music is no longer cut off the moment you start playing. It plays out first, whether you made a new character or carried an old one on, and the exploring music takes over when it ends. That is what the original does with it.
+
+- If you also own the sequel, its ambient tracks can join the rotation. They live inside `game.gog`, which despite the extension is a plain ISO9660 image that 7-Zip opens directly; the tracks are under `UW2\SOUND`. Copy both the `UWA` and the `UWR` version of each track into a folder called `UW2` inside `%USERPROFILE%\AppData\LocalLow\Kweepa\UnityUnderground\LooseData\UW\Sound`. Only these ten are recommended: 01, 05, 11, 12, 13, 14, 15, 16, 17 and 30.
+
+- The automap now leaves the music playing rather than cutting in with its own track, which also stops the exploring track restarting from the top on the way out. Its track joins the exploring rotation instead: nothing else ever plays it, so it was the one piece of the score you never heard. Options has a switch for the old behaviour.
+
 - The music now follows how a fight is going. Two tracks from the original that nothing ever played are back: one for when you have something down to its last quarter, one for when you are. The plain combat track keeps the middle, and the score only changes every few seconds so it does not flap from blow to blow.
 
 - Something noticing you no longer sounds the same as something fighting you. A creature that hears you through a wall now starts a warning, and the combat music waits until one of you actually swings. Holding your weapon up keeps the warning going, which is what the original used that track for.

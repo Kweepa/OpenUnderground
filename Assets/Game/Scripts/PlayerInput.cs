@@ -23,6 +23,25 @@ public static class PlayerInput
 
     public static bool AutoJump => PlayerPrefs.GetInt("Options_AutoJump", 0) == 1;
 
+    /// <summary>
+    /// Whether opening the automap leaves the music playing instead of starting the map's own
+    /// track. On unless the player turns it off, the same as the silence below.
+    /// </summary>
+    public static bool KeepMusicOnMap => PlayerPrefs.GetInt("Options_KeepMusicOnMap", 1) == 1;
+
+    /// <summary>
+    /// The longest stretch of quiet left between two ambient tracks, in seconds. Zero means none,
+    /// and the tracks run back to back the way they used to.
+    /// </summary>
+    /// <remarks>
+    /// A key that has never been written reads as its default, so a player carrying preferences
+    /// over from an older build gets the quiet without having to go and find the control.
+    /// The name says Max because the option is a length rather than a switch, and because the
+    /// switch it replaced held 0 or 1 under a shorter name: read as seconds, a stale 1 would mean
+    /// one second of quiet, which looks like the feature is broken rather than turned off.
+    /// </remarks>
+    public static float AmbientSilenceMax => PlayerPrefs.GetInt("Options_AmbientSilenceMax", 300);
+
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     public static Vector2 ReadMoveVector()
     {
