@@ -2,6 +2,10 @@
 
 ## Current release
 
+- The Track skill now does what the manual says: every few seconds it tells you of creatures nearby and every direction they are in, and the better your Track, the more often it tells you what they are and whether they are hostile. It stays quiet during a fight, and does not mention the same creature twice within a minute.
+
+- Detect Monster reaches as far as in the original and counts every creature, friendly or not. It names every direction they are in, and the better of your Track and Casting skills can tell you what they are and whether they are hostile.
+
 - A fight still counts as one when you are badly hurt or your foe is: you cannot sprint, and Search does not point out hidden doors or trapped objects.
 
 - After a fight, Search waits a full round before it points out hidden doors and trapped objects again.

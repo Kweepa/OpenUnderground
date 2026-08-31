@@ -103,6 +103,8 @@ public class StringLoader
         new [] { "Volcanos:", "Volcanoes:" },
         new [] { "splahes", "splashes" },
         new [] { "Enscribed", "Inscribed" },
+        new [] { "gray lizardman&red lizardmen", "gray lizardman&gray lizardmen" },
+        new [] { "You detect the activity of many creatures ", "You detect many creatures " },
         new [] { " . . . . .", "..." },
         new [] { " . . .", "..." },
         new [] { ". . .", "..." },

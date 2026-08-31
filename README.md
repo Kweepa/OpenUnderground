@@ -23,6 +23,7 @@ This project is a wrapper for the well-known 1992 dungeon crawler by Blue Sky Pr
   - four ratings on the inventory panel: attack and damage by the weapon hand, defence and armour by the shield hand
   - clearer attack feedback: the charge cursor stays dark until a release would actually land a swing, then lights up and fills
   - every few seconds the Search skill looks for you, and points out possible secrets and trapped objects in front of you
+  - every few seconds the Track skill tells you of creatures nearby, and in which direction
 
 **Faithful to the original**
 

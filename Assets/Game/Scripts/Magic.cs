@@ -2375,49 +2375,225 @@ public class Magic : MonoBehaviour
 
     void CastDetectMonster()
     {
-        // find enemies around and report approximate position
+        // The spell's roll is the Track skill's with the skill at 45, which no creature can
+        // resist: UW.EXE 0x35a28 calls 0x356ee(10, 45).
+        ReportNearbyCreatures(detectMonsterRadius, 45, isSpell: true);
+    }
+
+    /// <summary>How far Detect Monster reaches, in tiles: UW.EXE 0x35a28.</summary>
+    public const int detectMonsterRadius = 10;
+
+    /// <summary>
+    /// Difficulty of the roll that tells what a creature is, made for each creature sensed.
+    /// At 15 the chance is Track / 31: 3% at Track 1, 32% at 10, 65% at 20, 97% at 30.
+    /// </summary>
+    public const int identifyCreatureDifficulty = 15;
+
+    /// <summary>
+    /// Difficulty of the roll that tells a kind of creature is hostile, made once for each
+    /// kind named that has a hostile creature among the ones named. Much easier than naming it:
+    /// 35% at Track 1, 65% at 10, 97% at 20, always from 21.
+    /// </summary>
+    public const int hostileCreatureDifficulty = 5;
+
+    /// <summary>Seconds before the Track skill reports the same creature again.</summary>
+    public const float creatureReportDelay = 60.0f;
+
+    // Time.time each creature was last part of a report. The spell writes it and the Track skill
+    // reads it, so a creature the spell has just shown is not reported again by Track.
+    private readonly Dictionary<Critter, float> lastCreatureReportTime = new Dictionary<Critter, float>();
+    private readonly List<Critter> expiredCreatureReports = new List<Critter>();
+
+    // Enough for every creature in the 19 by 19 tiles of Detect Monster, which the 32 entries of
+    // cachedColliders are not.
+    private readonly Collider[] detectedColliders = new Collider[128];
+
+    // The kinds of creature named in a report, by plural name, and whether any of those named is
+    // hostile; and the order they were named in.
+    private readonly Dictionary<string, bool> namedKinds = new Dictionary<string, bool>();
+    private readonly List<string> namedKindOrder = new List<string>();
+
+    /// <summary>
+    /// Reports the creatures around the player in one line: how many were sensed, every direction
+    /// they are in, and then what kinds of creature the Track skill could tell, and which are hostile.
+    /// </summary>
+    /// <param name="radius">
+    /// How far to look, in tiles. The area is a square: a creature counts when its tile is less
+    /// than this many tiles from the player's on both axes, at any height and through any wall.
+    /// </param>
+    /// <param name="skill">
+    /// The skill each creature is rolled against, one roll each, at a difficulty of 15 minus the
+    /// creature's own detection byte (critterStats 0x1d, low nibble): a high byte is easy to sense.
+    /// The spell passes 45, which always succeeds; the Track skill passes its value.
+    /// </param>
+    /// <param name="isSpell">
+    /// The spell says "You detect no monster activity" when nothing is found, and counts every
+    /// creature. The passive Track check says nothing then, and leaves out the creatures it or the
+    /// spell reported in the last creatureReportDelay seconds, so a room of creatures that stay put
+    /// is not announced every few seconds.
+    /// </param>
+    /// <remarks>
+    /// Which creatures are sensed is the original's Detect Monster (UW.EXE 0x356ee): the square
+    /// area, the roll per creature, and every creature counting, friendly or not. The original's
+    /// own Track use, unreachable in UW.EXE 0x81270, calls that function with radius 8.
+    ///
+    /// The report is ours. The original names the direction with the most creatures, banded one,
+    /// two to four, five or more (0x3569d), and a second direction if another has more than three.
+    /// Here the band is taken from all the creatures sensed and every direction is named, with the
+    /// same strings: block 1, 59 to 61, and the directions 36 to 43; StringLoader shortens 61 to
+    /// "You detect many creatures ". Then, for each creature sensed, a roll against
+    /// identifyCreatureDifficulty tells what it is, and for each kind
+    /// told with a hostile creature among those, a roll against hostileCreatureDifficulty says so.
+    /// Both use the player's Track; for the spell, the higher of Track and Casting: the spell finds
+    /// the creatures, the skill reads them. The names are the plurals of block 4. Hostile means the
+    /// Hostile attitude only: an upset creature is not attacking.
+    /// </remarks>
+    public void ReportNearbyCreatures(int radius, int skill, bool isSpell)
+    {
+        PruneCreatureReports();
+
         int[] critters = { 0, 0, 0, 0, 0, 0, 0, 0 };
-        int count = Physics.OverlapSphereNonAlloc(PlayerObject.Player.transform.position, 6.0f * Tile.xzScale,
-                     cachedColliders, 1 << LayerMask.NameToLayer("Characters"));
+        int total = 0;
+        namedKinds.Clear();
+        namedKindOrder.Clear();
+        // What the creatures are: Track reads them, and for the spell Casting does as well as Track,
+        // so a mage with no Track still learns something from it.
+        int reading = isSpell
+            ? Mathf.Max(Skills.GetSkill(ESkill.Track), Skills.GetSkill(ESkill.Casting))
+            : Skills.GetSkill(ESkill.Track);
+
+        Vector3 playerPosition = PlayerObject.Player.transform.position;
+        int playerTileX = Mathf.FloorToInt(playerPosition.x / Tile.xzScale);
+        int playerTileZ = Mathf.FloorToInt(playerPosition.z / Tile.xzScale);
+
+        Vector3 halfExtents = new Vector3(radius * Tile.xzScale, 1000.0f, radius * Tile.xzScale);
+        int count = Physics.OverlapBoxNonAlloc(playerPosition, halfExtents, detectedColliders, Quaternion.identity,
+                     1 << LayerMask.NameToLayer("Characters"));
         for (int i = 0; i < count; i++)
         {
-            Collider col = cachedColliders[i];
-            if (col is CharacterController)
+            Collider col = detectedColliders[i];
+            if (col is not CharacterController)
             {
-                Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null && (critter.attitude is Critter.EAttitude.Upset or Critter.EAttitude.Hostile))
+                continue;
+            }
+
+            Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
+            if (critter == null || critter.state is Critter.EState.Die or Critter.EState.Dead or Critter.EState.Cleanup)
+            {
+                continue;
+            }
+
+            if (!isSpell && lastCreatureReportTime.ContainsKey(critter))
+            {
+                continue;
+            }
+
+            Vector3 critterPosition = critter.transform.position;
+            if (Mathf.Abs(Mathf.FloorToInt(critterPosition.x / Tile.xzScale) - playerTileX) >= radius
+                || Mathf.Abs(Mathf.FloorToInt(critterPosition.z / Tile.xzScale) - playerTileZ) >= radius)
+            {
+                continue;
+            }
+
+            int detection = DataLoader.sDataLoader.objectsData.critterStats[(int)critter.type & 63].unk1d & 0xf;
+            if (Skills.GetResult(skill, 15 - detection) < Skills.ESkillTestResult.Success)
+            {
+                continue;
+            }
+
+            Vector3 offset = critterPosition - playerPosition;
+            // Zero out Y component to ensure horizontal-only direction calculation
+            offset.y = 0.0f;
+            // Skip if critter is at exact same horizontal position (directly above/below)
+            if (offset.sqrMagnitude <= 0.001f)
+            {
+                continue;
+            }
+
+            ++critters[Utils.OffsetToOctant(offset)];
+            ++total;
+            lastCreatureReportTime[critter] = Time.time;
+
+            if (!string.IsNullOrEmpty(critter.pluralName)
+                && Skills.GetResult(reading, identifyCreatureDifficulty) >= Skills.ESkillTestResult.Success)
+            {
+                bool hostile = critter.attitude == Critter.EAttitude.Hostile;
+                if (namedKinds.TryGetValue(critter.pluralName, out bool anyHostile))
                 {
-                    Vector3 offset = critter.transform.position - PlayerObject.Player.transform.position;
-                    // Zero out Y component to ensure horizontal-only direction calculation
-                    offset.y = 0.0f;
-                    // Skip if critter is at exact same horizontal position (directly above/below)
-                    if (offset.sqrMagnitude > 0.001f)
-                    {
-                        ++critters[Utils.OffsetToOctant(offset)];
-                    }
+                    namedKinds[critter.pluralName] = anyHostile || hostile;
+                }
+                else
+                {
+                    namedKinds.Add(critter.pluralName, hostile);
+                    namedKindOrder.Add(critter.pluralName);
                 }
             }
         }
-        int largestOctant = 0;
-        int numCrittersInLargestOctant = 0;
-        for (int i = 0; i < 8; ++i)
+
+        if (total == 0)
         {
-            if (critters[i] > numCrittersInLargestOctant)
+            if (isSpell)
             {
-                numCrittersInLargestOctant = critters[i];
-                largestOctant = i;
+                Messages.Add(1, 62);
             }
+            return;
         }
 
-        if (numCrittersInLargestOctant == 0)
+        // "You detect a few creatures to the North, to the East and to the Southwest." Each
+        // direction is the whole string from the data, and the kinds below are always plural with
+        // "(hostile)" after them, so that every piece of the line can be translated on its own.
+        int index = 59 + (total > 1 ? 1 : 0) + (total > 4 ? 1 : 0);
+        List<string> directions = new List<string>();
+        for (int i = 0; i < 8; ++i)
         {
-            Messages.Add(1, 62);
+            if (critters[i] > 0)
+            {
+                directions.Add(StringLoader.GetString(1, 36 + i));
+            }
         }
-        else
+        string message = StringLoader.GetString(1, index) + JoinList(directions) + ".";
+
+        // "You make out signs of goblins (hostile) and mongbats." The plural reads right for one
+        // creature as well.
+        if (namedKindOrder.Count > 0)
         {
-            int _index = numCrittersInLargestOctant == 1 ? 59 : (numCrittersInLargestOctant < 4 ? 60 : 61);
-            string mess = StringLoader.GetString(1, _index) + StringLoader.GetString(1, 36 + largestOctant);
-            Messages.Add(mess);
+            List<string> kinds = new List<string>();
+            foreach (string name in namedKindOrder)
+            {
+                bool hostile = namedKinds[name]
+                    && Skills.GetResult(reading, hostileCreatureDifficulty) >= Skills.ESkillTestResult.Success;
+                kinds.Add(hostile ? name + " (hostile)" : name);
+            }
+            message += " You make out signs of " + JoinList(kinds) + ".";
+        }
+
+        Messages.Add(message);
+    }
+
+    // "A", "A and B", "A, B and C".
+    private static string JoinList(List<string> items)
+    {
+        if (items.Count == 1)
+        {
+            return items[0];
+        }
+        return string.Join(", ", items.GetRange(0, items.Count - 1)) + " and " + items[items.Count - 1];
+    }
+
+    // Forgets the creatures reported long enough ago, and the ones that no longer exist.
+    private void PruneCreatureReports()
+    {
+        expiredCreatureReports.Clear();
+        foreach (KeyValuePair<Critter, float> entry in lastCreatureReportTime)
+        {
+            if (entry.Key == null || Time.time - entry.Value >= creatureReportDelay)
+            {
+                expiredCreatureReports.Add(entry.Key);
+            }
+        }
+        foreach (Critter critter in expiredCreatureReports)
+        {
+            lastCreatureReportTime.Remove(critter);
         }
     }
 

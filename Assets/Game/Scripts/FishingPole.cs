@@ -55,8 +55,8 @@ public class FishingPole : UUObject
                     UUObject fish = LevelLoader.CreateObjectOfType(EObjectType.Fish);
                     if (fish != null)
                     {
-                        // make sure it's fresh
-                        fish.quality = 60;
+                        // as fresh as food gets, as in the original: UW.EXE 0x37d8e sets quality 63
+                        fish.quality = 63;
                         // Initialize name properties so fish has proper name
                         fish.PostLoadInitialize();
                         Vector3 playerPos = PlayerObject.Player.transform.position; 

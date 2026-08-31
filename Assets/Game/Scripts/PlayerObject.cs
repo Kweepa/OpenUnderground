@@ -1108,6 +1108,29 @@ public class PlayerObject : MonoBehaviour
         return launchVelocity;
     }
     
+    /// <summary>
+    /// The Track skill, made for you every few seconds: on a success, the creatures nearby and
+    /// their direction.
+    /// </summary>
+    /// <remarks>
+    /// The manual says Track "tells you when creatures are near". The original has the code for it
+    /// - using the skill calls Detect Monster with a radius of 8 and the skill's own value, one
+    /// roll per creature (UW.EXE 0x81270) - but nothing in the game reaches it, so this is an
+    /// addition with the original's numbers. The timer is ours, and so are the silence when nothing
+    /// is found, the minute before the same creature is reported again, and the line itself (see
+    /// Magic.ReportNearbyCreatures). With no points in Track there is no roll.
+    /// </remarks>
+    private void CheckTrack()
+    {
+        int track = Skills.GetSkill(ESkill.Track);
+        if (track <= 0 || Magic.sMagic == null)
+        {
+            return;
+        }
+
+        Magic.sMagic.ReportNearbyCreatures(trackRadius, track, isSpell: false);
+    }
+
     protected void Update()
     {
         // Guard against no level loaded yet
@@ -1151,6 +1174,18 @@ public class PlayerObject : MonoBehaviour
         {
             timeToNextTrapCheck = TrapSearch.checkInterval;
             TrapSearch.Poll();
+        }
+
+        // No Track roll while fighting, and the first one after a fight waits a whole interval.
+        timeToNextTrackCheck -= Time.deltaTime;
+        if (Music.IsInCombat())
+        {
+            timeToNextTrackCheck = trackCheckInterval;
+        }
+        else if (timeToNextTrackCheck <= 0.0f)
+        {
+            timeToNextTrackCheck = trackCheckInterval;
+            CheckTrack();
         }
 
         if (fadeIn)
@@ -1377,6 +1412,16 @@ public class PlayerObject : MonoBehaviour
     /// </summary>
     private float timeToNextSecretDoorCheck;
     private float timeToNextTrapCheck;
+
+    /// <summary>Seconds between two Track rolls.</summary>
+    private const float trackCheckInterval = 20.0f;
+
+    /// <summary>How far Track reaches, in tiles: the original's own Track use, UW.EXE 0x812a7.</summary>
+    private const int trackRadius = 8;
+
+    // Starts at 0, so the first check is made on the first frame, and loading a save gives a
+    // reading at once.
+    private float timeToNextTrackCheck;
 
     private static bool PlayerPanelsWantWasdOnlyMovement()
     {
