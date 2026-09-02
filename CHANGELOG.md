@@ -2,6 +2,16 @@
 
 ## Current release
 
+- A repair that goes badly wrong now destroys the item, as it does in the original. Taking a worn long sword to an anvil with no skill at it is close to throwing it away - eight attempts in ten ended with the sword gone - where before the bad roll did nothing at all.
+
+- Repairing takes time. A battered item in unskilled hands costs well over an hour of it, so an evening spent at the anvil leaves you hungry and tired, and a spare weapon is worth carrying again.
+
+- The anvil reads a weapon's toughness from the weapon table instead of the armour one. Nine melee weapons had the wrong repair difficulty - a broadsword was the easiest thing in the game to mend and is now among the hardest - and bows, crossbows and slings, which never wear out, are no longer offered for repair at all.
+
+- The anvil no longer turns away an item just because it is still in fair condition - only one at full quality, where a repair could do nothing but cost you the item.
+
+- The anvil tells you what you are getting into. Its five words used to cover uneven slices of the odds, so "hard" meant anything from a fair bet to one try in thirty, and a broadsword and a long sword got the same word while one was three times likelier to survive. There are six words now, cut on the actual chance of success, and the worst of them is "next to impossible" because some repairs are. It also warns you when you might ruin the item, which it never did before - a battered broadsword in unskilled hands now reads as "next to impossible and very risky", which is exactly what it is.
+
 - Common coins and gold coins can be told apart at last: the common ones are silver now, in the pack and on the floor. Both used to be drawn with the same two pictures and the same gold model, so a purse of silver and a purse of gold looked the same either way.
 
 - With auto jump turned on the jump now goes off when you press the key rather than when you let it go, and the edge of a gap still takes you over by itself - running at it is enough now, where before you had to be holding the key down as well.

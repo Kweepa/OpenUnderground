@@ -39,10 +39,14 @@ public class Armour : UUObject
         return 6;
     }
 
+    public override int GetDurability()
+    {
+        return DataLoader.sDataLoader.objectsData.armourStats[(int)type & 31].durability;
+    }
+
     protected override void GetQualityString(System.Text.StringBuilder sb)
     {
-        int durability = DataLoader.sDataLoader.objectsData.armourStats[(int)type & 31].durability;
-        if (durability == 255)
+        if (GetDurability() == 255)
         {
             return;
         }
@@ -126,7 +130,7 @@ public class Armour : UUObject
     public override void TryDamage(int unscaledDamage, Skills.ESkillTestResult result)
     {
         // Check durability first - if it's 255, armor is indestructible
-        int durability = DataLoader.sDataLoader.objectsData.armourStats[(int)type & 31].durability;
+        int durability = GetDurability();
         if (durability != 255)
         {
             int damage = result == Skills.ESkillTestResult.CriticalSuccess ? 2 * unscaledDamage : unscaledDamage;

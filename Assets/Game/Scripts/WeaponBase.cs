@@ -717,11 +717,15 @@ public class WeaponBase : UUObject
         return hitChance;
     }
 
+    public override int GetDurability()
+    {
+        return DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15].Durability;
+    }
+
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
     {
         // Check durability first - if it's 255, weapon is indestructible
-        ObjectsData.MeleeData meleeData = DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
-        int durability = meleeData.Durability;
+        int durability = GetDurability();
         if (durability != 255)
         {
             // Calculate damage to weapon - depends on durability
@@ -972,9 +976,7 @@ public class WeaponBase : UUObject
 
     protected override void GetQualityString(System.Text.StringBuilder sb)
     {
-        ObjectsData.MeleeData meleeData = DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
-        int durability = meleeData.Durability;
-        if (durability == 255)
+        if (GetDurability() == 255)
         {
             return;
         }

@@ -117,6 +117,15 @@ public class RangedWeapon : WeaponBase
         return GetAttackScore();
     }
 
+    /// <summary>
+    /// Missile weapons never wear out. The missile table carries no durability byte at all, and
+    /// the original neither damages them in combat nor lets the anvil repair them.
+    /// </summary>
+    public override int GetDurability()
+    {
+        return 255;
+    }
+
     protected override bool Attack()
     {
         // check we still have ammo
