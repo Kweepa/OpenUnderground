@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- A missile now does the damage its own row in the game's data gives it, instead of a hand-written number, and the Missile skill multiplies that damage rather than being added to it. Archery is a little weaker at the top and a spell is much stronger everywhere: a fireball averaged seven points for a new mage and fourteen for a practised one, where the original asks for sixteen and a half from both.
+
+- Spells no longer get a damage bonus from the caster's skill, which the original gives to neither spells nor arrows. A fireball is a fireball whoever throws it; what the skill buys is the chance of throwing one at all.
+
 - How long a weapon takes to wind up now depends on the weapon alone, as the original has it, and not on the character's skills as well: a trained fighter used to charge a battle axe in under a second, and it now takes the same two it takes a beginner. Every swing also opens with a short raise that no weapon skips and that a release cuts short, so the distance between the lightest weapon and the heaviest is the two to one the original asks for instead of the near-parity it drifted into.
 
 - Creatures now wear the armour their own data gives them, which nothing had been reading, so a blow that lands loses the protection covering the part it struck and one that cannot get through does no harm at all. Fights are harder and longer for it, and closer to the original: most creatures shrug off one to five points of every hit, and a headless turns out to be best protected exactly where it has no head.

@@ -22,11 +22,31 @@ public class ObjectsData
         public short Durability;
     };
 
-    public struct RangedData
+    public struct MissileData
     {
-        public int ammo;
-        public int unk;
+        /* One 16 x 3 table covering object types 16-31, indexed by type & 15 like the melee table:
+           the eight projectiles (16-23) first, then the eight launchers (24-31).
+
+           0000   Int8   damage, for a projectile; 3 for every launcher, so meaningless there
+           0001   Int8   unknown
+           0002   Int8   one byte read two ways, and the half it belongs to decides which
+
+           The launcher half checks out: the ammunition values give sling -> sling stone,
+           bow -> arrow, crossbow -> crossbow bolt and jewelled bow -> arrow, which is the mapping
+           RangedWeapon.GetAmmoType() spells out by hand.
+
+           On a projectile row the same byte is the kind of damage the missile does, kept negated:
+           the original negates it (UW.EXE 0x2b355) and hands it to the routine that asks whether
+           the target resists that kind, where acid's bit is the one poison uses too. It also
+           tests the byte itself for exactly 0xC0 before letting the Missile skill scale the
+           damage (0x2b2e6), and 0xC0 is what all four physical missiles carry - the sling stone,
+           the crossbow bolt, the arrow and the stone - against 0xF5, 0xDD, 0xF0 and 0xBD on the
+           fireball, the lightning bolt, the acid and the magic missile. That one test is how the
+           original keeps the character out of a spell's damage. */
         public int damage;
+        public int unk;
+        public int ammo;
+        public int marker;
     }
 
     public struct ArmourData
@@ -157,7 +177,7 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
     }
     
     public MeleeData[] weaponStats = new MeleeData[16];
-    public RangedData[] rangedStats = new RangedData[8];
+    public MissileData[] missileStats = new MissileData[16];
     public ArmourData[] armourStats = new ArmourData[32];
     public ContainerData[] containerStats = new ContainerData[16];
     public LightSourceData[] lightSourceStats = new LightSourceData[8];
@@ -183,17 +203,12 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
             weaponStats[i].Durability = stream.GetByte();
         }
         
-        for (int i = 0; i < rangedStats.Length; ++i)
+        for (int i = 0; i < missileStats.Length; ++i)
         {
-            rangedStats[i].damage = stream.GetByte();
-            stream.Skip(2);
-        }
-
-        for (int i = 0; i < rangedStats.Length; ++i)
-        {
-            rangedStats[i].damage = stream.GetByte();
-            rangedStats[i].unk = stream.GetByte();
-            rangedStats[i].ammo = stream.GetByte() + 16; // index into ranged table
+            missileStats[i].damage = stream.GetByte();
+            missileStats[i].unk = stream.GetByte();
+            missileStats[i].marker = stream.GetByte();
+            missileStats[i].ammo = missileStats[i].marker + 16; // stored as an offset into them
         }
 
         for (int i = 0; i < armourStats.Length; ++i)

@@ -212,84 +212,102 @@ public class Projectile : UUObject
         }
     }
 
-    private int GetDamageSkillBoost()
+    /// <summary>
+    /// The Missile skill scales a physical missile's damage rather than adding to it, and the
+    /// scale is a fraction of 256: 192 with no skill at all, eight more for every point of it.
+    /// So an untrained shot does three quarters of the table's damage and a fully trained one
+    /// a little over one and two thirds (UW.EXE 0x2b2ec-0x2b32b, read whole).
+    /// </summary>
+    private const int MissileScaleUntrained = 192;
+    private const int MissileScalePerPoint = 8;
+    private const int MissileScaleUnit = 256;
+
+    /// <summary>
+    /// Every shot the player takes rolls the skill at this difficulty, and only the two critical
+    /// outcomes move the scale - by which the worst a trained archer can do is still better than
+    /// the best an untrained one manages.
+    /// </summary>
+    private const int MissileRollDifficulty = 10;
+    private const int MissileScaleCriticalFailure = -128;
+    private const int MissileScaleCriticalSuccess = 192;
+
+    /// <summary>
+    /// The marker the missile table carries on the four physical projectiles. The original tests
+    /// the row's third byte for exactly this before letting any of the character into the sum,
+    /// which is how a fireball ends up owing nothing to the mage who cast it.
+    /// </summary>
+    private const int PhysicalMissileMarker = 0xC0;
+
+    /// <summary>
+    /// Nothing is ever rolled against a maximum lower than this: the routine that rolls the
+    /// damage lifts one up to two before it starts (UW.EXE 0x24cd9). Melee shares that routine,
+    /// but with this game's data only a scaled missile can arrive under two - a sling stone whose
+    /// skill roll came out a critical failure below Missile 5 - so this is where it belongs. The
+    /// unscaled rows are all five or more.
+    /// </summary>
+    private const int MinimumRolledMaximum = 2;
+
+    /// <summary>
+    /// The most damage this shot can do, before the roll: the missile table's own byte, scaled
+    /// by the Missile skill where the row allows it.
+    /// </summary>
+    private int GetMaxDamage()
     {
-        // The original adds nothing per character level, here or in melee: the chain that
-        // works out a projectile's damage - UW.EXE 0x2b2bd, 0x258cf and 0x24cb5, each read
-        // whole - never reads the level, the byte at P1[0x3d].
-        int damage = 0;
-        switch (type)
+        // Object types 16-23 are the eight rows of the missile table that carry a damage value;
+        // 24-31 are the launchers, whose byte reads 3 and means nothing.
+        if ((int)type < 16 || (int)type > 23)
         {
-        case EObjectType.MagicMissile:
-            damage += Skills.GetSkill(ESkill.Casting) / 6;
+            return 0;
+        }
+
+        ObjectsData.MissileData row = DataLoader.sDataLoader.objectsData.missileStats[(int)type & 15];
+
+        // Neither a creature's shot nor a spell takes anything from the player's skill. The
+        // original decides both at once: it scales only when the shot is the player's and the
+        // row carries the physical marker.
+        if (projectileOwner != PlayerObject.Player.gameObject || row.marker != PhysicalMissileMarker)
+        {
+            return row.damage;
+        }
+
+        int missile = Skills.GetSkill(ESkill.Missile);
+        int scale = MissileScaleUntrained + MissileScalePerPoint * missile;
+        switch (Skills.GetResult(missile, MissileRollDifficulty))
+        {
+        case Skills.ESkillTestResult.CriticalFailure:
+            scale += MissileScaleCriticalFailure;
             break;
-        case EObjectType.LightningBolt:
-            damage += Skills.GetSkill(ESkill.Casting) / 5;
-            break;
-        case EObjectType.Fireball:
-            damage += Skills.GetSkill(ESkill.Casting) / 4;
-            break;
-        case EObjectType.SlingStone:
-            damage += Skills.GetSkill(ESkill.Missile) / 6;
-            break;
-        case EObjectType.Arrow:
-            damage += Skills.GetSkill(ESkill.Missile) / 5;
-            break;
-        case EObjectType.CrossbowBolt:
-            damage += Skills.GetSkill(ESkill.Missile) / 4;
+        case Skills.ESkillTestResult.CriticalSuccess:
+            scale += MissileScaleCriticalSuccess;
             break;
         }
 
-        return damage;
-    }
-
-    private int GetBaseDamage()
-    {
-        int damage = 0;
-        switch (type)
-        {
-        case EObjectType.Acid:
-            damage = Random.Range(1, 3);
-            break;
-        case EObjectType.MagicMissile:
-            damage = Random.Range(2, 4);
-            break;
-        case EObjectType.LightningBolt:
-            damage = Random.Range(4, 7);
-            break;
-        case EObjectType.Fireball:
-            damage = Random.Range(6, 9);
-            break;
-        case EObjectType.Knife: // mage weapon
-            damage = Random.Range(3, 6);
-            break;
-        case EObjectType.SlingStone:
-            damage = Random.Range(2, 4);
-            break;
-        case EObjectType.Arrow:
-            damage = Random.Range(3, 5);
-            break;
-        case EObjectType.CrossbowBolt:
-            damage = Random.Range(4, 7);
-            break;
-        }
-
-        return damage;
+        return Mathf.Max(MinimumRolledMaximum, row.damage * scale / MissileScaleUnit);
     }
 
     private int GetDamage()
     {
-        int damage = GetBaseDamage();
-        if (projectileOwner == PlayerObject.Player.gameObject)
+        int damage;
+
+        if (type == EObjectType.Knife)
         {
-            damage += GetDamageSkillBoost();
+            // A mage weapon this project added rather than the original: type 27 lands among the
+            // launchers, which have no damage of their own, so it keeps its hand-written roll.
+            damage = Random.Range(3, 6);
         }
-        
+        else
+        {
+            // The table byte is a maximum and the original rolls it down, the same way and with
+            // the same helper melee damage uses - the two share the routine that finally takes
+            // the hit points off (UW.EXE 0x2b2bd to 0x258cf to 0x24cb5, each read whole).
+            damage = Utils.GetDamageRoll(GetMaxDamage());
+        }
+
         if (createdByCursedEntity)
         {
             damage /= 2;
         }
-        
+
         return damage;
     }
 
