@@ -503,23 +503,35 @@ public class Magic : MonoBehaviour
         permanentSpells.Clear();
     }
 
+    private static int GetSpellArmourValue(int spell)
+    {
+        switch (spells[spell].runes)
+        {
+        case "BIS":
+            return 10;
+        case "IS":
+            return 15;
+        case "IVS":
+            return 20;
+        }
+
+        return 0;
+    }
+
     public int GetSpellArmourScore()
     {
+        // the shield spells are one family, so the strongest wins - they never add up
         int armour = 0;
         foreach (SActiveSpell s in activeSpells)
         {
-            switch (spells[s.spell].runes)
-            {
-            case "BIS":
-                armour += 10;
-                break;
-            case "IS":
-                armour += 15;
-                break;
-            case "IVS":
-                armour += 20;
-                break;
-            }
+            armour = Mathf.Max(armour, GetSpellArmourValue(s.spell));
+        }
+
+        // enchanted items worn are held in permanentSpells, not activeSpells,
+        // so they have to be counted here too - see IsSpellActive()
+        foreach (SPermanentSpell s in permanentSpells)
+        {
+            armour = Mathf.Max(armour, GetSpellArmourValue((int)s.spell));
         }
 
         return armour;
