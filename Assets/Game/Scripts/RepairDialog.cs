@@ -16,7 +16,8 @@ public class RepairDialog : MonoBehaviour
 
     public UUObject itemToRepair;
     public int durability;
-    private int difficultyStringId;
+    private string difficultyWord;
+    private string riskWord;
 
     protected bool initialButtonsReleased;
     private int repairDialogHold;
@@ -49,42 +50,38 @@ public class RepairDialog : MonoBehaviour
         sRepairDialog.deferredMouseRepairAction = DeferredMouseRepairAction.None;
         sRepairDialog.executeDeferredMouseRepairOnFrame = -1;
 
-        // Calculate difficulty with randomness
         int repairSkill = Skills.GetSkill(ESkill.Repair);
-        int actualDifficulty = repairSkill + 15 - itemDurability; // Average roll is 15
+        int difficulty = repairSkill + 15 - itemDurability; // the roll has to beat 30 minus this
 
-        // Add randomness that decreases with repair skill
-        // Higher skill = less randomness, more accurate assessment
-        // Random range decreases as skill increases
-        // At skill 0: full randomness
-        // At skill 30: minimal randomness
+        // Six bands instead of the original's five, and they are cut on the chance of success
+        // rather than on tenths of the roll. The original's are exact tenths (UW.EXE 0x74909),
+        // but "hard" alone then spans 32% down to 3% and "very difficult" is spent on the case
+        // that cannot succeed at all, so a broadsword and a long sword get the same word while
+        // one is three times likelier to come back whole. The success chance is (30 - x) / 31
+        // with x = durability - Repair + 15, which is 30 - this value.
+        //
+        // A random wobble used to sit on this, widening as Repair fell, so that an unskilled
+        // smith misjudged the job. It is gone: the original has nothing of the kind, and at a low
+        // Repair it moved the answer by up to 48 points of a 100-point scale - which made the one
+        // number the player decides on worthless exactly when it mattered most.
+        sRepairDialog.difficultyWord =
+              difficulty >= 31 ? StringLoader.GetString(1, 219)   // 100%
+            : difficulty >= 24 ? StringLoader.GetString(1, 220)   // over 75%
+            : difficulty >= 16 ? StringLoader.GetString(1, 221)   // over 50%
+            : difficulty >= 8  ? StringLoader.GetString(1, 222)   // over 25%
+            : difficulty >= 4  ? StringLoader.GetString(1, 223)   // over 10%
+            : "next to impossible";                                        // 10% or less
 
-        int maxVariation = Mathf.Max(0, 15 - repairSkill / 2);
-        int randomVariation = Random.Range(-maxVariation, maxVariation + 1);
-
-        int displayedDifficulty = actualDifficulty + randomVariation;
-
-        // Map to difficulty string IDs (219-223)
-        if (displayedDifficulty >= 29)
-        {
-            sRepairDialog.difficultyStringId = 219; // "trivial"
-        }
-        else if (displayedDifficulty >= 16)
-        {
-            sRepairDialog.difficultyStringId = 220; // "simple"
-        }
-        else if (displayedDifficulty >= 3)
-        {
-            sRepairDialog.difficultyStringId = 221; // "possible"
-        }
-        else if (displayedDifficulty >= -10)
-        {
-            sRepairDialog.difficultyStringId = 222; // "hard"
-        }
-        else
-        {
-            sRepairDialog.difficultyStringId = 223; // "very difficult"
-        }
+        // And the chance of ruining it, which the original's estimate never mentions: the word
+        // only ever described the chance of success. A critical failure needs the roll at or
+        // below x - 12, and the save after it fails when rand & 63 clears quality + Repair, so
+        // the two together are the chance of losing the item on this attempt.
+        float criticalFailure = Mathf.Clamp(18 - difficulty, 0, 31) / 31.0f;
+        float saveFails = Mathf.Max(0, 63 - item.quality - repairSkill) / 64.0f;
+        float ruinChance = criticalFailure * saveFails;
+        sRepairDialog.riskWord = ruinChance <= 0.0f ? ""
+            : ruinChance <= 0.05f ? " and risky"
+            : " and very risky";
 
         Utils.PlayClip2d(sRepairDialog.dialogOn);
     }
@@ -209,7 +206,9 @@ public class RepairDialog : MonoBehaviour
 
             Texture2D tex = DataLoader.sDataLoader.invTex[6];
             float w = 5 * tex.width;
-            float h = 6 * tex.height;
+            // One row taller than it was: the risk clause makes the line wrap to three, and at
+            // six rows the last one landed on top of the buttons.
+            float h = 7 * tex.height;
 
             Rect r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
             GuiInput.RegisterBlockingRect(r);
@@ -238,11 +237,17 @@ public class RepairDialog : MonoBehaviour
             repairDialogStyle.fontSize = 24;
             repairDialogStyle.alignment = TextAnchor.MiddleCenter;
             string difficultyText = StringLoader.GetString(1, 216); // "You think it will be"
-            difficultyText += StringLoader.GetString(1, difficultyStringId); // difficulty string
+            difficultyText += difficultyWord;
+            difficultyText += riskWord;
             difficultyText += StringLoader.GetString(1, 217); // "to repair the"
             difficultyText += itemToRepair.singularName + ".";
             difficultyText += StringLoader.GetString(1, 218); // "Make an attempt?"
-            GUI.Label(new Rect(r.x + w / 4, r.y, w / 2, r.height), difficultyText, repairDialogStyle);
+            // Centred in the band between the title row and the button strip, not in the whole
+            // panel: that keeps a long line off the buttons however it wraps, and puts the block
+            // half a row lower than centring on the panel did. The strip is 54 tall in the mouse
+            // layout, which is the taller of the two.
+            GUI.Label(new Rect(r.x + w / 4, r.y + tex.height, w / 2, r.height - tex.height - 54),
+                      difficultyText, repairDialogStyle);
 
             // Buttons
             bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;

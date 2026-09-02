@@ -1172,6 +1172,16 @@ public class UUObject : LevelObject
         return GetToughness();
     }
 
+    /// <summary>
+    /// Durability from this object's own stat table, used both for wear from damage and for repair
+    /// difficulty. 255 means indestructible, which is the right default: a class with no durability
+    /// table can be neither worn down nor repaired.
+    /// </summary>
+    public virtual int GetDurability()
+    {
+        return 255;
+    }
+
     public virtual void TryDamage(int damage, Skills.ESkillTestResult result)
     {
     }
