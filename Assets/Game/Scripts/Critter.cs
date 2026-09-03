@@ -700,10 +700,56 @@ public class Critter : UUObject
 
     private ObjectsData.CritterData stats => DataLoader.sDataLoader.objectsData.critterStats[(int)type & 63];
 
-    // for now just use first attack value. not sure how we determine which, if there are options
-    private int attackChanceToHit => stats.AttackChanceToHit[0];
+    /// <summary>
+    /// Attack charge scale from the original executable, sixteen entries at 0x5619:0000 in UW1
+    /// and 0x609e:0000 in UW2. The creature builds charge while it winds up and the strike
+    /// multiplies its rolled damage by scale / 128, from 0.39x uncharged to 1.99x fully wound up.
+    /// </summary>
+    private static readonly int[] attackChargeScale =
+    {
+        50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 155, 170, 185, 205, 230, 255
+    };
 
-    private int attackDamage => stats.AttackDamage[0];
+    private int attackIndex;
+
+    /// <summary>
+    /// Charge the creature built before it committed to the swing. A creature within reach spends
+    /// each tick either starting an attack - one chance in four, which picks the attack, writes
+    /// the action code and begins the swing - or building charge; the blow then clears it. So the
+    /// charge at the blow is the run of ticks before that one in four came up: a geometric draw
+    /// with a mean of 3, capped at the top of the table.
+    /// </summary>
+    private int RollAttackCharge()
+    {
+        int charge = 0;
+        while (charge < attackChargeScale.Length - 1 && Random.value >= 0.25f)
+        {
+            ++charge;
+        }
+
+        return charge;
+    }
+
+    private int attackChanceToHit => stats.AttackChanceToHit[attackIndex];
+
+    private int attackDamage => stats.AttackDamage[attackIndex];
+
+    /// <summary>
+    /// Weighted roulette over the three attacks, the way the original does it: the probability
+    /// bytes of the triple sum to 100 for every creature in the data.
+    /// </summary>
+    private void ChooseAttack()
+    {
+        int ticket = Random.Range(0, 100);
+        for (attackIndex = 0; attackIndex < 2; ++attackIndex)
+        {
+            if (stats.AttackProbability[attackIndex] > ticket)
+            {
+                return;
+            }
+            ticket -= stats.AttackProbability[attackIndex];
+        }
+    }
 
     private int strength => (int)(stats.Strength * curseMultiplier);
 
@@ -1361,14 +1407,17 @@ public class Critter : UUObject
             break;
         case EState.Attack:
             // slot is determined by caller
+            ChooseAttack();
             {
-            // for now choose one randomly from available options
+            // The animation slot is the attack: 1 is bash, 2 slash, 3 thrust, one per row of the
+            // triple. Fall back only when the creature has no frames for the one the data chose.
             List<int> slots = new List<int>();
-            // = bash, 2 = slash, 3 = thrust
             if (crit.frameCount[1] > 0) slots.Add(1);
             if (crit.frameCount[2] > 0) slots.Add(2);
             if (crit.frameCount[3] > 0) slots.Add(3);
-            slot = slots.Count == 1 ? slots[0] : slots[Random.Range(0, slots.Count - 1)];
+            slot = crit.frameCount[attackIndex + 1] > 0
+                ? attackIndex + 1
+                : (slots.Count > 0 ? slots[Random.Range(0, slots.Count)] : 0);
             }
             ChangeAnimation("Attack");
             stateTime = 1.0f; // one second is more time for the player to dodge
@@ -3307,7 +3356,8 @@ public class Critter : UUObject
     int CalcFlankingBonus()
     {
         // base on where attacking the player from
-        // should be 0-3
+        // The original folds the difference between the two headings to 0-4 and adds it both to
+        // the attack score and to the damage, the latter after the charge scale. Still a stub.
         return 0;
     }
 
@@ -3335,9 +3385,11 @@ public class Critter : UUObject
             return;
         }
 
+        // The attack score matches the original: the chosen attack's chance-to-hit byte plus half
+        // the equipment-damage byte plus a roll. The original's roll is rand() % 6 + 7, which
+        // reaches 12; Random.Range stops one short of its bound.
         int flankingbonus = CalcFlankingBonus();
-        int attackScore = attackChanceToHit + (equipDamage / 2) + Random.Range(7, 12) + flankingbonus; //+Maybe Npc Level
-        // + unknownbonus (stored in critterdata)
+        int attackScore = attackChanceToHit + (equipDamage / 2) + Random.Range(7, 13) + flankingbonus;
 
         int defenceScore = attackTarget == null ? PlayerObject.Player.GetDefence() : attackTarget.GetDefence();
 
@@ -3353,17 +3405,14 @@ public class Critter : UUObject
             damage = GetCriticalDamage(damage);
         }
 
+        // The table value is a maximum, rolled down and then scaled by how far the creature wound
+        // up. Both steps and the divisor are the ones WeaponBase.Attack() already uses for the
+        // player's swing, which goes through the same routine in the original.
+        // Rounded up where the original truncates, so that a blow that lands always costs at
+        // least a point: worth +1 either way, which is a third again on a rotworm and 3% on the
+        // last boss.
         damage = Utils.GetDamageRoll(damage);
-
-        // Comment from Hank's UW exporter.
-        // TODO: damage for NPCS is scaled based on a lookup table and a property in their mobile data.
-        // This is similar to the player attack charge. (values stored in segment_60 in UW2 exe)
-        // Lookup appears to be based on the value in the object at 0xF ( bits 12 to 15)
-        // For now just scale it randomly
-        if (damage > 2)
-        {
-            damage = (short)Random.Range(2, damage + 1);
-        }
+        damage = (damage * attackChargeScale[RollAttackCharge()] + 127) / 128;
 
         switch (result)
         {
