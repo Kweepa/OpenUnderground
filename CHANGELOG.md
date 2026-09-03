@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A creature that notices you around a corner now comes after you. One that noticed you near the edge of its range, with a wall in between, used to turn to face you and then stand there for good.
+
 - Creatures stand in your way, as they do in the original: you can no longer walk up onto one, only jump over it. A plain jump clears a rat or a spider; a dwarf or anything taller takes Leap, and the final boss cannot be jumped at all.
 
 - A blow that lands on a back now counts for more, the way the original counts it: up to four points on the chance to hit and four on the damage, tailing off to nothing when the two of you are face to face. It works both ways, so something that catches you looking elsewhere hits harder, and so do you when you come up behind something that has not turned round yet.

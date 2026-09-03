@@ -2263,7 +2263,10 @@ public class Critter : UUObject
                     }
 
                     GetPath(out path, transform.position, GetTargetFootPos());
-                    if (path.Count > 0 && path.Count < detectionRange / Tile.xzScale)
+                    // A path is never shorter than the straight line CheckIdleToCombat() already
+                    // checked, and GetTilePath() keeps every path within range tiles of home, so a
+                    // third leash on the path length only rejects reachable targets.
+                    if (path.Count > 0)
                     {
                         SetState(EState.TurnToApproach);
                     }
