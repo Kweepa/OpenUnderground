@@ -20,6 +20,7 @@ public class CritterSaveData : UUObjectSaveData
     public int heading;
     public int hunger;
     public int whoami;
+    public bool elite;
     public int movementType;
     public int state;
     public float stateTime;
@@ -309,6 +310,12 @@ public class Critter : UUObject
     public int hunger;
     public EWhoAmI whoami;
 
+    // Bit 2 of critterData[6]: a marker the level designers put on 138 of the 872 placed creatures,
+    // and which nothing in UW.EXE ever sets or clears. One branch of the original (0x25a7b) gates
+    // two bonuses on it, +7..12 on the attack score and +4..15 on the damage; the other 84% get
+    // neither. It also multiplies the creature's own armour by 5/3 (0x24e03), which is not used yet.
+    public bool elite;
+
     public float walkSpeed = 1.0f;
     public float confusedSpeed = 2.0f;
     public float runSpeed = 3.0f;
@@ -356,6 +363,35 @@ public class Critter : UUObject
         return (v >> b0) & ((1 << (1 + b1 - b0)) - 1);
     }
 
+    /// <summary>
+    /// Bit 2 of critterData[6]. Nothing in UW.EXE ever sets or clears it, so it is level data:
+    /// 138 of the 872 placed creatures carry it (UW.EXE 0x25a7b).
+    /// </summary>
+    private static bool IsEliteInData(byte[] critterData)
+    {
+        return critterData != null && (critterData[6] & (1 << 2)) != 0;
+    }
+
+    /// <summary>
+    /// Reads the marker back from the level rather than trusting the save. It is static data, and
+    /// a save written before <see cref="elite"/> existed answers false for every creature already
+    /// on a level the player had visited - which would leave the marker dead for anyone carrying
+    /// on an old game. Creatures with no level of origin, summoned ones, keep what they were given.
+    /// </summary>
+    private void RefreshEliteFromLevel()
+    {
+        if (originalLevel <= 0 || objectIndex <= 0 || objectIndex >= 256 || LevelLoader.sLevelLoader == null)
+        {
+            return;
+        }
+
+        byte[] fromLevel = LevelLoader.sLevelLoader.ReadCritterDataFromLevel(originalLevel, objectIndex);
+        if (fromLevel != null)
+        {
+            elite = IsEliteInData(fromLevel);
+        }
+    }
+
     public override void Initialize(ushort[] objData, byte[] critterData)
     {
         base.Initialize(objData, critterData);
@@ -377,6 +413,7 @@ public class Critter : UUObject
             heading = critterData[16] & 31;
             hunger = critterData[17] & 127;
             whoami = (EWhoAmI)critterData[18];
+            elite = IsEliteInData(critterData);
 
             movementType = (EMovementType)(stats.Category & 0xf);
         }
@@ -3368,6 +3405,17 @@ public class Critter : UUObject
         return damage * Random.Range(1, 3);
     }
 
+    /// <summary>
+    /// The height the swing lands at: the middle of the creature's own body, which is what the
+    /// original compares against the target's extent to pick a body part (UW.EXE 0x2441a).
+    /// </summary>
+    private float GetSwingHeight()
+    {
+        return cachedCharacterController != null
+            ? transform.TransformPoint(cachedCharacterController.center).y
+            : transform.position.y;
+    }
+
     void TryDamageTarget()
     {
         if (GetDistanceToTarget() > meleeAttackRange + meleeAttackHysteresis)
@@ -3389,7 +3437,17 @@ public class Critter : UUObject
         // the equipment-damage byte plus a roll. The original's roll is rand() % 6 + 7, which
         // reaches 12; Random.Range stops one short of its bound.
         int flankingbonus = CalcFlankingBonus();
-        int attackScore = attackChanceToHit + (equipDamage / 2) + Random.Range(7, 13) + flankingbonus;
+        int attackScore = attackChanceToHit + (equipDamage / 2) + flankingbonus;
+        int damageBonus = 0;
+        if (elite)
+        {
+            // one branch in the original grants both of these, and only to the marked creatures
+            // (UW.EXE 0x25a7b). Giving the attack roll to everyone made the other 84% sharper than
+            // they ever were, which is what kept a lightly armoured player honest and hid the fact
+            // that a heavily armoured one could not be touched at all.
+            attackScore += Random.Range(7, 13);
+            damageBonus = Random.Range(4, 16);
+        }
 
         int defenceScore = attackTarget == null ? PlayerObject.Player.GetDefence() : attackTarget.GetDefence();
 
@@ -3399,7 +3457,7 @@ public class Critter : UUObject
             result = Skills.ESkillTestResult.Success;
         }
 
-        int damage = Mathf.Max(2, attackDamage + strength / 5);
+        int damage = Mathf.Max(2, attackDamage + strength / 5 + damageBonus);
         if (result == Skills.ESkillTestResult.CriticalSuccess)
         {
             damage = GetCriticalDamage(damage);
@@ -3437,6 +3495,7 @@ public class Critter : UUObject
                         poisoning = true;
                     }
                 }
+                damage = PlayerObject.Player.AbsorbWithArmour(damage, GetSwingHeight());
                 PlayerObject.Player.Damage(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage);
             }
             else
@@ -3994,6 +4053,7 @@ public class Critter : UUObject
             critterData.heading = heading;
             critterData.hunger = hunger;
             critterData.whoami = (int)whoami;
+            critterData.elite = elite;
             critterData.movementType = (int)movementType;
             critterData.state = (int)state;
             critterData.stateTime = stateTime;
@@ -4079,6 +4139,8 @@ public class Critter : UUObject
             heading = critterData.heading;
             hunger = critterData.hunger;
             whoami = (EWhoAmI)critterData.whoami;
+            elite = critterData.elite;
+            RefreshEliteFromLevel();
             movementType = (EMovementType)critterData.movementType;
             state = (EState)critterData.state;
             stateTime = critterData.stateTime;

@@ -17,4 +17,5 @@ Attempts to be gameplay-accurate while adding some modern conveniences
   - some tidied-up portraits
   - achievements
   - gamepad support
+  - three ratings added to the inventory panel: attack by the weapon hand, defence and armour by the shield hand
 

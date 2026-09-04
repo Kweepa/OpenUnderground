@@ -18,6 +18,18 @@ public enum EInvSlot
     None
 }
 
+/// <summary>
+/// The four body parts the original splits armour across, in its own order. A melee hit picks one
+/// and the protection covering it is subtracted from the damage (UW.EXE 0x24dc1).
+/// </summary>
+public enum EBodyPart
+{
+    Torso,
+    Arms,
+    Legs,
+    Head
+}
+
 public class Inventory : MonoBehaviour
 {
     public Texture cursor;
@@ -40,6 +52,11 @@ public class Inventory : MonoBehaviour
 
     // the style for the carry weight number
     public GUIStyle carryStyle;
+
+    // carryStyle is centred. The two ratings are drawn flush to their own side instead, the
+    // defence against the left edge of the shield slot and the armour against the right.
+    private GUIStyle ratingLeftStyle;
+    private GUIStyle ratingRightStyle;
 
     // the style for the item labels
     public GUIStyle descriptionStyle;
@@ -4331,20 +4348,67 @@ public class Inventory : MonoBehaviour
         EInvSlot.RightHand
     };
 
-    public int GetTotalArmourScore()
+    /// <summary>
+    /// The armour total as the player knows it, for the panel. Pieces answer with
+    /// <see cref="UUObject.GetKnownDefence"/>, so an enchantment he has not identified is missing
+    /// from the figure even though it is working: the number must not do the Lore roll's job.
+    /// Combat reads <see cref="GetArmourByBodyPart"/> instead, which uses the true values.
+    /// </summary>
+    public int GetKnownArmourScore()
     {
         int score = 0;
         foreach (var armorSlot in armorSlots)
         {
-            // TODO: add GetDefence to rings
+            // Not the fingers: the original's loop covers the five armour slots and the shield
+            // hand only (UW.EXE 0x7e466 and 0x7e4ab), and every ring reads zero protection anyway.
             UUObject armour = invSlotContents[(int)armorSlot];
             if (armour != null)
             {
-                score += armour.GetDefence();
+                score += armour.GetKnownDefence();
             }
         }
 
         return score;
+    }
+
+    // Which body part each worn piece covers. The original keeps it as the table 03 00 01 02 02 at
+    // DS:0x1af8 in UW.EXE, indexed by these five slots in this order; the shield hand covers torso
+    // and arms both (UW.EXE 0x7e512).
+    private static readonly EInvSlot[] armourPieceSlots =
+    {
+        EInvSlot.Head, EInvSlot.Torso, EInvSlot.Hands, EInvSlot.Legs, EInvSlot.Feet
+    };
+
+    private static readonly EBodyPart[] armourPieceParts =
+    {
+        EBodyPart.Head, EBodyPart.Torso, EBodyPart.Arms, EBodyPart.Legs, EBodyPart.Legs
+    };
+
+    /// <summary>
+    /// Protection per body part, the way the original keeps it: the pieces covering a part are
+    /// summed and the total is subtracted from the damage of a hit that lands there.
+    /// </summary>
+    public int[] GetArmourByBodyPart()
+    {
+        int[] armour = new int[4];
+        for (int i = 0; i < armourPieceSlots.Length; ++i)
+        {
+            UUObject piece = invSlotContents[(int)armourPieceSlots[i]];
+            if (piece != null)
+            {
+                armour[(int)armourPieceParts[i]] += piece.GetDefence();
+            }
+        }
+
+        UUObject shield = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand)];
+        if (shield != null)
+        {
+            // a weapon in that hand answers 0, so this only counts shields
+            armour[(int)EBodyPart.Torso] += shield.GetDefence();
+            armour[(int)EBodyPart.Arms] += shield.GetDefence();
+        }
+
+        return armour;
     }
 
     public UUObject GetRandomArmourPiece()
@@ -5004,11 +5068,33 @@ public class Inventory : MonoBehaviour
 
             // attack and defence ratings
             {
-                int defence = PlayerObject.Player.GetDefence();
+                // Two numbers, because once armour is off the to-hit roll the panel is showing two
+                // different things and one figure cannot honestly be both. On the left what keeps a
+                // blow from landing - the Defense skill, half the skill of the weapon in hand and
+                // magical protection, which is the side the original puts magic on too. On the
+                // right what keeps a blow that lands from hurting: the armour worn. Together they
+                // are the single number this used to show.
+                if (ratingLeftStyle == null && carryStyle != null)
+                {
+                    ratingLeftStyle = new GUIStyle(carryStyle) { alignment = TextAnchor.LowerLeft };
+                    ratingRightStyle = new GUIStyle(carryStyle) { alignment = TextAnchor.LowerRight };
+                }
+
                 EInvSlot shieldHandSlot = PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand;
                 float x = Screen.width - invPosition + 3 * invSlots[(int)shieldHandSlot].cx;
                 float y = 30 + 3.6f * invSlots[(int)shieldHandSlot].cy;
-                GUI.Label(new Rect(x, y + 40, 20, 20), defence.ToString(), carryStyle);
+
+                // Two boxes, each flush to its own side of the shield slot: the defence against the
+                // left edge, the armour against the right, so the pair reads as two figures rather
+                // than one. Nudge the offsets below to move them; a digit is about twelve pixels
+                // wide at this font size.
+                const float digit = 12.0f;
+                float defenceBox = x;                       // left edge of the defence, flush left
+                float armourBox = x + 23;                   // the armour box, its text flush right
+                GUI.Label(new Rect(defenceBox, y + 40, 2 * digit, 20),
+                    PlayerObject.Player.GetDefence().ToString(), ratingLeftStyle ?? carryStyle);
+                GUI.Label(new Rect(armourBox, y + 40, 2 * digit + 2, 20),
+                    GetKnownArmourScore().ToString(), ratingRightStyle ?? carryStyle);
             }
             {
                 int attack = 0;
