@@ -61,6 +61,25 @@ public class Armour : UUObject
         return defence;
     }
 
+    /// <summary>
+    /// The worn value minus a Protection enchantment the player has not pinned down yet. The flat
+    /// point every piece gets and the table protection are visible on the item, so they always
+    /// count; the enchantment is not, and only a critical Lore result names it (see
+    /// <see cref="GetIdentifiedName"/>). Until then the panel shows the crown, not the crown of
+    /// protection - while the bonus goes on working.
+    /// </summary>
+    public override int GetKnownDefence()
+    {
+        int defence = GetDefence();
+        if (enchantmentType == EEnchantmentType.Protection
+            && loreResult != Skills.ESkillTestResult.CriticalSuccess)
+        {
+            defence -= 1 + enchantmentIndex;
+        }
+
+        return defence;
+    }
+
     public override int GetToughness()
     {
         int toughness = 0;

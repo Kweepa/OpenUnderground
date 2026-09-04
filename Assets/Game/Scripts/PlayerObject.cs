@@ -142,9 +142,16 @@ public class PlayerObject : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// What a monster's attack roll is made against. Armour is deliberately not part of it: the
+    /// original keeps this number as the Defense skill plus half the skill of the weapon in hand
+    /// (UW.EXE 0x7e535 and 0x7e5f8) and spends armour on the damage instead, in
+    /// <see cref="AbsorbWithArmour"/>. Adding armour here made a plate-armoured player untouchable
+    /// rather than merely hard to hurt.
+    /// </summary>
     public int GetDefence()
     {
-        int defenceScore = Skills.GetSkill(ESkill.Defense) + Inventory.sInv.GetTotalArmourScore();
+        int defenceScore = Skills.GetSkill(ESkill.Defense);
         defenceScore += Magic.sMagic.GetSpellArmourScore();
         Weapon weapon = Inventory.sInv.invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand)] as Weapon;
         defenceScore += Skills.GetSkill(weapon != null ? weapon.skill : ESkill.Unarmed) / 2;
@@ -155,6 +162,62 @@ public class PlayerObject : MonoBehaviour
         }
 
         return defenceScore;
+    }
+
+    /// <summary>
+    /// Takes the protection covering the body part a blow arriving at <paramref name="strikeHeight"/>
+    /// lands on off the damage, floored at zero (UW.EXE 0x24e14). This is what armour does in the
+    /// original: it does not stop blows from landing, it stops them from hurting. Every blow that
+    /// reaches the damage routine goes through it, a swing and an arrow alike, because melee and
+    /// missiles share that routine (UW.EXE 0x2527e and 0x259e7).
+    /// </summary>
+    public int AbsorbWithArmour(int damage, float strikeHeight)
+    {
+        return Math.Max(0, damage - Inventory.sInv.GetArmourByBodyPart()[(int)PickBodyPart(strikeHeight)]);
+    }
+
+    /// <summary>
+    /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on. The original
+    /// compares that height with the vertical extent of what it is hitting (UW.EXE 0x2441a): under
+    /// the feet is legs, over the head is head, and in between the split leans low or high
+    /// depending on which of the two is taller. So a rotworm goes for the legs and an imp for the
+    /// head, and the armour that answers is the one covering that part.
+    /// </summary>
+    public EBodyPart PickBodyPart(float strikeHeight)
+    {
+        CharacterController body = cachedCharacterController;
+        if (body == null)
+        {
+            return EBodyPart.Torso;
+        }
+
+        float middle = transform.TransformPoint(body.center).y;
+        float foot = middle - 0.5f * body.height;
+        float head = middle + 0.5f * body.height;
+
+        if (strikeHeight < foot)
+        {
+            return EBodyPart.Legs;
+        }
+
+        if (strikeHeight > head)
+        {
+            return EBodyPart.Head;
+        }
+
+        if (strikeHeight < middle)
+        {
+            if (Random.Range(0, 2) == 0)
+            {
+                return EBodyPart.Legs;
+            }
+        }
+        else if (Random.Range(0, 3) == 0)
+        {
+            return EBodyPart.Head;
+        }
+
+        return Random.Range(0, 3) == 0 ? EBodyPart.Arms : EBodyPart.Torso;
     }
 
     public static void LoadSkills()

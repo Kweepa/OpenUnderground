@@ -1110,6 +1110,16 @@ public class UUObject : LevelObject
         return 0;
     }
 
+    /// <summary>
+    /// What the player is entitled to see of this item's protection. The same as
+    /// <see cref="GetDefence"/> unless the piece carries an enchantment he has not identified: that
+    /// still protects him in combat, it just must not announce itself through a number in the panel.
+    /// </summary>
+    public virtual int GetKnownDefence()
+    {
+        return GetDefence();
+    }
+
     public virtual int GetToughness()
     {
         return 0;

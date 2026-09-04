@@ -75,8 +75,12 @@ public class ObjectsData
     public class CritterData
     {
         /*
-00h 	1 	uint8 	Level: 	Level of the creature.
-01h 	3 	 ?? 	 ?? 	 ??
+00h 	4 	uint8[4] 	Armour: 	Protection per body part, in the order torso, arms, legs, head.
+Subtracted from the damage of a hit that lands on that part (UW.EXE 0x24dc1). 255 in bytes 1-3
+means the creature has no distinct limbs and the original falls back to byte 0 (UW.EXE 0x24dcc):
+humanoids carry four values (goblin 3 2 2 2, fighter 5 4 4 4, metal golem 7 7 7 7), worms and
+bats carry "n 255 255 255". The player has an entry of his own in this table and the game fills
+these four bytes from the armour he wears (UW.EXE 0x7e444).
 04h 	1 	uint8 	HitPoints 	Average hit points. <is this meant to be uint8
 05h     1    uint8 Strength  - for the player these values are copied at save load into the table.
 06h 	1 	uint8 	Dexterity
@@ -92,7 +96,9 @@ Mask 0xF0 is the remains; Nothing = 0x00, RotwormCorpse = 0x20, Rubble = 0x40, W
 0Fh 	1 	uint8 	PoisonDamage 	Amount of poison damage this is capable of on attack.
 10h 	1 	uint8 	Category 	Ethereal = 0x00 (Ethereal critters like ghosts, wisps, and shadow beasts), Humanoid = 0x01 (Humanlike non-thinking forms like lizardmen, trolls, ghouls, and mages), Flying = 0x02 (Flying critters like bats and imps), Swimming = 0x03 (Swimming critters like lurkers), Creeping = 0x04 (Creeping critters like rats and spiders), Crawling = 0x05 (Crawling critters like slugs, worms, reapers (!), and fire elementals (!!)), EarthGolem = 0x11 (Only used for the earth golem), Human = 0x51 (Humanlike thinking forms like goblins, skeletons, mountainmen, fighters, outcasts, and stone and metal golems).
 11h 	1 	uint8 	EquipmentDamage 	Amount of equipment damage this is capable of on attack.
-12h 	1 	 ?? 	 ?? 	 ??
+12h 	1 	uint8 	Defence: 	What an attack roll is made against (UW.EXE 0x24b96). For the
+player the game writes his Defense skill plus half the skill of the weapon in his hand into
+this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
 13h 	9 	Probability[3] 	Probabilities 	Each has the form (uint16 value, uint8 percent). What this means is unknown.
 1Ch 	12 	 ?? 	 ?? 	 ??
 28h 	2 	uint16 	Experience: 	Experience provided when killed.
@@ -100,10 +106,7 @@ Mask 0xF0 is the remains; Nothing = 0x00, RotwormCorpse = 0x20, Rubble = 0x40, W
 2Dh     Some sort of value (magic users related)
 2Fh 	1 	uint8 	 ?? 	Always 73.
 */
-        public int Level;
-        public byte unk01;
-        public byte unk02;
-        public byte unk03;
+        public int[] Armour; // per body part, see EBodyPart
         public short AvgHit;//Is this defence?????
         public int Strength;
         public int Dexterity;
@@ -204,10 +207,11 @@ Mask 0xF0 is the remains; Nothing = 0x00, RotwormCorpse = 0x20, Rubble = 0x40, W
         for (int i = 0; i < critterStats.Length; ++i)
         {
             critterStats[i] = new CritterData();
-            critterStats[i].Level = stream.GetByte();
-            critterStats[i].unk01 = stream.GetByte();
-            critterStats[i].unk02 = stream.GetByte();
-            critterStats[i].unk03 = stream.GetByte();
+            critterStats[i].Armour = new int[4];
+            for (int j = 0; j < 4; ++j)
+            {
+                critterStats[i].Armour[j] = stream.GetByte();
+            }
             critterStats[i].AvgHit = stream.GetByte();//Average Hitpoints - changed from uint16 to uint8
 
             critterStats[i].Strength = stream.GetByte(); //Base damage calculations
