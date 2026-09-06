@@ -1116,7 +1116,8 @@ public partial class Conversation
         case "set_inv_quality":
             {
                 int quality = mem[Arg(1)];
-                int itemIndex = mem[Arg(2)];
+                // Immediate NPC-inv position (Shak pushes 2), same convention as take_id_from_npc.
+                int itemIndex = Arg(2);
                 Inventory.sInv.Conversation_set_inv_quality(npc, itemIndex, quality);
                 result = 0; // no result.
             }

@@ -4572,6 +4572,10 @@ public class Inventory : MonoBehaviour
         // it's also possible it's a 1-indexed offset from the top of contents - i.e. npc.Contents.Count - (itemIndex - 1)
         // let's try that :)
         int contentsIndex = npc.contents.Count - (itemIndex - 1);
+        if (contentsIndex < 0 || contentsIndex >= npc.contents.Count)
+        {
+            contentsIndex = npc.contents.Count - 1;
+        }
         if (contentsIndex >= 0 && contentsIndex < npc.contents.Count)
         {
             UUObject obj = npc.contents[contentsIndex];
