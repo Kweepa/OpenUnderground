@@ -36,7 +36,12 @@ public class Skills
 
     public static ESkillTestResult GetResult(int hitChance, int target)
     {
-        int roll = hitChance + Random.Range(0, 30) - target;
+        // The original draws rand() % 31, so 0 to 30 inclusive - thirty-one values, not
+        // thirty. Random.Range with an int upper bound is exclusive, so it needs 31 to match.
+        // UW.EXE 0x3419c, read whole: mov $0x1f,%bx; cwtd; idiv %bx; add %dx,%si. rand() is
+        // 0xec5:0x0de7, file 0x12c37, and returns 0 to 32767, so the remainder spans the
+        // full 0 to 30. The four thresholds below already match the original exactly.
+        int roll = hitChance + Random.Range(0, 31) - target;
 
         if (roll <= 2)
         {
