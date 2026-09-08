@@ -210,7 +210,10 @@ public class Projectile : UUObject
 
     private int GetDamageSkillBoost()
     {
-        int damage = PlayerData.sData.charLevel / 4;
+        // The original adds nothing per character level, here or in melee: the chain that
+        // works out a projectile's damage - UW.EXE 0x2b2bd, 0x258cf and 0x24cb5, each read
+        // whole - never reads the level, the byte at P1[0x3d].
+        int damage = 0;
         switch (type)
         {
         case EObjectType.MagicMissile:
