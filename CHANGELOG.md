@@ -1,0 +1,19 @@
+# Changelog
+
+## Unreleased
+
+### Fixed
+
+- Armour no longer makes the player nearly impossible to hit. Creatures marked as elite keep the attack and damage bonus.
+
+- Creatures now choose among their three attacks the way the original does, weighted rather than at random, and the damage of a blow scales with how long it was charged. A goblin's swing is slightly weaker, a mongbat's is nearly twice as strong.
+
+- Armour and rings enchanted with Resist Blows, Thick Skin or Iron Flesh now give the protection they promise. The three never add up - the strongest one wins - which is also how the original behaves.
+
+- Levers, buttons and switches on a wall no longer attach themselves to the face of a door that shares their tile but sits on a different wall. The clearest case was a lever near a secret door on level 3.
+
+- Paying a smith to repair an item now actually repairs it. The item was taken, the money was spent and the item came back untouched.
+
+## First public release
+
+Release UUBUild14Aug2026.zip
