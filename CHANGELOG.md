@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Ultima Underworld's game.gog is now unpacked once and reused, instead of being extracted again on every trip through the game-directory dialog. Starting the game while another copy is already running no longer fails on the locked data files.
+- The original's game.gog is now unpacked once and reused, instead of being extracted again on every trip through the game-directory dialog. Starting the game while another copy is already running no longer fails on the locked data files.
 
 - Armour no longer makes the player nearly impossible to hit. Creatures marked as elite keep the attack and damage bonus.
 
