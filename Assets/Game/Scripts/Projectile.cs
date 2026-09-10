@@ -189,6 +189,10 @@ public class Projectile : UUObject
                     Critter critter = root.GetComponent<Critter>();
                     if (critter != null)
                     {
+                        // Same routine as a swing in the original (UW.EXE 0x259e7 and 0x2527e both
+                        // call 0x24cb5), and the missile path picks a body part of its own before
+                        // it gets there (0x25988), so a creature's armour soaks an arrow too.
+                        damage = critter.AbsorbWithArmour(damage, transform.position.y);
                         critter.TryDamage(damage, Skills.ESkillTestResult.Success);
                         PlayerObject.Player.SetLastEngagedInCombat(critter);
                     }

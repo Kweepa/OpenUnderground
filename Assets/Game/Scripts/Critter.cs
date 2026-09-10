@@ -313,7 +313,7 @@ public class Critter : UUObject
     // Bit 2 of critterData[6]: a marker the level designers put on 138 of the 872 placed creatures,
     // and which nothing in UW.EXE ever sets or clears. One branch of the original (0x25a7b) gates
     // two bonuses on it, +7..12 on the attack score and +4..15 on the damage; the other 84% get
-    // neither. It also multiplies the creature's own armour by 5/3 (0x24e03), which is not used yet.
+    // neither. It also multiplies the creature's own armour by 5/3, in GetArmourByBodyPart().
     public bool elite;
 
     public float walkSpeed = 1.0f;
@@ -3416,6 +3416,71 @@ public class Critter : UUObject
             : transform.position.y;
     }
 
+    /// <summary>
+    /// The protection covering one body part. The four bytes at the head of the creature's record
+    /// in OBJECTS.DAT are one value per part, and the original reads the one for the part that was
+    /// hit (UW.EXE 0x24dc1). A slot holding 255 means "the torso's", and the original falls back
+    /// to byte 0 for it (0x24dcc); seventeen of the sixty-four creatures are written that way -
+    /// rotworm, bats, rats, slugs, imp, mongbat, bloodworm, lurkers, ghosts, gazer, wisp - so
+    /// without that branch they would carry 255 everywhere but the torso, which is to say they
+    /// would be untouchable by anything that struck them elsewhere.
+    /// The marked creatures wear theirs at 5/3, and only they: the original skips that step when
+    /// the target is the player (0x24deb, 0x24e03).
+    /// </summary>
+    public int GetArmourByBodyPart(EBodyPart part)
+    {
+        int[] armour = stats.Armour;
+        if (armour == null)
+        {
+            return 0;
+        }
+
+        int protection = armour[(int)part];
+        if (protection == 255)
+        {
+            protection = armour[(int)EBodyPart.Torso];
+        }
+
+        if (elite)
+        {
+            protection = protection * 5 / 3;
+        }
+
+        return protection;
+    }
+
+    /// <summary>
+    /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on, measured
+    /// against this creature's own capsule. <see cref="Utils.PickBodyPart"/> holds the rule.
+    /// </summary>
+    public EBodyPart PickBodyPart(float strikeHeight)
+    {
+        CharacterController body = cachedCharacterController;
+        if (body == null)
+        {
+            return EBodyPart.Torso;
+        }
+
+        float middle = transform.TransformPoint(body.center).y;
+        return Utils.PickBodyPart(strikeHeight, middle - 0.5f * body.height, middle + 0.5f * body.height);
+    }
+
+    /// <summary>
+    /// Takes the protection covering the body part the blow landed on off the damage, floored at
+    /// zero (UW.EXE 0x24e14). One routine does this for whoever is being hit, so a creature's own
+    /// armour works exactly the way the player's does in
+    /// <see cref="PlayerObject.AbsorbWithArmour"/> - it does not stop blows from landing, it stops
+    /// them from hurting.
+    /// Only a swing and a missile go through it. The original's damage routine has two callers,
+    /// 0x2527e for a melee blow and 0x259e7 for a missile impact, and it is one of nineteen ways
+    /// into the routine that spends hit points: spells, poison, falls and traps reach that one
+    /// directly and armour never sees them.
+    /// </summary>
+    public int AbsorbWithArmour(int damage, float strikeHeight)
+    {
+        return Mathf.Max(0, damage - GetArmourByBodyPart(PickBodyPart(strikeHeight)));
+    }
+
     void TryDamageTarget()
     {
         if (GetDistanceToTarget() > meleeAttackRange + meleeAttackHysteresis)
@@ -3500,6 +3565,7 @@ public class Critter : UUObject
             }
             else
             {
+                damage = attackTarget.AbsorbWithArmour(damage, GetSwingHeight());
                 attackTarget.TryDamage(damage, result);
             }
             break;

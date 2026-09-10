@@ -185,6 +185,44 @@ public class Utils
         }
     }
 
+    /// <summary>
+    /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on, for a target
+    /// standing between <paramref name="foot"/> and <paramref name="head"/>. The original compares
+    /// the middle of the swing with the middle of what it is hitting (UW.EXE 0x2441a): below the
+    /// feet is legs, above the head is head, and in between the split leans low or high depending
+    /// on which side of the middle the blow arrived on. So a rotworm goes for the legs and an imp
+    /// for the head, and the protection that answers is the one covering that part.
+    /// One routine picks the part whoever is swinging: the melee path reaches it at 0x24a2e and
+    /// the missile path at 0x25988, and both then read the protection at 0x24dc1. That is why the
+    /// player and a creature ask the same question here.
+    /// </summary>
+    public static EBodyPart PickBodyPart(float strikeHeight, float foot, float head)
+    {
+        if (strikeHeight < foot)
+        {
+            return EBodyPart.Legs;
+        }
+
+        if (strikeHeight > head)
+        {
+            return EBodyPart.Head;
+        }
+
+        if (strikeHeight < 0.5f * (foot + head))
+        {
+            if (Random.Range(0, 2) == 0)
+            {
+                return EBodyPart.Legs;
+            }
+        }
+        else if (Random.Range(0, 3) == 0)
+        {
+            return EBodyPart.Head;
+        }
+
+        return Random.Range(0, 3) == 0 ? EBodyPart.Arms : EBodyPart.Torso;
+    }
+
     public static int GetDamageRoll(int maxDamage)
     {
         int numD6 = maxDamage / 6;

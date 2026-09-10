@@ -656,11 +656,21 @@ public class WeaponBase : UUObject
 
                     //Debug.Log($"Damage: max {maxDamage}; roll {rolledDamage}; prep {prepTime}; scale {scaledForDamage}; dam {damage}");
 
+                    Critter critter = obj as Critter;
+                    if (critter != null)
+                    {
+                        // The creature's own armour eats the blow, the same way the player's eats
+                        // one coming the other way: the original runs both through one routine and
+                        // subtracts the protection covering wherever the blow landed
+                        // (UW.EXE 0x24dc1, 0x24e14).
+                        damage = critter.AbsorbWithArmour(damage, PlayerObject.Player.GetSwingHeight());
+                    }
+
                     obj.TryDamage(damage, res);
                 
                     PlayerObject.Rumble(0.05f, 0.4f, 0.2f);
                 
-                    if (obj is Critter critter)
+                    if (critter != null)
                     {
                         PlayerObject.Player.SetLastEngagedInCombat(critter);
                         

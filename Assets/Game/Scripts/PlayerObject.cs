@@ -177,11 +177,9 @@ public class PlayerObject : MonoBehaviour
     }
 
     /// <summary>
-    /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on. The original
-    /// compares that height with the vertical extent of what it is hitting (UW.EXE 0x2441a): under
-    /// the feet is legs, over the head is head, and in between the split leans low or high
-    /// depending on which of the two is taller. So a rotworm goes for the legs and an imp for the
-    /// head, and the armour that answers is the one covering that part.
+    /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on, measured
+    /// against the player's own capsule. <see cref="Utils.PickBodyPart"/> holds the rule, which
+    /// the original applies to whoever is being hit.
     /// </summary>
     public EBodyPart PickBodyPart(float strikeHeight)
     {
@@ -192,32 +190,31 @@ public class PlayerObject : MonoBehaviour
         }
 
         float middle = transform.TransformPoint(body.center).y;
-        float foot = middle - 0.5f * body.height;
-        float head = middle + 0.5f * body.height;
+        return Utils.PickBodyPart(strikeHeight, middle - 0.5f * body.height, middle + 0.5f * body.height);
+    }
 
-        if (strikeHeight < foot)
-        {
-            return EBodyPart.Legs;
-        }
-
-        if (strikeHeight > head)
-        {
-            return EBodyPart.Head;
-        }
-
-        if (strikeHeight < middle)
-        {
-            if (Random.Range(0, 2) == 0)
-            {
-                return EBodyPart.Legs;
-            }
-        }
-        else if (Random.Range(0, 3) == 0)
-        {
-            return EBodyPart.Head;
-        }
-
-        return Random.Range(0, 3) == 0 ? EBodyPart.Arms : EBodyPart.Torso;
+    /// <summary>
+    /// The height the player's own blow arrives at, which is what decides where on a creature it
+    /// lands. The original works this out from the player's footing and build and hands it to the
+    /// same part picker a creature's swing uses (UW.EXE 0x24876), so the mirror of
+    /// Critter.GetSwingHeight() is the right shape.
+    /// It leaves out one term the original adds only when the swinger is the player, at UW.EXE
+    /// 0x24908: a quarter of the view pitch, which is to say that looking up makes a blow land
+    /// higher on what it hits. The original's pitch is one of the three angles of the viewpoint
+    /// (0x31759 fills it from DS:0x3588), clamped to a sixteenth of a turn either way in steps of
+    /// a sixty-fourth, so four notches up and four down; 0x24908 divides it by 512 and adds -8 to
+    /// +8 to the height of the blow, against a player 23 units tall in COMOBJ.DAT - about a third
+    /// of his own height, enough to move a hit from the chest to the head.
+    /// It is left out because the choice of part is worth almost nothing here: of the sixty-four
+    /// creatures forty-one carry the same protection on all four parts and twenty-one vary by a
+    /// single point, so the part chosen costs at most one point of damage to all but two of them.
+    /// Porting it would also be a design decision rather than a transcription, since mouse look
+    /// here is continuous where the original has four notches.
+    /// </summary>
+    public float GetSwingHeight()
+    {
+        CharacterController body = cachedCharacterController;
+        return body != null ? transform.TransformPoint(body.center).y : transform.position.y;
     }
 
     public static void LoadSkills()

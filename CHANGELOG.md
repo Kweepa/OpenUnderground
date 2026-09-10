@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Creatures now wear the armour their own data gives them, which nothing had been reading, so a blow that lands loses the protection covering the part it struck and one that cannot get through does no harm at all. Fights are harder and longer for it, and closer to the original: most creatures shrug off one to five points of every hit, and a headless turns out to be best protected exactly where it has no head.
+
 - Maximum hit points now grow with the character's level, as the original's do, instead of gaining a fixed step each time. A character with Strength 14 reached level 16 twelve points short - a sixth of the total - and the shortfall grew with every level.
 
 - A projectile the player fires no longer does extra damage for the character's level, which the original adds neither to missiles nor to melee. It was a quarter of the level, so at level 13 a sling stone hit for five where the stone itself is worth two.
