@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Every skill roll drew from a range one value short of the original's, so every check in the game - to hit, to pick a lock, to cast - was slightly harder than it should have been. Where the difficulty sat a point above the skill, a critical success was not merely rare but impossible.
+
 - The original's game.gog is now unpacked once and reused, instead of being extracted again on every trip through the game-directory dialog. Starting the game while another copy is already running no longer fails on the locked data files.
 
 - Armour no longer makes the player nearly impossible to hit. Creatures marked as elite keep the attack and damage bonus.
