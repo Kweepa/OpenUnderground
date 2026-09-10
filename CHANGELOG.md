@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Ultima Underworld's game.gog is now unpacked once and reused, instead of being extracted again on every trip through the game-directory dialog. Starting the game while another copy is already running no longer fails on the locked data files.
+
 - Armour no longer makes the player nearly impossible to hit. Creatures marked as elite keep the attack and damage bonus.
 
 - Creatures now choose among their three attacks the way the original does, weighted rather than at random, and the damage of a blow scales with how long it was charged. A goblin's swing is slightly weaker, a mongbat's is nearly twice as strong.
