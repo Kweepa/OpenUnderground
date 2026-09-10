@@ -79,6 +79,24 @@ the repository.
 Changes that are conveniences rather than restorations are welcome too, but they are easier to
 accept when they are optional, or at least when the original behaviour stays available.
 
+### Citing the original executable
+
+An address written as `UW.EXE 0x816fd` is a **byte offset into the file**, not a runtime address:
+open that executable, seek there, disassemble as 16-bit x86, and you are looking at what the
+comment is talking about.
+
+It names a byte in one particular build, so it is worth saying which. These offsets are for the
+executable in the GOG release, 547,248 bytes long, sha256
+`dcb2724c7f1dab861ab988cf493232a18ff9c52b318e42ca707a90465b8a54db`. The original floppy release is
+a different build - 561,744 bytes - and none of these offsets carry over to it.
+
+If you would rather work in the addresses a debugger shows, the MZ header is 0x3200 bytes, so a
+loaded `segment:offset` sits at `0x3200 + segment * 16 + offset` in the file. Two anchors to check
+that against: the skill check is `0x30f9:0x000c`, file `0x3419c`, and `rand()` is `0xec5:0x0de7`,
+file `0x12c37`. Above file `0x65700` there is overlaid code, which DOS loads on demand and which
+has no fixed runtime address at all - for that part the file offset is the only stable name, which
+is the reason to use it everywhere.
+
 ## Code
 
 Follow the style of the file you are editing. Name a method with its class when you talk about it -
