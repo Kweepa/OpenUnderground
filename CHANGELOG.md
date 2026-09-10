@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Mantras at a shrine no longer hand out an extra point on the seven skills governed by Strength, the way the original withholds it there and nowhere else. The mana ceiling now uses the game's own formula rather than one from a wiki, and saying the mana mantra no longer tops the pool back up.
+
 - Every skill roll drew from a range one value short of the original's, so every check in the game - to hit, to pick a lock, to cast - was slightly harder than it should have been. Where the difficulty sat a point above the skill, a critical success was not merely rare but impossible.
 
 - The original's game.gog is now unpacked once and reused, instead of being extracted again on every trip through the game-directory dialog. Starting the game while another copy is already running no longer fails on the locked data files.
