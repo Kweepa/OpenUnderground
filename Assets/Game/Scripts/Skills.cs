@@ -69,6 +69,12 @@ public class Skills
         return PlayerData.sData.dexterity;
     }
 
+    /// <summary>True for the seven skills the original governs with Strength (Attack..Missile).</summary>
+    private static bool IsStrengthSkill(ESkill skill)
+    {
+        return (int)skill < 7;
+    }
+
     private static int GetRandomRange(ESkill skill)
     {
         int i = (int)skill;
@@ -77,13 +83,21 @@ public class Skills
         return 40; // dexterity
     }
 
-    public static void ManaAdvanced()
+    /// <summary>
+    /// Recomputes the mana ceiling from the Mana skill and Intelligence, and optionally refills the
+    /// pool. The original computes (Mana + 1) * Intelligence / 8 and refills only when its caller
+    /// asks: character creation passes 1, the shrine passes 0 (UW.EXE 0x81305, called from 0x6ca4c
+    /// and 0x819ab).
+    /// </summary>
+    public static void ManaAdvanced(bool refill)
     {
-        // https://wiki.ultimacodex.com/wiki/Character_attributes#Ultima_Underworld_and_Ultima_Underworld_II
         int manaSkill = PlayerData.sData.skill[(int)ESkill.Mana];
         int intellect = PlayerData.sData.intellect;
-        PlayerData.sData.maxMana = ((3 * manaSkill + 2) * intellect + 12) / 24;
-        PlayerData.sData.mana = PlayerData.sData.maxMana;
+        PlayerData.sData.maxMana = (manaSkill + 1) * intellect / 8;
+        if (refill)
+        {
+            PlayerData.sData.mana = PlayerData.sData.maxMana;
+        }
     }
     
     public static bool AdvanceSkill(ESkill skill)
@@ -93,7 +107,10 @@ public class Skills
         if (curVal < 2 * attrib && curVal < 30)
         {
             ++curVal;
-            if (curVal < attrib / 2)
+            // The original grants this second point only when the governing attribute is not
+            // Strength: the test is on the attribute index and skips it when that index is 0, so
+            // the seven Strength skills (Attack..Missile) never get it (UW.EXE 0x8155a).
+            if (!IsStrengthSkill(skill) && curVal < attrib / 2)
             {
                 ++curVal;
             }
@@ -109,7 +126,8 @@ public class Skills
             switch (skill)
             {
             case ESkill.Mana:
-                ManaAdvanced();
+                // Advancing Mana raises the ceiling; the original does not refill the pool here.
+                ManaAdvanced(refill: false);
                 break;
             }
             

@@ -454,7 +454,7 @@ public class CreateCharacter : MonoBehaviour
             fadeAlpha += Time.deltaTime;
             if (fadeAlpha > 1.0f)
             {
-                Skills.ManaAdvanced();
+                Skills.ManaAdvanced(refill: true);
                 
                 // Save character sex to PlayerPrefs for frontend background display
                 PlayerPrefs.SetString("LastCharacterSex", PlayerData.sData.female ? "female" : "male");
