@@ -1526,6 +1526,16 @@ public class PlayerObject : MonoBehaviour
 
     // Awards skill points for newly crossed 300-display-XP tiers and character levels.
     // Uses a high-water XP tier so sapling XP penalties do not re-award the same tiers.
+    /// <summary>
+    /// The maximum hit points: level * Strength / 5 + 30, the multiply before the divide, as
+    /// the original works it out from scratch whenever the level changes (UW.EXE 0x81305,
+    /// reached from the level-up routine 0x8138a, both read whole).
+    /// </summary>
+    public static int GetMaxHitPoints()
+    {
+        return PlayerData.sData.charLevel * PlayerData.sData.strength / 5 + 30;
+    }
+
     public static void ApplyXpProgress()
     {
         int displayXp = PlayerData.sData.xp / 20;
@@ -1543,9 +1553,13 @@ public class PlayerObject : MonoBehaviour
             int levelsGained = newLevel - PlayerData.sData.charLevel;
             PlayerData.sData.charLevel = newLevel;
             Messages.Add($"{StringLoader.GetString(1, 147)}{PlayerData.sData.charLevel}.");
-            int vitalityIncrease = PlayerData.sData.strength / 5;
-            PlayerData.sData.vitality += vitalityIncrease;
-            PlayerData.sData.hp += vitalityIncrease;
+            int previousMax = PlayerData.sData.vitality;
+            PlayerData.sData.vitality = GetMaxHitPoints();
+            // The original raises the ceiling and leaves the current total alone, but the
+            // flask is drawn as 13 * hp / vitality, so that would empty two of its thirteen
+            // segments at every level, even at full health. Kept as it was: what the ceiling
+            // gains, the current total gains.
+            PlayerData.sData.hp += Mathf.Max(0, PlayerData.sData.vitality - previousMax);
             PlayerData.sData.skillPoints += levelsGained;
             Music.LevelUp();
         }

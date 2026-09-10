@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Maximum hit points now grow with the character's level, as the original's do, instead of gaining a fixed step each time. A character with Strength 14 reached level 16 twelve points short - a sixth of the total - and the shortfall grew with every level.
+
 - A projectile the player fires no longer does extra damage for the character's level, which the original adds neither to missiles nor to melee. It was a quarter of the level, so at level 13 a sling stone hit for five where the stone itself is worth two.
 
 - Mantras at a shrine no longer hand out an extra point on the seven skills governed by Strength, the way the original withholds it there and nowhere else. The mana ceiling now uses the game's own formula rather than one from a wiki, and saying the mana mantra no longer tops the pool back up.

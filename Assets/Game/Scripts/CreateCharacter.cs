@@ -187,9 +187,7 @@ public class CreateCharacter : MonoBehaviour
                 break;
             }
         }
-        // https://wiki.ultimacodex.com/wiki/Character_attributes#Ultima_Underworld_and_Ultima_Underworld_II
-        int strength = PlayerData.sData.strength;
-        PlayerData.sData.vitality = 29 + (6 * strength + 3) / 25;
+        PlayerData.sData.vitality = PlayerObject.GetMaxHitPoints();
         PlayerData.sData.hp = PlayerData.sData.vitality;
 
         for (int i = 0; i < PlayerData.sData.skill.Length; ++i)
