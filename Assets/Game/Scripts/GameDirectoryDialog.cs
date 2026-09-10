@@ -705,7 +705,7 @@ public class GameDirectoryDialog : MonoBehaviour
             // Check if already extracted and valid.
             // This has to search subdirectories the same way the verification at the end of this
             // method does, and for the same reason: the ISO may hold the game in a subfolder
-            // rather than at its root, which is exactly what the original's game.gog does -
+            // rather than at its root, which is exactly what Ultima Underworld's game.gog does -
             // everything sits under UW\. Checking only looseDataPath\Sound\UW01.XMI never matched
             // for those, so the whole ISO was re-extracted on every pass through this dialog.
             // Besides being slow, that failed outright whenever another copy of the game was
