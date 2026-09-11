@@ -6,6 +6,10 @@
 
 - A punch now takes its damage from the Unarmed skill, which had no effect on it at all. A trained brawler's fist is worth three and a half times what it was, an untrained one half again as much, so bare hands are a way to fight rather than a last resort.
 
+- Casting a spell now rolls the way the original rolls it: five points are added to the skill, and the roll is against twice the spell's circle rather than against its mana cost. Spells go off far more often - an eighth-circle spell at full Casting never fails now, where it failed a third of the time - and the cheapest spells can no longer backfire at any skill, which in the original they never could.
+
+- A spell no longer costs half its mana when the roll comes out a critical success. The original charges the full price however well the roll went, and at high Casting nearly every cast is a critical success, so most of a practised mage's spells were going off at half price.
+
 - A missile now does the damage its own row in the game's data gives it, instead of a hand-written number, and the Missile skill multiplies that damage rather than being added to it. Archery is a little weaker at the top and a spell is much stronger everywhere: a fireball averaged seven points for a new mage and fourteen for a practised one, where the original asks for sixteen and a half from both.
 
 - Spells no longer get a damage bonus from the caster's skill, which the original gives to neither spells nor arrows. A fireball is a fireball whoever throws it; what the skill buys is the chance of throwing one at all.

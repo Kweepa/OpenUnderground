@@ -1094,17 +1094,10 @@ public class Magic : MonoBehaviour
             return;
         }
 
-        int cost = spells[i].cost;
-        if (crit)
-        {
-            PlayerData.sData.mana -= cost / 2;
-            bubbleTime = 3.0f;
-        }
-        else
-        {
-            PlayerData.sData.mana -= cost;
-            bubbleTime = 2.0f;
-        }
+        // The full cost either way: see the note on the critical success in
+        // TryCastFromSpellRunes(). The flag still picks the longer bubble.
+        PlayerData.sData.mana -= spells[i].cost;
+        bubbleTime = crit ? 3.0f : 2.0f;
 
         castSpells[i] = true;
         timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
@@ -1437,12 +1430,19 @@ public class Magic : MonoBehaviour
             }
             else
             {
-                int casting = Skills.GetSkill(ESkill.Casting);
+                // The original rolls Casting with five added to it against twice the circle, not
+                // against the mana cost, which is three times the circle. The margin differs by
+                // 5 + circle: six points at the first circle, thirteen at the eighth. UW.EXE
+                // 0x78ec8, read from its prologue to the lret; the roll is at 0x78f4d and calls
+                // GetResult, which is 0x30f9:0x000c, file 0x3419c. The circle here stays the one
+                // the rest of this method already uses - the cost divided by three - so that the
+                // handful of spells whose cost is wrong keep whatever circle they had.
+                int casting = Skills.GetSkill(ESkill.Casting) + 5;
                 if (Cheats.sCheats.boostCasting)
                 {
                     casting += 20;
                 }
-                Skills.ESkillTestResult result = Skills.GetResult(casting, spells[i].cost);
+                Skills.ESkillTestResult result = Skills.GetResult(casting, 2 * spells[i].circle);
                 switch (result)
                 {
                 case Skills.ESkillTestResult.CriticalFailure:
@@ -1470,7 +1470,14 @@ public class Magic : MonoBehaviour
                         break;
                     }
 
-                    PlayerData.sData.mana -= spells[i].cost / 2;
+                    // A critical success costs what any success costs. The original cannot
+                    // charge less for one: it overwrites the roll's result with the spell's
+                    // power before it comes to the mana, so by then nothing can tell the two
+                    // apart, and it takes three per circle either way (UW.EXE 0x78f99 then
+                    // 0x78fd2). The power is the same for both too, at 0x78f83 - a critical
+                    // success in the original buys nothing at all - so what is left here is
+                    // the longer bubble, which is only feedback.
+                    PlayerData.sData.mana -= spells[i].cost;
                     bubbleTime = 3.0f;
                     TryCast(i);
                     castSpells[i] = true;
