@@ -564,30 +564,59 @@ public class WeaponBase : UUObject
         return Time.time - lastSwingEndTime < 2.0f;
     }
 
+    /// <summary>The largest damage one swing can roll, before the charge scales it.</summary>
+    /// <remarks>
+    /// Bare hands are not a special case in the original: the choice between the two formulas
+    /// comes from the weapon row's own skill byte, clamped into the four melee skills, and the
+    /// fist's row is the only one that falls outside them - it reads 6 where the others read 3,
+    /// 4 or 5 - so bare hands are the only thing that lands on Unarmed. With a weapon the damage
+    /// is the row's value for the attack plus a ninth of Strength; bare-handed it is two fifths
+    /// of Unarmed plus a sixth of Strength plus four, which puts the skill at the head of the sum
+    /// instead of leaving it out (UW.EXE 0x25406, read from its prologue to the lret; the
+    /// bare-handed arm starts at 0x2545e). Strength is read there through the player's row in the
+    /// creature table, whose byte 5 is copied from the attribute at 0x7ddee.
+    /// Only a melee type asks the row: past 15 the rows belong to other weapons, and in the
+    /// original a launcher's shot never comes through this routine at all.
+    /// </remarks>
     public int GetMaxDamage()
     {
         ObjectsData.MeleeData meleeData = DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
-        int weaponDamage = 0;
-        switch (attacks[(int)type & 15])
+
+        int rowSkill = meleeData.Skill;
+        if (rowSkill < (int)ESkill.Unarmed || rowSkill >= (int)ESkill.Missile)
         {
-        case EAttack.Slash:
-            weaponDamage = meleeData.Slash;
-            break;
-        case EAttack.Bash:
-            weaponDamage = meleeData.Bash;
-            break;
-        case EAttack.Stab:
-            weaponDamage = meleeData.Stab;
-            break;
-        }
-        int playerDamage = PlayerData.sData.strength / 9;
-        int weaponBonusDamage = 0;
-        if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex >= 8) // damage enchantment
-        {
-            weaponBonusDamage = 1 + enchantmentIndex - 8;
+            rowSkill = (int)ESkill.Unarmed;
         }
 
-        int maxDamage = weaponDamage + playerDamage + weaponBonusDamage;
+        int maxDamage;
+        if (rowSkill == (int)ESkill.Unarmed && (int)type <= (int)EObjectType.Fist)
+        {
+            maxDamage = 2 * Skills.GetSkill(ESkill.Unarmed) / 5
+                        + PlayerData.sData.strength / 6
+                        + 4;
+        }
+        else
+        {
+            int weaponDamage = 0;
+            switch (attacks[(int)type & 15])
+            {
+            case EAttack.Slash:
+                weaponDamage = meleeData.Slash;
+                break;
+            case EAttack.Bash:
+                weaponDamage = meleeData.Bash;
+                break;
+            case EAttack.Stab:
+                weaponDamage = meleeData.Stab;
+                break;
+            }
+            maxDamage = weaponDamage + PlayerData.sData.strength / 9;
+        }
+
+        if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex >= 8) // damage enchantment
+        {
+            maxDamage += 1 + enchantmentIndex - 8;
+        }
 
         if (Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed))
         {

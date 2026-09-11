@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- A punch now takes its damage from the Unarmed skill, which had no effect on it at all. A trained brawler's fist is worth three and a half times what it was, an untrained one half again as much, so bare hands are a way to fight rather than a last resort.
+
 - A missile now does the damage its own row in the game's data gives it, instead of a hand-written number, and the Missile skill multiplies that damage rather than being added to it. Archery is a little weaker at the top and a spell is much stronger everywhere: a fireball averaged seven points for a new mage and fourteen for a practised one, where the original asks for sixteen and a half from both.
 
 - Spells no longer get a damage bonus from the caster's skill, which the original gives to neither spells nor arrows. A fireball is a fireball whoever throws it; what the skill buys is the chance of throwing one at all.
