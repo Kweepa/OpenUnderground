@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- How long a weapon takes to wind up now depends on the weapon alone, as the original has it, and not on the character's skills as well: a trained fighter used to charge a battle axe in under a second, and it now takes the same two it takes a beginner. Every swing also opens with a short raise that no weapon skips and that a release cuts short, so the distance between the lightest weapon and the heaviest is the two to one the original asks for instead of the near-parity it drifted into.
+
 - Creatures now wear the armour their own data gives them, which nothing had been reading, so a blow that lands loses the protection covering the part it struck and one that cannot get through does no harm at all. Fights are harder and longer for it, and closer to the original: most creatures shrug off one to five points of every hit, and a headless turns out to be best protected exactly where it has no head.
 
 - Maximum hit points now grow with the character's level, as the original's do, instead of gaining a fixed step each time. A character with Strength 14 reached level 16 twelve points short - a sixth of the total - and the shortfall grew with every level.

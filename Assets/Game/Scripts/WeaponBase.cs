@@ -289,14 +289,17 @@ public class WeaponBase : UUObject
             }
             else if (attackHeld && !panelBlocksWeapon)
             {
-                bool wasPrepared = prepareTime > 0.5f;
-                float chargeSpeed = GetChargeSpeed();
-                prepareTime += Time.deltaTime * chargeSpeed;
-                if (!wasPrepared && prepareTime > 0.5f)
+                bool wasWoundUp = prepareTime > WindUpSeconds;
+                prepareTime += Time.deltaTime;
+                if (!wasWoundUp && prepareTime > WindUpSeconds)
                 {
                     Utils.PlayClip2d(prepareSound);
                 }
-                WeaponChargeGem.sChargeGem.power = Mathf.Clamp(prepareTime - 0.5f, 0.0f, 1.0f);
+
+                // The gem shows the charge itself, so it stays dark through the wind-up - where a
+                // release throws the swing away here and in the original alike - and then climbs
+                // in the same steps the charge does.
+                WeaponChargeGem.sChargeGem.power = GetChargePercent() / 100.0f;
 
                 if (cancelPressed)
                 {
@@ -306,7 +309,7 @@ public class WeaponBase : UUObject
             }
             else
             {
-                if (prepareTime > 0.5f)
+                if (prepareTime > WindUpSeconds)
                 {
                     ChangeState(EState.Swing);
                 }
@@ -500,28 +503,57 @@ public class WeaponBase : UUObject
         }
     }
 
-    private float GetChargeSpeed()
+    /// <summary>
+    /// The pause between the button going down and the charge starting to build. The original
+    /// spends it raising the weapon, on the same 32-tick mask the charge's clock drives: the
+    /// click arms the animation's bit at once (UW.EXE 0x3210b), the dispatcher runs it on the
+    /// next boundary (0x32145), and its state counter has to climb before the charge starts
+    /// accumulating (0x330c9). A release inside it throws the swing away rather than landing a
+    /// weak blow, here and in the original alike (0x255ca, the branch for that counter below 3).
+    /// </summary>
+    /// <remarks>
+    /// 176 ticks, and the last word here is play rather than the listing. Reading the state
+    /// machine accounts for 112 - half a boundary's wait on average plus three whole periods -
+    /// and timing the original gives 64 more, which is two more periods somewhere between the
+    /// click and the animation being asked for. Where they go has not been found, so the number
+    /// is the measured one and this note is the reason it is not the counted one.
+    /// </remarks>
+    private const float WindUpSeconds = 0.6875f;
+
+    /// <summary>
+    /// One step of the charge. The original adds the weapon's WeaponSpeed byte to a percentage
+    /// once every 16 ticks of that same clock and stops at a hundred (UW.EXE 0x2574e, clamped at
+    /// 0x25752), so the charge climbs in steps rather than smoothly and the number of steps is
+    /// ceil(100 / WeaponSpeed) - a dagger at 30 and a hand axe at 25 both take four of them.
+    /// </summary>
+    /// <remarks>
+    /// Both constants are in seconds, which the original is not: it counts ticks of a clock whose
+    /// rate the executable does not fix, since a timer library reprograms the PIT for whatever
+    /// period is asked of it. The rate comes instead from the gap between two weapons timed by
+    /// hand under DOSBox - a battle axe at two seconds and a dagger at one, 320 ticks of charge
+    /// against 64, so 256 ticks are a second and a tick is 1/256s. A stopwatch adds the same
+    /// constant to both readings and it cancels in the difference, which is why the gap pins the
+    /// rate where a single reading could not. It also lands on a round number, and on a
+    /// prediction: a long sword should take 1.19s, and measured 1.20 afterwards.
+    /// </remarks>
+    private const float ChargeStepSeconds = 0.0625f;
+
+    /// <summary>How quickly this weapon builds an attack charge, on the data's 5-30 scale.</summary>
+    protected virtual int GetWeaponSpeed()
     {
-        ObjectsData.MeleeData meleeData = DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
-        
-        // WeaponSpeed ranges from 5-30 (higher = faster)
-        float weaponSpeedNormalized = (meleeData.WeaponSpeed - 5.0f) / 25.0f; // 0.0 to 1.0
-        
-        // Skills range from 0-30 (higher = faster)
-        float attackSkillNormalized = Skills.GetSkill(ESkill.Attack) / 30.0f; // 0.0 to 1.0
-        float dexterityNormalized = PlayerData.sData.dexterity / 30.0f; // 0.0 to 1.0
-        float weaponSkillNormalized = Skills.GetSkill(skill) / 30.0f; // 0.0 to 1.0
-        
-        // Base speed: 0.5x to 2.0x multiplier based on weapon speed
-        // Skill bonus: up to 1.5x additional multiplier from skills
-        float baseSpeed = 0.5f + weaponSpeedNormalized * 1.5f;
-        float skillBonus = (attackSkillNormalized + dexterityNormalized + weaponSkillNormalized) / 3.0f * 1.5f;
-        
-        float chargeSpeed = baseSpeed + skillBonus;
-        
-        // Clamp chargeSpeed so time to reach prepareTime = 1.0 ranges from 0.1s to 5s
-        // time = 1.0 / chargeSpeed, so chargeSpeed must be between 0.2 and 10.0
-        return Mathf.Clamp(chargeSpeed, 0.2f, 10.0f);
+        return DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15].WeaponSpeed;
+    }
+
+    /// <summary>How far the charge has climbed for the hold so far, from 0 to 100.</summary>
+    private int GetChargePercent()
+    {
+        if (prepareTime <= WindUpSeconds)
+        {
+            return 0;
+        }
+
+        int steps = (int)((prepareTime - WindUpSeconds) / ChargeStepSeconds);
+        return Mathf.Clamp(steps * GetWeaponSpeed(), 0, 100);
     }
 
     /// <summary>True when the player is preparing, swinging, in post-swing, or within 2 seconds of finishing a swing (sprint blocked).</summary>
@@ -644,7 +676,7 @@ public class WeaponBase : UUObject
                     ObjectsData.MeleeData meleeData =  DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
                     int maxDamage = GetMaxDamage();
                     int rolledDamage = Utils.GetDamageRoll(maxDamage);
-                    int prepTime = (int)(100.0f * Mathf.Clamp(prepareTime - 0.5f, 0.0f, 1.0f));
+                    int prepTime = GetChargePercent();
                     int scaledForDamage = meleeData.MinCharge +
                                           (meleeData.MaxCharge - meleeData.MinCharge) * prepTime / 100;
                     int damage = scaledForDamage * rolledDamage / 128;
