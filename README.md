@@ -21,4 +21,5 @@ I removed a number of store-bought assets before pushing this to github, so it m
   - gamepad support
   - three ratings added to the inventory panel: attack by the weapon hand, defence and armour by the shield hand
   - clearer attack feedback: the charge cursor stays dark until a release would actually land a swing, then lights up and fills
+  - a shrine will not take a skill point when nothing it could raise can rise, and it names only the skills that actually improved
 

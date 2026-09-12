@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- The three group mantras at a shrine now advance as many skills as the original advances them: three for SUMM RA and four for OM CAH, where every group mantra used to advance two. OM CAH is once more the most generous thing a shrine offers, instead of being worth less than chanting a single skill's mantra.
+
+- A shrine no longer says it has improved skills that it has not, and it will not take the point when there is nothing in the group left to raise. MU AHM now leans towards Mana while Mana is still low, as the original has it.
+
+- A new character starts with one skill point instead of three, which is what the original grants.
+
 - A punch now takes its damage from the Unarmed skill, which had no effect on it at all. A trained brawler's fist is worth three and a half times what it was, an untrained one half again as much, so bare hands are a way to fight rather than a last resort.
 
 - Casting a spell now rolls the way the original rolls it: five points are added to the skill, and the roll is against twice the spell's circle rather than against its mana cost. Spells go off far more often - an eighth-circle spell at full Casting never fails now, where it failed a third of the time - and the cheapest spells can no longer backfire at any skill, which in the original they never could.

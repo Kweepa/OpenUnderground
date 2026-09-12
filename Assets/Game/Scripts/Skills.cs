@@ -100,11 +100,27 @@ public class Skills
         }
     }
     
+    /// <summary>
+    /// Whether this skill could still take an advance, without taking one.
+    /// </summary>
+    /// <remarks>
+    /// The ceiling is twice the governing attribute. The original is a shade looser - it fails
+    /// only once twice the attribute has fallen below the skill (UW.EXE 0x81521, a cmp followed
+    /// by jl), so a skill resting exactly on the ceiling takes one more step and ends a point
+    /// above it. That is left alone deliberately: the ceiling a player is told about is twice
+    /// the attribute, and a skill standing one past it reads as a bug rather than as fidelity.
+    /// </remarks>
+    public static bool CanAdvanceSkill(ESkill skill)
+    {
+        int curVal = GetSkill(skill);
+        return curVal < 2 * GetGoverningAttribute(skill) && curVal < 30;
+    }
+
     public static bool AdvanceSkill(ESkill skill)
     {
         int attrib = GetGoverningAttribute(skill);
         int curVal = GetSkill(skill);
-        if (curVal < 2 * attrib && curVal < 30)
+        if (CanAdvanceSkill(skill))
         {
             ++curVal;
             // The original grants this second point only when the governing attribute is not
@@ -136,39 +152,100 @@ public class Skills
         return false;
     }
 
-    public static bool AdvanceSkills(ESkill min, ESkill max)
+    /// <summary>
+    /// A group mantra: SUMM RA, MU AHM or OM CAH. How many skills it advances belongs to the
+    /// mantra and is not the same for all three (UW.EXE 0x816fd, the three cases of the jump
+    /// table at 0x819d3 set a base, a width and a count: 0/7/3, 7/3/2 and 10/10/4).
+    /// </summary>
+    /// <remarks>
+    /// The original draws blind over the whole group and tries each draw as it comes, so a draw
+    /// that lands on a skill which cannot rise is spent rather than re-rolled (the loop at
+    /// 0x81922: the count comes down on every pass, and only a successful advance is recorded).
+    /// Filtering the group first would never waste one, which is a kinder rule than the game's.
+    /// The point is spent whatever happens, and there is a message for the case where nothing
+    /// improved - the original prints it (0x81676) and reaches it the same way.
+    /// </remarks>
+    public static bool AdvanceSkills(ESkill min, ESkill max, int count)
     {
-        int eligibleCount = 0;
-        int[] eligible = new int[(int)ESkill.Swimming + 1];
-        for (int i = (int)min; i <= (int)max; i++)
+        // Deliberately kinder than the original, which spends the point whatever happens: if
+        // nothing in the group can move at all, say so and let the player keep the point. Kept
+        // as a modern convenience rather than restored to the original's behaviour.
+        bool anyCanAdvance = false;
+        for (int i = (int)min; i <= (int)max && !anyCanAdvance; i++)
         {
-            if (PlayerData.sData.skill[i] < 30)
-            {
-                eligible[eligibleCount++] = i;
-            }
+            anyCanAdvance = CanAdvanceSkill((ESkill)i);
         }
 
-        if (eligibleCount == 0)
+        if (!anyCanAdvance)
         {
-            Messages.Add(1, 27);
+            Messages.Add(1, 30); // none of your skills improved
             return false;
         }
 
-        int pick1 = eligible[Random.Range(0, eligibleCount)];
-        int pick2 = eligible[Random.Range(0, eligibleCount)];
-        ESkill skill1 = (ESkill)pick1;
-        ESkill skill2 = (ESkill)pick2;
-        AdvanceSkill(skill1);
-        AdvanceSkill(skill2);
-        Messages.Add(1, 26);
-        if (skill1 == skill2)
+        int width = max - min + 1;
+        // The original's safety counter is the group's width. It never binds on the three real
+        // mantras, where the count is always the smaller of the two, but it is what stops the
+        // loop in the original and it costs nothing to keep.
+        int attempts = width;
+        ESkill[] advanced = new ESkill[4];
+        int advancedCount = 0;
+
+        while (count > 0 && attempts-- > 0)
         {
-            Messages.Add($"{StringLoader.GetString(1, 28)}{skill1}.");
+            ESkill skill;
+            // MU AHM leans on Mana while Mana is still low: one draw in two is forced to it
+            // instead of being rolled. The original tests the group's base, the skill against 8,
+            // and a single bit of rand().
+            if (min == ESkill.Mana && GetSkill(ESkill.Mana) < 8 && Random.Range(0, 2) == 0)
+            {
+                skill = ESkill.Mana;
+            }
+            else
+            {
+                skill = (ESkill)((int)min + Random.Range(0, width));
+            }
+
+            if (AdvanceSkill(skill) && advancedCount < advanced.Length)
+            {
+                advanced[advancedCount++] = skill;
+            }
+
+            count--;
+        }
+
+        if (advancedCount == 0)
+        {
+            Messages.Add(1, 30); // none of your skills improved
         }
         else
         {
-            Messages.Add($"{StringLoader.GetString(1, 29)}{skill1} and {skill2}.");
+            // When every advance landed on the same skill, and there was more than one, say it
+            // went up greatly - the wording the single-skill mantras use for their two attempts.
+            bool allTheSame = true;
+            for (int i = 1; i < advancedCount; i++)
+            {
+                allTheSame &= advanced[i] == advanced[0];
+            }
+
+            if (allTheSame && advancedCount > 1)
+            {
+                Messages.Add($"{StringLoader.GetString(1, 28)}{advanced[0]}.");
+            }
+            else
+            {
+                string list = "";
+                for (int i = 0; i < advancedCount; i++)
+                {
+                    if (i > 0)
+                    {
+                        list += (i == advancedCount - 1) ? " and " : ", ";
+                    }
+                    list += advanced[i];
+                }
+                Messages.Add($"{StringLoader.GetString(1, 29)}{list}.");
+            }
         }
+
         --PlayerData.sData.skillPoints;
         return true;
     }
