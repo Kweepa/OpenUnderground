@@ -60,7 +60,10 @@ public class PlayerData : MonoBehaviour
     public int mana;
     public int xp;
     public int charLevel = 1;
-    public int skillPoints = 3; // start with 3, I think
+    // One, not three: character creation writes a single point (UW.EXE 0x6c84e,
+    // movb $0x1, 0x52(%bx), right beside the level being set to 1 and the experience
+    // tier high-water to 0).
+    public int skillPoints = 1;
     public int skillPointsXpTier; // high-water of displayXp/300 tiers already awarded
     public bool easy;
 

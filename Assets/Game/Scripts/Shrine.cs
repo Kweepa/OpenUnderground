@@ -124,6 +124,9 @@ public class Shrine : UUObject
         {
             ESkill firstSkill = ESkill.Attack;
             ESkill secondSkill = ESkill.Attack;
+            // How many skills a group mantra advances belongs to the mantra: the original's three
+            // cases set it alongside the group itself (UW.EXE 0x818b6, 0x818c5, 0x818d4).
+            int groupCount = 0;
             for (int i = 0; i < 20; ++i)
             {
                 if (mantraText == skillMantras[i])
@@ -141,16 +144,19 @@ public class Shrine : UUObject
                 case "mu ahm":
                     firstSkill = ESkill.Mana;
                     secondSkill = ESkill.Casting;
+                    groupCount = 2;
                     foundMantra = true;
                     break;
                 case "om cah":
                     firstSkill = ESkill.Traps;
                     secondSkill = ESkill.Swimming;
+                    groupCount = 4;
                     foundMantra = true;
                     break;
                 case "summ ra":
                     firstSkill = ESkill.Attack;
                     secondSkill = ESkill.Missile;
+                    groupCount = 3;
                     foundMantra = true;
                     break;
                 default:
@@ -185,7 +191,7 @@ public class Shrine : UUObject
                 }
                 else
                 {
-                    if (!Skills.AdvanceSkills(firstSkill, secondSkill))
+                    if (!Skills.AdvanceSkills(firstSkill, secondSkill, groupCount))
                     {
                         Utils.PlayClip2d(badMantra);
                         return;

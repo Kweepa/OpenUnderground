@@ -104,6 +104,14 @@ public class CreateCharacter : MonoBehaviour
         PlayerData.sData.mana = 0;
         PlayerData.sData.maxMana = 0;
         PlayerData.sData.xp = 0;
+        // The original writes these two right beside the experience it has just zeroed
+        // (UW.EXE 0x6c84e and 0x6c856). They belong here rather than in the field's
+        // initialiser: PlayerData is a component that survives from one game to the next,
+        // and the value Unity has serialised in the scene wins over any initialiser, so a
+        // new character was starting with whatever the scene held - three points - and a
+        // high-water mark left over from the character before.
+        PlayerData.sData.skillPoints = 1;
+        PlayerData.sData.skillPointsXpTier = 0;
         for (int i = 0; i < 20; ++i)
         {
             PlayerData.sData.skill[i] = 0;
