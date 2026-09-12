@@ -3398,13 +3398,6 @@ public class Critter : UUObject
         return 0;
     }
 
-    private static int GetCriticalDamage(int damage)
-    {
-        //based on disassembly:
-        //seems to be a 50:50 chance for a crit which gives double damage. (48+(rng 0-30)) >>5
-        return damage * Random.Range(1, 3);
-    }
-
     /// <summary>
     /// The height the swing lands at: the middle of the creature's own body, which is what the
     /// original compares against the target's extent to pick a body part (UW.EXE 0x2441a).
@@ -3525,7 +3518,7 @@ public class Critter : UUObject
         int damage = Mathf.Max(2, attackDamage + strength / 5 + damageBonus);
         if (result == Skills.ESkillTestResult.CriticalSuccess)
         {
-            damage = GetCriticalDamage(damage);
+            damage = Utils.GetCriticalDamage(damage);
         }
 
         // The table value is a maximum, rolled down and then scaled by how far the creature wound

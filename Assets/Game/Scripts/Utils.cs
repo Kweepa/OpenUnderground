@@ -223,6 +223,23 @@ public class Utils
         return Random.Range(0, 3) == 0 ? EBodyPart.Arms : EBodyPart.Torso;
     }
 
+    /// <summary>
+    /// What a critical hit does to the maximum before the dice are rolled: double it, half the
+    /// time.
+    /// </summary>
+    /// <remarks>
+    /// The original draws rand() &amp; 31, adds 48 and shifts right by 5, which is 1 for the low
+    /// sixteen values and 2 for the high sixteen - an even coin flip (UW.EXE 0x24bc3). It lands
+    /// on the nominal damage, before the roll and before the charge scale, and it lands there for
+    /// whoever swung: one routine resolves both the player's blow and a creature's, and the
+    /// critical branch sits inside it (0x24ac9, called from 0x255ca and from 0x259ee through
+    /// 0x251ac).
+    /// </remarks>
+    public static int GetCriticalDamage(int maxDamage)
+    {
+        return maxDamage * Random.Range(1, 3);
+    }
+
     public static int GetDamageRoll(int maxDamage)
     {
         int numD6 = maxDamage / 6;

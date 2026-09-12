@@ -704,6 +704,16 @@ public class WeaponBase : UUObject
                 {
                     ObjectsData.MeleeData meleeData =  DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
                     int maxDamage = GetMaxDamage();
+                    if (res == Skills.ESkillTestResult.CriticalSuccess)
+                    {
+                        // The original resolves the player's blow and a creature's in one routine,
+                        // so the doubling that creatures already get here belongs to the player
+                        // too - it sits in the shared routine's critical branch, not in either
+                        // caller (UW.EXE 0x24ac9, reached from 0x255ca for the player and from
+                        // 0x259ee for a creature). It applies to the nominal damage, which is why
+                        // it goes before the roll and before the charge scale.
+                        maxDamage = Utils.GetCriticalDamage(maxDamage);
+                    }
                     int rolledDamage = Utils.GetDamageRoll(maxDamage);
                     int prepTime = GetChargePercent();
                     int scaledForDamage = meleeData.MinCharge +
