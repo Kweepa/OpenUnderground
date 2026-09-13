@@ -4342,6 +4342,25 @@ public class Inventory : MonoBehaviour
         ClearGamepadStuffYUseChargeState();
     }
 
+    /// <summary>
+    /// The pair of figures under one hand: two boxes, each flush to its own side of the slot, so
+    /// they read as two numbers rather than one. Nudge the offset to move them apart; a digit is
+    /// about twelve pixels wide at this font size, and the hands are 162 pixels apart, so neither
+    /// pair can reach the other in either handedness.
+    /// </summary>
+    private void DrawRatingPair(float x, float y, int left, int right)
+    {
+        if (ratingLeftStyle == null && carryStyle != null)
+        {
+            ratingLeftStyle = new GUIStyle(carryStyle) { alignment = TextAnchor.LowerLeft };
+            ratingRightStyle = new GUIStyle(carryStyle) { alignment = TextAnchor.LowerRight };
+        }
+
+        const float digit = 12.0f;
+        GUI.Label(new Rect(x, y, 2 * digit, 20), left.ToString(), ratingLeftStyle ?? carryStyle);
+        GUI.Label(new Rect(x + 23, y, 2 * digit + 2, 20), right.ToString(), ratingRightStyle ?? carryStyle);
+    }
+
     private EInvSlot[] armorSlots =
     {
         EInvSlot.Head, EInvSlot.Torso, EInvSlot.Hands, EInvSlot.Legs, EInvSlot.Feet, EInvSlot.LeftHand,
@@ -5074,43 +5093,31 @@ public class Inventory : MonoBehaviour
                 // magical protection, which is the side the original puts magic on too. On the
                 // right what keeps a blow that lands from hurting: the armour worn. Together they
                 // are the single number this used to show.
-                if (ratingLeftStyle == null && carryStyle != null)
-                {
-                    ratingLeftStyle = new GUIStyle(carryStyle) { alignment = TextAnchor.LowerLeft };
-                    ratingRightStyle = new GUIStyle(carryStyle) { alignment = TextAnchor.LowerRight };
-                }
-
                 EInvSlot shieldHandSlot = PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand;
                 float x = Screen.width - invPosition + 3 * invSlots[(int)shieldHandSlot].cx;
                 float y = 30 + 3.6f * invSlots[(int)shieldHandSlot].cy;
 
-                // Two boxes, each flush to its own side of the shield slot: the defence against the
-                // left edge, the armour against the right, so the pair reads as two figures rather
-                // than one. Nudge the offsets below to move them; a digit is about twelve pixels
-                // wide at this font size.
-                const float digit = 12.0f;
-                float defenceBox = x;                       // left edge of the defence, flush left
-                float armourBox = x + 23;                   // the armour box, its text flush right
-                GUI.Label(new Rect(defenceBox, y + 40, 2 * digit, 20),
-                    PlayerObject.Player.GetDefence().ToString(), ratingLeftStyle ?? carryStyle);
-                GUI.Label(new Rect(armourBox, y + 40, 2 * digit + 2, 20),
-                    GetKnownArmourScore().ToString(), ratingRightStyle ?? carryStyle);
+                DrawRatingPair(x, y + 40, PlayerObject.Player.GetKnownDefence(), GetKnownArmourScore());
             }
             {
-                int attack = 0;
+                // And two on the weapon hand, for the same reason: what gets the blow there and
+                // what it does once it is there are not the same quantity either. On the left the
+                // score the swing is rolled with - half of Attack, the weapon's own skill and a
+                // seventh of Dexterity; on the right the largest damage one swing can roll, before
+                // the charge scales it. The single number this used to show was the right-hand one.
                 WeaponBase weapon = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand)] as WeaponBase;
                 if (weapon == null)
                 {
                     weapon = fist;
                 }
-                if (weapon != null)
-                {
-                    attack = weapon.GetMaxDamage();
-                }
+
                 EInvSlot swordHandSlot = PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand;
                 float x = Screen.width - invPosition + 3 * invSlots[(int)swordHandSlot].cx;
                 float y = 30 + 3.6f * invSlots[(int)swordHandSlot].cy;
-                GUI.Label(new Rect(x, y + 40, 20, 20), attack.ToString(), carryStyle);
+
+                DrawRatingPair(x, y + 40,
+                    weapon != null ? weapon.GetKnownAttackScore() : 0,
+                    weapon != null ? weapon.GetKnownMaxDamage() : 0);
             }
 
             // cursor: mouse/kb scheme follows pointer (drop target); gamepad uses index / equipSlot
@@ -5229,6 +5236,9 @@ public class Inventory : MonoBehaviour
             UUObject hoverDesc = null;
             bool hoverPaperdoll = false;
             int hoverPaperdollSlot = -1;
+            // A hand under the pointer, whether or not it holds anything: the ratings under it are
+            // there either way, and an empty hand still fights with the fist.
+            int hoverHandSlot = -1;
 
             Vector2 guiMouseDesc = Mouse.current != null
                 ? GuiInput.ScreenToGuiMouse(Mouse.current.position.ReadValue())
@@ -5251,6 +5261,11 @@ public class Inventory : MonoBehaviour
                 {
                     if (TryGetPaperdollSlotUnderMouse(guiMouseDesc, panelLeftDesc, out int pdSlot, out _))
                     {
+                        if (pdSlot == (int)EInvSlot.LeftHand || pdSlot == (int)EInvSlot.RightHand)
+                        {
+                            hoverHandSlot = pdSlot;
+                        }
+
                         if (pdSlot >= 0 && pdSlot < invSlotContents.Length && invSlotContents[pdSlot] != null)
                         {
                             hoverDesc = invSlotContents[pdSlot];
@@ -5288,6 +5303,17 @@ public class Inventory : MonoBehaviour
                         Utils.DropShadowText(hoverDesc.GetLookName(), Screen.width - invPosition + ix, iy + 250, 240,
                             20, descriptionStyle);
                     }
+                }
+
+                // Four numbers is more than anyone should have to hold in their head, so hovering a
+                // hand says what its pair is. The name of a held item goes to the top of the panel
+                // when the pointer is on the paperdoll, which leaves this box free.
+                if (hoverHandSlot >= 0)
+                {
+                    bool weaponHand = hoverHandSlot
+                        == (int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand);
+                    Utils.DropShadowText(weaponHand ? "attack / max damage" : "defence / armour",
+                        Screen.width - invPosition + ix, iy + 250, 240, 20, descriptionStyle);
                 }
             }
 
