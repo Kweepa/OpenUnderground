@@ -337,6 +337,16 @@ public class UUObject : LevelObject
             }
         }
 
+        if (originalLevel == 6 && objectIndex == 727)
+        {
+            // move the jeweled sword away from the ledge so it doesn't fall into the lava.
+            // it's in the lava tile, instead of the neighbouring floor tile, so we can't
+            // just set its x and y before calling this function like we do for other objects.
+            ox += 0.3f;
+            oy += 2.0f;
+            castToFloor = false;
+        }
+
         transform.position = new Vector3(ox, oy, oz);
 
         if (radiusMultiplier > 1.0f)
