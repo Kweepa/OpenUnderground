@@ -2,6 +2,16 @@
 
 ## Current release
 
+- Quicksaving, on F5 or by holding the right stick click on a gamepad. Five quicksaves are kept and the sixth takes the place of the oldest, so saving before you open a suspicious door never costs you the save from an hour ago.
+
+- The game now saves by itself the first time you set foot on a level, a new character's first level included. Rows read "Autosave - Cabirus - Lvl 3" and "Quick 01 - Cabirus - Lvl 4", lined up in a column, so a glance down the list tells you where each save came from and how deep you were. Quicksaving never overwrites a level's own save.
+
+- The save and load lists show every save you have, newest first, and scroll with the wheel, so eight saves is no longer the limit. Journey Onward opens on your most recent game with the pointer already on it, which is almost always the one you want.
+
+- The load screen is laid out properly. The list of saves and the preview of the selected one sit side by side, starting on the same line, centred on the screen, and they keep their shape and their proportions at any window size. The preview used to sit low and to the right, half over the list, and it drifted as the window changed.
+
+- A new character starts at level 1 again. Rolling one up without closing the game down first left him at whatever level the character before had reached, and with the hit points and the experience thresholds that go with it.
+
 - The armour rating in the pack now counts each piece once for every part of you it covers, so a shield counts for the torso and the arms both instead of once. It also carries the shield spells, which used to swell the defence figure next to it instead.
 
 - Resist Blows, Thick Skin and Iron Flesh take points off the damage instead of making you harder to hit, and they are worth what the original pays for them: 2, 3 and 5. Iron Flesh used to make two swings in three miss outright, which is not a shield spell so much as a suit of invisible plate.

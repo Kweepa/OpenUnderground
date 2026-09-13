@@ -62,6 +62,13 @@ public class CreateCharacter : MonoBehaviour
     public EStat[] skillGoverningStat;
     public GUIStyle descriptionStyle;
 
+    /// <summary>Most characters a character's name will take.</summary>
+    /// <remarks>
+    /// Twenty is well past what any save row shows - those cut at eight - but a name has to
+    /// stop somewhere, and a field with no limit at all is an invitation.
+    /// </remarks>
+    private const int MaxPlayerNameLength = 20;
+
     private void Start()
     {
         background = GraphicsLoader.ReadBYT("../Data/chargen.byt", 3);
@@ -104,14 +111,21 @@ public class CreateCharacter : MonoBehaviour
         PlayerData.sData.mana = 0;
         PlayerData.sData.maxMana = 0;
         PlayerData.sData.xp = 0;
-        // The original writes these two right beside the experience it has just zeroed
-        // (UW.EXE 0x6c84e and 0x6c856). They belong here rather than in the field's
+        // The original writes these three right beside the experience it has just zeroed
+        // (UW.EXE 0x6c84e, 0x6c856 and 0x6c85e). They belong here rather than in the field's
         // initialiser: PlayerData is a component that survives from one game to the next,
         // and the value Unity has serialised in the scene wins over any initialiser, so a
         // new character was starting with whatever the scene held - three points - and a
         // high-water mark left over from the character before.
         PlayerData.sData.skillPoints = 1;
         PlayerData.sData.skillPointsXpTier = 0;
+        // And the level with them, or a second character in the same session begins at the
+        // level the first one reached, with its hit point maximum and its experience
+        // thresholds. The original writes 1 here in the instruction next to those two.
+        PlayerData.sData.charLevel = 1;
+        // PlayerData survives from one game to the next, so a second character in the same
+        // session would otherwise inherit the levels the first one had already saved.
+        PlayerData.sData.autoSavedLevels = 0;
         for (int i = 0; i < 20; ++i)
         {
             PlayerData.sData.skill[i] = 0;
@@ -726,7 +740,8 @@ public class CreateCharacter : MonoBehaviour
                     new Vector2(keyboardX, keyboardY),
                     "Name:",
                     false,
-                    false); // allowCancel = false (can't cancel or enter empty string)
+                    false, // allowCancel = false (can't cancel or enter empty string)
+                    MaxPlayerNameLength);
             }
             break;
         case ERollState.Keep:

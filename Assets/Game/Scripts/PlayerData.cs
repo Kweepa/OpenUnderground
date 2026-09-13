@@ -86,6 +86,15 @@ public class PlayerData : MonoBehaviour
 
     public int[] globalVars = new int[64];
 
+    /// <summary>
+    /// One bit per level, set when that level has written its automatic save. It lives on the
+    /// character rather than on the save manager so it travels in the save file: walking back into
+    /// a level does not write a second one, and a new character starts with a clean set.
+    /// An older save has no such field and reads as zero, so the first visit to each level after
+    /// loading it writes one automatic save. That is the safe way round and it settles by itself.
+    /// </summary>
+    public int autoSavedLevels;
+
     public List<int> dreamsRemaining;
     public double timeOfLastDream;
     public int cupDreamIndex;

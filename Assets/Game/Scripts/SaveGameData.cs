@@ -79,6 +79,7 @@ public class PlayerSaveData
     public int charLevel;
     public int skillPoints;
     public int skillPointsXpTier;
+    public int autoSavedLevels;
     public bool easy;
     public bool dead;
     

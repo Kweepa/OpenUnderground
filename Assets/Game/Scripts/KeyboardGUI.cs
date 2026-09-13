@@ -22,6 +22,18 @@ public class KeyboardGUI : MonoBehaviour
     // State
     private bool visible;
     private string currentText;
+
+    /// <summary>Most characters this field will take, or 0 for no limit. Set by Show.</summary>
+    /// <remarks>
+    /// A limit the player can see working as he types, rather than a name cut behind his back
+    /// once he has confirmed it.
+    /// </remarks>
+    private int maxLength;
+
+    private bool CanAppend()
+    {
+        return maxLength <= 0 || currentText == null || currentText.Length < maxLength;
+    }
     private string contextLabel;
     private int cursorX, cursorY;
     private bool shiftActive;
@@ -127,9 +139,16 @@ public class KeyboardGUI : MonoBehaviour
         panelBackgroundTex.Apply();
     }
     
-    public void Show(string initialText, System.Action<string> _onComplete, System.Action _onCancel = null, Vector2? position = null, string _contextLabel = "", bool _isMapScreenKeyboard = false, bool _allowCancel = false)
+    /// <param name="_maxLength">Most characters the field will take, or 0 for no limit.</param>
+    public void Show(string initialText, System.Action<string> _onComplete, System.Action _onCancel = null, Vector2? position = null, string _contextLabel = "", bool _isMapScreenKeyboard = false, bool _allowCancel = false, int _maxLength = 0)
     {
+        maxLength = _maxLength;
         currentText = initialText ?? "";
+        if (maxLength > 0 && currentText.Length > maxLength)
+        {
+            currentText = currentText.Substring(0, maxLength);
+        }
+
         ResetTextEntryCursorBlink();
         contextLabel = _contextLabel ?? "";
         onComplete = _onComplete;
@@ -325,7 +344,11 @@ public class KeyboardGUI : MonoBehaviour
         }
         else if (key == "Space")
         {
-            currentText += " ";
+            if (CanAppend())
+            {
+                currentText += " ";
+            }
+
             ResetTextEntryCursorBlink();
         }
         else if (key == "Del")
@@ -335,7 +358,11 @@ public class KeyboardGUI : MonoBehaviour
         else
         {
             // Regular character key - use the key from the appropriate array
-            currentText += key;
+            if (CanAppend())
+            {
+                currentText += key;
+            }
+
             ResetTextEntryCursorBlink();
             if (shiftActive && key != "Shift" && key != "Space" && key != "Del")
             {
@@ -414,7 +441,11 @@ public class KeyboardGUI : MonoBehaviour
                 }
                 else if (Event.current.character != 0 && !char.IsControl(Event.current.character))
                 {
-                    currentText += Event.current.character;
+                    if (CanAppend())
+                    {
+                        currentText += Event.current.character;
+                    }
+
                     ResetTextEntryCursorBlink();
                     Event.current.Use();
                 }

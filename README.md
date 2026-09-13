@@ -15,6 +15,7 @@ I removed a number of store-bought assets before pushing this to github, so it m
 **Attempts to be gameplay-accurate while adding some modern conveniences**
   - full audio
   - 3d models for critters and objects
+  - autosave at the beginning of each Abyss level and five quicksave slots, rolling in BG3 style
   - better lighting and particles
   - some tidied-up portraits
   - achievements
