@@ -1,8 +1,12 @@
 # Changelog
 
-## Unreleased
+## Current release
 
-### Fixed
+- The weapon hand of the inventory panel now shows two numbers instead of one, the way the other hand already shows defence and armour: on the left the score your swing is rolled with, on the right the largest damage that swing can do. The single number it used to show was the damage.
+
+- Putting the pointer on a hand now names its two numbers at the foot of the panel: attack and max damage for the weapon hand, defence and armour for the other.
+
+- The inventory numbers no longer give away enchantments you have not identified. An enchanted weapon, ring or piece of armour works from the moment you wear it, but its bonus now stays out of the figures until a Lore roll names the enchantment, so the panel no longer tells you what your Lore has not.
 
 - The jeweled sword on level six no longer ends up in the lava when the level loads, so it can be picked up instead of being lost.
 

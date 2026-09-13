@@ -151,12 +151,33 @@ public class PlayerObject : MonoBehaviour
     /// </summary>
     public int GetDefence()
     {
+        return GetDefence(false);
+    }
+
+    /// <summary>
+    /// The same figure as the player knows it, for the panel: magic coming from an item he has not
+    /// identified is left out, the way a worn piece leaves its enchantment out of
+    /// <see cref="UUObject.GetKnownDefence"/>. It is still defending him - the roll calls
+    /// <see cref="GetDefence()"/> - the number just does not do the Lore roll's job.
+    /// </summary>
+    public int GetKnownDefence()
+    {
+        return GetDefence(true);
+    }
+
+    private int GetDefence(bool asKnown)
+    {
         int defenceScore = Skills.GetSkill(ESkill.Defense);
-        defenceScore += Magic.sMagic.GetSpellArmourScore();
+        defenceScore += asKnown
+            ? Magic.sMagic.GetKnownSpellArmourScore()
+            : Magic.sMagic.GetSpellArmourScore();
         Weapon weapon = Inventory.sInv.invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand)] as Weapon;
         defenceScore += Skills.GetSkill(weapon != null ? weapon.skill : ESkill.Unarmed) / 2;
 
-        if (Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed))
+        bool cursed = asKnown
+            ? Magic.sMagic.IsSpellKnownActive(Magic.ESpell.Cursed)
+            : Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed);
+        if (cursed)
         {
             defenceScore /= 2;
         }

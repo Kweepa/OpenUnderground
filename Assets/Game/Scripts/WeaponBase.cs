@@ -580,6 +580,22 @@ public class WeaponBase : UUObject
     /// </remarks>
     public int GetMaxDamage()
     {
+        return GetMaxDamage(false);
+    }
+
+    /// <summary>
+    /// The same figure as the player knows it, for the panel: an enchantment he has not identified
+    /// is left out of the number while going on adding its damage to every blow. The armour side
+    /// of the panel has done this since it was split in two - see
+    /// <see cref="UUObject.GetKnownDefence"/>.
+    /// </summary>
+    public int GetKnownMaxDamage()
+    {
+        return GetMaxDamage(true);
+    }
+
+    private int GetMaxDamage(bool asKnown)
+    {
         ObjectsData.MeleeData meleeData = DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
 
         int rowSkill = meleeData.Skill;
@@ -613,17 +629,60 @@ public class WeaponBase : UUObject
             maxDamage = weaponDamage + PlayerData.sData.strength / 9;
         }
 
-        if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex >= 8) // damage enchantment
+        if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex >= 8 // damage enchantment
+            && !(asKnown && loreResult != Skills.ESkillTestResult.CriticalSuccess))
         {
             maxDamage += 1 + enchantmentIndex - 8;
         }
 
-        if (Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed))
+        bool cursed = asKnown
+            ? Magic.sMagic.IsSpellKnownActive(Magic.ESpell.Cursed)
+            : Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed);
+        if (cursed)
         {
             maxDamage /= 2;
         }
         
         return maxDamage;
+    }
+
+    /// <summary>The score the swing is rolled with, before the target's defence.</summary>
+    /// <remarks>
+    /// Half of Attack, the weapon's own skill in full and a seventh of Dexterity: the original
+    /// weights the two skills that way round, so the weapon's skill is worth nearly twice a point
+    /// of Attack (UW.EXE 0x255ca). An accuracy enchantment on the weapon adds its own points.
+    /// </remarks>
+    public virtual int GetAttackScore()
+    {
+        return GetAttackScore(false);
+    }
+
+    /// <summary>
+    /// The same score as the player knows it, for the panel: an accuracy enchantment he has not
+    /// identified is left out of the number and still added to every swing.
+    /// </summary>
+    public virtual int GetKnownAttackScore()
+    {
+        return GetAttackScore(true);
+    }
+
+    protected int GetAttackScore(bool asKnown)
+    {
+        int hitChance = Skills.GetSkill(ESkill.Attack) / 2
+                        + Skills.GetSkill(skill)
+                        + PlayerData.sData.dexterity / 7;
+        // Easy mode: add 5 to damage check
+        if (PlayerData.sData.easy)
+        {
+            hitChance += 5;
+        }
+        if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex < 8 // an accuracy enchantment
+            && !(asKnown && loreResult != Skills.ESkillTestResult.CriticalSuccess))
+        {
+            hitChance += 1 + enchantmentIndex;
+        }
+
+        return hitChance;
     }
 
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
@@ -657,19 +716,7 @@ public class WeaponBase : UUObject
         UUObject obj = FindObjectToDamage(3.0f);
         if (obj != null)
         {
-            int hitChance = Skills.GetSkill(ESkill.Attack) / 2
-                            + Skills.GetSkill(skill)
-                            + PlayerData.sData.dexterity / 7;
-            // Easy mode: add 5 to damage check
-            if (PlayerData.sData.easy)
-            {
-                hitChance += 5;
-            }
-            if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex < 8) // an accuracy enchantment
-            {
-                hitChance += 1 + enchantmentIndex;
-            }
-            Skills.ESkillTestResult res = Skills.GetResult(hitChance, obj.GetDefence());
+            Skills.ESkillTestResult res = Skills.GetResult(GetAttackScore(), obj.GetDefence());
             switch (res)
             {
             case Skills.ESkillTestResult.CriticalFailure:

@@ -102,6 +102,21 @@ public class RangedWeapon : WeaponBase
         return ammoType;
     }
 
+    /// <summary>
+    /// A shot is not a swing. It is rolled on Missile alone, against a fixed difficulty, when the
+    /// arrow is loosed (see <see cref="Projectile"/>) - none of Attack, Dexterity or the weapon's
+    /// own enchantment comes into it, so the panel must not add them either.
+    /// </summary>
+    public override int GetAttackScore()
+    {
+        return Skills.GetSkill(ESkill.Missile);
+    }
+
+    public override int GetKnownAttackScore()
+    {
+        return GetAttackScore();
+    }
+
     protected override bool Attack()
     {
         // check we still have ammo

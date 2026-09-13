@@ -440,6 +440,43 @@ public class Magic : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Whether the player has been told what the item lending this spell does. An enchanted item
+    /// works from the moment it is worn, but only a critical Lore result names the enchantment
+    /// (see <see cref="UUObject.GetIdentifiedName"/>), and until then nothing on screen may read
+    /// it out for him.
+    /// </summary>
+    private static bool IsPermanentSpellKnown(SPermanentSpell s)
+    {
+        return s.obj != null && s.obj.loreResult >= Skills.ESkillTestResult.CriticalSuccess;
+    }
+
+    /// <summary>
+    /// <see cref="IsSpellActive"/> as the player knows it: a spell coming from an item he has not
+    /// identified is left out. For what the panel shows only - everything that resolves a rule
+    /// calls <see cref="IsSpellActive"/>, so the spell goes on working either way.
+    /// </summary>
+    public bool IsSpellKnownActive(ESpell spell)
+    {
+        foreach (SActiveSpell s in activeSpells)
+        {
+            if ((ESpell)s.spell == spell)
+            {
+                return true;
+            }
+        }
+
+        foreach (SPermanentSpell s in permanentSpells)
+        {
+            if (s.spell == spell && IsPermanentSpellKnown(s))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void EquipEnchantedItem(UUObject obj)
     {
         EnsureSpellNamesBound();
@@ -520,6 +557,21 @@ public class Magic : MonoBehaviour
 
     public int GetSpellArmourScore()
     {
+        return GetSpellArmourScore(false);
+    }
+
+    /// <summary>
+    /// The shield spells the player knows he is under, for the panel: one cast by an item he has
+    /// not identified protects him just the same, it simply is not part of the figure yet. The
+    /// worn pieces follow the same rule through <see cref="UUObject.GetKnownDefence"/>.
+    /// </summary>
+    public int GetKnownSpellArmourScore()
+    {
+        return GetSpellArmourScore(true);
+    }
+
+    private int GetSpellArmourScore(bool asKnown)
+    {
         // the shield spells are one family, so the strongest wins - they never add up
         int armour = 0;
         foreach (SActiveSpell s in activeSpells)
@@ -531,6 +583,11 @@ public class Magic : MonoBehaviour
         // so they have to be counted here too - see IsSpellActive()
         foreach (SPermanentSpell s in permanentSpells)
         {
+            if (asKnown && !IsPermanentSpellKnown(s))
+            {
+                continue;
+            }
+
             armour = Mathf.Max(armour, GetSpellArmourValue((int)s.spell));
         }
 
@@ -2877,7 +2934,7 @@ public class Magic : MonoBehaviour
             int psx = 100;
             foreach (SPermanentSpell spell in permanentSpells)
             {
-                if (spell.obj.loreResult >= Skills.ESkillTestResult.CriticalSuccess)
+                if (IsPermanentSpellKnown(spell))
                 {
                     int icon = spells[(int)spell.spell].icon;
                     // if there isn't an icon for it (mana regen, regen, poison resistance) just don't draw anything
