@@ -42,6 +42,12 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 
 *Left-handed:* use the **right** trigger for stats instead of the left.
 
+### Saving
+
+|Control|Action|
+|-|-|
+|Right stick click (R3), hold|Quicksave (five are kept, the sixth replaces the oldest)|
+
 ### Inventory
 
 |Control|Action|
@@ -147,6 +153,13 @@ Look speed and invert options are in Options.
 |R|Show / hide character stats|
 |Tab|Open / close map (requires a map in your inventory)|
 |Esc|Close open panels; if none are open, open Save / Load / Options|
+
+### Saving
+
+|Control|Action|
+|-|-|
+|F5|Quicksave (five are kept, the sixth replaces the oldest)|
+|Mouse wheel|Scroll the save and load lists|
 
 ### Inventory
 

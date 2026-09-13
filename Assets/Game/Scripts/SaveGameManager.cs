@@ -48,6 +48,456 @@ public class SaveGameManager : MonoBehaviour
         catch { }
     }
 
+    // --- Save slot kinds -----------------------------------------------------------------------
+    //
+    // A slot name is the file name, and it says where the save came from: "Slot" in front of one
+    // the player made by hand, "Quick" in front of the rolling quicksaves, and the character's own
+    // name for the one written on first setting foot on a level. Only the quicksave prefix is ever
+    // read back - it is what lets the five of them roll over each other while leaving every other
+    // save alone - and the lists are sorted by date and show the name the player sees.
+    //
+    // A quicksave's file carries the date down to the second and no number, because the number the
+    // player sees is its place in the list, newest first, and that changes every time one is
+    // written. A number in the file name would disagree with the screen as soon as the oldest was
+    // rolled over.
+
+    /// <summary>
+    /// How many quicksaves are kept. The sixth use of the quicksave key overwrites the oldest of
+    /// them, and nothing else: a manual save and a level's automatic save are never rolled over.
+    /// </summary>
+    public const int QuickSaveSlotCount = 5;
+
+    private const string ManualSlotPrefix = "Slot";
+    private const string QuickSlotPrefix = "Quick";
+
+    /// <summary>What a level's own save calls itself on its row. Eight characters, like "Quick 01".</summary>
+    public const string AutoSaveRowKind = "Autosave";
+
+    /// <summary>
+    /// How many characters of the player's name a generated name keeps, on screen and on disk
+    /// alike: a long name makes a row nobody can read, and a file name nobody wants to look at.
+    /// </summary>
+    private const int GeneratedNameLength = 8;
+
+    /// <summary>Is this the save the game wrote on first setting foot on a level.</summary>
+    public static bool IsAutoSlot(string slotName)
+    {
+        return !string.IsNullOrEmpty(slotName) && slotName.StartsWith(AutoSaveRowKind + " - ");
+    }
+
+    /// <summary>
+    /// Is this one of the rolling quicksaves. The save list hides them: they are the game's to
+    /// write over, so offering one as a place to put a save by hand would be a trap.
+    /// </summary>
+    public static bool IsQuickSlot(string slotName)
+    {
+        return !string.IsNullOrEmpty(slotName) && slotName.StartsWith(QuickSlotPrefix);
+    }
+
+    /// <summary>
+    /// When a save was written, in ticks, or 0 when the header carries no readable date.
+    /// </summary>
+    public static long SavedAtTicks(SaveSlotInfo info)
+    {
+        if (info != null && !string.IsNullOrEmpty(info.savedAtIso)
+            && System.DateTime.TryParse(info.savedAtIso, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out System.DateTime when))
+        {
+            return when.ToUniversalTime().Ticks;
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Every save on disk, newest first. This is the order both save lists show, so the game a
+    /// player is most likely to want is always the top row.
+    /// </summary>
+    public SaveSlotInfo[] ListSaveSlotsNewestFirst()
+    {
+        SaveSlotInfo[] slots = ListSaveSlots();
+        // Sort is not stable, so two saves written inside the same second would otherwise swap
+        // places from one refresh to the next: the slot name settles it.
+        System.Array.Sort(slots, (a, b) =>
+        {
+            int byDate = SavedAtTicks(b).CompareTo(SavedAtTicks(a));
+            return byDate != 0 ? byDate : string.CompareOrdinal(a?.slotName, b?.slotName);
+        });
+        return slots;
+    }
+
+    private static SaveSlotInfo FindSlot(SaveSlotInfo[] slots, string slotName)
+    {
+        foreach (SaveSlotInfo info in slots)
+        {
+            if (info != null && info.slotName == slotName)
+            {
+                return info;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The player's name cut down to what can safely be part of a file name: letters, digits, -, _
+    /// and . only, and no more than eight characters, to leave room for the level and the date.
+    /// </summary>
+    /// <remarks>
+    /// Only the name on disk needs this. The name shown in the lists is the player's own, spaces,
+    /// apostrophes and all: there is nothing to protect there.
+    /// </remarks>
+    public static string SanitizeForFileName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder(GeneratedNameLength);
+        foreach (char c in name)
+        {
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '_' || c == '.')
+            {
+                sb.Append(c);
+                if (sb.Length == GeneratedNameLength)
+                {
+                    break;
+                }
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static string PlayerNameOrAvatar()
+    {
+        string who = PlayerData.sData != null ? PlayerData.sData.playerName : "";
+        return string.IsNullOrWhiteSpace(who) ? "Avatar" : who.Trim();
+    }
+
+    /// <summary>
+    /// The player's name cut to eight characters, keeping whatever he typed inside them.
+    /// </summary>
+    /// <remarks>
+    /// The cut is for the eye, not for the file system, so it applies to the name in the list as
+    /// well: a character called after half a dynasty would otherwise push the level off the end of
+    /// a row that is only so wide.
+    /// </remarks>
+    private static string ShortPlayerName()
+    {
+        return ShortName(PlayerNameOrAvatar());
+    }
+
+    /// <summary>
+    /// Any name cut to the same eight characters, for a row that has to fit beside a level and a
+    /// kind. Public because the lists build a quicksave's row from the name in its header rather
+    /// than from the live player, who may be someone else entirely.
+    /// </summary>
+    public static string ShortName(string who)
+    {
+        if (string.IsNullOrWhiteSpace(who))
+        {
+            return "Avatar";
+        }
+
+        who = who.Trim();
+        return who.Length > GeneratedNameLength ? who.Substring(0, GeneratedNameLength).TrimEnd() : who;
+    }
+
+    /// <summary>
+    /// The name shown in the lists for a save the game wrote by itself: what kind of save it is,
+    /// who it belongs to, and how deep it was taken - "Autosave - Cabirus - Lvl 3".
+    /// </summary>
+    /// <remarks>
+    /// The kind comes first so the rows line up in a column, and "Quick 01" is eight characters
+    /// wide for the same reason "Autosave" is: the two names the game writes are the same length,
+    /// so the player's name starts on the same column in every row the game made itself.
+    /// No date here, although the file name carries one. The panel already prints the date of the
+    /// selected save beside its screenshot, and a second copy of it on the row was long enough to
+    /// run off the end of the list.
+    /// </remarks>
+    public static string BuildGeneratedSaveName(string kind, int level)
+    {
+        return $"{kind} - {ShortPlayerName()} - {DungeonLevelLabel(level)}";
+    }
+
+    /// <summary>
+    /// How a dungeon level is written on a save row and in a save's file name.
+    /// </summary>
+    /// <remarks>
+    /// It said "Abyss Lvl 3" until it was seen in the game on 23 September 2026, and the row was
+    /// too long for the window it has to fit. What tells this number apart from the character's
+    /// own is the rest of the row: a save the game wrote names its kind first, and the character's
+    /// level is not on it at all.
+    /// </remarks>
+    public static string DungeonLevelLabel(int level)
+    {
+        return $"Lvl {level}";
+    }
+
+    /// <summary>
+    /// The file name for a save the game wrote by itself: the same three things, but tamed.
+    /// </summary>
+    /// <remarks>
+    /// The date cannot be the local one here. A short date is full of slashes and a short time of
+    /// colons, and neither can go in a file name: the sanitiser would turn every one of them into
+    /// an underscore, which is both ugly and ambiguous. So the file gets the international order,
+    /// yyyy-MM-dd HH.mm, which sorts by date on its own in any file browser, and uses only - and .
+    /// The list shows the player his own format either way.
+    /// </remarks>
+    public static string BuildGeneratedSlotName(int level)
+    {
+        string who = SanitizeForFileName(PlayerNameOrAvatar());
+        if (string.IsNullOrEmpty(who))
+        {
+            who = "Avatar";
+        }
+
+        string when = System.DateTime.Now.ToString("yyyy-MM-dd HH.mm",
+            System.Globalization.CultureInfo.InvariantCulture);
+        // The same shape as the row it makes, with the date on the end: the folder reads like the
+        // list does. "Autosave - Cabirus - Lvl 3 2026-09-22 14.05".
+        return $"{AutoSaveRowKind} - {who} - {DungeonLevelLabel(level)} {when}";
+    }
+
+    /// <summary>Can the game be saved at all right now.</summary>
+    public bool CanSaveNow()
+    {
+        return PlayerObject.Player != null && PlayerData.sData != null && LevelLoader.sLevelLoader != null
+            && LevelLoader.sLevelLoader.loadedLevel > 0;
+    }
+
+    /// <summary>How long the quicksave key is dead after it has written one.</summary>
+    /// <remarks>
+    /// Two reasons, and the second is the one that matters. It stops a key held down from filling
+    /// the five slots with the same moment; and it is what makes the file name unique, since that
+    /// name is the clock read to the second.
+    /// </remarks>
+    private const float QuickSaveCooldownSeconds = 1.0f;
+
+    private float lastQuickSaveTime = -QuickSaveCooldownSeconds;
+
+    /// <summary>
+    /// Writes one of the rolling quicksaves. Returns the slot written, or null when the game
+    /// cannot be saved at this moment, or when one was written a moment ago.
+    /// </summary>
+    public string QuickSave()
+    {
+        if (!CanSaveNow())
+        {
+            return null;
+        }
+
+        float now = Time.unscaledTime;
+        if (now - lastQuickSaveTime < QuickSaveCooldownSeconds)
+        {
+            return null;
+        }
+
+        lastQuickSaveTime = now;
+
+        int level = LevelLoader.sLevelLoader.loadedLevel;
+        // The file reads like the row it will make, minus the number, which is the row's place in
+        // the list and not a property of the file: "Quick - Cabirus - Lvl 4 2026-09-22 14.05.33".
+        string slotName = $"{QuickSlotPrefix} - {SanitizeForFileName(PlayerNameOrAvatar())} - "
+            + $"{DungeonLevelLabel(level)} "
+            + System.DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss", System.Globalization.CultureInfo.InvariantCulture);
+        // No number in the stored name either: the lists put the player's own name, the place in
+        // the list and the level together when they draw the row.
+        SaveGameToSlot(slotName, BuildGeneratedSaveName("Quick", level));
+        RequestScreenshotForSlot(slotName);
+        PruneQuickSaves();
+        return slotName;
+    }
+
+    /// <summary>How recent a level's previous automatic save has to be to be replaced.</summary>
+    private const double AutoSaveReplaceHours = 24.0;
+
+    /// <summary>
+    /// Keeps one automatic save per level per character, as long as the one it replaces is from
+    /// the same day's play.
+    /// </summary>
+    /// <remarks>
+    /// Without this, loading an older save and walking the same stairs again leaves a row for
+    /// every visit, since the file name carries the time and never collides with the one before.
+    /// Three things have to agree before anything is deleted: the level, the character - matched
+    /// on the name in each save's own header, not the shortened one in the file name, so two who
+    /// begin alike cannot delete each other's - and the age. Only a save from the last
+    /// <see cref="AutoSaveReplaceHours"/> hours is replaced: a year-old game that happens to share
+    /// a character name is another playthrough, not the one being played, and losing it to a
+    /// coincidence of names would be the worst thing this feature could do. A save whose date
+    /// cannot be read is left alone for the same reason.
+    /// </remarks>
+    private void PruneOldAutoSaves(int level, string keepSlotName)
+    {
+        string who = PlayerNameOrAvatar();
+        long now = System.DateTime.UtcNow.Ticks;
+        long window = System.TimeSpan.FromHours(AutoSaveReplaceHours).Ticks;
+
+        foreach (SaveSlotInfo info in ListSaveSlots())
+        {
+            if (info == null || info.slotName == keepSlotName || !IsAutoSlot(info.slotName))
+            {
+                continue;
+            }
+
+            if (info.level != level || info.playerName != who)
+            {
+                continue;
+            }
+
+            long when = SavedAtTicks(info);
+            if (when == 0 || now - when >= window)
+            {
+                continue;
+            }
+
+            DeleteSaveSlot(info.slotName);
+        }
+    }
+
+    /// <summary>Keeps the newest <see cref="QuickSaveSlotCount"/> quicksaves and deletes the rest.</summary>
+    private void PruneQuickSaves()
+    {
+        SaveSlotInfo[] slots = ListSaveSlotsNewestFirst();
+        int kept = 0;
+        foreach (SaveSlotInfo info in slots)
+        {
+            if (info == null || !IsQuickSlot(info.slotName))
+            {
+                continue;
+            }
+
+            ++kept;
+            if (kept > QuickSaveSlotCount)
+            {
+                DeleteSaveSlot(info.slotName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// An unused quicksave slot if there is one, otherwise the oldest: that is what makes the five
+    /// roll. A quicksave slot with no readable date counts as the oldest there is, so a save left
+    /// behind by an older build is the first to go rather than the last.
+    /// </summary>
+    /// <summary>
+    /// The first free Slot0, Slot1, ... name, for a save the player is making by hand.
+    /// </summary>
+    public string NextFreeManualSlot()
+    {
+        SaveSlotInfo[] slots = ListSaveSlots();
+        for (int i = 0; i < 1000; ++i)
+        {
+            string slotName = ManualSlotPrefix + i;
+            if (FindSlot(slots, slotName) == null)
+            {
+                return slotName;
+            }
+        }
+
+        // A thousand manual saves is not a case worth a nicer answer, but it is worth not
+        // overwriting Slot0 in silence.
+        return ManualSlotPrefix + System.DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+    }
+
+    /// <summary>
+    /// Asks for the automatic save of a level, the first time this character sets foot on it.
+    /// </summary>
+    /// <remarks>
+    /// The levels already saved are remembered in the character, not in this component, so the
+    /// record travels with the save file: coming back to a level does not write a second one, and
+    /// a second character gets its own set.
+    ///
+    /// The save itself is put off until the screen has faded back in. Writing it here would catch
+    /// the player mid transition, before the teleport that follows the level load has settled him,
+    /// and the thumbnail would be a black frame.
+    /// </remarks>
+    public void RequestAutoSaveForLevel(int level)
+    {
+        if (level <= 0 || level >= 32 || PlayerData.sData == null)
+        {
+            return;
+        }
+
+        int bit = 1 << level;
+        if ((PlayerData.sData.autoSavedLevels & bit) != 0 || pendingAutoSaveLevel == level)
+        {
+            return;
+        }
+
+        // The bit is set when the save is actually written, not here: if the save cannot happen -
+        // the level was left again while the screen was still fading, say - the level should get
+        // another chance rather than be marked done for a save that never existed.
+        pendingAutoSaveLevel = level;
+        StartCoroutine(AutoSaveWhenSettled(level));
+    }
+
+    /// <summary>The level whose automatic save is waiting for the fade, or 0.</summary>
+    private int pendingAutoSaveLevel;
+
+    /// <summary>Is the level built and populated, rather than merely named.</summary>
+    /// <remarks>
+    /// The one condition that actually matters to a save, and the one that was missing. A level
+    /// with geometry and no objects is a level that has not finished loading, and a save taken
+    /// there is an empty world that the loader cannot repair afterwards.
+    /// </remarks>
+    private static bool LevelHasObjects(int level)
+    {
+        Level[] levels = LevelLoader.sLevelLoader != null ? LevelLoader.sLevelLoader.levels : null;
+        // First, not Count: worldObj is an ObservableLinkedList, which wraps a LinkedList rather
+        // than extending one, and the only members it exposes are AddFirst, AddLast, Remove,
+        // Contains, GetEnumerator and First. Count would compile here under -nostdlib and fail
+        // in Unity as a CS1061, which is one of the codes that check throws away.
+        return levels != null && level >= 0 && level < levels.Length
+            && levels[level] != null && levels[level].worldObj.First != null;
+    }
+
+    private IEnumerator AutoSaveWhenSettled(int level)
+    {
+        // Give the frame away before looking at anything. A coroutine runs inside StartCoroutine
+        // until its first yield, so a wait whose condition is already true never yields at all -
+        // and this one is started from the top of LevelLoader.LoadLevel, which means the save
+        // would be written before the level is built. That is exactly what happened to the first
+        // level of a new character, whose fade is already clear when the level is asked for: the
+        // file came out 1.3 KB against the 500 KB of a real one, and the world it restored was
+        // empty. Measured on three characters in a row on 22 September 2026.
+        yield return null;
+
+        // Then wait for the fade AND for the level to have its objects. Five seconds, then give
+        // up: an automatic save that does not happen is a nuisance, but one that writes an empty
+        // world is data loss, because nothing repopulates a level that a save says is empty.
+        float deadline = Time.realtimeSinceStartup + 5.0f;
+        while (Time.realtimeSinceStartup < deadline)
+        {
+            if (PlayerObject.Player != null && PlayerObject.Player.fade <= 0.05f
+                && LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel == level
+                && LevelHasObjects(level))
+            {
+                break;
+            }
+
+            yield return null;
+        }
+
+        pendingAutoSaveLevel = 0;
+        if (!CanSaveNow() || LevelLoader.sLevelLoader.loadedLevel != level || PlayerData.sData == null
+            || !LevelHasObjects(level))
+        {
+            // The bit stays clear on purpose: the level gets another chance next time rather than
+            // being marked done for a save that never happened.
+            yield break;
+        }
+
+        PlayerData.sData.autoSavedLevels |= 1 << level;
+        string slotName = BuildGeneratedSlotName(level);
+        SaveGameToSlot(slotName, BuildGeneratedSaveName(AutoSaveRowKind, level));
+        RequestScreenshotForSlot(slotName);
+        PruneOldAutoSaves(level, slotName);
+    }
+
     // Multi-slot API
     public void SaveGameToSlot(string slotName, string displayName = null)
     {
@@ -262,6 +712,9 @@ public class SaveGameManager : MonoBehaviour
         string filePath = GetSlotFilePath(slotName);
         string headerFilePath = GetSlotHeaderFilePath(slotName);
         string screenshotPath = GetSlotScreenshotPath(slotName);
+        // The PNG of a save made before the screenshots became JPEGs, so deleting a slot does not
+        // leave its picture behind.
+        string oldScreenshotPath = Path.Combine(savesDirectoryPath, SanitizeFileName(slotName) + ".png");
         try
         {
             if (File.Exists(filePath))
@@ -275,6 +728,10 @@ public class SaveGameManager : MonoBehaviour
             if (File.Exists(screenshotPath))
             {
                 File.Delete(screenshotPath);
+            }
+            if (File.Exists(oldScreenshotPath))
+            {
+                File.Delete(oldScreenshotPath);
             }
         }
         catch (System.Exception e)
@@ -295,11 +752,44 @@ public class SaveGameManager : MonoBehaviour
         return Path.Combine(savesDirectoryPath, safe + ".header.json");
     }
 
+    /// <summary>Where a screenshot for this slot is written. JPEG since 23 September 2026.</summary>
     public string GetSlotScreenshotPath(string slotName)
     {
         string safe = SanitizeFileName(slotName);
-        return Path.Combine(savesDirectoryPath, safe + ".png");
+        return Path.Combine(savesDirectoryPath, safe + ".jpg");
     }
+
+    /// <summary>
+    /// The screenshot a slot actually has on disk: the JPEG it writes now, or the PNG it used to
+    /// write, so saves made before the change still show their picture.
+    /// </summary>
+    public string FindSlotScreenshotPath(string slotName)
+    {
+        string jpg = GetSlotScreenshotPath(slotName);
+        if (File.Exists(jpg))
+        {
+            return jpg;
+        }
+
+        string png = Path.Combine(savesDirectoryPath, SanitizeFileName(slotName) + ".png");
+        return File.Exists(png) ? png : jpg;
+    }
+
+    /// <summary>
+    /// How large a screenshot is kept, in pixels.
+    /// </summary>
+    /// <remarks>
+    /// It is only ever shown in the preview panel, which is 570 by 332 in the reference pixels the
+    /// rest of the layout uses, and the largest it is ever drawn is that times the scale cap - so
+    /// 1140 by 664, which is what is kept. What it replaces: a full screen grab at whatever the
+    /// monitor happens to be - 2560 by 1440 on the machine this was measured on - kept as a PNG,
+    /// which came to 1.2 MB for every save.
+    /// </remarks>
+    public const int ScreenshotWidth = 1140;
+    public const int ScreenshotHeight = 664;
+
+    /// <summary>JPEG quality, for a picture nobody looks at closely.</summary>
+    private const int ScreenshotQuality = 75;
 
     /// <summary>
     /// Takes a screenshot after the next frame and saves it for the given slot.
@@ -318,19 +808,52 @@ public class SaveGameManager : MonoBehaviour
         yield return new WaitForEndOfFrame();
 
         string path = GetSlotScreenshotPath(slotName);
+        Texture2D full = null;
+        Texture2D small = null;
+        RenderTexture scaled = null;
+        RenderTexture wasActive = RenderTexture.active;
         try
         {
-            Texture2D tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-            tex.Apply();
-            byte[] bytes = tex.EncodeToPNG();
+            full = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+            full.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+            full.Apply();
+
+            // Down to the size it will be looked at, through a render texture so the card does the
+            // filtering, and out as a JPEG: the picture of a dungeon has no flat colour for PNG to
+            // exploit, so it was paying for lossless on the one kind of image that gains nothing.
+            scaled = RenderTexture.GetTemporary(ScreenshotWidth, ScreenshotHeight, 0);
+            Graphics.Blit(full, scaled);
+            RenderTexture.active = scaled;
+
+            small = new Texture2D(ScreenshotWidth, ScreenshotHeight, TextureFormat.RGB24, false);
+            small.ReadPixels(new Rect(0, 0, ScreenshotWidth, ScreenshotHeight), 0, 0);
+            small.Apply();
+
+            byte[] bytes = small.EncodeToJPG(ScreenshotQuality);
             File.WriteAllBytes(path, bytes);
-            Destroy(tex);
-            Debug.Log($"Screenshot saved to {path}");
+            Debug.Log($"Screenshot saved to {path} ({bytes.Length} bytes, {ScreenshotWidth}x{ScreenshotHeight})");
         }
         catch (System.Exception e)
         {
             Debug.LogError($"Failed to save screenshot for slot '{slotName}': {e.Message}");
+        }
+        finally
+        {
+            RenderTexture.active = wasActive;
+            if (scaled != null)
+            {
+                RenderTexture.ReleaseTemporary(scaled);
+            }
+
+            if (full != null)
+            {
+                Destroy(full);
+            }
+
+            if (small != null)
+            {
+                Destroy(small);
+            }
         }
     }
 
@@ -490,6 +1013,9 @@ public class SaveGameManager : MonoBehaviour
         data.playTime = playerData.playTime;
         data.booksBurned = playerData.booksBurned;
         data.pacifistStopped = playerData.pacifistStopped;
+        // Away from the block of core stats above on purpose: that is where every mod that adds
+        // a saved field puts it, and two of them land on the same line.
+        data.autoSavedLevels = playerData.autoSavedLevels;
 
         if (playerData.openedChest != null)
         {
@@ -660,6 +1186,7 @@ public class SaveGameManager : MonoBehaviour
         playerData.playTime = data.playTime;
         playerData.booksBurned = data.booksBurned;
         playerData.pacifistStopped = data.pacifistStopped;
+        playerData.autoSavedLevels = data.autoSavedLevels;
 
         if (data.openedChest != null)
         {

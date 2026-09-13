@@ -567,6 +567,16 @@ public class LevelLoader : MonoBehaviour
     {
         // Check if level was already loaded before calling LoadLevelGeometry
         bool wasAlreadyLoaded = (levels[level] != null);
+
+        // The first time this character sets foot on a level, the game saves for him. Asking here
+        // covers every way in - a new game, a stair, a teleport - because all of them come through
+        // this method, while loading a save does not: that path goes to EnsureLevelsInitialized.
+        // Whether it is really the first time is the character's business, and the save manager
+        // asks him; the save itself waits for the fade to end.
+        if (SaveGameManager.sInstance != null)
+        {
+            SaveGameManager.sInstance.RequestAutoSaveForLevel(level);
+        }
         
         // Load geometry/environment first
         LoadLevelGeometry(level);

@@ -145,6 +145,33 @@ public static class PlayerInput
                || (GameInput.CurrentKeyboard?.fKey.wasPressedThisFrame ?? false);
     }
 
+    /// <summary>Keyboard F5 — write a quicksave, at once.</summary>
+    /// <remarks>
+    /// F5 is the one convention there is, and it is a keyboard one: it is the quicksave key in most
+    /// PC games that have quicksaving at all.
+    /// </remarks>
+    public static bool QuickSaveKeyPressed()
+    {
+        return GameInput.CurrentKeyboard?.f5Key.wasPressedThisFrame ?? false;
+    }
+
+    /// <summary>Gamepad right stick click (R3) held down — the quicksave button, which wants a hold.</summary>
+    /// <remarks>
+    /// On a gamepad there is no convention to follow - one game puts quicksave on a face button
+    /// inside the pause menu, another on a shoulder and Select together, and plenty have none - so
+    /// the button here is chosen by what is free. Every face button, both shoulders, both triggers,
+    /// Start, Select, the D-pad and the left stick click already do something in this game; the
+    /// right stick click does not.
+    ///
+    /// It answers to a hold rather than a click, because the thumb rests on that stick the whole
+    /// time the player is looking around and a click is far too easy to make by accident. The
+    /// caller times the hold; this only says whether the button is down.
+    /// </remarks>
+    public static bool QuickSaveButtonHeld()
+    {
+        return GameInput.CurrentGamepad?.rightStickButton.isPressed ?? false;
+    }
+
     /// <summary>Gamepad Y — use (mouse uses LMB hold / drag). Keyboard has no use binding.</summary>
     public static bool InteractUsePressed()
     {
