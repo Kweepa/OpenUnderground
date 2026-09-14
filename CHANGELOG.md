@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- The jeweled sword on level six no longer ends up in the lava when the level loads, so it can be picked up instead of being lost.
+
 - The three group mantras at a shrine now advance as many skills as the original advances them: three for SUMM RA and four for OM CAH, where every group mantra used to advance two. OM CAH is once more the most generous thing a shrine offers, instead of being worth less than chanting a single skill's mantra.
 
 - A shrine no longer says it has improved skills that it has not, and it will not take the point when there is nothing in the group left to raise. MU AHM now leans towards Mana while Mana is still low, as the original has it.
