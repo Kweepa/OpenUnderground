@@ -24,6 +24,10 @@ commit replacements if you don't have the right to redistribute them.**
 can be taken or turned down on its own; three changes sharing a branch have to be judged together,
 and one problem holds up the other two. Branch from `main`, not from another feature branch.
 
+If the change is not a small one, please open an issue first and say what you have in mind. A
+short conversation before the work is cheaper than a rewrite after it, and it keeps two people
+from solving the same thing in two different ways.
+
 Anyone can open a pull request; that is the door in. People with push access may commit small
 changes straight to `main` - docs, tooling, typos, an obvious one-line fix. Anything that changes
 how the game plays goes through a pull request even then: not to ask permission, but so that the
