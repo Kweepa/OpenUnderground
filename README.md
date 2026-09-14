@@ -10,7 +10,7 @@ The game is built with Unity 6000.0.68f1. The root scene is GameDirectoryDialog.
 
 I removed a number of store-bought assets before pushing this to github, so it may not work out of the box. Some things I removed were: some audio (a lot of interface clicks); some particles (water splashes mostly I think); and some minor textures and models. I think it should still run, but it might sound sparse and show some pink textures until those are replaced.
 
-**Bug reports and comments are both very welcome.** A bug is easiest to act on as a GitHub issue, where it can be tracked and closed; for anything else - thoughts, questions, or something you would like to see - the [itch.io page](https://kweepa.itch.io/unity-underground) is the friendlier place, and it is where most of the conversation happens anyway.
+**Bug reports and comments are both very welcome.** A bug is easiest to act on as a GitHub issue, where it can be tracked and closed, and a saved game attached to it helps a lot: one made just before the bug happens, and where the bug leaves a mark on the game, one made after it as well. For anything else - thoughts, questions, or something you would like to see - the [itch.io page](https://kweepa.itch.io/unity-underground) is the friendlier place, and it is where most of the conversation happens anyway.
 
 **Attempts to be gameplay-accurate while adding some modern conveniences**
   - full audio
@@ -21,5 +21,4 @@ I removed a number of store-bought assets before pushing this to github, so it m
   - gamepad support
   - three ratings added to the inventory panel: attack by the weapon hand, defence and armour by the shield hand
   - clearer attack feedback: the charge cursor stays dark until a release would actually land a swing, then lights up and fills
-  - a shrine only takes your skill point if it can raise something, and it names just the skills that improved
 
