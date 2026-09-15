@@ -1130,9 +1130,46 @@ public class UUObject : LevelObject
         return GetDefence();
     }
 
+    /// <summary>
+    /// The magic protection this piece gives the body part it covers. The original keeps this apart
+    /// from armour: armour is subtracted from the damage of a blow that lands, while this is
+    /// subtracted from the attacker's attack score, so it stops the blow from landing at all. It
+    /// lives in the four bytes at DS:0x266a, one per body part, rebuilt from the worn pieces
+    /// (UW.EXE 0x7e1d0) and read by the to-hit roll (UW.EXE 0x24b8a).
+    /// </summary>
+    public virtual int GetMagicProtection()
+    {
+        return 0;
+    }
+
+    /// <summary>
+    /// What the player is entitled to see of <see cref="GetMagicProtection"/>, on the same rule as
+    /// <see cref="GetKnownDefence"/>: an enchantment he has not identified goes on protecting him
+    /// without announcing itself.
+    /// </summary>
+    public virtual int GetKnownMagicProtection()
+    {
+        return GetMagicProtection();
+    }
+
+    /// <summary>
+    /// The damage this piece takes off a blow that lands on the body part it covers, over and above
+    /// its own armour. It is the other half of <see cref="GetMagicProtection"/>: the same effect 12,
+    /// with bit 3 of the parameter set, which sends the value to the player's armour bytes instead
+    /// of to the to-hit protection (UW.EXE 0x7e19c, 0x7e1d4).
+    /// </summary>
     public virtual int GetToughness()
     {
         return 0;
+    }
+
+    /// <summary>
+    /// What the player is entitled to see of <see cref="GetToughness"/>, on the same rule as
+    /// <see cref="GetKnownDefence"/>.
+    /// </summary>
+    public virtual int GetKnownToughness()
+    {
+        return GetToughness();
     }
 
     public virtual void TryDamage(int damage, Skills.ESkillTestResult result)

@@ -4387,6 +4387,10 @@ public class Inventory : MonoBehaviour
             }
         }
 
+        // Toughness is spread over the body parts, so one figure cannot carry it whole: the panel
+        // takes the average of the four, the rule fix 163 settles for every localised term.
+        score += AverageOverBodyParts(GetToughnessByBodyPart(asKnown: true));
+
         return score;
     }
 
@@ -4427,7 +4431,142 @@ public class Inventory : MonoBehaviour
             armour[(int)EBodyPart.Arms] += shield.GetDefence();
         }
 
+        // A Toughness enchantment lands in these same bytes in the original, by a rule of its own
+        int[] toughness = GetToughnessByBodyPart();
+        for (int i = 0; i < armour.Length; ++i)
+        {
+            armour[i] += toughness[i];
+        }
+
         return armour;
+    }
+
+    /// <summary>
+    /// Magic protection per body part - what a "of Protection" piece gives. It is kept apart from
+    /// the armour above because the original spends it in a different place: armour comes off the
+    /// damage of a blow that lands, this comes off the attack score of the creature swinging, so it
+    /// stops the blow from landing (UW.EXE 0x24b8a).
+    /// </summary>
+    /// <remarks>
+    /// The original rebuilds four bytes at DS:0x266a from the worn pieces every time the equipment
+    /// changes (UW.EXE 0x7dea4 clears them, 0x7e1d0 fills them). Its loop walks slots 0 to 10 and
+    /// asks 0x79c12 whether each one counts: the five armour slots and both rings always do, the
+    /// shield hand only for a shield or a piece of headgear, and the weapon hand and shoulders never
+    /// do. Only armour can carry this enchantment - on a weapon the same numbers 704-711 read as
+    /// Accuracy instead - so asking every slot for <see cref="UUObject.GetMagicProtection"/> lands
+    /// on the same set. A ring covers torso and arms, the way the shield hand does, because the
+    /// original maps every slot past the fifth to those two parts (UW.EXE 0x7e181).
+    /// </remarks>
+    public int[] GetMagicProtectionByBodyPart(bool asKnown = false)
+    {
+        int[] protection = new int[4];
+        for (int i = 0; i < armourPieceSlots.Length; ++i)
+        {
+            UUObject piece = invSlotContents[(int)armourPieceSlots[i]];
+            if (piece != null)
+            {
+                protection[(int)armourPieceParts[i]] += Of(piece, asKnown);
+            }
+        }
+
+        foreach (EInvSlot slot in torsoAndArmsSlots)
+        {
+            UUObject piece = invSlotContents[(int)slot];
+            if (piece != null)
+            {
+                protection[(int)EBodyPart.Torso] += Of(piece, asKnown);
+                protection[(int)EBodyPart.Arms] += Of(piece, asKnown);
+            }
+        }
+
+        UUObject shield = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand)];
+        if (shield != null)
+        {
+            protection[(int)EBodyPart.Torso] += Of(shield, asKnown);
+            protection[(int)EBodyPart.Arms] += Of(shield, asKnown);
+        }
+
+        return protection;
+
+        static int Of(UUObject piece, bool asKnown)
+        {
+            return asKnown ? piece.GetKnownMagicProtection() : piece.GetMagicProtection();
+        }
+    }
+
+    /// <summary>
+    /// The one figure that stands for a quantity spread over the four body parts: the average,
+    /// rounded to the nearest whole point. A bonus sitting on one part must not swell the number as
+    /// though it counted on every blow, but it must still move it, because having it is better than
+    /// not having it. Flat terms are added whole by the caller and only the localised part comes
+    /// through here, so with nothing localised the figure is the one shown before.
+    /// </summary>
+    public static int AverageOverBodyParts(int[] perPart)
+    {
+        int total = 0;
+        foreach (int part in perPart)
+        {
+            total += part;
+        }
+
+        return (total + perPart.Length / 2) / perPart.Length;
+    }
+
+    // The slots the original maps to torso and arms both, apart from the shield hand.
+    private static readonly EInvSlot[] torsoAndArmsSlots =
+    {
+        EInvSlot.RightFinger, EInvSlot.LeftFinger
+    };
+
+    /// <summary>
+    /// Toughness per body part - what a "of Toughness" piece takes off a blow that lands there. It
+    /// is summed into <see cref="GetArmourByBodyPart"/>, because the original puts it in the very
+    /// same armour bytes the table protection goes into.
+    /// </summary>
+    /// <remarks>
+    /// The same loop and the same slots as <see cref="GetMagicProtectionByBodyPart"/> - the two
+    /// enchantments are one case in the original, told apart by bit 3 of the parameter - with one
+    /// difference that is the original's and is reproduced here deliberately. For a slot covering
+    /// two parts, the write that lands Toughness indexes the part list at 0 instead of at the loop
+    /// counter (UW.EXE 0x7e1d4 against 0x7e1af in the same case), so both turns of the loop land on
+    /// the torso and the arms get nothing. The base armour of a shield is not like this: it is two
+    /// separate writes, one per part (0x7e512 and 0x7e521), which is why
+    /// <see cref="GetArmourByBodyPart"/> splits that one evenly and this one does not.
+    /// </remarks>
+    public int[] GetToughnessByBodyPart(bool asKnown = false)
+    {
+        int[] toughness = new int[4];
+        for (int i = 0; i < armourPieceSlots.Length; ++i)
+        {
+            UUObject piece = invSlotContents[(int)armourPieceSlots[i]];
+            if (piece != null)
+            {
+                // one part covered, so the loop turns once and lands on it
+                toughness[(int)armourPieceParts[i]] += Of(piece, asKnown);
+            }
+        }
+
+        foreach (EInvSlot slot in torsoAndArmsSlots)
+        {
+            UUObject piece = invSlotContents[(int)slot];
+            if (piece != null)
+            {
+                toughness[(int)EBodyPart.Torso] += 2 * Of(piece, asKnown);
+            }
+        }
+
+        UUObject shield = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand)];
+        if (shield != null)
+        {
+            toughness[(int)EBodyPart.Torso] += 2 * Of(shield, asKnown);
+        }
+
+        return toughness;
+
+        static int Of(UUObject piece, bool asKnown)
+        {
+            return asKnown ? piece.GetKnownToughness() : piece.GetToughness();
+        }
     }
 
     public UUObject GetRandomArmourPiece()

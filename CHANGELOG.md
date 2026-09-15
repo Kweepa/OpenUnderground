@@ -2,6 +2,12 @@
 
 ## Current release
 
+- A piece *of Protection* now makes you harder to hit on the part it covers, instead of soaking damage there, which is what the original does with it. Ten pieces in the game carry the enchantment, from the buckler of Minor Protection on level two to the breastplate of Tremendous Protection on level eight. The panel follows: they leave the armour number, since they no longer stop damage, and show up in the defence one instead, averaged over the four body parts because that is where they now act.
+
+- A piece *of Toughness* now soaks damage on the part it covers, as the original has it. It used to do nothing in a fight at all, only making the piece itself wear out more slowly, so the enchantment never showed. Eight pieces in the game carry it, up to the leather cap of Unsurpassed Toughness on level eight, which is worth eight points off every blow that lands on your head.
+
+- A blow now picks where it lands once. It used to choose a body part for the attack and then choose again for the armour, so the piece that was rolled against was not always the piece that took the hit.
+
 - The weapon hand of the inventory panel now shows two numbers instead of one, the way the other hand already shows defence and armour: on the left the score your swing is rolled with, on the right the largest damage that swing can do. The single number it used to show was the damage.
 
 - Putting the pointer on a hand now names its two numbers at the foot of the panel: attack and max damage for the weapon hand, defence and armour for the other.
