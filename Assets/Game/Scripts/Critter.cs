@@ -3471,7 +3471,17 @@ public class Critter : UUObject
     /// </summary>
     public int AbsorbWithArmour(int damage, float strikeHeight)
     {
-        return Mathf.Max(0, damage - GetArmourByBodyPart(PickBodyPart(strikeHeight)));
+        return AbsorbWithArmour(damage, PickBodyPart(strikeHeight));
+    }
+
+    /// <summary>
+    /// The same, for a blow that has already chosen where it lands. See
+    /// <see cref="PlayerObject.AbsorbWithArmour(int, EBodyPart)"/>: the original picks the part once
+    /// per blow, before the roll, and the damage spends that same choice.
+    /// </summary>
+    public int AbsorbWithArmour(int damage, EBodyPart bodyPart)
+    {
+        return Mathf.Max(0, damage - GetArmourByBodyPart(bodyPart));
     }
 
     void TryDamageTarget()
@@ -3491,6 +3501,14 @@ public class Critter : UUObject
             return;
         }
 
+        // Where the blow lands is decided before the roll, not after it. The original writes the
+        // body part to DS:0x2672 while it is setting the blow up (UW.EXE 0x24a34), the to-hit roll
+        // reads it back to find the protection covering that part (0x24b86), and the damage routine
+        // spends the same choice on armour (0x24f6b). One draw per blow, used twice.
+        EBodyPart bodyPart = attackTarget == null
+            ? PlayerObject.Player.PickBodyPart(GetSwingHeight())
+            : attackTarget.PickBodyPart(GetSwingHeight());
+
         // The attack score matches the original: the chosen attack's chance-to-hit byte plus half
         // the equipment-damage byte plus a roll. The original's roll is rand() % 6 + 7, which
         // reaches 12; Random.Range stops one short of its bound.
@@ -3508,6 +3526,15 @@ public class Critter : UUObject
         }
 
         int defenceScore = attackTarget == null ? PlayerObject.Player.GetDefence() : attackTarget.GetDefence();
+
+        if (attackTarget == null)
+        {
+            // A "of Protection" piece defends by making the blow miss, not by soaking it: the
+            // original subtracts the protection covering the part being struck from the attacker's
+            // attack score, and only when the one being struck is the player, whose four bytes
+            // those are (UW.EXE 0x24b7f checks the target is object 1 before 0x24b8f subtracts).
+            attackScore -= Inventory.sInv.GetMagicProtectionByBodyPart()[(int)bodyPart];
+        }
 
         Skills.ESkillTestResult result = Skills.GetResult(attackScore, defenceScore);
         if (type == EObjectType.SlasherOfVeils && result != Skills.ESkillTestResult.CriticalSuccess)
@@ -3553,12 +3580,12 @@ public class Critter : UUObject
                         poisoning = true;
                     }
                 }
-                damage = PlayerObject.Player.AbsorbWithArmour(damage, GetSwingHeight());
+                damage = PlayerObject.Player.AbsorbWithArmour(damage, bodyPart);
                 PlayerObject.Player.Damage(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage);
             }
             else
             {
-                damage = attackTarget.AbsorbWithArmour(damage, GetSwingHeight());
+                damage = attackTarget.AbsorbWithArmour(damage, bodyPart);
                 attackTarget.TryDamage(damage, result);
             }
             break;
