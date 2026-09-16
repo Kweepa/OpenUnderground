@@ -224,6 +224,36 @@ public class Utils
     }
 
     /// <summary>
+    /// What a blow gains for landing on a back instead of a face: 0 face to face, 4 from straight
+    /// behind, and the steps in between.
+    /// </summary>
+    /// <remarks>
+    /// The original compares the two facings, not the direction the attacker came from, so
+    /// circling something that keeps turning towards you earns nothing. It folds the difference
+    /// of the two headings into 0-4 and spends it twice: on the attack score, and on the damage
+    /// after the charge scale and before armour (UW.EXE 0x25158, read at 0x24ba0 and 0x24d45).
+    /// The headings are three bits wide, so eighths of a turn, and they are truncated rather than
+    /// rounded - the player's own is written as (angle >> 13) &amp; 7 at 0x1d08c, and a creature
+    /// has nothing finer, it turns an eighth at a time (0x1ac5d). One routine works it out for
+    /// whoever is swinging (0x2522c inside 0x251ac, reached from 0x255ca for the player and from
+    /// 0x259ee for a creature), which is why the player gets it too. A shot does not: the missile
+    /// path zeroes the same byte at 0x258e3.
+    /// </remarks>
+    public static int CalcFlankingBonus(Transform attacker, Transform target)
+    {
+        int difference = (GetHeading(target) - GetHeading(attacker) + 4) & 7;
+        return difference > 4 ? 8 - difference : difference;
+    }
+
+    /// <summary>
+    /// A facing the way the original keeps it: an eighth of a turn, truncated (UW.EXE 0x1d08c).
+    /// </summary>
+    public static int GetHeading(Transform t)
+    {
+        return Mathf.FloorToInt(t.eulerAngles.y / 45.0f) & 7;
+    }
+
+    /// <summary>
     /// What a critical hit does to the maximum before the dice are rolled: double it, half the
     /// time.
     /// </summary>

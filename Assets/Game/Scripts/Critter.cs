@@ -3580,12 +3580,21 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// What this blow gains for landing on the target's back, 0 to 4.
+    /// </summary>
+    /// <remarks>
+    /// The original works it out once per blow, before the roll, and spends it on the score and
+    /// on the damage (UW.EXE 0x25158). It reads the two facings out of the attacker's and the
+    /// target's own records, so the same call serves a creature swinging at the player and the
+    /// player swinging back.
+    /// </remarks>
     int CalcFlankingBonus()
     {
-        // base on where attacking the player from
-        // The original folds the difference between the two headings to 0-4 and adds it both to
-        // the attack score and to the damage, the latter after the charge scale. Still a stub.
-        return 0;
+        Transform targetTransform = attackTarget == null
+            ? PlayerObject.Player.transform
+            : attackTarget.transform;
+        return Utils.CalcFlankingBonus(transform, targetTransform);
     }
 
     /// <summary>
@@ -3746,6 +3755,11 @@ public class Critter : UUObject
         // last boss.
         damage = Utils.GetDamageRoll(damage);
         damage = (damage * attackChargeScale[RollAttackCharge()] + 127) / 128;
+
+        // The same bonus lands a second time, on the damage: the original adds the byte it wrote
+        // before the roll to the scaled damage, and armour is taken off what is left (UW.EXE
+        // 0x24d45, armour at 0x24e14).
+        damage += flankingbonus;
 
         switch (result)
         {

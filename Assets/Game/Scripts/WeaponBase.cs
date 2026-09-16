@@ -752,7 +752,16 @@ public class WeaponBase : UUObject
         UUObject obj = FindObjectToDamage(3.0f);
         if (obj != null)
         {
-            Skills.ESkillTestResult res = Skills.GetResult(GetAttackScore(), obj.GetDefence());
+            // What the swing gains for landing on a back. The original works it out once, before
+            // the roll, and spends it on the score and again on the damage (UW.EXE 0x2522c, read
+            // at 0x24ba0 and 0x24d45). It stays out of GetAttackScore() on purpose: that number
+            // describes the weapon and is what the inventory panel shows, while this one belongs
+            // to one blow. Only a creature is rolled against for it - the original leaves the
+            // roll behind before the bonus for anything else (0x24b65) - but the damage half
+            // lands on whatever was struck.
+            int flankingBonus = Utils.CalcFlankingBonus(PlayerObject.Player.transform, obj.transform);
+            int rollBonus = obj is Critter ? flankingBonus : 0;
+            Skills.ESkillTestResult res = Skills.GetResult(GetAttackScore() + rollBonus, obj.GetDefence());
             switch (res)
             {
             case Skills.ESkillTestResult.CriticalFailure:
@@ -801,7 +810,7 @@ public class WeaponBase : UUObject
                     int prepTime = GetChargePercent();
                     int scaledForDamage = meleeData.MinCharge +
                                           (meleeData.MaxCharge - meleeData.MinCharge) * prepTime / 100;
-                    int damage = scaledForDamage * rolledDamage / 128;
+                    int damage = scaledForDamage * rolledDamage / 128 + flankingBonus;
 
                     if (Cheats.sCheats.boostDamageFromPlayer)
                     {
