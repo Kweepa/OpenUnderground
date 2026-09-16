@@ -61,6 +61,9 @@ public class Bedroll : UUObject
 
         Messages.Add(1, 16); // you go to sleep
 
+        // The original plays its own track while you sleep (UW.EXE 0x81f8f).
+        Music.Sleep();
+
         while (PlayerObject.Player.fade < 1.0f)
         {
             PlayerObject.Player.fade += Time.unscaledDeltaTime;
@@ -117,7 +120,13 @@ public class Bedroll : UUObject
             yield return null;
         }
         PlayerObject.Player.fade = 0.0f;
-        
+
         PlayerObject.DisableControls(EControlMask.Resting, false);
+
+        // The sleep music runs on a little rather than stopping the instant the eyes open. With
+        // no dream to play the whole sleep is two seconds, so cutting it on the last frame left
+        // barely a bar of it. Control is already back, so this waits without holding anything up.
+        yield return new WaitForSeconds(2.0f);
+        Music.ResumeExploringMusic();
     }
 }

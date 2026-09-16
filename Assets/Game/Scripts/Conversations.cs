@@ -1761,6 +1761,10 @@ public class Conversations : MonoBehaviour
                 runningConversation.npc = critter;
                 runningConversation.conversationIndex = conversationIndex;
                 runningConversation.StartConversation(npcName);
+
+                // The original asks for its screens track while you talk, the same one it asks
+                // for when you sleep.
+                Music.Conversation();
                 waitForEnd = false;
                 chatScrollOffset = 0f;
                 lastOutputLength = 0;
@@ -1823,6 +1827,7 @@ public class Conversations : MonoBehaviour
             {
                 waitAFrameAfterRelease = false;
                 runningConversation = null;
+                Music.ResumeExploringMusic();
                 PlayerObject.DisableControls(EControlMask.Conversation, false);
                 Time.timeScale = 1.0f;
             }
