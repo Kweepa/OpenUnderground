@@ -2,6 +2,16 @@
 
 ## Current release
 
+- The music now follows how a fight is going. Two tracks from the original that nothing ever played are back: one for when you have something down to its last quarter, one for when you are. The plain combat track keeps the middle, and the score only changes every few seconds so it does not flap from blow to blow.
+
+- Something noticing you no longer sounds the same as something fighting you. A creature that hears you through a wall now starts a warning, and the combat music waits until one of you actually swings. Holding your weapon up keeps the warning going, which is what the original used that track for.
+
+- The track that used to play when you gained a level is the original's combat music, so it has gone back where it belongs. Gaining a level plays the victory music instead.
+
+- Sleeping and talking have their own music again, the track the original plays for both. It is the one this remake already used for the automap, and that stays as it is.
+
+- A victory fanfare is no longer cut off when the fight is not over. Killing one of three used to chop it in half; now it finishes, and the music goes back to the fight rather than out to the corridors.
+
 - A piece *of Protection* now makes you harder to hit on the part it covers, instead of soaking damage there, which is what the original does with it. Ten pieces in the game carry the enchantment, from the buckler of Minor Protection on level two to the breastplate of Tremendous Protection on level eight. The panel follows: they leave the armour number, since they no longer stop damage, and show up in the defence one instead, averaged over the four body parts because that is where they now act.
 
 - A piece *of Toughness* now soaks damage on the part it covers, as the original has it. It used to do nothing in a fight at all, only making the piece itself wear out more slowly, so the enchantment never showed. Eight pieces in the game carry it, up to the leather cap of Unsurpassed Toughness on level eight, which is worth eight points off every blow that lands on your head.

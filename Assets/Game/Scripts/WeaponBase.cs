@@ -107,6 +107,24 @@ public class WeaponBase : UUObject
         }
     }
 
+    /// <summary>
+    /// Whether the player is holding his weapon up rather than carrying it at rest.
+    /// </summary>
+    /// <remarks>
+    /// The attack button raises it and it falls back to Reset by itself after three seconds
+    /// without a swing, so this is a state the player enters on purpose and leaves by losing
+    /// interest - which is what the original's fight stance was, and what its own track is for.
+    /// Written every frame by whichever weapon is the equipped one, and only by that one: the
+    /// others all have hold false, and the fist stands in when the hand is empty.
+    /// </remarks>
+    public static bool IsRaised { get; private set; }
+
+    // Whether this weapon went up because the player asked. Being in Hold is not enough, and
+    // that is the whole point: Equip() sets resetTime to zero on purpose to show off the weapon
+    // just put in hand, and loading a game equips whatever was held, so a weapon comes up on
+    // every load. Worth seeing - it is a deliberate touch - but not worth the warning music.
+    private bool raisedOnPurpose;
+
     protected virtual void ChangeState(EState newState)
     {
         state = newState;
@@ -249,7 +267,21 @@ public class WeaponBase : UUObject
             }
         }
         bool pressingTrigger = !wasCancelled && attackHeld && !panelBlocksWeapon;
-        
+
+        if (pressingTrigger)
+        {
+            raisedOnPurpose = true;
+        }
+        else if (state == EState.Reset)
+        {
+            raisedOnPurpose = false;
+        }
+
+        if (hold)
+        {
+            IsRaised = raisedOnPurpose && state != EState.Reset;
+        }
+
         switch (state)
         {
         case EState.Reset:

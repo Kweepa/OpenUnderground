@@ -185,6 +185,16 @@ public class Critter : UUObject
 
     static readonly float kWakeUpRange = 50.0f;
 
+    /// <summary>
+    /// How near something has to be for noticing the player to be worth a warning, in metres.
+    /// </summary>
+    /// <remarks>
+    /// Three tiles. Hearing has neither occlusion nor falloff, so a creature can pick the player
+    /// up from the far end of a level and start walking; that is the acquisition working as it
+    /// should, but as music it is a warning that starts once and never has a reason to stop.
+    /// </remarks>
+    private const float alertRange = 3.0f * Tile.xzScale;
+
     // Static cache for string -> enum conversion (zero allocations)
     private static readonly Dictionary<string, CritterSoundType> soundTypeCache;
 
@@ -1904,7 +1914,24 @@ public class Critter : UUObject
         {
             return;
         }
+
         distanceToPlayer = Mathf.Sqrt(distanceToPlayer);
+
+        // Still on its way, and near enough to matter: keep the warning music alive. These four
+        // states are a creature that has the player and is closing on him without having swung
+        // yet, which is exactly what that music is for; the moment it swings, InCombat takes
+        // over. Refreshed every frame rather than started, so the warning ends a breath after
+        // the last one gives up or is outrun, instead of running on a timer of its own.
+        // Below the sqrt on purpose: above it the distance is still squared, and the same
+        // threshold written twice in two units is a bug waiting for someone in a hurry.
+        if (attitude == EAttitude.Hostile
+            && attackTarget == null
+            && distanceToPlayer <= alertRange
+            && state is EState.TurnToApproach or EState.Approach
+                or EState.CombatIdle or EState.ProjectileIdle)
+        {
+            Music.AlertHeartbeat();
+        }
 
         if (IsGolemWithShieldOfValor() && hp < 5)
         {
@@ -2070,6 +2097,18 @@ public class Critter : UUObject
                     if (attackTarget == null && attitude == EAttitude.Hostile && !hasPlayedAlertForCurrentDetection)
                     {
                         PlayAlertSound();
+
+                        // And the warning music with it, if the thing that noticed is close
+                        // enough to be a threat. Noticing the player is not the same as
+                        // attacking him - the creature may be behind a wall or a door, and the
+                        // hearing that picked him up goes through both - so this is the track
+                        // that says something is coming, not the one for when it has arrived.
+                        // Hearing carries a long way, though, and a warning for something that
+                        // heard the player from across the level is one that never stops.
+                        if (distanceToPlayer <= alertRange)
+                        {
+                            Music.Alert();
+                        }
                     }
 
                     GetPath(out path, transform.position, GetTargetFootPos());
