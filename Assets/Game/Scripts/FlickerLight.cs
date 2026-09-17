@@ -21,13 +21,22 @@ public class FlickerLight : MonoBehaviour
         #endif
     }
 
-    void Update()
+    /// <summary>
+    /// The light the player is currently carrying: the two shoulder slots, the ambient light of
+    /// level 9, and the Daylight, Night Vision and Light spells, resolved together.
+    /// </summary>
+    /// <remarks>
+    /// Pulled out of Update so that anything else needing to know how brightly lit the player is -
+    /// Critter, for how far it can see them - reads the same numbers, rather than a copy that can
+    /// drift away from this one.
+    /// </remarks>
+    public static void GetPlayerLightProps(out float lightRange, out float lightIntensity, out float lightFlicker)
     {
         UUObject objA = Inventory.sInv.invSlotContents[(int) EInvSlot.LeftShoulder];
         UUObject objB = Inventory.sInv.invSlotContents[(int) EInvSlot.RightShoulder];
-        float lightRange = 12.0f;
-        float lightIntensity = 1.2f;
-        float lightFlicker = 1.0f;
+        lightRange = 12.0f;
+        lightIntensity = 1.2f;
+        lightFlicker = 1.0f;
 
         if (LevelLoader.sLevelLoader.loadedLevel == 9)
         {
@@ -55,7 +64,12 @@ public class FlickerLight : MonoBehaviour
                 lightFlicker = 0.96f;
             }
         }
-        
+    }
+
+    void Update()
+    {
+        GetPlayerLightProps(out float lightRange, out float lightIntensity, out float lightFlicker);
+
         if (cachedLight != null)
         {
             cachedLight.range = lightRange;

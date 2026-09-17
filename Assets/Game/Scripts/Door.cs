@@ -54,9 +54,46 @@ public class Door : Lockable
             {
                 door.transform.localPosition = new Vector3(0.0f, openDistance * openAmount, 0.0f);
             }
+
+            KeepTheTombRoomOpen();
         }
     }
     
+    /// <summary>
+    /// Level 4: the door of the room at 13,44 will not shut with the player inside it.
+    /// </summary>
+    /// <remarks>
+    /// It is the one door in the game that can wall somebody in. Both switches that work it are
+    /// out in the corridor, on the east side of the threshold, and the door is locked - closing
+    /// it does not unlock it - so a player inside with the door shut has nothing to open it with
+    /// and nothing to walk out through. The original will not close a door on you at all: it
+    /// moves a little towards shut and opens again by itself. This is that answer, kept to the
+    /// one place where being shut in has no way out rather than changed for every door in the
+    /// game, which is where a change like this could do harm.
+    /// The room is the floor west of the door, x 10 to 12, y 43 to 45, plus the doorway itself;
+    /// the corridor and its two switches are east of it, so operating them still closes the door
+    /// behind you when you are out there.
+    /// </remarks>
+    private void KeepTheTombRoomOpen()
+    {
+        if (originalLevel != 4 || objectIndex != 748 || opening || openAmount <= 0.1f
+            || PlayerObject.Player == null)
+        {
+            return;
+        }
+
+        Tile playerTile = LevelLoader.GetTile(PlayerObject.Player.transform.position);
+        if (playerTile == null
+            || playerTile.x < 10 || playerTile.x > 13
+            || playerTile.y < 43 || playerTile.y > 45)
+        {
+            return;
+        }
+
+        PlayerObject.Rumble(0.2f, 0.2f, 0.2f);
+        opening = true;
+    }
+
     private void CheckForPlayerAndReverseDirection()
     {
         float checkDirection = 0.0f;

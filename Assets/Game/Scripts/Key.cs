@@ -118,6 +118,24 @@ public class Key : UUObject
         }
     }
 
+    /// <summary>
+    /// The key's name, with the level it was found on after it.
+    /// </summary>
+    /// <remarks>
+    /// Keys are never thrown away, because there is no telling which door is still waiting for
+    /// one, so they pile up: by the middle of the game the pack holds a dozen of them and they
+    /// all read the same. The level is the one piece of information that sorts them - a key from
+    /// four levels up is dead weight and can be left in a bag on the way past.
+    /// originalLevel is where the object was placed in the level data, which for a key is where
+    /// it was picked up. A key that never lived in a level has none, and then the name is left
+    /// exactly as it was.
+    /// </remarks>
+    public override string GetLookName()
+    {
+        string name = base.GetLookName();
+        return originalLevel > 0 ? name + " (level " + originalLevel + ")" : name;
+    }
+
     protected override bool TryUseAtAim()
     {
         if (Interaction.sInt == null)

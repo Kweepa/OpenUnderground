@@ -26,6 +26,9 @@ public class SaveLoadGUI : MonoBehaviour
     public Texture2D xButtonChargeRing;
     public Material xButtonChargeRingMaterial;
 
+    [Tooltip("Open the save/load screen, and so pause the game, when the window loses focus.")]
+    public bool pauseOnFocusLoss = true;
+
     public AudioClip diskSound;
 
     private bool visible;
@@ -242,6 +245,35 @@ public class SaveLoadGUI : MonoBehaviour
     private bool KeyboardActive()
     {
         return KeyboardGUI.sKeyboard != null && KeyboardGUI.sKeyboard.IsVisible();
+    }
+
+    /// <summary>
+    /// Pauses the game when the window loses focus, by opening the save/load screen.
+    /// </summary>
+    /// <remarks>
+    /// Nothing else in the project handles focus, so whether alt-tabbing freezes the game depends
+    /// entirely on the Run In Background player setting. With that on, hunger, fatigue, poison,
+    /// torch decay and every Critter.Update keep running while you are in another window.
+    /// Opening this screen is exactly what Escape does from gameplay, and it sets Time.timeScale
+    /// to 0. Simulating an Escape press would not do the same thing: Escape is context sensitive,
+    /// and with a panel open it only closes the panel.
+    /// TryOpenFromGame needs no guard here. It is idempotent, and CanOpenSaveLoadFromGameplay
+    /// already refuses when the menu is up, when the virtual keyboard is showing, when a modal
+    /// blocks, on level 9, or when controls are disabled for a conversation or cutscene; it
+    /// cannot fire on the main menu either, since it requires PlayerObject.Player and
+    /// LevelLoader.sLevelLoader to exist.
+    /// Unity delivers OnApplicationFocus(false) at the moment focus is lost, before it suspends
+    /// updates, so this works whether or not Run In Background is set.
+    /// On coming back you find the save/load screen open and time stopped; Escape resumes.
+    /// Not in the editor, where losing focus is how you reach the rest of the editor while the
+    /// game runs: pausing there would stop the clock every time you clicked on the inspector.
+    /// </remarks>
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus && pauseOnFocusLoss && !Application.isEditor)
+        {
+            TryOpenFromGame();
+        }
     }
 
     public void Update()

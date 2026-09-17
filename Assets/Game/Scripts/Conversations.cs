@@ -1830,6 +1830,18 @@ public class Conversations : MonoBehaviour
                 Music.ResumeExploringMusic();
                 PlayerObject.DisableControls(EControlMask.Conversation, false);
                 Time.timeScale = 1.0f;
+
+                // Bartering opens the inventory panel and nothing closed it again, so you walked
+                // away from every trade with the panel still up. This is the single place in the
+                // project where a conversation ends - farewell, dismissal and interruption all
+                // pass through here - so one check covers every exit route.
+                // fromUserToggle is false because this is not the player reaching for the panel;
+                // it is the same value PlayerPanelInput passes when it closes a panel by itself,
+                // and TutorialManager.NotifyPanelChanged uses it to tell the two apart.
+                if (PlayerPanelState.IsExploringInventory)
+                {
+                    PlayerPanelState.SetPanel(EPlayerPanel.None, false);
+                }
             }
             else
             {
