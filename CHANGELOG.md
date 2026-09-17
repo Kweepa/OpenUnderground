@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Common coins and gold coins can be told apart at last: the common ones are silver now, in the pack and on the floor. Both used to be drawn with the same two pictures and the same gold model, so a purse of silver and a purse of gold looked the same either way.
+
 - With auto jump turned on the jump now goes off when you press the key rather than when you let it go, and the edge of a gap still takes you over by itself - running at it is enough now, where before you had to be holding the key down as well.
 
 - Keys now carry the level they were found on in their name. A dozen of them look alike by the middle of the game, and the level is what tells you which ones belong to doors you are never going back to.
