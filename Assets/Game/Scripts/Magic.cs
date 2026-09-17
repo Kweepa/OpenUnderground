@@ -51,6 +51,14 @@ public class MagicSaveData
 
     /// <summary>Whether the primed cast was a critical success (halved mana on finalize).</summary>
     public bool mousePrimedSpellWasCritical;
+
+    /// <summary>
+    /// Runes laid out on the shelf, ready to cast. Null in older saves, in which case the shelf
+    /// comes back empty, exactly as it always did. Named differently from Magic.spellInProgress
+    /// on purpose, so it is obvious at a glance whether a line is reading the live shelf or its
+    /// serialised copy; "rune shelf" is the manual's own term for it.
+    /// </summary>
+    public int[] runeShelf;
 }
 
 [DefaultExecutionOrder(-150)]
@@ -89,7 +97,11 @@ public class Magic : MonoBehaviour
     private Texture2D flaskCopy;
     private Texture2D flaskBase;
 
+    /// <summary>Runes laid out on the shelf, ready to cast. Persisted via MagicSaveData.runeShelf.</summary>
     private readonly List<int> spellInProgress = new();
+
+    /// <summary>Runes the shelf holds. Three, as in the original.</summary>
+    private const int MaxRunesOnShelf = 3;
     private bool castASpellWithTheseRunes;
 
     private bool wasExploringMagic;
@@ -874,7 +886,7 @@ public class Magic : MonoBehaviour
                     {
                         spellInProgress.Clear();
                     }
-                    if (spellInProgress.Count < 3)
+                    if (spellInProgress.Count < MaxRunesOnShelf)
                     {
                         spellInProgress.Add(index);
                         Utils.PlayClip2d(moveToRune);
@@ -893,8 +905,11 @@ public class Magic : MonoBehaviour
             }
         }
 
-        if (!exploring
-            && (PlayerObject.Player.controlsDisabled & EControlMask.Map) == 0
+        // With the panel open as well as closed. C is the cast key, and the panel that shows the
+        // runes about to be cast was the one place it did nothing - so laying a spell out and
+        // pressing C, which is the obvious thing to do, cast nothing at all. A successful cast
+        // puts the panel away by itself, so one press casts and closes.
+        if ((PlayerObject.Player.controlsDisabled & EControlMask.Map) == 0
             && GameInput.MagicCastKeyboardConfirmPressedThisFrame())
         {
             TryCastFromSpellRunes();
@@ -1540,6 +1555,24 @@ public class Magic : MonoBehaviour
                     castSpells[i] = true;
                     break;
                 }
+
+                // A successful cast closes the panel; a failed one leaves it up so the runes can
+                // be tried again without reopening it.
+                //
+                // This matters most for the seven spells that wait for a mouse aim - Magic Arrow,
+                // Lightning, Fireball, Acid, Open, Strengthen Door and Name Enchantment. Aiming
+                // one is a click on the point you want, with the pointer free, and the panel
+                // covers the left of the screen and swallows any click over it through
+                // GuiInput.BlocksPointer, so anything behind it could not be targeted at all.
+                // Closing the panel does not release the pointer - a primed spell keeps it free
+                // on its own, see GameplayCursorPolicy - it just uncovers the screen.
+                //
+                // Safe to do while a spell is primed: PlayerPanelState.SetPanel does not touch
+                // mousePrimedSpellIndex, so the aim survives the panel going away.
+                if (result >= Skills.ESkillTestResult.Success)
+                {
+                    HidePanel();
+                }
             }
             break;
         }
@@ -1864,10 +1897,19 @@ public class Magic : MonoBehaviour
         bam = Physics.SphereCast(start, 0.2f, Vector3.down, out hit, 2.0f, layerMask);
         start += Vector3.down * (bam ? hit.distance : 2.0f);
         // spawn food here - weight heavily towards fish, since these are specifically needed for a couple of puzzles
-        EObjectType foodToSpawn = Random.value < 0.5f ? EObjectType.Fish : (EObjectType)Random.Range((int)EObjectType.PieceOfMeat, (int)EObjectType.Fish); 
+        // The fish does turn up now. The draw above it could never produce one outside that
+        // half, because Random.Range excludes the top of an integer range and Fish is the top
+        // of it, so the other half covered the six foods below it and the 50% branch was the
+        // only way to get a fish at all. With the range closed, all seven are equally likely,
+        // which is what the original does: 176 + rand() % 7, and quality 63 rather than 48
+        // (UW.EXE 0x351e5). A fish now comes up once in seven castings instead of once in two.
+        // The puzzles that want one are presumably meant to be solved with the fishing pole,
+        // which otherwise has nothing to do in the game.
+        EObjectType foodToSpawn =
+            (EObjectType)Random.Range((int)EObjectType.PieceOfMeat, (int)EObjectType.Fish + 1);
         UUObject obj = LevelLoader.CreateObjectOfType(foodToSpawn);
         obj.transform.position = start;
-        obj.quality = 48; // fresh
+        obj.quality = 63; // as fresh as it goes: the original writes the top of the scale, 0x351e5
         obj.PostLoadInitialize(); // Initialize name properties so food has proper inspect name
         LevelLoader.AddToWorld(obj);
 
@@ -2719,7 +2761,7 @@ public class Magic : MonoBehaviour
 
         if (castASpellWithTheseRunes)
             spellInProgress.Clear();
-        if (spellInProgress.Count < 3)
+        if (spellInProgress.Count < MaxRunesOnShelf)
         {
             spellInProgress.Add(runeIndex);
             Utils.PlayClip2d(moveToRune);
@@ -2794,7 +2836,7 @@ public class Magic : MonoBehaviour
                 continue;
             if (castASpellWithTheseRunes)
                 spellInProgress.Clear();
-            if (spellInProgress.Count < 3)
+            if (spellInProgress.Count < MaxRunesOnShelf)
             {
                 spellInProgress.Add(i);
                 Utils.PlayClip2d(moveToRune);
@@ -3087,6 +3129,8 @@ public class Magic : MonoBehaviour
             saveData.mousePrimedSpellListIndex = mousePrimedSpellIndex;
             saveData.mousePrimedSpellWasCritical = mousePrimedSpellWasCritical;
         }
+
+        saveData.runeShelf = spellInProgress.ToArray();
         
         return saveData;
     }
@@ -3127,6 +3171,27 @@ public class Magic : MonoBehaviour
                     spell = savedSpell.spell,
                     time = savedSpell.time
                 });
+            }
+        }
+
+        // Restore the rune shelf. The limits are re-checked rather than trusted: three runes and
+        // indices inside hasRunestone are the same constraints that apply when you lay the shelf
+        // out by hand, so a hand edited or future version save cannot get the state into a shape
+        // the rest of the class does not expect.
+        // Deliberately NOT gated on hasRunestone. That array is rebuilt from the inventory in
+        // RefreshRunestones(), which runs when the magic panel is opened, so at this point it may
+        // not be populated yet and the shelf would always come back empty. Losing a rune while it
+        // sits on the shelf is rare and harmless: you see the letter and the cast matches no spell.
+        spellInProgress.Clear();
+        if (data.runeShelf != null)
+        {
+            for (int i = 0; i < data.runeShelf.Length && spellInProgress.Count < MaxRunesOnShelf; i++)
+            {
+                int rune = data.runeShelf[i];
+                if (rune >= 0 && rune < hasRunestone.Length)
+                {
+                    spellInProgress.Add(rune);
+                }
             }
         }
 

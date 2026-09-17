@@ -2,6 +2,26 @@
 
 ## Current release
 
+- With auto jump turned on the jump now goes off when you press the key rather than when you let it go, and the edge of a gap still takes you over by itself - running at it is enough now, where before you had to be holding the key down as well.
+
+- Keys now carry the level they were found on in their name. A dozen of them look alike by the middle of the game, and the level is what tells you which ones belong to doors you are never going back to.
+
+- Create Food no longer turns half of everything it makes into fish. All seven foods are equally likely, the way the original draws them, and what it makes is as fresh as food gets.
+
+- A creature's eyes only glow as far as your own light reaches, and a couple of paces past it, since eyes shine by throwing light back. They used to shine right down an unlit corridor, so a pair of them gave a creature away long before anything else could, and putting your torch out made no difference. A creature that is a light in its own right, like the fire elemental, still shows.
+
+- A door will not close on you. Standing in a doorway while something shuts it - a lever, a sleeping spell, a creature squeezing past - now pushes it open again, which is what the original does. The room with the tomb on level four has both its switches out in the corridor, so a door that shut behind you there left you with nothing to open it with.
+
+- The game pauses when its window loses focus, by opening the save screen the way Escape does. Alt-tabbing used to leave hunger, fatigue, poison and every creature running while you were somewhere else.
+
+- The magic panel closes when a spell is cast, and the inventory when a conversation ends. And C casts with the panel open, which it used not to: the one screen showing the runes you are about to cast was the one place the cast key did nothing. Bartering used to leave the pack open, and the panel used to sit over the half of the screen you needed to aim a fireball at.
+
+- The runes laid out ready to cast survive a save and a reload. You used to find the shelf empty and have to lay the spell out again.
+
+- How long you can sprint, and how quickly your wind comes back, now depend on the Acrobat skill: eight seconds of running and twenty to recover for an untrained character, forty and ten for a trained one, where it used to be ten and twenty for everyone. Acrobat had nothing to its name but the fall it saves you from.
+
+- The flute plays an octave higher, in the register a flute actually sings in, and the whole scale is now one instrument. Four of the ten notes were overblown takes, thin and reedy, so a tune sounded like several players taking turns.
+
 - The exploring music no longer runs wall to wall. A stretch of quiet is left between one track and the next, and after a fight, so the next track lands instead of just carrying on. Options sets how long that quiet can get, and setting it to zero puts the music back the way it was.
 
 - The title music is no longer cut off the moment you start playing. It plays out first, whether you made a new character or carried an old one on, and the exploring music takes over when it ends. That is what the original does with it.
@@ -75,6 +95,7 @@
 - Levers, buttons and switches on a wall no longer attach themselves to the face of a door that shares their tile but sits on a different wall. The clearest case was a lever near a secret door on level 3.
 
 - Paying a smith to repair an item now actually repairs it. The item was taken, the money was spent and the item came back untouched.
+
 
 ## First public release
 

@@ -390,6 +390,33 @@ public class Utils
         return PlayClip2d(clip, 1.0f, randomizePitch);
     }
 
+    /// <summary>
+    /// Plays a 2d clip at a fixed pitch ratio, for a sampler that transposes one recording across
+    /// several notes. 1.0 is the clip as recorded; 2.0 is an octave up.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the overload below because that one randomises the pitch, which is right for
+    /// a footstep and wrong for a note. The lifetime has to account for the ratio: resampling up
+    /// shortens the clip and resampling down lengthens it, and destroying the object after the
+    /// unscaled length would cut a low note off.
+    /// </remarks>
+    public static AudioSource PlayClip2dAtPitch(AudioClip clip, float pitch, float volume = 1.0f)
+    {
+        AudioSource src = null;
+        if (clip != null && pitch > 0.0f)
+        {
+            src = CreateClip2d(clip);
+            if (src != null)
+            {
+                src.pitch = pitch;
+                src.volume = ScaleEffectsVolume(volume);
+                src.Play();
+                Object.Destroy(src.gameObject, src.clip.length / pitch);
+            }
+        }
+        return src;
+    }
+
     public static AudioSource PlayClip2d(AudioClip clip, float volume, bool randomizePitch = true)
     {
         AudioSource src = null;

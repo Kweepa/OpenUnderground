@@ -568,12 +568,22 @@ public class PlayerObject : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// With auto jump on, running straight at the edge of a gap jumps by itself.
+    /// </summary>
+    /// <remarks>
+    /// This used to need the jump key held as well, because the manual jump went off on the
+    /// release: holding the key was how a player said "jump when we get there". The manual jump
+    /// now goes off on the press, so a held key is no longer a state anyone is in - a player who
+    /// presses gets a jump on the spot, and the edge that arrives a moment later found nothing
+    /// holding. Auto jump asks for the run and the edge, which is what the option promises, and
+    /// it stays off until it is turned on.
+    /// </remarks>
     private bool ShouldAutoJump(Vector2 moveControl, float moveSpeed)
     {
         if (cachedCharacterController.isGrounded
             && moveControl.y > 0.7f
-            && Mathf.Abs(moveControl.x) < 0.4f
-            && PlayerInput.JumpHeld())
+            && Mathf.Abs(moveControl.x) < 0.4f)
         {
             float lookAheadTime = 0.05f;
             Vector3 center = transform.position;
@@ -630,6 +640,42 @@ public class PlayerObject : MonoBehaviour
         WeaponBase weapon = Inventory.sInv.invSlotContents[(int)slot] as WeaponBase;
         if (weapon == null) weapon = Inventory.sInv.fist;
         return weapon != null && weapon.IsSprintBlocked();
+    }
+
+    /// <summary>
+    /// Seconds of continuous sprinting the stamina bar is worth, scaled by Acrobat.
+    /// </summary>
+    /// <remarks>
+    /// Sprinting is an addition to the remake rather than something UW1 had, so there is no
+    /// original model to respect - but 10 seconds of sprint and 20 to recharge, identical for
+    /// every character regardless of attributes, left three hard coded constants with nothing
+    /// behind them. Because stamina is normalised from 0 to 1, the divisor is literally the
+    /// number of seconds, so tying it to the skill is a one line change.
+    ///     Acrobat   sprint   recharge   run : rest
+    ///        0        8 s      20 s       1 : 2.5
+    ///       10       18.7 s    16.7 s   1.1 : 1
+    ///       20       29.3 s    13.3 s   2.2 : 1
+    ///       30       40 s      10 s       4 : 1
+    /// The scale runs from four fifths of the old fixed figure to four times it, so an untrained
+    /// character is a little worse off than before, a trained one runs four times the old fixed
+    /// figure, and the two ends are five times apart. That is the point: a skill nothing reads is
+    /// not a choice, and Acrobat had only the fall damage roll to its name. The top matters as
+    /// much as the bottom - at a gentler slope the last ten points bought so little that stopping
+    /// at 20 was the sensible play, which is the same problem one step along. Acrobat is governed
+    /// by dexterity, so the real cap is min(30, 2 * dexterity). The 2 second stall after emptying the bar is left alone: that is
+    /// the punishment for running it dry, not a measure of fitness. Combat is unaffected -
+    /// sprinting is already barred there by !IsInCombat().
+    /// </remarks>
+    private float SprintDrainTime()
+    {
+        return staminaDrainTime * (0.8f + 3.2f * Skills.GetSkill(ESkill.Acrobat) / 30.0f);
+    }
+
+    /// <inheritdoc cref="SprintDrainTime"/>
+    private float SprintRecoverTime()
+    {
+        // Cannot reach zero: that would need Acrobat 60 and the cap is 30. Floored anyway.
+        return Mathf.Max(staminaRecoverTime - 0.5f * staminaRecoverTime * Skills.GetSkill(ESkill.Acrobat) / 30.0f, 5.0f);
     }
 
     private void NormalMovement()
@@ -698,7 +744,7 @@ public class PlayerObject : MonoBehaviour
         if (wantsSprint)
         {
             moveSpeed *= sprintSpeedMultiplier;
-            stamina -= Time.deltaTime / staminaDrainTime;
+            stamina -= Time.deltaTime / SprintDrainTime();
             if (stamina <= 0f)
             {
                 stamina = 0f;
@@ -712,7 +758,7 @@ public class PlayerObject : MonoBehaviour
                 staminaRecoverDelayRemaining -= Time.deltaTime;
             if (staminaRecoverDelayRemaining <= 0f)
             {
-                stamina += Time.deltaTime / staminaRecoverTime;
+                stamina += Time.deltaTime / SprintRecoverTime();
                 stamina = Mathf.Min(stamina, 1.0f);
                 if (stamina >= 1f)
                     staminaRecoverDelayRemaining = 0f;
@@ -833,15 +879,13 @@ public class PlayerObject : MonoBehaviour
             bool jumped = false;
             if (allowMove && !isInWater)
             {
-                if (PlayerInput.AutoJump)
-                {
-                    // Auto-jump: wait for release (or leap at the detected edge while held).
-                    if (IsJumpReleasedSeparated() || ShouldAutoJump(moveControl, moveSpeed))
-                    {
-                        jumped = true;
-                    }
-                }
-                else if (IsJumpPressedSeparated())
+                // The jump goes off when the key goes down, whatever the auto jump setting says.
+                // Waiting for the release was how a held key could still mean "jump at the edge
+                // ahead", but it put a delay on the ordinary jump, which is the one a player
+                // makes all day. Auto jump keeps its own trigger, and no longer needs the key:
+                // running at the edge of a gap fires the jump by itself.
+                if (IsJumpPressedSeparated()
+                    || (PlayerInput.AutoJump && ShouldAutoJump(moveControl, moveSpeed)))
                 {
                     jumped = true;
                 }
@@ -1537,6 +1581,10 @@ public class PlayerObject : MonoBehaviour
     }
 
     // watching some YouTube videos, it seems this is how it works
+    // Not in the data: the thresholds are code in UW.EXE, absent from every UW1 and UW2 data file.
+    // Self-consistent though - over 50 they read 1,2,3,4,6,8,12,16,24,32,48,64,96,128,192, each
+    // twice the one two places back from the fifth on: the requirement doubles every two levels.
+    // Unverified: that pattern pins down neither the strict > below nor the 20x on displayed XP.
     private static readonly int[] levelUp =
     {
         50, 100, 150, 200, 300, 400, 600, 800, 1200, 1600, 2400, 3200, 4800, 6400, 9600

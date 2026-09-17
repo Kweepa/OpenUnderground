@@ -239,6 +239,145 @@ public class Critter : UUObject
     private Renderer eyeGlowRenderer;
     private static readonly Color[] eyeColors = { Color.green, Color.yellow, Color.red };
 
+    // The renderers that paint a glow, and the block that turns it off. Both are set up once,
+    // when the creature is initialized.
+    private Renderer[] glowingRenderers;
+    private MaterialPropertyBlock glowBlock;
+    private bool glowHidden;
+
+    // The reach of the player's light, worked out once a frame rather than once per creature.
+    private static int glowFrame = -1;
+    private static float glowRangeSquared;
+
+    /// <summary>How far past the edge of the player's light a pair of eyes still catches it.</summary>
+    /// <remarks>
+    /// Eyes shine because they throw light back, so they answer a lamp from a little further off
+    /// than the lamp itself reaches. Two tiles is what that looks like in play.
+    /// </remarks>
+    private const float eyeGlowMarginTiles = 2.0f;
+
+    /// <summary>
+    /// True for a renderer that paints a glow on the creature rather than being a light itself.
+    /// </summary>
+    /// <remarks>
+    /// Two kinds carry it. Most creatures have an emission map on their own material -
+    /// Rat_Emission, Skeleton_Warrior_Emission and the rest - which paints the eyes and nothing
+    /// else. The mongbat and the imp instead wear a particle system for eyes, a pair of electric
+    /// sparks on the Particles/Standard Unlit shader, which the mage and the sorceress use too.
+    ///
+    /// A particle is the glow, so it counts however bright it is. A mesh is a body that happens
+    /// to have a glow painted on it, and there the brightness tells the two apart: over white
+    /// means the body itself burns - the fire elemental at 2.3, the reaper at 1.3 - and a
+    /// creature made of fire should be visible in the dark.
+    /// </remarks>
+    private static bool PaintsAGlow(Renderer rend)
+    {
+        Material material = rend.sharedMaterial;
+        if (material == null
+            || !material.HasProperty(emissionColorPropertyId)
+            || !material.IsKeywordEnabled("_EMISSION"))
+        {
+            return false;
+        }
+
+        if (rend is ParticleSystemRenderer)
+        {
+            return true;
+        }
+
+        float brightest = material.GetColor(emissionColorPropertyId).maxColorComponent;
+        return brightest > 0.0f && brightest <= 1.0f;
+    }
+
+    /// <summary>
+    /// Shows the glow of the eyes only as far as the player's light reaches, and two tiles past.
+    /// </summary>
+    /// <remarks>
+    /// The glow is emissive, so darkness does not dim it: in an unlit corridor a pair of eyes
+    /// reads from the far end of the level, and a torch in hand made no difference to how far
+    /// away you could pick creatures out. The reach is the range of the player's light, taken
+    /// from FlickerLight, which works it out every frame for the light rather than from a second
+    /// copy of the same sum that could drift away from it. That is 12 with nothing lit, 20 with
+    /// a torch and 25 with a lantern, so putting the torch out pulls the eyes in by a third.
+    ///
+    /// The switch is the emission colour, taken to black through a property block, which leaves
+    /// the material alone and instantiates nothing; it is written only when the answer changes.
+    /// eyeGlowRenderer is not what carries the glow and cannot be: nothing in the game is tagged
+    /// EyeGlow, so that field is null on every creature.
+    /// </remarks>
+    /// <param name="squaredDistanceToPlayer">Squared, so no root is taken that is not needed.</param>
+    private void UpdateEyeGlow(float squaredDistanceToPlayer)
+    {
+        if (eyeGlowRenderer == null && (glowingRenderers == null || glowingRenderers.Length == 0))
+        {
+            return;
+        }
+
+        if (glowFrame != Time.frameCount)
+        {
+            glowFrame = Time.frameCount;
+            FlickerLight.GetPlayerLightProps(out float lightRange, out _, out _);
+            float reach = lightRange + eyeGlowMarginTiles * Tile.xzScale;
+            glowRangeSquared = reach * reach;
+        }
+
+        bool hide = squaredDistanceToPlayer > glowRangeSquared;
+        bool changed = hide != glowHidden || glowBlock == null;
+        glowHidden = hide;
+
+        if (!changed && !hide)
+        {
+            return;
+        }
+
+        glowBlock ??= new MaterialPropertyBlock();
+
+        if (eyeGlowRenderer != null && changed)
+        {
+            // A model that does carry the tag has a renderer of its own for the eyes, and the
+            // colour of that one follows the creature's health: it goes off whole, rather than
+            // having its colour written over.
+            eyeGlowRenderer.enabled = !hide;
+        }
+
+        foreach (Renderer rend in glowingRenderers)
+        {
+            if (rend == null)
+            {
+                continue;
+            }
+
+            if (rend is ParticleSystemRenderer)
+            {
+                // The particle is the glow rather than a body with a glow on it, so it goes off
+                // whole: its shader is unlit, and taking the emission to black would leave the
+                // sparks drawn at full brightness. Past the light it is held off every frame,
+                // because these are effects the creature switches on and off for itself and one
+                // it turns on out there would otherwise light up; inside the light it is handed
+                // back on the way in and then left alone.
+                if (hide)
+                {
+                    rend.enabled = false;
+                }
+                else if (changed)
+                {
+                    rend.enabled = true;
+                }
+                continue;
+            }
+
+            if (!changed)
+            {
+                continue;
+            }
+
+            rend.GetPropertyBlock(glowBlock);
+            glowBlock.SetColor(emissionColorPropertyId,
+                hide ? Color.black : rend.sharedMaterial.GetColor(emissionColorPropertyId));
+            rend.SetPropertyBlock(glowBlock);
+        }
+    }
+
     public bool removeTalker;
 
     public enum EState
@@ -569,7 +708,15 @@ public class Critter : UUObject
             singularName = "mage";
         }
 
-        eyeGlowRenderer = GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.CompareTag("EyeGlow"));
+        // Any renderer, and inactive ones too: the eyes are not always a skinned mesh, and on a
+        // model where they start switched off this search came back empty.
+        eyeGlowRenderer = GetComponentsInChildren<Renderer>(true).FirstOrDefault(r => r.CompareTag("EyeGlow"));
+
+        // What actually glows, which is not the same thing: the eyes are painted by an emission
+        // map on the creature's own material, so the renderer to reach for is whichever one wears
+        // a material with emission on.
+        glowingRenderers = GetComponentsInChildren<Renderer>(true)
+            .Where(r => r != eyeGlowRenderer && PaintsAGlow(r)).ToArray();
 
         // Defer animator restore to LateUpdate so it runs after any Start() (e.g. BaseCritterSM) that would overwrite it
         if (restoredFromSave && cachedAnimator != null && savedAnimatorStateHash != 0)
@@ -1910,6 +2057,10 @@ public class Critter : UUObject
 
         Vector3 off = transform.position - PlayerObject.Player.mainCamera!.transform.position;
         float distanceToPlayer = off.sqrMagnitude;
+
+        // Above the early return below on purpose: being far away is the case this is about.
+        UpdateEyeGlow(distanceToPlayer);
+
         if (distanceToPlayer > kWakeUpRange * kWakeUpRange && LevelLoader.sLevelLoader.loadedLevel != 9)
         {
             return;
