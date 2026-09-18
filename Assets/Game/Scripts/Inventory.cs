@@ -4368,30 +4368,34 @@ public class Inventory : MonoBehaviour
     };
 
     /// <summary>
-    /// The armour total as the player knows it, for the panel. Pieces answer with
-    /// <see cref="UUObject.GetKnownDefence"/>, so an enchantment he has not identified is missing
-    /// from the figure even though it is working: the number must not do the Lore roll's job.
-    /// Combat reads <see cref="GetArmourByBodyPart"/> instead, which uses the true values.
+    /// The armour rating for the panel: every piece counted once for each body part it covers. A
+    /// shield covers torso and arms, so it counts twice; a helmet covers the head, so it counts
+    /// once. Pieces answer with <see cref="UUObject.GetKnownDefence"/>, so an enchantment the
+    /// player has not identified stays out of the figure even though it is working: the number must
+    /// not do the Lore roll's job. Combat reads <see cref="GetArmourByBodyPart"/> itself and spends
+    /// only the part that was struck.
     /// </summary>
+    /// <remarks>
+    /// This total is exactly four times the damage a blow soaks on average, since a blow meets one
+    /// part and there are four. The scale is deliberate and it is ours - the panel rating is an
+    /// addition of this remake, so there is no original figure to match. Four times keeps the
+    /// rating on the same footing as attack, damage and defence, where a full suit of chain reads
+    /// about 16 rather than 4, and it gives the number enough resolution to move when one piece is
+    /// swapped for a slightly better one. Every term scales alike, so the ratios are honest: a
+    /// Resist Blows spell reads 8 and so does a full leather suit, and both do soak 2 a blow.
+    /// The one figure that must NOT be scaled this way is defence, whose magic protection has to
+    /// stay commensurate with the Defense skill - in the roll a point of either is worth the same -
+    /// which is why that one still goes through <see cref="AverageOverBodyParts"/>.
+    /// </remarks>
     public int GetKnownArmourScore()
     {
-        int score = 0;
-        foreach (var armorSlot in armorSlots)
+        int total = 0;
+        foreach (int part in GetArmourByBodyPart(asKnown: true))
         {
-            // Not the fingers: the original's loop covers the five armour slots and the shield
-            // hand only (UW.EXE 0x7e466 and 0x7e4ab), and every ring reads zero protection anyway.
-            UUObject armour = invSlotContents[(int)armorSlot];
-            if (armour != null)
-            {
-                score += armour.GetKnownDefence();
-            }
+            total += part;
         }
 
-        // Toughness is spread over the body parts, so one figure cannot carry it whole: the panel
-        // takes the average of the four, the rule fix 163 settles for every localised term.
-        score += AverageOverBodyParts(GetToughnessByBodyPart(asKnown: true));
-
-        return score;
+        return total;
     }
 
     // Which body part each worn piece covers. The original keeps it as the table 03 00 01 02 02 at
@@ -4409,9 +4413,15 @@ public class Inventory : MonoBehaviour
 
     /// <summary>
     /// Protection per body part, the way the original keeps it: the pieces covering a part are
-    /// summed and the total is subtracted from the damage of a hit that lands there.
+    /// summed and the total is subtracted from the damage of a hit that lands there. These are the
+    /// four armour bytes of the player's critterStats row, read at UW.EXE 0x24dc1 and taken off the
+    /// damage at 0x24e22.
     /// </summary>
-    public int[] GetArmourByBodyPart()
+    /// <param name="asKnown">
+    /// True for the panel, where an enchantment the player has not identified must stay out of the
+    /// figure although it goes on soaking damage. Combat asks for the true values.
+    /// </param>
+    public int[] GetArmourByBodyPart(bool asKnown = false)
     {
         int[] armour = new int[4];
         for (int i = 0; i < armourPieceSlots.Length; ++i)
@@ -4419,7 +4429,7 @@ public class Inventory : MonoBehaviour
             UUObject piece = invSlotContents[(int)armourPieceSlots[i]];
             if (piece != null)
             {
-                armour[(int)armourPieceParts[i]] += piece.GetDefence();
+                armour[(int)armourPieceParts[i]] += Of(piece, asKnown);
             }
         }
 
@@ -4427,18 +4437,35 @@ public class Inventory : MonoBehaviour
         if (shield != null)
         {
             // a weapon in that hand answers 0, so this only counts shields
-            armour[(int)EBodyPart.Torso] += shield.GetDefence();
-            armour[(int)EBodyPart.Arms] += shield.GetDefence();
+            armour[(int)EBodyPart.Torso] += Of(shield, asKnown);
+            armour[(int)EBodyPart.Arms] += Of(shield, asKnown);
         }
 
         // A Toughness enchantment lands in these same bytes in the original, by a rule of its own
-        int[] toughness = GetToughnessByBodyPart();
+        int[] toughness = GetToughnessByBodyPart(asKnown);
         for (int i = 0; i < armour.Length; ++i)
         {
             armour[i] += toughness[i];
         }
 
+        // And so does a shield spell, flat on all four parts: the original keeps the largest
+        // parameter among the active effects (UW.EXE 0x7e028) and adds it to every one of the four
+        // bytes (0x7e31d). It soaks damage, it does not make a blow harder to land, so it does not
+        // belong in PlayerObject.GetDefence() where the remake used to spend it.
+        int spellArmour = asKnown
+            ? Magic.sMagic.GetKnownSpellArmourScore()
+            : Magic.sMagic.GetSpellArmourScore();
+        for (int i = 0; i < armour.Length; ++i)
+        {
+            armour[i] += spellArmour;
+        }
+
         return armour;
+
+        static int Of(UUObject piece, bool asKnown)
+        {
+            return asKnown ? piece.GetKnownDefence() : piece.GetDefence();
+        }
     }
 
     /// <summary>
@@ -4496,11 +4523,18 @@ public class Inventory : MonoBehaviour
 
     /// <summary>
     /// The one figure that stands for a quantity spread over the four body parts: the average,
-    /// rounded to the nearest whole point. A bonus sitting on one part must not swell the number as
-    /// though it counted on every blow, but it must still move it, because having it is better than
-    /// not having it. Flat terms are added whole by the caller and only the localised part comes
-    /// through here, so with nothing localised the figure is the one shown before.
+    /// rounded to the nearest whole point, so half a point reads as one. A bonus sitting on one
+    /// part must not swell the number as though it counted on every blow, but it must still move
+    /// it, because having it is better than not having it. Flat terms are added whole by the caller
+    /// and only the localised part comes through here, so with nothing localised the figure is the
+    /// one shown before.
     /// </summary>
+    /// <remarks>
+    /// Used by <see cref="PlayerObject.GetDefence()"/> and not by the armour rating, which wants a
+    /// coarser scale and carries its own reasoning - see <see cref="GetKnownArmourScore"/>. Defence
+    /// has to keep this one because its terms sit beside the Defense skill in the same roll, where
+    /// a point of protection and a point of Defense are worth exactly the same.
+    /// </remarks>
     public static int AverageOverBodyParts(int[] perPart)
     {
         int total = 0;

@@ -552,21 +552,38 @@ public class Magic : MonoBehaviour
         permanentSpells.Clear();
     }
 
+    /// <summary>
+    /// What a shield spell takes off a blow that lands. The original holds the three of them as
+    /// effect 2 with parameter <c>special &amp; 15</c> - specials 546, 547 and 549, so 2, 3 and 5
+    /// (UW.EXE 0x38cb6 decodes the effect, 0x38cc5 the parameter).
+    /// </summary>
+    /// <remarks>
+    /// The remake used to answer 10, 15 and 20 and spend them on the to-hit roll. Both halves were
+    /// wrong: five times the size, and the wrong side of the blow. Iron Flesh made two swings in
+    /// three miss where the original merely costs each swing that lands five points of its damage.
+    /// </remarks>
     private static int GetSpellArmourValue(int spell)
     {
         switch (spells[spell].runes)
         {
         case "BIS":
-            return 10;
+            return 2;
         case "IS":
-            return 15;
+            return 3;
         case "IVS":
-            return 20;
+            return 5;
         }
 
         return 0;
     }
 
+    /// <summary>
+    /// The damage a shield spell soaks, on every body part alike. The original keeps the largest
+    /// parameter among the active effects (UW.EXE 0x7e028) and adds it to all four armour bytes of
+    /// the player's critterStats row (0x7e31d), which the damage routine subtracts from a blow that
+    /// lands (0x24e22). <see cref="Inventory.GetArmourByBodyPart"/> is where it is spent, not
+    /// <see cref="PlayerObject.GetDefence()"/>.
+    /// </summary>
     public int GetSpellArmourScore()
     {
         return GetSpellArmourScore(false);

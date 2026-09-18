@@ -147,7 +147,8 @@ public class PlayerObject : MonoBehaviour
     /// original keeps this number as the Defense skill plus half the skill of the weapon in hand
     /// (UW.EXE 0x7e535 and 0x7e5f8) and spends armour on the damage instead, in
     /// <see cref="AbsorbWithArmour"/>. Adding armour here made a plate-armoured player untouchable
-    /// rather than merely hard to hurt.
+    /// rather than merely hard to hurt. A shield spell is out for the same reason and now sits in
+    /// <see cref="Inventory.GetArmourByBodyPart"/>: it soaks damage on every body part.
     /// </summary>
     public int GetDefence()
     {
@@ -168,9 +169,6 @@ public class PlayerObject : MonoBehaviour
     private int GetDefence(bool asKnown)
     {
         int defenceScore = Skills.GetSkill(ESkill.Defense);
-        defenceScore += asKnown
-            ? Magic.sMagic.GetKnownSpellArmourScore()
-            : Magic.sMagic.GetSpellArmourScore();
         Weapon weapon = Inventory.sInv.invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand)] as Weapon;
         defenceScore += Skills.GetSkill(weapon != null ? weapon.skill : ESkill.Unarmed) / 2;
 
