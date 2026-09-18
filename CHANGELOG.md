@@ -2,6 +2,10 @@
 
 ## Current release
 
+- The armour rating in the pack now counts each piece once for every part of you it covers, so a shield counts for the torso and the arms both instead of once. It also carries the shield spells, which used to swell the defence figure next to it instead.
+
+- Resist Blows, Thick Skin and Iron Flesh take points off the damage instead of making you harder to hit, and they are worth what the original pays for them: 2, 3 and 5. Iron Flesh used to make two swings in three miss outright, which is not a shield spell so much as a suit of invisible plate.
+
 - A repair that goes badly wrong now destroys the item, as it does in the original. Taking a worn long sword to an anvil with no skill at it is close to throwing it away - eight attempts in ten ended with the sword gone - where before the bad roll did nothing at all.
 
 - Repairing takes time. A battered item in unskilled hands costs well over an hour of it, so an evening spent at the anvil leaves you hungry and tired, and a spare weapon is worth carrying again.
