@@ -101,6 +101,31 @@ public class UUObject : LevelObject
 
     public string enchantmentName;
 
+    /// <summary>
+    /// The enchantment's number: its index in STRINGS.PAK block 6, or <see cref="Enchantment.None"/>.
+    /// This is what the game acts on. <see cref="enchantmentName"/> is only what it prints, and it
+    /// is rebuilt from this number every time the object is loaded, so it always comes from the
+    /// strings file in use.
+    /// </summary>
+    public int enchantmentNumber = Enchantment.None;
+
+    /// <summary>Sets the enchantment from its block 6 index, keeping the number and the name in step.</summary>
+    public void SetEnchantment(int enchantmentIndex)
+    {
+        enchantmentNumber = enchantmentIndex;
+        enchantmentName = StringLoader.GetString(6, enchantmentIndex);
+    }
+
+    /// <summary>
+    /// Works the enchantment out from <see cref="special"/>, which the save carries, so that an
+    /// object loaded from a save ends up exactly as one built from the level data. Weapons always
+    /// did this; the other kinds only did it on first load, which is why an enchantment used to
+    /// depend on the name written into the save.
+    /// </summary>
+    protected virtual void UpdateEnchantmentState()
+    {
+    }
+
     public string singularArticle;
     public string singularName;
     public string pluralArticle;
@@ -842,9 +867,7 @@ public class UUObject : LevelObject
             else
             {
                 UUObject obj = LevelLoader.CreateObjectOfType(type);
-                obj.quality = quality;
-                obj.flags = flags;
-                obj.ownerIndex = ownerIndex;
+                Inventory.CopyPeeledStackProperties(this, obj);
                 obj.quantity = howMany;
                 obj.PostLoadInitialize();
                 quantity -= howMany;
@@ -864,9 +887,7 @@ public class UUObject : LevelObject
         else
         {
             UUObject obj = LevelLoader.CreateObjectOfType(type);
-            obj.quality = quality;
-            obj.flags = flags;
-            obj.ownerIndex = ownerIndex;
+            Inventory.CopyPeeledStackProperties(this, obj);
             obj.quantity = howMany;
             obj.PostLoadInitialize();
             Inventory.Add(obj);
@@ -1415,7 +1436,8 @@ public class UUObject : LevelObject
         {
             lookNameBuilder.Clear();
             lookNameBuilder.Append(baseName);
-            if (enchantmentName == StringLoader.GetString(6, Magic.StringIndexCursed))
+            // Every one of the sixteen grades, 144 to 159, not just the first.
+            if (Enchantment.KindOf(enchantmentNumber) == Enchantment.KindCursed)
             {
                 lookNameBuilder.Append(" (Cursed}");
             }
@@ -1460,7 +1482,7 @@ public class UUObject : LevelObject
         {
             // all potions and wands accounted for
 
-            if (enchantmentName == StringLoader.GetString(6, Magic.StringIndexManaBoost))
+            if (enchantmentNumber == Magic.StringIndexManaBoost)
             {
                 // the original is too random here. modern audiences expect some predictability
                 Magic.sMagic.RestoreMana(PlayerData.sData.maxMana / 2);
@@ -1471,7 +1493,7 @@ public class UUObject : LevelObject
                 return true;
             }
 
-            if (enchantmentName == StringLoader.GetString(6, Magic.StringIndexRestoreMana))
+            if (enchantmentNumber == Magic.StringIndexRestoreMana)
             {
                 Magic.sMagic.RestoreMana(PlayerData.sData.maxMana);
                 if (Magic.sMagic.defaultCastSound != null)
@@ -1481,7 +1503,15 @@ public class UUObject : LevelObject
                 return true;
             }
 
-            return Magic.sMagic.TryCast(enchantmentName, anonymous);
+            if (enchantmentNumber != Enchantment.None)
+            {
+                return Magic.sMagic.TryCastEnchantment(enchantmentNumber, anonymous);
+            }
+
+            // No number could be worked out, so the saved name is all there is. A potion from an
+            // older save no longer gets here, because Potion recovers its number from that name.
+            // What is left is a linked wand whose spell object was not found when it loaded.
+            return Magic.sMagic.TryCastEnchantmentFromSavedName(enchantmentName, anonymous);
         }
 
         // find linked 
@@ -1776,7 +1806,10 @@ public class UUObject : LevelObject
             alignToFloor = uuData.alignToFloor;
             loreResult = (Skills.ESkillTestResult)uuData.loreResult;
             loreResultLoreLevel = uuData.loreResultLoreLevel;
+            // The saved name is kept as a fallback for anything UpdateEnchantmentState() does not
+            // cover; where it does, the name it derives wins, and the saved one is never consulted.
             enchantmentName = uuData.enchantmentName;
+            UpdateEnchantmentState();
             quantity = uuData.quantity;
             
             if (uuData.contents != null && uuData.contents.Count > 0)

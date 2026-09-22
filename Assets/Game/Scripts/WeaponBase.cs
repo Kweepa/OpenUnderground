@@ -1005,18 +1005,18 @@ public class WeaponBase : UUObject
 
     protected override void RestoreFromSaveData(LevelObjectSaveData data)
     {
+        // The base class rebuilds the enchantment now, so there is nothing to do here.
         base.RestoreFromSaveData(data);
-        UpdateEnchantmentState();
     }
 
-    private void UpdateEnchantmentState()
+    protected override void UpdateEnchantmentState()
     {
         if (!isLinked && isEnchanted)
         {
             int spellIndex = special - 704;
             if (spellIndex is >= 0 and < 16)
             {
-                enchantmentName = StringLoader.GetString(6, 448 + spellIndex);
+                SetEnchantment(448 + spellIndex);
                 enchantmentIndex = spellIndex;
             }
         }

@@ -162,31 +162,40 @@ public class Armour : UUObject
         }
     }
 
+    protected override void UpdateEnchantmentState()
+    {
+        if (isLinked || !isEnchanted)
+        {
+            return;
+        }
+
+        if (special is >= 704 and < 712)
+        {
+            enchantmentIndex = special - 704;
+            SetEnchantment(464 + enchantmentIndex);
+            enchantmentType = EEnchantmentType.Protection;
+        }
+        else if (special is >= 712 and < 720)
+        {
+            enchantmentIndex = special - 712;
+            SetEnchantment(472 + enchantmentIndex);
+            enchantmentType = EEnchantmentType.Toughness;
+        }
+        else if (special >= 512)
+        {
+            enchantmentIndex = special - 512;
+            SetEnchantment(enchantmentIndex);
+            enchantmentType = EEnchantmentType.Normal;
+        }
+    }
+
     public override void Initialize(ushort[] objData, byte[] critterData)
     {
         base.Initialize(objData, critterData);
     
+        UpdateEnchantmentState();
         if (!isLinked && isEnchanted)
         {
-            if (special is >= 704 and < 712)
-            {
-                enchantmentIndex = special - 704;
-                enchantmentName = StringLoader.GetString(6, 464 + enchantmentIndex);
-                enchantmentType = EEnchantmentType.Protection;
-            }
-            else if (special is >= 712 and < 720)
-            {
-                enchantmentIndex = special - 712;
-                enchantmentName = StringLoader.GetString(6, 472 + enchantmentIndex);
-                enchantmentType = EEnchantmentType.Toughness;
-            }
-            else if (special >= 512)
-            {
-                enchantmentIndex = special - 512;
-                enchantmentName = StringLoader.GetString(6, enchantmentIndex);
-                enchantmentType = EEnchantmentType.Normal;
-            }
-
             name += " of " + enchantmentName;
         }
 

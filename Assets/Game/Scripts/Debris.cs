@@ -161,8 +161,22 @@ public class Debris : UUObject
             // Set potion enchantment if it's a potion
             if (lootType == EObjectType.RedPotion || lootType == EObjectType.GreenPotion)
             {
-                lootObj.enchantmentName = DebrisLootTables.GetRandomPotionEnchantment();
+                // The number also goes into special, where a potion from the level data carries
+                // it. Without that this potion would be the one object whose enchantment cannot be
+                // worked out again after a save, because nothing else records the roll.
+                //
+                // It has to go in high, at 512 and up, because that is the only place special
+                // means "enchantment". Below 368 it is the quantity of a stack instead, and the
+                // two share the same bits: writing the number low mints items rather than storing
+                // an enchantment, and it also leaves the potion stackable, so a handful of them
+                // merge into one pile that keeps a single enchantment and swallows the rest.
+                // A potion from the level data carries it high for exactly these reasons. The one
+                // roll that is not a spell, Poison Resistance, has a value of its own: see
+                // Enchantment.PoisonResistancePotionSpecial.
+                int enchantmentNumber = DebrisLootTables.GetRandomPotionEnchantmentNumber();
+                lootObj.special = Enchantment.PotionSpecialFor(enchantmentNumber);
                 lootObj.isEnchanted = true;
+                lootObj.SetEnchantment(enchantmentNumber);
             }
             
             // Position near debris with random offset

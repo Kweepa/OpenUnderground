@@ -6,7 +6,8 @@ using UnityEngine.Rendering.PostProcessing;
 
 public struct SSpell
 {
-    public SSpell(string _runes, string _name, int _cost, int _icon, int _duration, int _stringIndex)
+    public SSpell(string _runes, string _name, int _cost, int _icon, int _duration, int _stringIndex,
+                  int _itemIndex = -1)
     {
         runes = _runes;
         name = _name;
@@ -14,6 +15,7 @@ public struct SSpell
         icon = _icon;
         duration = _duration;
         stringIndex = _stringIndex;
+        itemIndex = _itemIndex;
     }
 
     public int circle => cost / 3;
@@ -25,6 +27,14 @@ public struct SSpell
     public readonly int duration; // approximate seconds. there will be some variability
     /// <summary>Block 6 index in STRINGS.PAK for this spell's display / enchantment name.</summary>
     public readonly int stringIndex;
+
+    /// <summary>
+    /// The same spell's index in block 6's lower table, which is the one an item carries:
+    /// kind * 16 + parameter, taken from the original's own spell table at UW.EXE 0x59ef0.
+    /// -1 for the four entries that are not spells there at all - Cursed, the two Regenerations
+    /// and Poison Resistance - whose stringIndex is already a number from that lower table.
+    /// </summary>
+    public readonly int itemIndex;
 }
 
 [System.Serializable]
@@ -270,7 +280,7 @@ public class Magic : MonoBehaviour
     public AudioClip primeSpellSound;
 
     // STRINGS.PAK block 6 indices used for enchantment matching (language-stable).
-    public const int StringIndexMagicLantern = 4;
+    // public const int StringIndexMagicLantern = 4; // not read any more: ResolveWornEffect() decodes kind 0
     public const int StringIndexPoisonResistance = 55;
     public const int StringIndexCursed = 144;
     public const int StringIndexRegeneration = 190;
@@ -282,81 +292,81 @@ public class Magic : MonoBehaviour
     private static readonly List<SSpell> spells = new()
     {
         // first circle — stringIndex from block 6 castable range (256+)
-        new SSpell("IMY", "Create Food", 3, -1, 0, 259), // done
-        new SSpell("UP", "Leap", 6, 0, 60, 261), // done
-        new SSpell("IL", "Light", 3, 17, 1500, 256), // done
-        new SSpell("OJ", "Magic Arrow", 3, -1, 0, 258), // done
-        new SSpell("BIS", "Resist Blows", 3, 15, 90, 257), // done
-        new SSpell("SH", "Stealth", 3, 6, 30, 260), // done (quiet)
+        new SSpell("IMY", "Create Food", 3, -1, 0, 259, 129), // done
+        new SSpell("UP", "Leap", 6, 0, 60, 261, 17), // done
+        new SSpell("IL", "Light", 3, 17, 1500, 256, 3), // done
+        new SSpell("OJ", "Magic Arrow", 3, -1, 0, 258, 81), // done
+        new SSpell("BIS", "Resist Blows", 3, 15, 90, 257, 34), // done
+        new SSpell("SH", "Stealth", 3, 6, 30, 260, 50), // done (quiet)
 
         // second circle
-        new SSpell("QC", "Create Fear", 6, -1, 0, 266), // done (PAK: Cause Fear)
-        new SSpell("AS", "Curse", 24, 5, 0, 262), // gotten from crowns on level 7, also on a scroll on level 4. guess at level
-        new SSpell("WM", "Detect Monster", 6, -1, 0, 265), // done
-        new SSpell("IBM", "Lesser Heal", 6, -1, 0, 264), // done
-        new SSpell("IJ", "Rune of Warding", 6, -1, 0, 267), // done
-        new SSpell("RDP", "Slow Fall", 6, 1, 30, 263), // done
+        new SSpell("QC", "Create Fear", 6, -1, 0, 266, 113), // done (PAK: Cause Fear)
+        new SSpell("AS", "Curse", 24, 5, 0, 262, 49), // gotten from crowns on level 7, also on a scroll on level 4. guess at level
+        new SSpell("WM", "Detect Monster", 6, -1, 0, 265, 177), // done
+        new SSpell("IBM", "Lesser Heal", 6, -1, 0, 264, 66), // done
+        new SSpell("IJ", "Rune of Warding", 6, -1, 0, 267, 131), // done
+        new SSpell("RDP", "Slow Fall", 6, 1, 30, 263, 18), // done
 
         // third circle
-        new SSpell("BSL", "Conceal", 9, 7, 60, 269), // done (can't be seen)
-        new SSpell("OG", "Lightning", 9, -1, 0, 271), // done (PAK: Electrical Bolt)
-        new SSpell("QL", "Night Vision", 9, 12, 120, 270), // done
-        new SSpell("RTP", "Speed", 9, 13, 30, 268), // done
-        new SSpell("SJ", "Strengthen Door", 9, -1, 0, 272), // unused
-        new SSpell("IS", "Thick Skin", 12, 16, 90, 273), // done
+        new SSpell("BSL", "Conceal", 9, 7, 60, 269, 51), // done (can't be seen)
+        new SSpell("OG", "Lightning", 9, -1, 0, 271, 82), // done (PAK: Electrical Bolt)
+        new SSpell("QL", "Night Vision", 9, 12, 120, 270, 5), // done
+        new SSpell("RTP", "Speed", 9, 13, 30, 268, 176), // done
+        new SSpell("SJ", "Strengthen Door", 9, -1, 0, 272, 178), // unused
+        new SSpell("IS", "Thick Skin", 12, 16, 90, 273, 35), // done
 
         // fourth circle
-        new SSpell("SF", "Flameproof", 12, 10, 90, 278), // done
-        new SSpell("IM", "Heal", 12, -1, 0, 275), // done
-        new SSpell("NM", "Poison", 12, -1, 0, 277), // done  
-        new SSpell("AJ", "Remove Trap", 12, -1, 0, 279), // ???
-        new SSpell("YP", "Water Walk", 9, 3, 180, 274), // done
+        new SSpell("SF", "Flameproof", 12, 10, 90, 278, 54), // done
+        new SSpell("IM", "Heal", 12, -1, 0, 275, 68), // done
+        new SSpell("NM", "Poison", 12, -1, 0, 277, 116), // done  
+        new SSpell("AJ", "Remove Trap", 12, -1, 0, 279, 179), // ???
+        new SSpell("YP", "Water Walk", 9, 3, 180, 274, 20), // done
 
         // fifth circle
-        new SSpell("AN", "Cure Poison", 15, -1, 0, 285), // done
-        new SSpell("PF", "Fireball", 15, -1, 0, 280), // done
-        new SSpell("HP", "Levitate", 15, 2, 60, 276), // done
-        new SSpell("GSP", "Missile Protection", 15, 9, 60, 283), // done
-        new SSpell("OWY", "Name Enchantment", 15, -1, 0, 282), // done
-        new SSpell("EY", "Open", 15, -1, 0, 284), // done
-        new SSpell("ACM", "Smite Undead", 15, -1, 0, 281), // done
+        new SSpell("AN", "Cure Poison", 15, -1, 0, 285, 182), // done
+        new SSpell("PF", "Fireball", 15, -1, 0, 280, 83), // done
+        new SSpell("HP", "Levitate", 15, 2, 60, 276, 19), // done
+        new SSpell("GSP", "Missile Protection", 15, 9, 60, 283, 53), // done
+        new SSpell("OWY", "Name Enchantment", 15, -1, 0, 282, 180), // done
+        new SSpell("EY", "Open", 15, -1, 0, 284, 181), // done
+        new SSpell("ACM", "Smite Undead", 15, -1, 0, 281, 114), // done
 
         // sixth circle
-        new SSpell("VIL", "Daylight", 18, 20, 300, 290), // done
-        new SSpell("VRP", "Gate Travel", 18, -1, 0, 288), // done
-        new SSpell("VIM", "Greater Heal", 18, -1, 0, 286), // done
-        new SSpell("AEP", "Paralyze", 18, -1, 0, 289), // done
-        new SSpell("VOG", "Sheet Lightning", 18, -1, 0, 287),
-        new SSpell("OPY", "Telekinesis", 18, 14, 30, 291), // done
+        new SSpell("VIL", "Daylight", 18, 20, 300, 290, 6), // done
+        new SSpell("VRP", "Gate Travel", 18, -1, 0, 288, 186), // done
+        new SSpell("VIM", "Greater Heal", 18, -1, 0, 286, 79), // done
+        new SSpell("AEP", "Paralyze", 18, -1, 0, 289, 117), // done
+        new SSpell("VOG", "Sheet Lightning", 18, -1, 0, 287, 98),
+        new SSpell("OPY", "Telekinesis", 18, 14, 30, 291, 184), // done
 
         // seventh circle
-        new SSpell("IMR", "Ally", 21, -1, 0, 293), // done
-        new SSpell("VHP", "Fly", 21, 4, 30, 292), // done
-        new SSpell("VSL", "Invisibility", 21, 8, 120, 295), // done (both quiet and can't be seen)
-        new SSpell("VAW", "Confusion", 21, -1, 0, 296),
-        new SSpell("OAQ", "Reveal", 21, -1, 0, 297), // done
-        new SSpell("KM", "Summon Monster", 21, -1, 0, 294), // guessing the circle...
+        new SSpell("IMR", "Ally", 21, -1, 0, 293, 115), // done
+        new SSpell("VHP", "Fly", 21, 4, 30, 292, 21), // done
+        new SSpell("VSL", "Invisibility", 21, 8, 120, 295, 52), // done (both quiet and can't be seen)
+        new SSpell("VAW", "Confusion", 21, -1, 0, 296, 99),
+        new SSpell("OAQ", "Reveal", 21, -1, 0, 297, 97), // done
+        new SSpell("KM", "Summon Monster", 21, -1, 0, 294, 132), // guessing the circle...
 
         // eighth circle
-        new SSpell("VKC", "Armageddon", 24, -1, 0, 303), // done
-        new SSpell("FH", "Flame Wind", 24, -1, 0, 301), // explosions in an area
-        new SSpell("AT", "Freeze Time", 24, 11, 30, 302), // done
-        new SSpell("IVS", "Iron Flesh", 24, 18, 120, 298), // done
-        new SSpell("OPW", "Roaming Sight", 24, 19, 30, 300), // done
-        new SSpell("VPY", "Tremor", 24, -1, 0, 299), // done
+        new SSpell("VKC", "Armageddon", 24, -1, 0, 303, 188), // done
+        new SSpell("FH", "Flame Wind", 24, -1, 0, 301, 100), // explosions in an area
+        new SSpell("AT", "Freeze Time", 24, 11, 30, 302, 187), // done
+        new SSpell("IVS", "Iron Flesh", 24, 18, 120, 298, 37), // done
+        new SSpell("OPW", "Roaming Sight", 24, 19, 30, 300, 183), // done
+        new SSpell("VPY", "Tremor", 24, -1, 0, 299, 185), // done
 
         // uncastable - get from rings, crowns, etc (low-table / special block 6 indices)
         new SSpell("", "Cursed", 0, 5, 0, StringIndexCursed),
         new SSpell("", "Mana Regeneration", 0, -1, 0, StringIndexManaRegeneration),
         new SSpell("", "Regeneration", 0, -1, 0, StringIndexRegeneration),
         new SSpell("", "Poison Resistance", 0, -1, 0, StringIndexPoisonResistance),
-        new SSpell("ZZZ", "Acid", 0, -1, 0, 305)
+        new SSpell("ZZZ", "Acid", 0, -1, 0, 305, 84)
     };
 
-    private static bool spellNamesBound;
-
     /// <summary>
-    /// Overwrite spell names from STRINGS.PAK block 6 so enchantment matching works with translated strings.
+    /// Takes the spell names from STRINGS.PAK block 6, so the spell list reads in whatever
+    /// language the strings file is in. Nothing keys off these names any more - enchantments are
+    /// matched by number now - so this is purely what the player sees.
     /// </summary>
     public static void BindSpellNamesFromStrings()
     {
@@ -365,16 +375,6 @@ public class Magic : MonoBehaviour
             SSpell spell = spells[i];
             spell.name = StringLoader.GetString(6, spell.stringIndex);
             spells[i] = spell;
-        }
-
-        spellNamesBound = true;
-    }
-
-    private static void EnsureSpellNamesBound()
-    {
-        if (!spellNamesBound)
-        {
-            BindSpellNamesFromStrings();
         }
     }
 
@@ -489,46 +489,104 @@ public class Magic : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// The lasting effect an enchantment number gives while its item is worn, or 0 for none.
+    /// </summary>
+    /// <remarks>
+    /// Decoded, not matched by name. See <see cref="Enchantment"/> for why the name cannot do
+    /// this job. UW.EXE 0x7e007 is the applicator these kinds index into.
+    /// </remarks>
+    private static ESpell ResolveWornEffect(int enchantmentNumber)
+    {
+        int kind = Enchantment.KindOf(enchantmentNumber);
+        int parameter = Enchantment.ParameterOf(enchantmentNumber);
+
+        switch (kind)
+        {
+        case Enchantment.KindLight:
+            // The original has one case here and eight brightness levels in the parameter, and its
+            // Night Vision and Daylight spells are levels 5 and 6 of it. This engine has those two
+            // as spells of their own, so they map to them. Sunlight, level 7, is brighter still
+            // and gets Daylight, the brightest there is. The three below Light - darkness, a
+            // burning match, a candle - are dimmer than the torch you are probably carrying and
+            // are left alone.
+            switch (parameter)
+            {
+            case 3: return ESpell.Light;
+            case 4: return ESpell.Light;
+            case 5: return ESpell.NightVision;
+            case 6: return ESpell.Daylight;
+            case 7: return ESpell.Daylight;
+            }
+            return 0;
+
+        case Enchantment.KindMovement:
+            switch (parameter)
+            {
+            case 1: return ESpell.Leap;
+            case 2: return ESpell.SlowFall;
+            case 3: return ESpell.Levitate;
+            case 4: return ESpell.WaterWalk;
+            case 5: return ESpell.Fly;
+            }
+            return 0;
+
+        case Enchantment.KindSoakDamage:
+            switch (parameter)
+            {
+            case 2: return ESpell.ResistBlows;
+            case 3: return ESpell.ThickSkin;
+            case 5: return ESpell.IronFlesh;
+            }
+            return 0;
+
+        case Enchantment.KindWard:
+            switch (parameter)
+            {
+            case 2: return ESpell.Stealth;
+            case 3: return ESpell.Conceal;
+            case 4: return ESpell.Invisibility;
+
+            // Parameters 5 to 9 are the five resistances. In the original they make damage of a
+            // matching type miss outright, which this engine has no vocabulary for, so these two
+            // stay mapped to the spells they were mapped to before: this change is about how an
+            // enchantment is identified, not about what it does. Flameproof (6) and the two Magic
+            // Protections (8, 9) had no mapping before and still have none.
+            case 5: return ESpell.MissileProtection;
+            case 7: return ESpell.PoisonResistance;
+            }
+            // Parameter 1 is Curse, which the original adds to the protection of every body part
+            // rather than making it an effect. Left alone here on purpose.
+            return 0;
+
+        case Enchantment.KindCursed:
+            // Every one of the sixteen grades. Testing a single number would leave the crowns on
+            // level 7 uncursed, because they carry 149 and 150 rather than 144.
+            return ESpell.Cursed;
+
+        case Enchantment.KindRegeneration:
+            switch (parameter)
+            {
+            case 14: return ESpell.Regeneration;
+            case 15: return ESpell.ManaRegeneration;
+            }
+            return 0;
+        }
+
+        return 0;
+    }
+
     public void EquipEnchantedItem(UUObject obj)
     {
-        EnsureSpellNamesBound();
-
-        SPermanentSpell permanentSpell = new();
-        ESpell resolved = 0;
-
-        if (obj.enchantmentName == StringLoader.GetString(6, StringIndexMagicLantern))
+        ESpell resolved = ResolveWornEffect(obj.enchantmentNumber);
+        if (resolved == 0)
         {
-            resolved = ESpell.Light;
-        }
-        else if (TryFindSpellIndexFromEnchantmentName(obj.enchantmentName, out int spellIndex))
-        {
-            resolved = (ESpell)spellIndex;
+            return;
         }
 
-        switch (resolved)
-        {
-        case ESpell.Levitate:
-        case ESpell.Leap:
-        case ESpell.ResistBlows:
-        case ESpell.MissileProtection:
-        case ESpell.SlowFall:
-        case ESpell.Cursed:
-        case ESpell.Light:
-        case ESpell.PoisonResistance:
-        case ESpell.Invisibility:
-        case ESpell.ManaRegeneration:
-        case ESpell.Regeneration:
-        case ESpell.ThickSkin:
-        case ESpell.Stealth:
-            permanentSpell.spell = resolved;
-            break;
-        }
-
-        if (permanentSpell.spell != 0)
-        {
-            permanentSpell.obj = obj;
-            permanentSpells.Add(permanentSpell);
-        }
+        SPermanentSpell permanentSpell = new() { spell = resolved, obj = obj };
+        permanentSpells.Add(permanentSpell);
+        SyncNightVisionGrading(resolved);
     }
 
     public void UnequipEnchantedItem(UUObject obj)
@@ -537,9 +595,31 @@ public class Magic : MonoBehaviour
         {
             if (permanentSpells[i].obj == obj)
             {
+                ESpell removed = permanentSpells[i].spell;
                 permanentSpells.RemoveAt(i);
+                SyncNightVisionGrading(removed);
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// The night vision greyscale follows the spell. A cast turns it on in TryCast() and off in
+    /// RemoveSpell(), which only see cast spells, so an item that lends Night Vision sets it here
+    /// when it is put on or taken off. A load re-equips every item after clearing the permanent
+    /// spells, so this also covers a load.
+    /// </summary>
+    private void SyncNightVisionGrading(ESpell changed)
+    {
+        if (changed != ESpell.NightVision || PlayerObject.Player == null)
+        {
+            return;
+        }
+
+        PostProcessVolume vol = PlayerObject.Player.GetComponentInChildren<PostProcessVolume>();
+        if (vol != null && vol.profile.TryGetSettings(out ColorGrading colorGrading))
+        {
+            colorGrading.enabled.Override(IsSpellActive(ESpell.NightVision));
         }
     }
 
@@ -1037,22 +1117,83 @@ public class Magic : MonoBehaviour
         SoftwareCursorOverlay.DefaultTextureOverride = null;
     }
 
-    private static bool TryFindSpellIndexFromEnchantmentName(string enchantmentName, out int spellIndex)
+    /// <summary>
+    /// Finds the spell an enchantment number names. Block 6 names a spell in two places, and an
+    /// item carries whichever fits it: a scroll, potion or wand carries the spell name from 256,
+    /// while something that is simply consumed carries the lower table's kind * 16 + parameter -
+    /// the enchanted loaf on level 8 is 182, which is Cure Poison. Both numbers are unique and
+    /// both point at the same spell, so either one answers. This replaces matching the printed
+    /// name, which only held while a single strings file was loaded.
+    /// </summary>
+    private static bool TryFindSpellIndexFromNumber(int enchantmentNumber, out int spellIndex)
     {
         spellIndex = -1;
-        if (string.IsNullOrEmpty(enchantmentName))
+        if (enchantmentNumber < 0)
         {
             return false;
         }
 
-        EnsureSpellNamesBound();
-
         for (int i = 0; i < spells.Count; ++i)
         {
-            if (spells[i].name == enchantmentName)
+            if (spells[i].stringIndex == enchantmentNumber || spells[i].itemIndex == enchantmentNumber)
             {
                 spellIndex = i;
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The block 6 number of the spell whose name is <paramref name="savedName"/>, or
+    /// <see cref="Enchantment.None"/>. For an object from an older save whose name is all that is
+    /// left of its enchantment. The names are the ones bound from the strings file in use.
+    /// </summary>
+    public static int FindSpellNumberByName(string savedName)
+    {
+        if (string.IsNullOrEmpty(savedName))
+        {
+            return Enchantment.None;
+        }
+
+        for (int i = 0; i < spells.Count; ++i)
+        {
+            if (spells[i].name == savedName)
+            {
+                return spells[i].stringIndex;
+            }
+        }
+
+        return Enchantment.None;
+    }
+
+    /// <summary>Casts the spell an enchantment number names, as a scroll or a potion does.</summary>
+    public bool TryCastEnchantment(int enchantmentNumber, bool anonymous = false)
+    {
+        return TryFindSpellIndexFromNumber(enchantmentNumber, out int spellIndex)
+               && TryCast(spellIndex, anonymous);
+    }
+
+    /// <summary>
+    /// Casts the spell a saved name names, for an object that has a name but no number. Only
+    /// UUObject.UseEnchantedScrollOrPotion() calls this, as a last resort, and nothing built from
+    /// the level data needs it. A potion from an older save does not come here: Potion recovers
+    /// its number from the saved name, which matters because Mana Boost and Restore Mana are not
+    /// in the spell list and could not be found here.
+    /// </summary>
+    public bool TryCastEnchantmentFromSavedName(string savedName, bool anonymous = false)
+    {
+        if (string.IsNullOrEmpty(savedName))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < spells.Count; ++i)
+        {
+            if (spells[i].name == savedName)
+            {
+                return TryCast(i, anonymous);
             }
         }
 
@@ -1113,7 +1254,7 @@ public class Magic : MonoBehaviour
             return false;
         }
 
-        if (!TryFindSpellIndexFromEnchantmentName(wand.enchantmentName, out int spellIndex))
+        if (!TryFindSpellIndexFromNumber(wand.enchantmentNumber, out int spellIndex))
         {
             return false;
         }
@@ -1619,21 +1760,6 @@ public class Magic : MonoBehaviour
             }
             break;
         }
-    }
-
-    public bool TryCast(string spellName, bool anonymous = false)
-    {
-        EnsureSpellNamesBound();
-
-        for (int i = 0; i < spells.Count; ++i)
-        {
-            if (spells[i].name == spellName)
-            {
-                return TryCast(i, anonymous);
-            }
-        }
-
-        return false;
     }
 
     public bool TryCast(int i, bool anonymous = false)

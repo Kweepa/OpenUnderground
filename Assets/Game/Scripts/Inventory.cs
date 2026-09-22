@@ -2380,6 +2380,15 @@ public class Inventory : MonoBehaviour
         peeled.quality = source.quality;
         peeled.flags = source.flags;
         peeled.ownerIndex = source.ownerIndex;
+
+        // The enchantment too. The peeled object is made fresh, so its special is 0 and says
+        // nothing, and special cannot carry the enchantment of anything that stacks anyway: below
+        // 368 it is the size of the stack. Without these a potion taken off a pile of them came
+        // out as Light whatever the pile was - 256 + 0 - and once potions derive their
+        // enchantment only from a special that holds one, it came out with no enchantment at all.
+        peeled.isEnchanted = source.isEnchanted;
+        peeled.enchantmentName = source.enchantmentName;
+        peeled.enchantmentNumber = source.enchantmentNumber;
     }
 
     public UUObject Split(UUObject obj)
