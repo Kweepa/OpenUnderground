@@ -29,9 +29,24 @@ public class Wand : UUObject
     private void ClearMagicalState()
     {
         enchantmentName = null;
+        enchantmentNumber = Enchantment.None;
         isEnchanted = false;
         loreResult = Skills.ESkillTestResult.Failure;
         loreResultLoreLevel = -1;
+    }
+
+    protected override void UpdateEnchantmentState()
+    {
+        if (isLinked || IsBrokenWand)
+        {
+            return;
+        }
+
+        int spellIndex = special - 368;
+        if (spellIndex >= 0)
+        {
+            SetEnchantment(spellIndex);
+        }
     }
 
     public override void Initialize(ushort[] objData, byte[] critterData)
@@ -41,10 +56,9 @@ public class Wand : UUObject
         if (!isLinked && !IsBrokenWand)
         {
             // TODO: investigate and fix this
-            int spellIndex = special - 368;
-            if (spellIndex >= 0)
+            if (special - 368 >= 0)
             {
-                enchantmentName = StringLoader.GetString(6, spellIndex);
+                UpdateEnchantmentState();
 
                 name = $"{name} of {enchantmentName} ({special})";
             }
@@ -75,11 +89,11 @@ public class Wand : UUObject
                 {
                     if (spellIndex < 576)
                     {
-                        enchantmentName = StringLoader.GetString(6, spellIndex - 256);
+                        SetEnchantment(spellIndex - 256);
                     }
                     else
                     {
-                        enchantmentName = StringLoader.GetString(6, spellIndex - 368);
+                        SetEnchantment(spellIndex - 368);
                     }
 
                     if (!restoredFromSave || recoverChargesFromLinkedSpell)
@@ -171,7 +185,7 @@ public class Wand : UUObject
 
     public override EEquipAction Equip()
     {
-        if (enchantmentName == StringLoader.GetString(6, Magic.StringIndexTheFrog))
+        if (enchantmentNumber == Magic.StringIndexTheFrog)
         {
             // reset bullfrog puzzle
             if (LevelLoader.sLevelLoader.loadedLevel == 4)

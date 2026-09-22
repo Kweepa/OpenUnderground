@@ -172,11 +172,67 @@ public static class DebrisLootTables
     }
     
     /// <summary>
-    /// Get a random potion enchantment name
+    /// Get a random potion enchantment number (a block 6 index)
     /// </summary>
-    public static string GetRandomPotionEnchantment()
+    public static int GetRandomPotionEnchantmentNumber()
     {
-        int stringIndex = potionEnchantmentStringIndices[Random.Range(0, potionEnchantmentStringIndices.Length)];
-        return StringLoader.GetString(6, stringIndex);
+        return potionEnchantmentStringIndices[Random.Range(0, potionEnchantmentStringIndices.Length)];
+    }
+
+    // The English names STRINGS.PAK gives the potions above, written out so that they do not
+    // depend on the strings file. They serve one case only: a potion from a save written before
+    // its roll was recorded in special has nothing but its name, and if the strings file has been
+    // swapped for a translated one since, that English name matches nothing read from the file.
+    private static readonly Dictionary<int, string> englishPotionEnchantmentNames = new()
+    {
+        { 261, "Leap" },
+        { 264, "Lesser Heal" },
+        { 275, "Heal" },
+        { 286, "Greater Heal" },
+        { Magic.StringIndexManaBoost, "Mana Boost" },
+        { Magic.StringIndexRestoreMana, "Restore Mana" },
+        { 256, "Light" },
+        { 270, "Night Vision" },
+        { 268, "Speed" },
+        { 257, "Resist Blows" },
+        { 273, "Thick Skin" },
+        { 260, "Stealth" },
+        { 274, "Water Walk" },
+        { 278, "Flameproof" },
+        { Magic.StringIndexPoisonResistance, "Poison Resistance" }
+    };
+
+    /// <summary>
+    /// The potion enchantment whose name is <paramref name="savedName"/>, or
+    /// <see cref="Enchantment.None"/>. This is for a potion from a save written before the roll
+    /// was recorded in special, where the name is all that is left of it. The names from the
+    /// strings file in use are tried first, then the fixed English ones, for a save written in
+    /// English and loaded with a translation. The fifteen names are all different, so the match
+    /// cannot be ambiguous.
+    /// </summary>
+    public static int FindPotionEnchantmentNumber(string savedName)
+    {
+        if (string.IsNullOrEmpty(savedName))
+        {
+            return Enchantment.None;
+        }
+
+        foreach (int number in potionEnchantmentStringIndices)
+        {
+            if (StringLoader.GetString(6, number) == savedName)
+            {
+                return number;
+            }
+        }
+
+        foreach (int number in potionEnchantmentStringIndices)
+        {
+            if (englishPotionEnchantmentNames.TryGetValue(number, out string english) && english == savedName)
+            {
+                return number;
+            }
+        }
+
+        return Enchantment.None;
     }
 }

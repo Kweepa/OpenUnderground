@@ -20,7 +20,7 @@ public class Food : UUObject
 
         if (isEnchanted)
         {
-            Magic.sMagic.TryCast(enchantmentName, anonymous: true);
+            Magic.sMagic.TryCastEnchantment(enchantmentNumber, anonymous: true);
         }
 
         return EEquipAction.Consume;
@@ -37,25 +37,32 @@ public class Food : UUObject
         return action;
     }
     
+    protected override void UpdateEnchantmentState()
+    {
+        if (!isEnchanted)
+        {
+            return;
+        }
+
+        int enchantmentIndex = special;
+        if (option == 0)
+        {
+            // just the loaf of bread on level 8
+            enchantmentIndex &= 255;
+        }
+        else
+        {
+            // just the bottle of ale on level 1
+            enchantmentIndex = 256 + (special & 63);
+        }
+        SetEnchantment(enchantmentIndex);
+    }
+
     public override void Initialize(ushort[] objData, byte[] critterData)
     {
         base.Initialize(objData, critterData);
 
-        if (isEnchanted)
-        {
-            int enchantmentIndex = special;
-            if (option == 0)
-            {
-                // just the loaf of bread on level 8
-                enchantmentIndex &= 255;
-            }
-            else
-            {
-                // just the bottle of ale on level 1
-                enchantmentIndex = 256 + (special & 63);
-            }
-            enchantmentName = StringLoader.GetString(6, enchantmentIndex);
-        }
+        UpdateEnchantmentState();
 
         // identify Wine of Compassion immediately
         if (type == EObjectType.BottleOfWine)
@@ -103,7 +110,7 @@ public class Food : UUObject
 
             if (isEnchanted)
             {
-                Magic.sMagic.TryCast(enchantmentName, true);
+                Magic.sMagic.TryCastEnchantment(enchantmentNumber, true);
             }
 
             switch (type)

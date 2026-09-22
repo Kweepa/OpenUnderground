@@ -2,6 +2,12 @@
 
 ## Current release
 
+- Enchanted items keep working when the game text is in another language. A saved game used to remember an enchantment by the name it printed, and the game recognised it by reading that name back, so putting a translated strings file in the data folder left every potion, wand and enchanted ring inert - which is what players running the French text were seeing.
+
+- Garamon's empty grave is named as his in any language, not only in English.
+
+- Potions found in debris no longer merge into one pile. Picking up two with different effects used to leave you with two of the first kind, and the second one gone.
+
 - Quicksaving, on F5 or by holding the right stick click on a gamepad. Five quicksaves are kept and the sixth takes the place of the oldest, so saving before you open a suspicious door never costs you the save from an hour ago.
 
 - The game now saves by itself the first time you set foot on a level, a new character's first level included. Rows read "Autosave - Cabirus - Lvl 3" and "Quick 01 - Cabirus - Lvl 4", lined up in a column, so a glance down the list tells you where each save came from and how deep you were. Quicksaving never overwrites a level's own save.

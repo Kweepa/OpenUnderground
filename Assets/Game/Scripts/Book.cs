@@ -25,15 +25,19 @@ public class Book : UUObject
 
     public bool IsRotwormStewRecipe() => special == 769;
 
+    protected override void UpdateEnchantmentState()
+    {
+        if (!isLinked && isEnchanted)
+        {
+            SetEnchantment(256 + (special & 0x3f));
+        }
+    }
+
     public override void Initialize(ushort[] objData, byte[] critterData)
     {
         base.Initialize(objData, critterData);
 
-        if (!isLinked && isEnchanted)
-        {
-            int enchantmentIndex = special & 0x3f;
-            enchantmentName = StringLoader.GetString(6, 256 + enchantmentIndex);
-        }
+        UpdateEnchantmentState();
         
         // identify book of honesty immediately
         if (type == EObjectType.BookOfHonesty)

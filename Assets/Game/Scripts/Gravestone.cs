@@ -62,7 +62,10 @@ public class Gravestone : UUObject
 
         stoneText = StringLoader.GetString(8, special & 511);
 
-        if (stoneText.Contains("empty grave"))
+        // Block 8 index 33 is "The empty grave of Garamon", the only entry in the block that
+        // matches. Testing the index instead of the English text keeps this working when the
+        // strings file is translated.
+        if ((special & 511) == 33)
         {
             stoneText = "Garamon";
         }
