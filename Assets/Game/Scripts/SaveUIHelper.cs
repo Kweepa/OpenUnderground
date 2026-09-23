@@ -9,26 +9,6 @@ public static class SaveUIHelper
     public const string NewSaveRowLabel = "< New save >";
 
     /// <summary>
-    /// Fills <paramref name="saves"/> with every save on disk, newest first, and sizes
-    /// <paramref name="screenshots"/> to match. Returns the selected row, clamped.
-    /// </summary>
-    /// <remarks>
-    /// The lists used to be ten fixed rows, Slot0 to Slot9, with the empty ones drawn as "Empty":
-    /// the row was the slot. Now the row is whatever is on disk, in date order, which is what lets
-    /// the quicksaves and the automatic saves show up beside the saves made by hand without any of
-    /// them owning a numbered place. There is no upper limit any more, and the lists scroll.
-    ///
-    /// <paramref name="forSaving"/> makes it the save list rather than the load list, and that
-    /// differs in two ways. Its first row is not a save but the way to make one, because a list of
-    /// existing saves can only offer to overwrite them and on a first run there would be nothing to
-    /// pick at all. And it leaves the quicksaves out: those five are the game's to write over, so
-    /// putting a save by hand on one would be a trap. They are all there in the load list.
-    ///
-    /// Screenshots are not loaded here. Only the selected row's picture is ever drawn, and it is a
-    /// full screen PNG: loading one per save would cost hundreds of megabytes once a player has a
-    /// few dozen. <see cref="EnsureScreenshotLoaded"/> keeps exactly one.
-    /// </remarks>
-    /// <summary>
     /// The row that holds this slot, or <paramref name="fallback"/> when the list has no such row.
     /// </summary>
     /// <remarks>
@@ -54,6 +34,28 @@ public static class SaveUIHelper
         return fallback;
     }
 
+    /// <summary>
+    /// Fills <paramref name="saves"/> with every save on disk, newest first, and sizes
+    /// <paramref name="screenshots"/> to match. Returns the selected row, clamped.
+    /// </summary>
+    /// <remarks>
+    /// The lists used to be ten fixed rows, Slot0 to Slot9, with the empty ones drawn as "Empty":
+    /// the row was the slot. Now the row is whatever is on disk, in date order, which is what lets
+    /// the quicksaves and the automatic saves show up beside the saves made by hand without any of
+    /// them owning a numbered place. There is no upper limit any more, and the lists scroll.
+    ///
+    /// <paramref name="forSaving"/> makes it the save list rather than the load list, and that
+    /// differs in two ways. Its first row is not a save but the way to make one, because a list of
+    /// existing saves can only offer to overwrite them and on a first run there would be nothing to
+    /// pick at all. And it leaves out the saves the game writes by itself, quicksaves and autosaves
+    /// alike. Those are the game's to write over, and a save written by hand on one keeps the
+    /// file it lands in - so the game would later replace it as its own. They are all there in
+    /// the load list.
+    ///
+    /// Screenshots are not loaded here. Only the selected row's picture is ever drawn, so loading
+    /// one per save would be decoding a few dozen pictures to show one of them.
+    /// <see cref="EnsureScreenshotLoaded"/> keeps exactly one.
+    /// </remarks>
     public static int RefreshSaves(
         ref SaveGameManager.SaveSlotInfo[] saves,
         ref Texture2D[] screenshots,
@@ -67,7 +69,8 @@ public static class SaveUIHelper
         List<SaveGameManager.SaveSlotInfo> keep = new List<SaveGameManager.SaveSlotInfo>(all.Length);
         foreach (SaveGameManager.SaveSlotInfo info in all)
         {
-            if (forSaving && SaveGameManager.IsQuickSlot(info?.slotName))
+            if (forSaving && (SaveGameManager.IsQuickSlot(info?.slotName)
+                || SaveGameManager.IsAutoSlot(info?.slotName)))
             {
                 continue;
             }
@@ -215,8 +218,8 @@ public static class SaveUIHelper
     // list is ever on screen: the front end's and the in game panel's cannot both be open.
     private static string loadedScreenshotSlot;
 
-    // The slot the selection has moved to, and when it got there. A picture is a full screen PNG to
-    // decode, so it is not read until the selection has stood still for a moment: holding the arrow
+    // The slot the selection has moved to, and when it got there. A picture has to be read and
+    // decoded, so it is not done until the selection has stood still for a moment: holding the arrow
     // key down through a long list would otherwise decode one per row, all of them thrown away.
     private static string pendingScreenshotSlot;
     private static float pendingScreenshotSince;
