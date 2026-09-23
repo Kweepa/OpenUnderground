@@ -52,9 +52,10 @@ public class SaveGameManager : MonoBehaviour
     //
     // A slot name is the file name, and it says where the save came from: "Slot" in front of one
     // the player made by hand, "Quick" in front of the rolling quicksaves, and the character's own
-    // name for the one written on first setting foot on a level. Only the quicksave prefix is ever
-    // read back - it is what lets the five of them roll over each other while leaving every other
-    // save alone - and the lists are sorted by date and show the name the player sees.
+    // name for the one written on first setting foot on a level. Only the two prefixes the game
+    // writes are ever read back - they are what lets the five quicksaves roll over each other and
+    // a level's autosave replace the one before, while leaving every save made by hand alone -
+    // and the lists are sorted by date and show the name the player sees.
     //
     // A quicksave's file carries the date down to the second and no number, because the number the
     // player sees is its place in the list, newest first, and that changes every time one is
@@ -79,7 +80,11 @@ public class SaveGameManager : MonoBehaviour
     /// </summary>
     private const int GeneratedNameLength = 8;
 
-    /// <summary>Is this the save the game wrote on first setting foot on a level.</summary>
+    /// <summary>
+    /// Is this the save the game wrote on first setting foot on a level. The save list hides these
+    /// as it hides the quicksaves: a save made by hand on one would keep its file, and with it the
+    /// name that marks it as the game's to replace.
+    /// </summary>
     public static bool IsAutoSlot(string slotName)
     {
         return !string.IsNullOrEmpty(slotName) && slotName.StartsWith(AutoSaveRowKind + " - ");
@@ -173,8 +178,30 @@ public class SaveGameManager : MonoBehaviour
 
     private static string PlayerNameOrAvatar()
     {
-        string who = PlayerData.sData != null ? PlayerData.sData.playerName : "";
+        return NormalizedPlayerName(PlayerData.sData != null ? PlayerData.sData.playerName : "");
+    }
+
+    /// <summary>
+    /// A character's name as the saves compare it: trimmed, and "Avatar" when there is none.
+    /// </summary>
+    /// <remarks>
+    /// A header keeps the name exactly as it was typed, trailing space and all, so two names are
+    /// only compared after both have been through here. Without it "Bob " never matched "Bob",
+    /// and that character's automatic saves were never replaced.
+    /// </remarks>
+    private static string NormalizedPlayerName(string who)
+    {
         return string.IsNullOrWhiteSpace(who) ? "Avatar" : who.Trim();
+    }
+
+    /// <summary>
+    /// The player's name as it goes into a file name, falling back to "Avatar" when nothing in it
+    /// survives the sanitiser - a name written only in letters outside A to Z, say.
+    /// </summary>
+    private static string FileNamePlayerName()
+    {
+        string who = SanitizeForFileName(PlayerNameOrAvatar());
+        return string.IsNullOrEmpty(who) ? "Avatar" : who;
     }
 
     /// <summary>
@@ -249,12 +276,7 @@ public class SaveGameManager : MonoBehaviour
     /// </remarks>
     public static string BuildGeneratedSlotName(int level)
     {
-        string who = SanitizeForFileName(PlayerNameOrAvatar());
-        if (string.IsNullOrEmpty(who))
-        {
-            who = "Avatar";
-        }
-
+        string who = FileNamePlayerName();
         string when = System.DateTime.Now.ToString("yyyy-MM-dd HH.mm",
             System.Globalization.CultureInfo.InvariantCulture);
         // The same shape as the row it makes, with the date on the end: the folder reads like the
@@ -262,11 +284,22 @@ public class SaveGameManager : MonoBehaviour
         return $"{AutoSaveRowKind} - {who} - {DungeonLevelLabel(level)} {when}";
     }
 
+    /// <summary>
+    /// The Ethereal Void. The save panel refuses to open there
+    /// (SaveLoadGUI.CanOpenSaveLoadFromGameplay), so the game does not save there by itself either.
+    /// </summary>
+    private const int VoidLevel = 9;
+
     /// <summary>Can the game be saved at all right now.</summary>
+    /// <remarks>
+    /// Not while the player is dead: there is a moment between the killing blow and the death
+    /// cutscene, and a save taken in it would restore a dead character that nothing ever buries.
+    /// </remarks>
     public bool CanSaveNow()
     {
         return PlayerObject.Player != null && PlayerData.sData != null && LevelLoader.sLevelLoader != null
-            && LevelLoader.sLevelLoader.loadedLevel > 0;
+            && LevelLoader.sLevelLoader.loadedLevel > 0 && LevelLoader.sLevelLoader.loadedLevel != VoidLevel
+            && !PlayerData.sData.dead;
     }
 
     /// <summary>How long the quicksave key is dead after it has written one.</summary>
@@ -301,12 +334,18 @@ public class SaveGameManager : MonoBehaviour
         int level = LevelLoader.sLevelLoader.loadedLevel;
         // The file reads like the row it will make, minus the number, which is the row's place in
         // the list and not a property of the file: "Quick - Cabirus - Lvl 4 2026-09-22 14.05.33".
-        string slotName = $"{QuickSlotPrefix} - {SanitizeForFileName(PlayerNameOrAvatar())} - "
+        string slotName = $"{QuickSlotPrefix} - {FileNamePlayerName()} - "
             + $"{DungeonLevelLabel(level)} "
             + System.DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss", System.Globalization.CultureInfo.InvariantCulture);
         // No number in the stored name either: the lists put the player's own name, the place in
         // the list and the level together when they draw the row.
-        SaveGameToSlot(slotName, BuildGeneratedSaveName("Quick", level));
+        // Nothing is pruned unless the new one is on disk: with a full disk the oldest would go and
+        // nothing would take its place.
+        if (!SaveGameToSlot(slotName, BuildGeneratedSaveName("Quick", level)))
+        {
+            return null;
+        }
+
         RequestScreenshotForSlot(slotName);
         PruneQuickSaves();
         return slotName;
@@ -343,7 +382,14 @@ public class SaveGameManager : MonoBehaviour
                 continue;
             }
 
-            if (info.level != level || info.playerName != who)
+            if (info.level != level || NormalizedPlayerName(info.playerName) != who)
+            {
+                continue;
+            }
+
+            // A save made by hand over an autosave, before the save list stopped offering them,
+            // kept the autosave's file but carries the name the player typed. It is his now.
+            if (info.displayName == null || !info.displayName.StartsWith(AutoSaveRowKind + " - "))
             {
                 continue;
             }
@@ -379,11 +425,6 @@ public class SaveGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// An unused quicksave slot if there is one, otherwise the oldest: that is what makes the five
-    /// roll. A quicksave slot with no readable date counts as the oldest there is, so a save left
-    /// behind by an older build is the first to go rather than the last.
-    /// </summary>
-    /// <summary>
     /// The first free Slot0, Slot1, ... name, for a save the player is making by hand.
     /// </summary>
     public string NextFreeManualSlot()
@@ -417,7 +458,7 @@ public class SaveGameManager : MonoBehaviour
     /// </remarks>
     public void RequestAutoSaveForLevel(int level)
     {
-        if (level <= 0 || level >= 32 || PlayerData.sData == null)
+        if (level <= 0 || level >= 32 || level == VoidLevel || PlayerData.sData == null)
         {
             return;
         }
@@ -469,47 +510,73 @@ public class SaveGameManager : MonoBehaviour
         // Then wait for the fade AND for the level to have its objects. Five seconds, then give
         // up: an automatic save that does not happen is a nuisance, but one that writes an empty
         // world is data loss, because nothing repopulates a level that a save says is empty.
-        float deadline = Time.realtimeSinceStartup + 5.0f;
-        while (Time.realtimeSinceStartup < deadline)
+        //
+        // The five seconds are of play, not of the clock, and nothing is saved while the game is
+        // paused. The fade runs on unscaled time, so without this the save went ahead with the
+        // save panel open, took the panel into its screenshot, and could even be written after
+        // the player had loaded another game from that panel. The save panel, the map, a
+        // conversation, a cutscene and the on screen keyboard all stop time.
+        float waited = 0.0f;
+        while (waited < 5.0f)
         {
-            if (PlayerObject.Player != null && PlayerObject.Player.fade <= 0.05f
-                && LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel == level
-                && LevelHasObjects(level))
+            if (Time.timeScale > 0.0f)
             {
-                break;
+                if (PlayerObject.Player != null && PlayerObject.Player.fade <= 0.05f
+                    && LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel == level
+                    && LevelHasObjects(level))
+                {
+                    break;
+                }
+
+                waited += Time.unscaledDeltaTime;
             }
 
             yield return null;
         }
 
-        pendingAutoSaveLevel = 0;
-        if (!CanSaveNow() || LevelLoader.sLevelLoader.loadedLevel != level || PlayerData.sData == null
-            || !LevelHasObjects(level))
+        // Only if it is still this level's: a request for another level may have taken its place.
+        if (pendingAutoSaveLevel == level)
+        {
+            pendingAutoSaveLevel = 0;
+        }
+
+        // Asked again now, not only when the request was made: a game loaded while this waited
+        // brings its own record of which levels are done.
+        if (!CanSaveNow() || Time.timeScale <= 0.0f || LevelLoader.sLevelLoader.loadedLevel != level
+            || (PlayerData.sData.autoSavedLevels & (1 << level)) != 0 || !LevelHasObjects(level))
         {
             // The bit stays clear on purpose: the level gets another chance next time rather than
             // being marked done for a save that never happened.
             yield break;
         }
 
-        PlayerData.sData.autoSavedLevels |= 1 << level;
         string slotName = BuildGeneratedSlotName(level);
-        SaveGameToSlot(slotName, BuildGeneratedSaveName(AutoSaveRowKind, level));
+        // The bit is set before writing, because it has to be inside the file; if the write fails
+        // it is taken back, and the level's previous save is only replaced by one that exists.
+        PlayerData.sData.autoSavedLevels |= 1 << level;
+        if (!SaveGameToSlot(slotName, BuildGeneratedSaveName(AutoSaveRowKind, level)))
+        {
+            PlayerData.sData.autoSavedLevels &= ~(1 << level);
+            yield break;
+        }
+
         RequestScreenshotForSlot(slotName);
         PruneOldAutoSaves(level, slotName);
     }
 
     // Multi-slot API
-    public void SaveGameToSlot(string slotName, string displayName = null)
+    /// <summary>Writes the game to a slot. Returns false when nothing, or not all of it, was written.</summary>
+    public bool SaveGameToSlot(string slotName, string displayName = null)
     {
         if (PlayerObject.Player == null || PlayerData.sData == null || LevelLoader.sLevelLoader == null)
         {
             Debug.LogError("Cannot save: Required components not initialized");
-            return;
+            return false;
         }
         if (string.IsNullOrWhiteSpace(slotName))
         {
             Debug.LogError("Cannot save: slotName is empty");
-            return;
+            return false;
         }
 
         SaveGameData saveData = new SaveGameData();
@@ -551,7 +618,10 @@ public class SaveGameManager : MonoBehaviour
         catch (System.Exception e)
         {
             Debug.LogError($"Failed to save slot '{slotName}': {e.Message}");
+            return false;
         }
+
+        return true;
     }
 
     public void LoadGameFromSlot(string slotName)

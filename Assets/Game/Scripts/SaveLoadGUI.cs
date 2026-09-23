@@ -325,6 +325,9 @@ public class SaveLoadGUI : MonoBehaviour
         if (!KeyboardActive())
         {
             bool esc = GameInput.EscapePressedThisFrame();
+            // Read here, and tested by the branch that uses it. A branch taken on every frame of the
+            // save and load tabs blocks the ones after it, and the gamepad's A button is one of them.
+            float wheel = Mouse.current?.scroll.ReadValue().y ?? 0.0f;
             // Esc/Start open via PlayerPanelInput; same frame the press is still true here — do not close immediately.
             bool escDismiss = esc && Time.frameCount != visibleShownAtFrame;
             bool startDismiss = (Gamepad.current?.startButton.wasPressedThisFrame ?? false)
@@ -371,13 +374,12 @@ public class SaveLoadGUI : MonoBehaviour
                     MoveSlotSelection(-1);
                 }
             }
-            else if (tab != ETab.Options)
+            else if (tab != ETab.Options && wheel != 0.0f)
             {
                 // The wheel scrolls the list without moving the selection, the way a list is
                 // expected to behave once it is longer than the panel. One row per notch: the
                 // value the mouse reports is not the same number on every platform, so only its
                 // sign is used.
-                float wheel = Mouse.current?.scroll.ReadValue().y ?? 0.0f;
                 if (wheel > 0.0f)
                 {
                     slotScroll = Mathf.Max(0, slotScroll - 1);
@@ -581,6 +583,12 @@ public class SaveLoadGUI : MonoBehaviour
 
     private void PerformLoadFromSelection()
     {
+        // The list is whatever is on disk and can be empty, so the row is checked before it is read.
+        if (index < 0 || index >= saves.Length || saves[index] == null)
+        {
+            return;
+        }
+
         if (SaveGameManager.sInstance != null && !string.IsNullOrEmpty(saves[index].slotName))
         {
             SaveGameManager.sInstance.LoadGameFromSlot(saves[index].slotName);
@@ -674,9 +682,10 @@ public class SaveLoadGUI : MonoBehaviour
 
         // What was selected stays selected across the move, which is what a player who went to
         // the save tab and then realised he meant to load expects. It is carried by slot name and
-        // not by row number: the save list hides the quicksaves and carries the new save row at
-        // the top, so the same number is a different save on the other side. A save that has no
-        // row on the other side - a quicksave, going from load to save - falls back to the top.
+        // not by row number: the save list hides the saves the game writes and carries the new save
+        // row at the top, so the same number is a different save on the other side. A save that
+        // has no row on the other side - a quicksave or an autosave, going from load to save -
+        // falls back to the top.
         // No test on the tab we are leaving: the options tab has a selection of its own and leaves
         // this list and this index alone, so they still name the save that was chosen before it.
         string wasSelected = index >= 0 && index < saves.Length && saves[index] != null
