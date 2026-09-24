@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Resist Blows, Thick Skin and Iron Flesh now take 1, 2 and 3 points off every blow, down from 2, 3 and 5, whether cast or worn. The original's data says 2, 3 and 5, but the code in the original makes them do nothing at all; at 2, a first-circle spell shrugged off most bites on the first level.
+
 - The Open spell works as in the original: it opens the one door or chest you aim at, within reach, and a hard lock can resist it. Locks the original keeps for their own key no longer give way to it, nor to a lockpick, so the spell no longer lets you skip a part of the game.
 
 - A toadstool now makes you ill, as its message says and as in the original.

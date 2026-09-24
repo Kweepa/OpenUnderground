@@ -636,35 +636,38 @@ public class Magic : MonoBehaviour
     }
 
     /// <summary>
-    /// What a shield spell takes off a blow that lands. The original holds the three of them as
-    /// effect 2 with parameter <c>special &amp; 15</c> - specials 546, 547 and 549, so 2, 3 and 5
-    /// (UW.EXE 0x38cb6 decodes the effect, 0x38cc5 the parameter).
+    /// What a shield spell takes off a blow that lands, on every body part: 1, 2 and 3.
     /// </summary>
     /// <remarks>
-    /// The remake used to answer 10, 15 and 20 and spend them on the to-hit roll. Both halves were
-    /// wrong: five times the size, and the wrong side of the blow. Iron Flesh made two swings in
-    /// three miss where the original merely costs each swing that lands five points of its damage.
+    /// The original's data gives the three of them effect 2 with parameters 2, 3 and 5 (the spell
+    /// table at UW.EXE 0x59ef0), but in the game they add nothing. 0x7e007 keeps the value in bits
+    /// 4-7 of a word, and 0x7e31d reads bits 8-11 of it after shifting the word by four, so the
+    /// armour gets 0, 0 and 0. A cast of Iron Flesh in the original, against a creature, confirmed
+    /// it. Maybe the developers noticed that the values were too strong - at 2, a first-circle spell
+    /// stops most bites on the first level - so this takes a middle way: 1, 2 and 3.
+    /// The remake first answered 10, 15 and 20 and spent them on the to-hit roll, which made two
+    /// swings in three miss under Iron Flesh.
     /// </remarks>
     private static int GetSpellArmourValue(int spell)
     {
         switch (spells[spell].runes)
         {
         case "BIS":
-            return 2;
+            return 1;
         case "IS":
-            return 3;
+            return 2;
         case "IVS":
-            return 5;
+            return 3;
         }
 
         return 0;
     }
 
     /// <summary>
-    /// The damage a shield spell soaks, on every body part alike. The original keeps the largest
-    /// parameter among the active effects (UW.EXE 0x7e028) and adds it to all four armour bytes of
-    /// the player's critterStats row (0x7e31d), which the damage routine subtracts from a blow that
-    /// lands (0x24e22). <see cref="Inventory.GetArmourByBodyPart"/> is where it is spent, not
+    /// The damage a shield spell soaks, on every body part alike. Only the largest of the active
+    /// ones counts, as in the original, which keeps the largest parameter (UW.EXE 0x7e028) and means
+    /// to add it to all four armour bytes (0x7e31d) - it adds 0, see GetSpellArmourValue().
+    /// <see cref="Inventory.GetArmourByBodyPart"/> is where it is spent, not
     /// <see cref="PlayerObject.GetDefence()"/>.
     /// </summary>
     public int GetSpellArmourScore()
@@ -684,6 +687,12 @@ public class Magic : MonoBehaviour
 
     private int GetSpellArmourScore(bool asKnown)
     {
+        // turned off, the shield spells soak nothing, cast or worn, as in the original
+        if (!PlayerInput.ShieldSpellsSoak)
+        {
+            return 0;
+        }
+
         // the shield spells are one family, so the strongest wins - they never add up
         int armour = 0;
         foreach (SActiveSpell s in activeSpells)
