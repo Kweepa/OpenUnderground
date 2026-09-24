@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Creatures stand in your way, as they do in the original: you can no longer walk up onto one, only jump over it. A plain jump clears a rat or a spider; a dwarf or anything taller takes Leap, and the final boss cannot be jumped at all.
+
 - A blow that lands on a back now counts for more, the way the original counts it: up to four points on the chance to hit and four on the damage, tailing off to nothing when the two of you are face to face. It works both ways, so something that catches you looking elsewhere hits harder, and so do you when you come up behind something that has not turned round yet.
 
 - Enchanted items keep working when the game text is in another language. A saved game used to remember an enchantment by the name it printed, and the game recognised it by reading that name back, so putting a translated strings file in the data folder left every potion, wand and enchanted ring inert - which is what players running the French text were seeing.

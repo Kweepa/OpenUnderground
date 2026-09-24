@@ -772,7 +772,11 @@ public class PlayerObject : MonoBehaviour
             UpdateJumpIndicator(moveControl, moveSpeed);
         }
         
-        cachedCharacterController.Move(cachedMoveDirection * (moveSpeed * Time.deltaTime) + (Time.deltaTime * yVelocity) * Vector3.up);
+        float stepOffset = cachedCharacterController.stepOffset;
+        Vector3 walk = KeepOutOfCreatures(cachedMoveDirection * (moveSpeed * Time.deltaTime), out float stepLimit);
+        cachedCharacterController.stepOffset = Mathf.Min(stepOffset, stepLimit);
+        cachedCharacterController.Move(walk + (Time.deltaTime * yVelocity) * Vector3.up);
+        cachedCharacterController.stepOffset = stepOffset;
 
         Tile t = LevelLoader.GetTile((int)(transform.position.x / Tile.xzScale),
             (int)(transform.position.z / Tile.xzScale));
@@ -955,6 +959,101 @@ public class PlayerObject : MonoBehaviour
         
         flightVelocity = Vector3.zero;
         flightBobTime = 0.0f;
+    }
+
+    /// <summary>
+    /// How far above a creature's head the player's feet have to be before he passes over it.
+    /// </summary>
+    private const float creatureClearance = 0.1f;
+
+    /// <summary>How close to a creature, beyond touching, the player counts as up against it.</summary>
+    private const float touchMargin = 0.05f;
+
+    /// <summary>
+    /// Trims a step of horizontal movement so that it does not carry the player into a creature,
+    /// and says how far the controller may step up while it is next to one.
+    /// </summary>
+    /// <remarks>
+    /// In the original a creature cannot be walked onto, but it can be jumped over by a player who
+    /// gets his feet above it. Here the capsules alone let him walk up onto the low ones, and in a
+    /// fight that is a way out of any corner. So the step is cut while the player's feet are below
+    /// the top of a creature, plus creatureClearance, and let through once they are above it. How
+    /// high a jump goes then decides what can be cleared: the plain jump lifts the feet about
+    /// 1.27 m, which clears a rat, a spider or a worm but not a dwarf, and Leap lifts them about
+    /// 3.26 m, which clears the rest. A player who lands on top of one can walk off it.
+    ///
+    /// The one exception is the Slasher of Veils. At 2.9 m Leap would still get over it, and the
+    /// last fight of the game should not be won by jumping over the boss, so no jump clears it.
+    ///
+    /// Each creature is treated as an upright cylinder, radius plus the player's radius and skin.
+    /// Only the part of the step that heads into it is taken away, so the player slides along it,
+    /// and he can always move away from it.
+    ///
+    /// Cutting the step is not enough on its own, because sliding along a creature is touching it,
+    /// and the controller steps up onto whatever it touches that is less than stepOffset (0.68 m)
+    /// above its feet: 1.27 m of jump plus 0.68 m of step is above a man's head. So stepLimit
+    /// is how high the controller may step while next to a creature: short of the top of the
+    /// lowest one it is touching, and never more than it already had, so a stair beside a
+    /// creature still climbs as long as the step is lower than the creature.
+    /// </remarks>
+    private Vector3 KeepOutOfCreatures(Vector3 step, out float stepLimit)
+    {
+        CharacterController body = cachedCharacterController;
+        Vector3 bodyMiddle = transform.TransformPoint(body.center);
+        float feet = bodyMiddle.y - 0.5f * body.height;
+        float head = bodyMiddle.y + 0.5f * body.height;
+        stepLimit = float.MaxValue;
+
+        Vector3 flat = new Vector3(step.x, 0.0f, step.z);
+        // A little beyond the step, so that a creature the player is sliding along is still found.
+        float reach = body.radius + body.skinWidth + flat.magnitude + touchMargin;
+        Vector3 axis = (0.5f * body.height - body.radius) * Vector3.up;
+        int count = Physics.OverlapCapsuleNonAlloc(bodyMiddle - axis, bodyMiddle + axis, reach, cachedColliders,
+            1 << LayerMask.NameToLayer("Characters"));
+
+        for (int i = 0; i < count; i++)
+        {
+            CharacterController cc = cachedColliders[i] as CharacterController;
+            Critter critter = cc != null ? cc.GetComponentInParent<Critter>() : null;
+            if (critter == null || cc == body || !cc.enabled)
+            {
+                continue;
+            }
+
+            Vector3 middle = cc.transform.TransformPoint(cc.center);
+            float halfHeight = 0.5f * Mathf.Max(cc.height, 2.0f * cc.radius);
+            float top = middle.y + halfHeight;
+            bool jumpable = critter.type != EObjectType.SlasherOfVeils;
+            if (head <= middle.y - halfHeight || (jumpable && feet >= top + creatureClearance))
+            {
+                // under it, or over it
+                continue;
+            }
+
+            Vector3 away = bodyMiddle - middle;
+            away.y = 0.0f;
+            float distance = away.magnitude;
+            if (distance < 0.001f)
+            {
+                continue;
+            }
+            away /= distance;
+
+            float closest = body.radius + cc.radius + body.skinWidth;
+            if (distance < closest + touchMargin)
+            {
+                stepLimit = Mathf.Min(stepLimit, Mathf.Max(top - feet - touchMargin, 0.0f));
+            }
+
+            float room = Mathf.Max(distance - closest, 0.0f);
+            float approach = -Vector3.Dot(flat, away);
+            if (approach > room)
+            {
+                flat += (approach - room) * away;
+            }
+        }
+
+        return new Vector3(flat.x, step.y, flat.z);
     }
 
     private void Flight()
