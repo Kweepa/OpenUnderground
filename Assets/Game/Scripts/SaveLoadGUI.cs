@@ -1558,6 +1558,7 @@ public class SaveLoadGUI : MonoBehaviour
         // which is the only place they can be changed.
         PlayerPrefs.SetInt("Options_KeepMusicOnMap", PlayerInput.KeepMusicOnMap ? 1 : 0);
         PlayerPrefs.SetInt("Options_AmbientSilenceMax", (int)PlayerInput.AmbientSilenceMax);
+        PlayerPrefs.SetInt("Options_ShieldSpellsSoak", PlayerInput.ShieldSpellsSoak ? 1 : 0);
         PlayerPrefs.Save();
         
         // Apply music volume to MusicPlayer

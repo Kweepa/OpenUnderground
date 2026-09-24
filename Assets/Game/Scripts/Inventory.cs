@@ -4399,7 +4399,7 @@ public class Inventory : MonoBehaviour
     /// rating on the same footing as attack, damage and defence, where a full suit of chain reads
     /// about 16 rather than 4, and it gives the number enough resolution to move when one piece is
     /// swapped for a slightly better one. Every term scales alike, so the ratios are honest: a
-    /// Resist Blows spell reads 8 and so does a full leather suit, and both do soak 2 a blow.
+    /// Thick Skin spell reads 8 and so does a full leather suit, and both do soak 2 a blow.
     /// The one figure that must NOT be scaled this way is defence, whose magic protection has to
     /// stay commensurate with the Defense skill - in the roll a point of either is worth the same -
     /// which is why that one still goes through <see cref="AverageOverBodyParts"/>.
@@ -4466,9 +4466,10 @@ public class Inventory : MonoBehaviour
         }
 
         // And so does a shield spell, flat on all four parts: the original keeps the largest
-        // parameter among the active effects (UW.EXE 0x7e028) and adds it to every one of the four
-        // bytes (0x7e31d). It soaks damage, it does not make a blow harder to land, so it does not
-        // belong in PlayerObject.GetDefence() where the remake used to spend it.
+        // parameter among the active effects (UW.EXE 0x7e028) for every one of the four bytes
+        // (0x7e31d), though the code there makes it add 0 - see Magic.GetSpellArmourValue().
+        // It soaks damage, it does not make a blow harder to land, so it does not belong in
+        // PlayerObject.GetDefence() where the remake used to spend it.
         int spellArmour = asKnown
             ? Magic.sMagic.GetKnownSpellArmourScore()
             : Magic.sMagic.GetSpellArmourScore();

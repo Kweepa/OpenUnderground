@@ -42,6 +42,13 @@ public static class PlayerInput
     /// </remarks>
     public static float AmbientSilenceMax => PlayerPrefs.GetInt("Options_AmbientSilenceMax", 0);
 
+    /// <summary>
+    /// Whether Resist Blows, Thick Skin and Iron Flesh soak 1, 2 and 3 points of every blow, cast
+    /// or worn. Off, they soak nothing, which is what the original does. On unless the player
+    /// turns it off.
+    /// </summary>
+    public static bool ShieldSpellsSoak => PlayerPrefs.GetInt("Options_ShieldSpellsSoak", 1) == 1;
+
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     public static Vector2 ReadMoveVector()
     {
