@@ -112,6 +112,9 @@ MonoBehaviour:
   spawnVelocity: 15
   bowRoot: {fileID: 0}
   projectileRoot: {fileID: 0}
+  slingRoot: {fileID: 6811155312215688600}
+  slingWhirlModel: {fileID: 5590189501699791684, guid: c77e2ede18184fc3842829eff9928506, type: 3}
+  slingWhirlClip: {fileID: 2931803096544738256, guid: 13dd66d7e76d4dc5b613b5a7a104a354, type: 3}
 --- !u!1 &5065748849381698977
 GameObject:
   m_ObjectHideFlags: 0

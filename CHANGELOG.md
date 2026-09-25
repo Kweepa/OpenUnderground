@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The sling now whirls over your head from the moment you press to ready a shot, the way the goblins whirl theirs, faster and faster until the shot is ready, with a swoosh on every turn. Before, nothing moved and nothing sounded until the cursor turned green.
+
 - A bow, crossbow or sling with nothing to shoot says so the moment you press the button - "Sorry, you have no arrows." - as the original does, instead of drawing back all the way and loosing nothing. Once drawn, its power gem lights up at once, because holding a shot longer gains nothing, and the damage shown next to it is that of the arrows or stones it fires rather than a mace's.
 
 - A creature that notices you around a corner now comes after you. One that noticed you near the edge of its range, with a wall in between, used to turn to face you and then stand there for good.
