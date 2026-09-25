@@ -105,8 +105,11 @@ public class DataLoader : MonoBehaviour
         {
             return name.Substring(ampIndex + 1);
         }
+        // No '&' means the name takes an s, and the original writes it onto the end of the string
+        // (UW.EXE 0x360b6). Taking the length from ampIndex, which is -1 here, made every such name
+        // throw - most of them, and all three kinds of ammunition.
         int scoreIndex = name.IndexOf('_') + 1;
-        return name.Substring(scoreIndex, ampIndex - scoreIndex) + "s";
+        return name.Substring(scoreIndex) + "s";
     }
 
     protected void Start()

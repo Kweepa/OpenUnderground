@@ -248,6 +248,28 @@ public class Projectile : UUObject
     private const int MinimumRolledMaximum = 2;
 
     /// <summary>
+    /// The most damage one of the player's shots of this kind can do, for the panel under a
+    /// launcher: the sum <see cref="GetMaxDamage"/> makes, on an ordinary roll of the skill. The
+    /// two critical outcomes are left out because only the shot itself rolls them.
+    /// </summary>
+    public static int GetPlayerMaxDamage(EObjectType type)
+    {
+        if ((int)type < 16 || (int)type > 23)
+        {
+            return 0;
+        }
+
+        ObjectsData.MissileData row = DataLoader.sDataLoader.objectsData.missileStats[(int)type & 15];
+        if (row.marker != PhysicalMissileMarker)
+        {
+            return row.damage;
+        }
+
+        int scale = MissileScaleUntrained + MissileScalePerPoint * Skills.GetSkill(ESkill.Missile);
+        return Mathf.Max(MinimumRolledMaximum, row.damage * scale / MissileScaleUnit);
+    }
+
+    /// <summary>
     /// The most damage this shot can do, before the roll: the missile table's own byte, scaled
     /// by the Missile skill where the row allows it.
     /// </summary>
