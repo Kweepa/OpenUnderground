@@ -554,7 +554,27 @@ public class SaveGameManager : MonoBehaviour
         // The bit is set before writing, because it has to be inside the file; if the write fails
         // it is taken back, and the level's previous save is only replaced by one that exists.
         PlayerData.sData.autoSavedLevels |= 1 << level;
-        if (!SaveGameToSlot(slotName, BuildGeneratedSaveName(AutoSaveRowKind, level)))
+
+        // Only the copy of the game is taken here, because it reads the live objects. The JSON,
+        // the compression and the files go to a worker: done in this frame they were a stall of
+        // their own right as the new level came into view - the JSON alone is some 8 MB.
+        SaveGameData saveData = CaptureSaveData(slotName, BuildGeneratedSaveName(AutoSaveRowKind, level));
+        if (saveData == null)
+        {
+            PlayerData.sData.autoSavedLevels &= ~(1 << level);
+            yield break;
+        }
+
+        string filePath = GetSlotFilePath(slotName);
+        string headerFilePath = GetSlotHeaderFilePath(slotName);
+        System.Threading.Tasks.Task<bool> write =
+            System.Threading.Tasks.Task.Run(() => WriteSaveData(saveData, filePath, headerFilePath));
+        while (!write.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if (write.Status != System.Threading.Tasks.TaskStatus.RanToCompletion || !write.Result)
         {
             PlayerData.sData.autoSavedLevels &= ~(1 << level);
             yield break;
@@ -568,15 +588,26 @@ public class SaveGameManager : MonoBehaviour
     /// <summary>Writes the game to a slot. Returns false when nothing, or not all of it, was written.</summary>
     public bool SaveGameToSlot(string slotName, string displayName = null)
     {
+        SaveGameData saveData = CaptureSaveData(slotName, displayName);
+        return saveData != null
+            && WriteSaveData(saveData, GetSlotFilePath(slotName), GetSlotHeaderFilePath(slotName));
+    }
+
+    /// <summary>
+    /// A copy of the game as it is now, ready to be written. Main thread only, since it reads the
+    /// live objects; null when the game cannot be saved.
+    /// </summary>
+    private SaveGameData CaptureSaveData(string slotName, string displayName)
+    {
         if (PlayerObject.Player == null || PlayerData.sData == null || LevelLoader.sLevelLoader == null)
         {
             Debug.LogError("Cannot save: Required components not initialized");
-            return false;
+            return null;
         }
         if (string.IsNullOrWhiteSpace(slotName))
         {
             Debug.LogError("Cannot save: slotName is empty");
-            return false;
+            return null;
         }
 
         SaveGameData saveData = new SaveGameData();
@@ -588,10 +619,19 @@ public class SaveGameManager : MonoBehaviour
         SaveInventoryData(saveData.inventoryData);
         SaveWorldObjects(saveData);
         SaveMapData(saveData);
+        return saveData;
+    }
 
+    /// <summary>
+    /// Writes a copy taken by <see cref="CaptureSaveData"/>: the JSON, its compression, the save
+    /// and its header. It touches nothing but that copy and the disk, so it may run on a worker
+    /// thread - JsonUtility can be used off the main thread on an object nobody else is changing,
+    /// and nothing else holds this one. The paths are worked out by the caller for the same reason.
+    /// </summary>
+    private static bool WriteSaveData(SaveGameData saveData, string filePath, string headerFilePath)
+    {
+        string slotName = saveData.slotName;
         string json = JsonUtility.ToJson(saveData, prettyPrint: true);
-        string filePath = GetSlotFilePath(slotName);
-        string headerFilePath = GetSlotHeaderFilePath(slotName);
         try
         {
             // Write compressed full save file
@@ -878,6 +918,12 @@ public class SaveGameManager : MonoBehaviour
         yield return new WaitForEndOfFrame();
 
         string path = GetSlotScreenshotPath(slotName);
+        if (SystemInfo.supportsAsyncGPUReadback)
+        {
+            CaptureScreenshotWithoutStall(path);
+            yield break;
+        }
+
         Texture2D full = null;
         Texture2D small = null;
         RenderTexture scaled = null;
@@ -925,6 +971,59 @@ public class SaveGameManager : MonoBehaviour
                 Destroy(small);
             }
         }
+    }
+
+    /// <summary>
+    /// The same picture as below, without stopping the frame for it. Reading the screen back into
+    /// a texture makes the processor wait for the card, at full screen size, and the JPEG was then
+    /// encoded in the same frame: on an automatic save that came on top of the level appearing.
+    /// Here the screen is copied and shrunk on the card, read back when the card is ready, and
+    /// encoded and written on a worker - ImageConversion.EncodeArrayToJPG may be called from any
+    /// thread.
+    /// </summary>
+    private static void CaptureScreenshotWithoutStall(string path)
+    {
+        RenderTexture full = RenderTexture.GetTemporary(Screen.width, Screen.height, 0);
+        RenderTexture scaled = RenderTexture.GetTemporary(ScreenshotWidth, ScreenshotHeight, 0);
+        ScreenCapture.CaptureScreenshotIntoRenderTexture(full);
+        // On the graphics APIs whose textures start at the top row - Direct3D, Metal - the capture
+        // comes out upside down, and the shrinking is where it is turned the right way up.
+        if (SystemInfo.graphicsUVStartsAtTop)
+        {
+            Graphics.Blit(full, scaled, new Vector2(1.0f, -1.0f), new Vector2(0.0f, 1.0f));
+        }
+        else
+        {
+            Graphics.Blit(full, scaled);
+        }
+        RenderTexture.ReleaseTemporary(full);
+
+        UnityEngine.Rendering.AsyncGPUReadback.Request(scaled, 0, TextureFormat.RGBA32, request =>
+        {
+            RenderTexture.ReleaseTemporary(scaled);
+            if (request.hasError)
+            {
+                Debug.LogError($"Failed to read back the screenshot for '{path}'");
+                return;
+            }
+
+            byte[] pixels = request.GetData<byte>().ToArray();
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    byte[] bytes = ImageConversion.EncodeArrayToJPG(pixels,
+                        UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8B8A8_UNorm,
+                        (uint)ScreenshotWidth, (uint)ScreenshotHeight, 0, ScreenshotQuality);
+                    File.WriteAllBytes(path, bytes);
+                    Debug.Log($"Screenshot saved to {path} ({bytes.Length} bytes, {ScreenshotWidth}x{ScreenshotHeight})");
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"Failed to save screenshot '{path}': {e.Message}");
+                }
+            });
+        });
     }
 
     private static byte[] CompressString(string text)
@@ -1550,17 +1649,25 @@ public class SaveGameManager : MonoBehaviour
         for (int i = 0; i < saveData.worldObjectsByLevel.Length; i++)
             saveData.worldObjectsByLevel[i] = new LevelWorldSaveData();
         
+        // What is in the world, gathered on the way through it: the second pass asks this of every
+        // object of the level, and asking the linked list walked it from the top each time, with a
+        // UnityEngine.Object comparison per step: a thousand objects a level against as many, for
+        // every level visited, in the frame an automatic save holds.
+        HashSet<LevelObject> inWorld = new HashSet<LevelObject>();
+
         for (int levelIndex = 0; levelIndex < levels.Length; levelIndex++)
         {
             Level level = levels[levelIndex];
             if (level == null)
                 continue;
             
+            inWorld.Clear();
             LinkedListNode<LevelObject> node = level.worldObj.First;
             while (node != null)
             {
                 LevelObject levelObj = node.Value;
                 node = node.Next;
+                inWorld.Add(levelObj);
                 
                 if (levelObj == null)
                     continue;
@@ -1595,7 +1702,7 @@ public class SaveGameManager : MonoBehaviour
                         continue;
                     if (uu.temporary)
                         continue;
-                    if (level.worldObj.Contains(uu))
+                    if (inWorld.Contains(uu))
                         continue;
                     ObjectSaveData objData = uu.SaveToData();
                     if (objData != null)
