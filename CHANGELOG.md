@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A bow, crossbow or sling with nothing to shoot says so the moment you press the button - "Sorry, you have no arrows." - as the original does, instead of drawing back all the way and loosing nothing. Once drawn, its power gem lights up at once, because holding a shot longer gains nothing, and the damage shown next to it is that of the arrows or stones it fires rather than a mace's.
+
 - A creature that notices you around a corner now comes after you. One that noticed you near the edge of its range, with a wall in between, used to turn to face you and then stand there for good.
 
 - Creatures stand in your way, as they do in the original: you can no longer walk up onto one, only jump over it. A plain jump clears a rat or a spider; a dwarf or anything taller takes Leap, and the final boss cannot be jumped at all.

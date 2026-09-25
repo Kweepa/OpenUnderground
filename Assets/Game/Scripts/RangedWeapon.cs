@@ -126,6 +126,64 @@ public class RangedWeapon : WeaponBase
         return 255;
     }
 
+    /// <summary>
+    /// A launcher does not charge. Once it is up the original sets the gem straight to its last
+    /// frame, the one a melee charge reaches at a hundred, and never runs the charge loop for it
+    /// (UW.EXE 0x256a4; the loop at 0x2574b is reached only on the melee side of the flag
+    /// 0x2674). So there is no draw speed to look up, and the melee row this used to borrow -
+    /// a mace's for a bow, the shiny sword's for a crossbow - made the gem climb at a rate that
+    /// meant nothing, since the shot does not depend on it.
+    /// </summary>
+    protected override int GetChargePercent()
+    {
+        return prepareTime > WindUpSeconds ? 100 : 0;
+    }
+
+    /// <summary>
+    /// A launcher does the damage of what it fires, scaled by Missile the way the shot scales it.
+    /// The melee row this used to read belongs to another weapon. An enchantment on the launcher
+    /// is not counted, because the shot does not count it either.
+    /// </summary>
+    protected override int GetMaxDamage(bool asKnown)
+    {
+        int maxDamage = Projectile.GetPlayerMaxDamage(GetAmmoType());
+
+        bool cursed = asKnown
+            ? Magic.sMagic.IsSpellKnownActive(Magic.ESpell.Cursed)
+            : Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed);
+        if (cursed)
+        {
+            maxDamage /= 2;
+        }
+
+        return maxDamage;
+    }
+
+    /// <summary>
+    /// A launcher with nothing to launch refuses the attack before it starts, and says what is
+    /// missing. The original checks at the press: for a launcher UW.EXE 0x25326 calls 0x25288,
+    /// which looks for the ammunition in the pack and, finding none, prints the message and
+    /// returns -1, so the attack never begins. The words are the original's, kept in the
+    /// executable's data segment rather than in strings.pak: "Sorry, you have no " at DS:0x24b,
+    /// the plural of the ammunition without its article (0x3605e), and "." at DS:0x267.
+    /// </summary>
+    protected override bool CanStartAttack(bool announce)
+    {
+        EObjectType ammoType = GetAmmoType();
+        if (Inventory.sInv.FindObjectInInventory(ammoType) != null)
+        {
+            return true;
+        }
+
+        if (announce)
+        {
+            Messages.Add($"Sorry, you have no {DataLoader.GetPlural((int)ammoType)}.");
+            Utils.PlayClip2d(failedShot);
+        }
+
+        return false;
+    }
+
     protected override bool Attack()
     {
         // check we still have ammo

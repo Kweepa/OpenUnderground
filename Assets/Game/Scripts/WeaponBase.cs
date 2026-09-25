@@ -302,7 +302,10 @@ public class WeaponBase : UUObject
             }
             else if (pressingTrigger)
             {
-                ChangeState(EState.Prepare);
+                if (CanStartAttack(attackPressed))
+                {
+                    ChangeState(EState.Prepare);
+                }
             }
             else
             {
@@ -550,7 +553,7 @@ public class WeaponBase : UUObject
     /// click and the animation being asked for. Where they go has not been found, so the number
     /// is the measured one and this note is the reason it is not the counted one.
     /// </remarks>
-    private const float WindUpSeconds = 0.6875f;
+    protected const float WindUpSeconds = 0.6875f;
 
     /// <summary>
     /// One step of the charge. The original adds the weapon's WeaponSpeed byte to a percentage
@@ -577,7 +580,7 @@ public class WeaponBase : UUObject
     }
 
     /// <summary>How far the charge has climbed for the hold so far, from 0 to 100.</summary>
-    private int GetChargePercent()
+    protected virtual int GetChargePercent()
     {
         if (prepareTime <= WindUpSeconds)
         {
@@ -586,6 +589,19 @@ public class WeaponBase : UUObject
 
         int steps = (int)((prepareTime - WindUpSeconds) / ChargeStepSeconds);
         return Mathf.Clamp(steps * GetWeaponSpeed(), 0, 100);
+    }
+
+    /// <summary>
+    /// Whether an attack can begin at all. A weapon that swings always can; one that launches
+    /// something cannot without anything to launch.
+    /// </summary>
+    /// <param name="announce">
+    /// True only on the frame the attack button goes down, so a refusal is said once rather than
+    /// once per frame for as long as the button is held.
+    /// </param>
+    protected virtual bool CanStartAttack(bool announce)
+    {
+        return true;
     }
 
     /// <summary>True when the player is preparing, swinging, in post-swing, or within 2 seconds of finishing a swing (sprint blocked).</summary>
@@ -626,7 +642,7 @@ public class WeaponBase : UUObject
         return GetMaxDamage(true);
     }
 
-    private int GetMaxDamage(bool asKnown)
+    protected virtual int GetMaxDamage(bool asKnown)
     {
         ObjectsData.MeleeData meleeData = DataLoader.sDataLoader.objectsData.weaponStats[(int)type & 15];
 
