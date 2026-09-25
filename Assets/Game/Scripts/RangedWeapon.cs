@@ -13,11 +13,52 @@ public class RangedWeapon : WeaponBase
     public Transform bowRoot;
     public GameObject projectileRoot;
 
+    /// <summary>The sling as it is held, hidden while the whirl shows the goblins' one.</summary>
+    public Transform slingRoot;
+    /// <summary>
+    /// A goblin model, whose own sling - a cord with a pouch, on a chain of bones - is whirled
+    /// over the player's head while a shot is prepared. Only the sling is drawn; the rest of the
+    /// goblin is there to carry the animation, which moves the arm as well as the cord.
+    /// </summary>
+    public GameObject slingWhirlModel;
+    /// <summary>The goblins' whirl, flat over the head: Sling_Attack_Loop.</summary>
+    public AnimationClip slingWhirlClip;
+    /// <summary>The one renderer of <see cref="slingWhirlModel"/> that is drawn.</summary>
+    public string slingWhirlMesh = "Sling";
+    /// <summary>The goblin's bone that is put where the player's head is.</summary>
+    public string slingWhirlHeadBone = "head";
+    /// <summary>Where the goblin's head goes, in the camera's space.</summary>
+    public Vector3 slingWhirlOffset = Vector3.zero;
+    public float slingWhirlScale = 1.0f;
+    /// <summary>How fast the whirl plays once the wind-up is over, 1 being the goblins' speed.</summary>
+    public float slingWhirlSpeed = 1.0f;
+    /// <summary>The share of that speed the whirl already has at the press.</summary>
+    public float slingWhirlStartSpeed = 0.25f;
+    /// <summary>
+    /// The end of the goblins' sling, the bone the whirl starts from: at the press the loop is
+    /// entered where this comes into the view, so the sling is seen from the first frame.
+    /// </summary>
+    public string slingWhirlTipBone = "Sling_7";
+
     private int swooshNum;
+    private float whirlStartTime = -1.0f;
+
+    // One whirl for the whole game, under the camera: only one sling is ever in hand, so every
+    // sling shares it, and the goblin is copied once per session rather than once per sling.
+    private static GameObject sWhirlRig;
+    private static Transform sWhirlHead;
+    private static Transform sWhirlTip;
+    private static RangedWeapon sWhirlUser;
 
     protected override Transform GetLoweredHideExemptChild()
     {
         return projectileRoot != null ? projectileRoot.transform : null;
+    }
+
+    private void OnDisable()
+    {
+        // A sling put away or destroyed mid-whirl must not leave the whirl turning under the camera.
+        StopSlingWhirl();
     }
 
     protected override void ChangeState(EState newState)
@@ -38,6 +79,7 @@ public class RangedWeapon : WeaponBase
             {
                 projectileRoot.SetActive(false);
             }
+            StopSlingWhirl();
             break;
         }
     }
@@ -65,21 +107,258 @@ public class RangedWeapon : WeaponBase
         }
         else if (type is EObjectType.Sling)
         {
+            // Built as soon as a sling is in hand, so the copy is made while the player is busy
+            // with the pack rather than on the first press, where it would be a stall.
+            if (sWhirlRig == null && PlayerObject.Player != null && PlayerObject.Player.mainCamera != null
+                && transform.parent == PlayerObject.Player.mainCamera.transform)
+            {
+                EnsureWhirlRig();
+            }
+
             switch (state)
             {
             case EState.Prepare:
                 {
-                    int swooshCount = (int)prepareTime;
+                    // The cursor stays grey through the wind-up, so the sling itself has to show that
+                    // something is happening: it comes into view at the press, gathers speed until
+                    // a release would land, and swooshes once a round.
+                    float rounds = WhirlSling(prepareTime);
+
+                    int swooshCount = (int)(rounds + 0.5f);
                     if (swooshCount > swooshNum)
                     {
                         swooshNum = swooshCount;
                         Vector3 pos = PlayerObject.Player.mainCamera.transform.position + Vector3.up;
-                        Utils.PlayClip(swingSound, pos, Mathf.Min(prepareTime, 1.0f),Random.Range(0.9f, 1.1f));
+                        float volume = Mathf.Clamp01(prepareTime / WindUpSeconds);
+                        Utils.PlayClip(swingSound, pos, volume, Random.Range(0.9f, 1.1f));
                     }
                 }
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// How far into the whirl the animation is after this long a hold, in seconds of the clip.
+    /// The speed climbs evenly from <see cref="slingWhirlStartSpeed"/> to full across the wind-up
+    /// and stays there, so the time is a parabola and then a straight line - worked out from the
+    /// hold rather than added up frame by frame.
+    /// </summary>
+    private float GetWhirlTime(float held)
+    {
+        float start = slingWhirlStartSpeed;
+        if (held <= WindUpSeconds)
+        {
+            return slingWhirlSpeed * (start * held + (1.0f - start) * held * held / (2.0f * WindUpSeconds));
+        }
+
+        return slingWhirlSpeed * ((1.0f + start) * WindUpSeconds / 2.0f + held - WindUpSeconds);
+    }
+
+    /// <summary>Poses the whirl for this long a hold, and returns how many rounds of the clip it has played.</summary>
+    private float WhirlSling(float held)
+    {
+        if (!EnsureWhirlRig())
+        {
+            return 0.0f;
+        }
+
+        sWhirlUser = this;
+        sWhirlRig.SetActive(true);
+        SetHeldSlingVisible(false);
+
+        float length = Mathf.Max(slingWhirlClip.length, 0.01f);
+        if (whirlStartTime < 0.0f)
+        {
+            whirlStartTime = FindWhirlStart(length);
+        }
+
+        // It starts slowly and gathers speed until a release would land, and since it starts
+        // where the sling comes into view, the slow part is on screen rather than behind the head.
+        float played = GetWhirlTime(held);
+        PoseWhirl((whirlStartTime + played) % length);
+
+        return played / length;
+    }
+
+    /// <summary>
+    /// The point of the loop to start from: where the end of the sling comes into the view at the
+    /// side, on its way to the lowest point it reaches. Found by trying twelve points of the clip
+    /// against the camera as it is at the press, and stepping back from the lowest one for as
+    /// long as the end is still in view.
+    /// </summary>
+    private float FindWhirlStart(float length)
+    {
+        Camera cam = PlayerObject.Player.mainCamera;
+        const int tries = 12;
+        bool[] inView = new bool[tries];
+        int lowest = -1;
+        float lowestHeight = float.MaxValue;
+        for (int i = 0; i < tries; i++)
+        {
+            PoseWhirl(length * i / tries);
+            Vector3 view = cam.WorldToViewportPoint(sWhirlTip.position);
+            inView[i] = view.z > cam.nearClipPlane
+                        && view.x > 0.0f && view.x < 1.0f
+                        && view.y > 0.0f && view.y < 1.0f;
+            if (inView[i] && view.y < lowestHeight)
+            {
+                lowestHeight = view.y;
+                lowest = i;
+            }
+        }
+
+        if (lowest < 0)
+        {
+            return 0.0f;
+        }
+
+        int start = lowest;
+        for (int step = 1; step < tries; step++)
+        {
+            int previous = (lowest - step + tries) % tries;
+            if (!inView[previous])
+            {
+                break;
+            }
+            start = previous;
+        }
+        return length * start / tries;
+    }
+
+    /// <summary>
+    /// The goblin looks where the player looks, and its head is pinned to the player's, so the
+    /// sling turns over the player's head and the goblin's body sway does not carry it about. The
+    /// goblins sling left-handed, so for a right-handed player the whole rig is mirrored.
+    /// </summary>
+    /// <remarks>
+    /// The mirror is set in the world, not against the parent, so that a flip higher up - as
+    /// WeaponBase does to a left-handed player's weapon - cannot cancel it.
+    /// </remarks>
+    private void PoseWhirl(float clipTime)
+    {
+        Transform rig = sWhirlRig.transform;
+        slingWhirlClip.SampleAnimation(sWhirlRig, clipTime);
+
+        Transform cam = PlayerObject.Player.mainCamera.transform;
+        float side = PlayerData.sData.leftHanded ? 1.0f : -1.0f;
+        side *= Mathf.Sign(rig.parent.lossyScale.x);
+        rig.localScale = slingWhirlScale * new Vector3(side, 1.0f, 1.0f);
+        rig.rotation = cam.rotation;
+        rig.position += cam.TransformPoint(slingWhirlOffset) - sWhirlHead.position;
+    }
+
+    private void StopSlingWhirl()
+    {
+        whirlStartTime = -1.0f;
+        if (sWhirlUser == this)
+        {
+            sWhirlUser = null;
+            if (sWhirlRig != null)
+            {
+                sWhirlRig.SetActive(false);
+            }
+        }
+        SetHeldSlingVisible(true);
+    }
+
+    private void SetHeldSlingVisible(bool visible)
+    {
+        if (slingRoot != null && slingRoot.TryGetComponent(out Renderer held))
+        {
+            held.enabled = visible;
+        }
+    }
+
+    /// <summary>
+    /// Builds the whirl once: a copy of the goblin under the camera, cut down to the sling and the
+    /// bones that move it. The other meshes are destroyed rather than hidden - a goblin carries a
+    /// dozen of them, heads, eyes, armour and a club - and so is anything that could act by
+    /// itself: animators, colliders, scripts.
+    /// </summary>
+    private bool EnsureWhirlRig()
+    {
+        if (sWhirlRig != null)
+        {
+            return true;
+        }
+        if (slingWhirlModel == null || slingWhirlClip == null
+            || PlayerObject.Player == null || PlayerObject.Player.mainCamera == null)
+        {
+            return false;
+        }
+
+        GameObject rig = Instantiate(slingWhirlModel, PlayerObject.Player.mainCamera.transform, false);
+        rig.name = "Sling whirl";
+        rig.SetActive(false);
+        int layer = slingRoot != null ? slingRoot.gameObject.layer : gameObject.layer;
+
+        foreach (Animator animator in rig.GetComponentsInChildren<Animator>(true))
+        {
+            Destroy(animator);
+        }
+        foreach (Collider col in rig.GetComponentsInChildren<Collider>(true))
+        {
+            Destroy(col);
+        }
+        foreach (MonoBehaviour script in rig.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            Destroy(script);
+        }
+        foreach (Renderer r in rig.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r.name != slingWhirlMesh)
+            {
+                // A mesh node with nothing under it goes whole; one that other nodes hang from
+                // keeps its transform and loses only the renderer.
+                if (r.transform.childCount == 0)
+                {
+                    Destroy(r.gameObject);
+                }
+                else
+                {
+                    Destroy(r);
+                }
+                continue;
+            }
+
+            r.gameObject.SetActive(true);
+            r.enabled = true;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            if (r is SkinnedMeshRenderer skinned)
+            {
+                // The pose comes from sampling the clip, and the bounds must follow it or the
+                // sling can be culled while it is plainly in view.
+                skinned.updateWhenOffscreen = true;
+            }
+        }
+
+        sWhirlHead = null;
+        sWhirlTip = null;
+        foreach (Transform t in rig.GetComponentsInChildren<Transform>(true))
+        {
+            t.gameObject.layer = layer;
+            if (sWhirlHead == null && t.name == slingWhirlHeadBone)
+            {
+                sWhirlHead = t;
+            }
+            if (sWhirlTip == null && t.name == slingWhirlTipBone)
+            {
+                sWhirlTip = t;
+            }
+        }
+        if (sWhirlHead == null)
+        {
+            sWhirlHead = rig.transform;
+        }
+        if (sWhirlTip == null)
+        {
+            sWhirlTip = rig.transform;
+        }
+
+        sWhirlRig = rig;
+        return true;
     }
 
     private EObjectType GetAmmoType()
