@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The combat music no longer comes back after the victory fanfare when nothing is left to fight. A creature that had just appeared nearby, out of sight behind a wall, used to be enough to start it again.
+
 - The sling now whirls over your head from the moment you press to ready a shot, the way the goblins whirl theirs, faster and faster until the shot is ready, with a swoosh on every turn. Before, nothing moved and nothing sounded until the cursor turned green.
 
 - A bow, crossbow or sling with nothing to shoot says so the moment you press the button - "Sorry, you have no arrows." - as the original does, instead of drawing back all the way and loosing nothing. Once drawn, its power gem lights up at once, because holding a shot longer gains nothing, and the damage shown next to it is that of the arrows or stones it fires rather than a mace's.

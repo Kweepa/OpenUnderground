@@ -138,8 +138,17 @@ public class Music : MonoBehaviour
     
     public static bool IsInCombat() => sMusic != null && sMusic.musicState == EMusicState.Combat;
 
-    public static void InCombat()
+    /// <param name="fighter">
+    /// The creature that is fighting, when there is one, so that <see cref="HostileStillFighting"/>
+    /// can tell it from one that is only near.
+    /// </param>
+    public static void InCombat(Critter fighter = null)
     {
+        if (fighter != null)
+        {
+            fighter.lastFightTime = Time.unscaledTime;
+        }
+
         if (sMusic != null)
         {
             // Outside the switch: this says the fight is still going on, and that stays true
@@ -226,8 +235,20 @@ public class Music : MonoBehaviour
     }
 
     /// <summary>
+    /// How long a creature still counts as in the fight after the last thing it did in it. The
+    /// same eight seconds the combat music runs on after the last blow.
+    /// </summary>
+    private const float fightMemory = 8.0f;
+
+    /// <summary>
     /// Whether anything hostile within three tiles is still in the fight.
     /// </summary>
+    /// <remarks>
+    /// Near, awake and hostile is not enough: it has to have taken part. The sphere sees through
+    /// walls and the states include waiting and running away, so without that a creature that had
+    /// never come near - one the respawn had just put behind a wall, say - sent the combat music
+    /// back over an empty room when the fanfare ended, and held the fanfare back as well.
+    /// </remarks>
     private static bool HostileStillFighting()
     {
         int count = Physics.OverlapSphereNonAlloc(PlayerObject.Player.mainCamera.transform.position,
@@ -238,7 +259,8 @@ public class Music : MonoBehaviour
             if (critter != null
                 && critter.attitude == Critter.EAttitude.Hostile
                 && critter.hp > 0
-                && CritterIsAttacking(critter.state))
+                && CritterIsAttacking(critter.state)
+                && Time.unscaledTime - critter.lastFightTime < fightMemory)
             {
                 return true;
             }

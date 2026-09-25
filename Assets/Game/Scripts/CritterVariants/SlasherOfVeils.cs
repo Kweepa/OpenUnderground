@@ -95,7 +95,7 @@ namespace Game.Scripts.CritterVariants
 
                 if (LevelLoader.sLevelLoader.loadedLevel == 9 && !PlayerData.sData.enteredGreenMoongate)
                 {
-                    Music.InCombat();
+                    Music.InCombat(this);
             
                     // do 1 damage to the player every so often - until drained
                     if (Time.time - timeOfNextSlasherHit > 0.0f)

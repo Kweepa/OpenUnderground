@@ -452,6 +452,12 @@ public class Critter : UUObject
 
     public EAttitude attitude;
 
+    /// <summary>
+    /// When this creature last kept the combat music going - came into reach, swung, shot or was
+    /// hit - on the music's clock. Not saved: after a load the next blow sets it again.
+    /// </summary>
+    [NonSerialized] public float lastFightTime = float.NegativeInfinity;
+
     //public int height;
     public int yhome;
     public int xhome;
@@ -1618,7 +1624,7 @@ public class Critter : UUObject
             mLungeTime = 0.0f; // Reset lunge timer - will be set by animation event
             mLungeDirection = Vector3.zero;
             mLungeDestination = Vector3.zero;
-            Music.InCombat();
+            Music.InCombat(this);
             break;
         case EState.ProjectileIdle:
             slot = 0;
@@ -1630,7 +1636,7 @@ public class Critter : UUObject
             slot = crit.frameCount[5] > 0 ? 5 : 1;
             ChangeAnimation("ProjectileAttack");
             stateTime = 1.0f; // when the projectile is generated
-            Music.InCombat();
+            Music.InCombat(this);
             break;
         case EState.TurnToFlee:
             slot = 128;
@@ -2413,7 +2419,7 @@ public class Critter : UUObject
                 // see if we're close enough to the target to attack
                 else if (GetDistanceToTarget() < meleeAttackRange && IsViewToTargetClear())
                 {
-                    Music.InCombat();
+                    Music.InCombat(this);
                     SetState(EState.CombatIdle);
                 }
                 else if (wallRubTime > 1.0f)
@@ -3464,7 +3470,12 @@ public class Critter : UUObject
 
         if (attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5)
         {
-            Music.InCombat();
+            // Not for a body, and not for the blow that kills: the death that follows is the
+            // victory's to announce, and a fight started on it would be one with nobody in it.
+            if (hp > 0)
+            {
+                Music.InCombat(this);
+            }
             NotifyRaceOfAttack();
 
             // maybe flee
@@ -3513,7 +3524,7 @@ public class Critter : UUObject
                 if (attitude == EAttitude.Hostile)
                 {
                     PlayAlertSound();
-                    Music.InCombat();
+                    Music.InCombat(this);
                 }
             }
             damagedTimer += 2.0f; // Shorter than actual damage

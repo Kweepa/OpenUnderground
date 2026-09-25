@@ -865,9 +865,10 @@ public class WeaponBase : UUObject
             if (obj is Critter)
             {
                 Critter c = obj as Critter;
-                if (c.attitude == Critter.EAttitude.Hostile)
+                // A blow at a body is not a fight, and the killing blow is already past it.
+                if (c.attitude == Critter.EAttitude.Hostile && c.hp > 0)
                 {
-                    Music.InCombat();
+                    Music.InCombat(c);
                 }
             }
 
