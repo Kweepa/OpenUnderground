@@ -452,9 +452,9 @@ public class SaveGameManager : MonoBehaviour
     /// record travels with the save file: coming back to a level does not write a second one, and
     /// a second character gets its own set.
     ///
-    /// The save itself is put off until the screen has faded back in. Writing it here would catch
-    /// the player mid transition, before the teleport that follows the level load has settled him,
-    /// and the thumbnail would be a black frame.
+    /// The save itself waits for the level's objects to be finished, a frame or two, and is taken
+    /// while the screen is still black from the level change, so its stall is not seen. Writing it
+    /// here would catch the level before its objects exist. The thumbnail waits for the fade.
     /// </remarks>
     public void RequestAutoSaveForLevel(int level)
     {
@@ -476,7 +476,7 @@ public class SaveGameManager : MonoBehaviour
         StartCoroutine(AutoSaveWhenSettled(level));
     }
 
-    /// <summary>The level whose automatic save is waiting for the fade, or 0.</summary>
+    /// <summary>The level whose automatic save is waiting to be taken, or 0.</summary>
     private int pendingAutoSaveLevel;
 
     /// <summary>Is the level built and populated, rather than merely named.</summary>
@@ -507,9 +507,14 @@ public class SaveGameManager : MonoBehaviour
         // empty. Measured on three characters in a row on 22 September 2026.
         yield return null;
 
-        // Then wait for the fade AND for the level to have its objects. Five seconds, then give
-        // up: an automatic save that does not happen is a nuisance, but one that writes an empty
-        // world is data loss, because nothing repopulates a level that a save says is empty.
+        // Then wait for the level to have its objects, and for those objects to be finished: the
+        // frame after a level is built, LevelLoader.Update() runs PostLoadInitialize() on every one
+        // of them and sets sentPostLoadInitialize, and one more frame lets them start. That is
+        // still inside the fade from black, so the time the copy takes is not seen - it used to
+        // wait for the fade to end, and the stall landed on the new level in full view. The
+        // screen being black is not a condition, only the reason for going early. Five seconds,
+        // then give up: an automatic save that does not happen is a nuisance, but one that writes
+        // an empty world is data loss, because nothing repopulates a level that a save says is empty.
         //
         // The five seconds are of play, not of the clock, and nothing is saved while the game is
         // paused. The fade runs on unscaled time, so without this the save went ahead with the
@@ -517,15 +522,19 @@ public class SaveGameManager : MonoBehaviour
         // the player had loaded another game from that panel. The save panel, the map, a
         // conversation, a cutscene and the on screen keyboard all stop time.
         float waited = 0.0f;
+        int framesFinished = 0;
         while (waited < 5.0f)
         {
             if (Time.timeScale > 0.0f)
             {
-                if (PlayerObject.Player != null && PlayerObject.Player.fade <= 0.05f
+                if (PlayerObject.Player != null
                     && LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel == level
-                    && LevelHasObjects(level))
+                    && LevelLoader.sLevelLoader.sentPostLoadInitialize && LevelHasObjects(level))
                 {
-                    break;
+                    if (++framesFinished >= 2)
+                    {
+                        break;
+                    }
                 }
 
                 waited += Time.unscaledDeltaTime;
@@ -580,9 +589,31 @@ public class SaveGameManager : MonoBehaviour
             yield break;
         }
 
-        RequestScreenshotForSlot(slotName);
         PruneOldAutoSaves(level, slotName);
+
+        // The picture waits for the fade, since taken now it would be black, and for time to be
+        // running, or it would be of a panel. It is only taken of the game that was saved: not if
+        // the level was left meanwhile, nor if another game was loaded.
+        int loadsBefore = gamesLoaded;
+        waited = 0.0f;
+        while (waited < 5.0f
+               && (Time.timeScale <= 0.0f || (PlayerObject.Player != null && PlayerObject.Player.fade > 0.05f)))
+        {
+            if (Time.timeScale > 0.0f)
+            {
+                waited += Time.unscaledDeltaTime;
+            }
+            yield return null;
+        }
+
+        if (gamesLoaded == loadsBefore && LevelLoader.sLevelLoader.loadedLevel == level && Time.timeScale > 0.0f)
+        {
+            RequestScreenshotForSlot(slotName);
+        }
     }
+
+    /// <summary>How many games have been loaded, so that a wait can tell the game has changed under it.</summary>
+    private int gamesLoaded;
 
     // Multi-slot API
     /// <summary>Writes the game to a slot. Returns false when nothing, or not all of it, was written.</summary>
@@ -761,6 +792,7 @@ public class SaveGameManager : MonoBehaviour
 
             PlayerObject.Player?.GetComponent<PlayerEffectsController>()?.ResetMushroomTripAfterLoad();
             
+            ++gamesLoaded;
             Debug.Log($"Game loaded successfully in {Time.realtimeSinceStartup - startTime:F3}s");
         }
     }

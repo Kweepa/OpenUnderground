@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Arriving on a new level no longer stutters while the game saves by itself.
+
 - The combat music no longer comes back after the victory fanfare when nothing is left to fight. A creature that had just appeared nearby, out of sight behind a wall, used to be enough to start it again.
 
 - The sling now whirls over your head from the moment you press to ready a shot, the way the goblins whirl theirs, faster and faster until the shot is ready, with a swoosh on every turn. Before, nothing moved and nothing sounded until the cursor turned green.
