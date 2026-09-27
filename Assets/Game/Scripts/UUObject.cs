@@ -788,6 +788,13 @@ public class UUObject : LevelObject
         {
             if (isPortable)
             {
+                // A trap found on the object stops the pick-up and asks instead (TrapSearch.TryPickup).
+                if (TrapSearch.TryPickup(this))
+                {
+                    Interaction.sInt?.ClearWorldPickupIntentFlags();
+                    return;
+                }
+
                 if (quantity > 1)
                 {
                     // pop up the how many dialog 

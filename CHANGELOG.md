@@ -2,6 +2,10 @@
 
 ## Current release
 
+- Traps on objects can be found and disarmed again, as in the original: a look, or reaching to take the object, can find one with your Search skill and asks whether to try to disarm it, and your Traps skill decides - with little skill, a clumsy attempt sets the trap off more often than it succeeds. The Remove Trap spell now works, on every trap within three tiles of you, and every few seconds Search also points out a trapped object in front of you.
+
+- Traps that should poison you now poison you, as in the original, instead of taking hit points at once; and a trapped object that had been turned into something else is trapped again - and says it is useless once its trap is gone.
+
 - Reloading a save no longer replays the same luck: the first rolls after a load used to come out the same every time, because giving goblins, fighters and a few other creatures their looks reset the game's dice.
 
 - Loading a game no longer carries over what the game you left was doing: falling to your death and loading used to kill you again on landing, at the speed you had been falling, a character freed in one game stayed away after loading an older one, and the treasury achievement forgot a treasure taken before a save.

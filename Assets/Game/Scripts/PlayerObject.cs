@@ -1129,6 +1129,13 @@ public class PlayerObject : MonoBehaviour
             SecretDoorSearch.Poll();
         }
 
+        timeToNextTrapCheck -= Time.deltaTime;
+        if (timeToNextTrapCheck <= 0.0f)
+        {
+            timeToNextTrapCheck = TrapSearch.checkInterval;
+            TrapSearch.Poll();
+        }
+
         if (fadeIn)
         {
             fade = Mathf.Max(0.0f, fade - Time.unscaledDeltaTime);
@@ -1331,6 +1338,7 @@ public class PlayerObject : MonoBehaviour
     /// round happens as soon as a level has settled, which is when you most want to be told.
     /// </summary>
     private float timeToNextSecretDoorCheck;
+    private float timeToNextTrapCheck;
 
     private static bool PlayerPanelsWantWasdOnlyMovement()
     {
@@ -1789,6 +1797,27 @@ public class PlayerObject : MonoBehaviour
             PlayerData.sData.skillPoints += levelsGained;
             Music.LevelUp();
         }
+    }
+
+    /// <summary>
+    /// Raises the poison to a level when it is lower, the way a damage trap with an owner poisons
+    /// in the original: it sets the level and does no damage (UW.EXE 0x73e22, the negative branch).
+    /// </summary>
+    /// <remarks>
+    /// The original tests only the resistances of the player's own object type there (0x25eaf with
+    /// mask 0x10), not a spell, so Poison Resistance does not lessen it, unlike AddPoison.
+    /// </remarks>
+    public static void PoisonAtLeast(int level)
+    {
+        level = Math.Min(level, 15);
+        if (level <= PlayerData.sData.poison)
+        {
+            return;
+        }
+
+        PlayerData.sData.poison = level;
+        Player.timeToDecrementPoison = Random.Range(25.0f, 35.0f);
+        Player.timeToNextPoisonDamage = Random.Range(15.0f, 20.0f);
     }
 
     public static void AddPoison(int poison)
