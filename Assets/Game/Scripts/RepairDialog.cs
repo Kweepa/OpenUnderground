@@ -36,6 +36,53 @@ public class RepairDialog : MonoBehaviour
     public static RepairDialog sRepairDialog;
     public static System.Action<UUObject, int> OnRepairConfirmed;
 
+    /// <summary>
+    /// The yes-or-no question on screen instead of a repair, or null. The dialog asks one when a
+    /// look finds a trap (TrapSearch), with the same buttons and the same keys as a repair.
+    /// </summary>
+    private string question;
+    private System.Action<bool> onQuestionAnswered;
+    private float timeScaleBeforeQuestion = 1.0f;
+
+    /// <summary>Whether a repair or a question is on screen.</summary>
+    private bool IsOpen => itemToRepair != null || question != null;
+
+    /// <summary>
+    /// Asks a yes-or-no question and calls back with the answer, Yes on Enter, A or Y, No on Esc,
+    /// B or N.
+    /// </summary>
+    /// <remarks>
+    /// The game stands still until the question is answered, as the original's prompt does: its
+    /// loop only reads the keyboard and the mouse and redraws Yes or No (UW.EXE 0x3a181).
+    /// </remarks>
+    public static void AskYesNo(string text, System.Action<bool> onAnswered)
+    {
+        if (sRepairDialog == null)
+        {
+            Debug.LogError("RepairDialog singleton not found!");
+            onAnswered?.Invoke(false);
+            return;
+        }
+
+        if (sRepairDialog.IsOpen)
+        {
+            // One question at a time: the look that asked it cannot happen while the dialog is up,
+            // so a second one would only come from a bug.
+            onAnswered?.Invoke(false);
+            return;
+        }
+
+        sRepairDialog.question = text;
+        sRepairDialog.onQuestionAnswered = onAnswered;
+        sRepairDialog.initialButtonsReleased = false;
+        sRepairDialog.deferredMouseRepairAction = DeferredMouseRepairAction.None;
+        sRepairDialog.executeDeferredMouseRepairOnFrame = -1;
+        sRepairDialog.timeScaleBeforeQuestion = Time.timeScale;
+        Time.timeScale = 0.0f;
+
+        Utils.PlayClip2d(sRepairDialog.dialogOn);
+    }
+
     public static void AskRepair(UUObject item, int itemDurability)
     {
         if (sRepairDialog == null)
@@ -88,7 +135,7 @@ public class RepairDialog : MonoBehaviour
 
     public static bool IsActive()
     {
-        return sRepairDialog != null && (sRepairDialog.repairDialogHold > 0 || sRepairDialog.itemToRepair != null);
+        return sRepairDialog != null && (sRepairDialog.repairDialogHold > 0 || sRepairDialog.IsOpen);
     }
 
     protected void Start()
@@ -101,6 +148,11 @@ public class RepairDialog : MonoBehaviour
         deferredMouseRepairAction = DeferredMouseRepairAction.None;
         executeDeferredMouseRepairOnFrame = -1;
         Utils.PlayClip2d(confirm);
+        if (question != null)
+        {
+            AnswerQuestion(true);
+            return;
+        }
         OnRepairConfirmed?.Invoke(itemToRepair, durability);
         itemToRepair = null;
     }
@@ -109,20 +161,36 @@ public class RepairDialog : MonoBehaviour
     {
         deferredMouseRepairAction = DeferredMouseRepairAction.None;
         executeDeferredMouseRepairOnFrame = -1;
-        itemToRepair = null;
         Utils.PlayClip2d(cancel);
+        if (question != null)
+        {
+            AnswerQuestion(false);
+            return;
+        }
+        itemToRepair = null;
+    }
+
+    private void AnswerQuestion(bool yes)
+    {
+        System.Action<bool> answered = onQuestionAnswered;
+        question = null;
+        onQuestionAnswered = null;
+        // Back before the answer is acted on: a trap that goes off on the answer moves or hurts
+        // the player, and that has to happen with the clock running.
+        Time.timeScale = timeScaleBeforeQuestion;
+        answered?.Invoke(yes);
     }
 
     protected void Update()
     {
         PlayerObject.DisableControls(EControlMask.RepairDialog, IsActive());
 
-        if (itemToRepair != null && GameInput.EscapePressedThisFrame())
+        if (IsOpen && GameInput.EscapePressedThisFrame())
         {
             CancelRepair();
         }
 
-        if (itemToRepair != null && deferredMouseRepairAction != DeferredMouseRepairAction.None)
+        if (IsOpen && deferredMouseRepairAction != DeferredMouseRepairAction.None)
         {
             Mouse m = GameInput.CurrentMouse;
             if (m != null && m.leftButton.isPressed)
@@ -149,7 +217,7 @@ public class RepairDialog : MonoBehaviour
             }
         }
 
-        if (itemToRepair != null)
+        if (IsOpen)
         {
             if (deferredMouseRepairAction != DeferredMouseRepairAction.None)
             {
@@ -187,12 +255,24 @@ public class RepairDialog : MonoBehaviour
             {
                 CancelRepair();
             }
+            else if (question != null && GameInput.CurrentKeyboard != null)
+            {
+                // The original's own keys for its prompt, Y and N (UW.EXE 0x3a1f4).
+                if (GameInput.CurrentKeyboard.yKey.wasPressedThisFrame)
+                {
+                    ConfirmRepair();
+                }
+                else if (GameInput.CurrentKeyboard.nKey.wasPressedThisFrame)
+                {
+                    CancelRepair();
+                }
+            }
         }
 
         bool aButtonInAction = (GameInput.CurrentGamepad?.aButton.isPressed ?? false) || (GameInput.CurrentGamepad?.aButton.wasReleasedThisFrame ?? false);
         bool bButtonInAction = (GameInput.CurrentGamepad?.bButton.isPressed ?? false) || (GameInput.CurrentGamepad?.bButton.wasReleasedThisFrame ?? false);
 
-        if (itemToRepair == null && !aButtonInAction && !bButtonInAction && repairDialogHold > 0)
+        if (!IsOpen && !aButtonInAction && !bButtonInAction && repairDialogHold > 0)
         {
             --repairDialogHold;
         }
@@ -200,6 +280,12 @@ public class RepairDialog : MonoBehaviour
 
     protected void OnGUI()
     {
+        if (question != null)
+        {
+            DrawQuestion();
+            return;
+        }
+
         if (itemToRepair != null)
         {
             GUI.depth = (int)EGUIDepth.RepairDialog;
@@ -249,85 +335,113 @@ public class RepairDialog : MonoBehaviour
             GUI.Label(new Rect(r.x + w / 4, r.y + tex.height, w / 2, r.height - tex.height - 54),
                       difficultyText, repairDialogStyle);
 
-            // Buttons
-            bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
-
-            repairDialogStyle.fontSize = 20;
-            repairDialogStyle.alignment = TextAnchor.MiddleLeft;
-
-            if (mouseUi)
-            {
-                // Match the original gamepad hint placement + click rects.
-                int kk = 29;
-                int ww = 100;
-                float yy = r.y + r.height - 25 - kk;
-
-                Rect hintCancelRect = new Rect(r.x + 40, yy, ww, kk);
-                Rect hintConfirmRect = new Rect(r.x + r.width - 160, yy, ww, kk);
-
-
-                if (buttonOutline != null)
-                {
-                    GUI.DrawTexture(hintCancelRect, buttonOutline, ScaleMode.StretchToFill, true);
-                    GUI.DrawTexture(hintConfirmRect, buttonOutline, ScaleMode.StretchToFill, true);
-                }
-
-                if (escapeKey != null)
-                {
-                    GUI.DrawTexture(new Rect(hintCancelRect.x + 10, hintCancelRect.y + 2, 24, 24), escapeKey);
-                }
-                GUI.Label(new Rect(hintCancelRect.x + 10 + 24 + 5, hintCancelRect.y, ww, kk), "Forgo", repairDialogStyle);
-
-                repairDialogStyle.alignment = TextAnchor.MiddleCenter;
-                GUI.Label(hintConfirmRect, "Attempt", repairDialogStyle);
-                repairDialogStyle.alignment = TextAnchor.MiddleLeft;
-
-                if (GuiInput.TryConsumeClickInRect(hintCancelRect))
-                {
-                    deferredMouseRepairAction = DeferredMouseRepairAction.Cancel;
-                    executeDeferredMouseRepairOnFrame = -1;
-                }
-                else if (GuiInput.TryConsumeClickInRect(hintConfirmRect))
-                {
-                    deferredMouseRepairAction = DeferredMouseRepairAction.Confirm;
-                    executeDeferredMouseRepairOnFrame = -1;
-                }
-            }
-            else
-            {
-                // Keep the original gamepad hint placement + click rects.
-                int k = 20;
-                Rect bRect = new Rect(r.x + 50, r.y + r.height - 25 - k, k, k);
-                Rect bLabelRect = new Rect(r.x + 50 + k + 5, r.y + r.height - 25 - k, 150, k);
-                Rect aRect = new Rect(r.x + r.width - 170, r.y + r.height - 25 - k, k, k);
-                Rect aLabelRect = new Rect(r.x + r.width - 170 + k + 5, r.y + r.height - 25 - k, 150, k);
-
-                if (bButton != null)
-                {
-                    GUI.DrawTexture(bRect, bButton);
-                }
-                GUI.Label(bLabelRect, "Forgo", repairDialogStyle);
-
-                if (aButton != null)
-                {
-                    GUI.DrawTexture(aRect, aButton);
-                }
-                GUI.Label(aLabelRect, "Attempt", repairDialogStyle);
-
-                int kk = 20;
-                Rect cancelRect = new Rect(r.x + 50, r.y + r.height - 25 - kk, 200, kk + 8);
-                Rect confirmRect = new Rect(r.x + r.width - 220, r.y + r.height - 25 - kk, 200, kk + 8);
-                if (GuiInput.TryConsumeClickInRect(cancelRect))
-                {
-                    CancelRepair();
-                }
-                else if (GuiInput.TryConsumeClickInRect(confirmRect))
-                {
-                    ConfirmRepair();
-                }
-            }
+            DrawButtons(r, "Forgo", "Attempt");
 
             GuiInput.TryConsumeClickInPanel(r);
+        }
+    }
+
+    /// <summary>The question: the same panel as a repair, shorter, with the text and No and Yes.</summary>
+    private void DrawQuestion()
+    {
+        GUI.depth = (int)EGUIDepth.RepairDialog;
+
+        Texture2D tex = DataLoader.sDataLoader.invTex[6];
+        float w = 5 * tex.width;
+        float h = 5 * tex.height;
+
+        Rect r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
+        GuiInput.RegisterBlockingRect(r);
+        GUI.DrawTexture(r, tex);
+
+        repairDialogStyle.fontSize = 24;
+        repairDialogStyle.alignment = TextAnchor.MiddleCenter;
+        GUI.Label(new Rect(r.x + w / 8, r.y, 3 * w / 4, r.height - 54), question, repairDialogStyle);
+
+        // The original's two words for its prompt (DS:0xaa2 and DS:0xaa6).
+        DrawButtons(r, "No", "Yes");
+
+        GuiInput.TryConsumeClickInPanel(r);
+    }
+
+    /// <summary>The two buttons along the foot of the panel: cancel on the left, confirm on the right.</summary>
+    private void DrawButtons(Rect r, string cancelLabel, string confirmLabel)
+    {
+        bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
+
+        repairDialogStyle.fontSize = 20;
+        repairDialogStyle.alignment = TextAnchor.MiddleLeft;
+
+        if (mouseUi)
+        {
+            // Match the original gamepad hint placement + click rects.
+            int kk = 29;
+            int ww = 100;
+            float yy = r.y + r.height - 25 - kk;
+
+            Rect hintCancelRect = new Rect(r.x + 40, yy, ww, kk);
+            Rect hintConfirmRect = new Rect(r.x + r.width - 160, yy, ww, kk);
+
+
+            if (buttonOutline != null)
+            {
+                GUI.DrawTexture(hintCancelRect, buttonOutline, ScaleMode.StretchToFill, true);
+                GUI.DrawTexture(hintConfirmRect, buttonOutline, ScaleMode.StretchToFill, true);
+            }
+
+            if (escapeKey != null)
+            {
+                GUI.DrawTexture(new Rect(hintCancelRect.x + 10, hintCancelRect.y + 2, 24, 24), escapeKey);
+            }
+            GUI.Label(new Rect(hintCancelRect.x + 10 + 24 + 5, hintCancelRect.y, ww, kk), cancelLabel, repairDialogStyle);
+
+            repairDialogStyle.alignment = TextAnchor.MiddleCenter;
+            GUI.Label(hintConfirmRect, confirmLabel, repairDialogStyle);
+            repairDialogStyle.alignment = TextAnchor.MiddleLeft;
+
+            if (GuiInput.TryConsumeClickInRect(hintCancelRect))
+            {
+                deferredMouseRepairAction = DeferredMouseRepairAction.Cancel;
+                executeDeferredMouseRepairOnFrame = -1;
+            }
+            else if (GuiInput.TryConsumeClickInRect(hintConfirmRect))
+            {
+                deferredMouseRepairAction = DeferredMouseRepairAction.Confirm;
+                executeDeferredMouseRepairOnFrame = -1;
+            }
+        }
+        else
+        {
+            // Keep the original gamepad hint placement + click rects.
+            int k = 20;
+            Rect bRect = new Rect(r.x + 50, r.y + r.height - 25 - k, k, k);
+            Rect bLabelRect = new Rect(r.x + 50 + k + 5, r.y + r.height - 25 - k, 150, k);
+            Rect aRect = new Rect(r.x + r.width - 170, r.y + r.height - 25 - k, k, k);
+            Rect aLabelRect = new Rect(r.x + r.width - 170 + k + 5, r.y + r.height - 25 - k, 150, k);
+
+            if (bButton != null)
+            {
+                GUI.DrawTexture(bRect, bButton);
+            }
+            GUI.Label(bLabelRect, cancelLabel, repairDialogStyle);
+
+            if (aButton != null)
+            {
+                GUI.DrawTexture(aRect, aButton);
+            }
+            GUI.Label(aLabelRect, confirmLabel, repairDialogStyle);
+
+            int kk = 20;
+            Rect cancelRect = new Rect(r.x + 50, r.y + r.height - 25 - kk, 200, kk + 8);
+            Rect confirmRect = new Rect(r.x + r.width - 220, r.y + r.height - 25 - kk, 200, kk + 8);
+            if (GuiInput.TryConsumeClickInRect(cancelRect))
+            {
+                CancelRepair();
+            }
+            else if (GuiInput.TryConsumeClickInRect(confirmRect))
+            {
+                ConfirmRepair();
+            }
         }
     }
 }

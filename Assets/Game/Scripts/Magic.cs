@@ -319,7 +319,7 @@ public class Magic : MonoBehaviour
         new SSpell("SF", "Flameproof", 12, 10, 90, 278, 54), // done
         new SSpell("IM", "Heal", 12, -1, 0, 275, 68), // done
         new SSpell("NM", "Poison", 12, -1, 0, 277, 116), // done  
-        new SSpell("AJ", "Remove Trap", 12, -1, 0, 279, 179), // ???
+        new SSpell("AJ", "Remove Trap", 12, -1, 0, 279, 179), // done
         new SSpell("YP", "Water Walk", 9, 3, 180, 274, 20), // done
 
         // fifth circle
@@ -1939,6 +1939,9 @@ public class Magic : MonoBehaviour
         case "SJ":
             CastStrengthenDoor(mouseWorldAimDirOpt);
             break;
+        case "AJ":
+            CastRemoveTrap();
+            break;
         case "VRP":
             CastGateTravel();
             break;
@@ -2419,6 +2422,15 @@ public class Magic : MonoBehaviour
                 door.Spike();
             }
         }
+    }
+
+    /// <summary>
+    /// Remove Trap: the traps on the objects around the player are disarmed for certain
+    /// (TrapSearch.RemoveTrap).
+    /// </summary>
+    void CastRemoveTrap()
+    {
+        TrapSearch.RemoveTrap();
     }
 
     void CastGateTravel()

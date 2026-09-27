@@ -10,23 +10,22 @@ public class Potion : UUObject
     {
         base.Initialize(objData, critterData);
         
-        // there is only one potion that's linked to a damage trap
-        // the whole damage trap + what to do with the leftover potion suggests that instead we should
-        // just rewrite it as a normal potion
         UpdateEnchantmentState();
-        if (isLinked)
-        {
-            link = 0;
-        }
     }
 
     protected override void UpdateEnchantmentState()
     {
-        // The linked potion keeps its own number even after the link is cleared, because
-        // isLinked still says what it is.
+        // A potion whose quantity bit is clear has no enchantment: its link is a list, and the
+        // one potion in the game that has one holds a poison trap there and nothing else (UW.EXE
+        // 0x38b5c looks for an enchantment object in the list and finds none). The trap is the
+        // whole potion: drunk, it goes off once; disarmed or set off, the potion is a dud. A save
+        // written when the remake still made it a Poison potion comes back as a dud too, because
+        // the link was cleared then; its saved name is dropped here.
         if (isLinked)
         {
-            SetEnchantment(277);
+            // this.: the method declares a local of the same name further down.
+            this.enchantmentNumber = Enchantment.None;
+            enchantmentName = "";
             return;
         }
 
@@ -54,9 +53,39 @@ public class Potion : UUObject
         }
     }
 
+    /// <summary>
+    /// The trapped potion once its trap is gone - disarmed, set off, or drunk: it does nothing, and
+    /// says so by its name.
+    /// </summary>
+    /// <remarks>
+    /// Ours, the user's request of 27 September 2026. The original leaves it a red potion that
+    /// only prints "You quaff the potion in one gulp." (UW.EXE 0x374ee), which nothing tells the
+    /// player. The state is only reached by dealing with the trap, so the name gives nothing away.
+    /// </remarks>
+    public bool IsUseless => isLinked && link == 0;
+
+    public override string GetLookName()
+    {
+        if (!IsUseless)
+        {
+            return base.GetLookName();
+        }
+
+        string name = singularName;
+        singularName = "useless potion";
+        try
+        {
+            return base.GetLookName();
+        }
+        finally
+        {
+            singularName = name;
+        }
+    }
+
     protected override string GetIdentifiedName(string baseName)
     {
-        return baseName + " of " + enchantmentName;
+        return string.IsNullOrEmpty(enchantmentName) ? baseName : baseName + " of " + enchantmentName;
     }
     
     public override EEquipAction Equip()
@@ -66,7 +95,14 @@ public class Potion : UUObject
         Utils.PlayClip2d(quaff);
         Messages.Add(1, 240); // quaff
 
-        if (enchantmentNumber == 277) // Poison
+        if (isLinked)
+        {
+            // The trapped potion: after the message, the use goes down its list and sets off a
+            // trap hung straight on it, which is then deleted (UW.EXE 0x374ee at 0x37945,
+            // 0x385d6). With no trap left there is nothing else to it.
+            TrapSearch.SetOffOnUse(this);
+        }
+        else if (enchantmentNumber == 277) // Poison
         {
             if (!Magic.sMagic.IsSpellActive(Magic.ESpell.PoisonResistance))
             {

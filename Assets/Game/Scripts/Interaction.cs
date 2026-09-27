@@ -371,8 +371,14 @@ public class Interaction : MonoBehaviour
             Messages.Add(lookText);
 
             // The original's Look handler (UW.EXE 0x26e10) hands the look on after the
-            // description, with the Look icon or without it and at any distance.
-            centeredObject.SendLookToTrigger();
+            // description, with the Look icon or without it and at any distance. In between, in
+            // Look mode, it checks the object for a trap, and a trap found asks a question first:
+            // the look is handed on once it is answered.
+            UUObject looked = centeredObject;
+            if (!TrapSearch.TryLook(looked, looked.SendLookToTrigger))
+            {
+                looked.SendLookToTrigger();
+            }
         }
         else if (hasMaterialHit)
         {
@@ -503,6 +509,12 @@ public class Interaction : MonoBehaviour
     private bool HasSomethingToInteractWith(UUObject obj)
     {
         return obj != null && GetWorldInteractionDistance(obj) < GetInteractionDistance(obj);
+    }
+
+    /// <summary>Within the object's own reach for a use, with no Telekinesis and no pole.</summary>
+    public bool IsWithinHandReach(UUObject obj)
+    {
+        return obj != null && GetWorldInteractionDistance(obj) < obj.GetInteractionDistance();
     }
 
     private Texture2D greyscaleCursorTex = null;

@@ -24,4 +24,5 @@ I removed a number of store-bought assets before pushing this to github, so it m
   - clearer attack feedback: the charge cursor stays dark until a release would actually land a swing, then lights up and fills
   - sprinting, bound to the Acrobat skill. Be warned: dashing through the level can make you miss secret details
   - every few seconds the Search skill looks for you, and points out possible secrets in front of you or at your side
+  - the same for traps: every few seconds Search may point out a trapped object in front of you
 

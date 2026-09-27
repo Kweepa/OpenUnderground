@@ -504,6 +504,7 @@ public class LevelLoader : MonoBehaviour
         // Object indices only mean anything within one level, and this also runs when a save is
         // loaded, so anything the Search skill has already mentioned is forgotten here.
         SecretDoorSearch.Reset();
+        TrapSearch.Reset();
 
         // Disable geometry for all other levels
         for (int i = 1; i < levels.Length; ++i)

@@ -284,7 +284,7 @@ public static class SecretDoorSearch
     /// difficulties the level designers used, 3 and 10, that is 19% and 8% a round at Search 0,
     /// 67% and 46% at Search 10, and all but certain at 30.
     /// </remarks>
-    private static float ReportChance(int skill, int difficulty)
+    internal static float ReportChance(int skill, int difficulty)
     {
         float factor = 1.0f - 0.5f * Mathf.Exp(-handicapFade * Mathf.Max(skill, 0));
         return factor * LookChance(skill, difficulty);
@@ -305,7 +305,7 @@ public static class SecretDoorSearch
     /// <summary>
     /// Whether a point is in front of the player or to one side, rather than behind.
     /// </summary>
-    private static bool IsInFrontOrBeside(Vector3 targetPos)
+    internal static bool IsInFrontOrBeside(Vector3 targetPos)
     {
         Transform eye = PlayerObject.Player.mainCamera.transform;
         Vector3 facing = eye.forward;
@@ -327,7 +327,7 @@ public static class SecretDoorSearch
     /// Without this a door in the next corridor is reported through the stone between, which
     /// reads as clairvoyance rather than as a sharp pair of eyes.
     /// </remarks>
-    private static bool HasLineOfSight(Vector3 targetPos)
+    internal static bool HasLineOfSight(Vector3 targetPos)
     {
         Vector3 eye = PlayerObject.Player.mainCamera.transform.position;
         Vector3 toTarget = targetPos - eye;
