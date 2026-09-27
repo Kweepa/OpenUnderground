@@ -119,6 +119,8 @@ public class PlayerSaveData
     public int talismansCollected;
     public bool garamonAtRest;
     public bool enteredGreenMoongate;
+    public bool releasedArial;
+    public bool raidedTreasury;
     
     // Game time
     public double gameTime;
