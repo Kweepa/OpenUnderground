@@ -2256,12 +2256,12 @@ public class Inventory : MonoBehaviour
                 }
                 else
                 {
-                    obj.TryInventoryUse();
+                    obj.InventoryLook();
                 }
             }
             else
             {
-                obj.TryInventoryUse();
+                obj.InventoryLook();
             }
         }
     }
@@ -3020,12 +3020,12 @@ public class Inventory : MonoBehaviour
                 }
                 else
                 {
-                    obj.TryInventoryUse();
+                    obj.InventoryLook();
                 }
             }
             else
             {
-                obj.TryInventoryUse();
+                obj.InventoryLook();
             }
         }
     }
@@ -3334,7 +3334,7 @@ public class Inventory : MonoBehaviour
                 UUObject x = GetCurrentItemInternal();
                 if (x != null)
                 {
-                    x.TryInventoryUse();
+                    x.InventoryLook();
                 }
             }
         }

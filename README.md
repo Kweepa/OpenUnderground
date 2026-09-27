@@ -23,4 +23,5 @@ I removed a number of store-bought assets before pushing this to github, so it m
   - four ratings added to the inventory panel: attack and damage by the weapon hand, defence and armour by the shield hand, named at the foot of the panel when you point at the hand. The armour rating counts each piece once for every body part it covers, so a shield counts twice and a helmet once
   - clearer attack feedback: the charge cursor stays dark until a release would actually land a swing, then lights up and fills
   - sprinting, bound to the Acrobat skill. Be warned: dashing through the level can make you miss secret details
+  - every few seconds the Search skill looks for you, and points out possible secrets in front of you or at your side
 

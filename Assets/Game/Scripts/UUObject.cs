@@ -933,6 +933,47 @@ public class UUObject : LevelObject
         }
     }
 
+    /// <summary>
+    /// A look at this object sets off the look trigger its list starts with.
+    /// </summary>
+    /// <remarks>
+    /// In the original a look sends event 5 down the list of the object looked at, from the view
+    /// (UW.EXE 0x26e10) and from the inventory (0x2718b) alike, and a look trigger is the one
+    /// thing that answers event 5. Only a trigger is handed the look, because a door, say, opens
+    /// or closes on any action at all. Nor when the link is not a list: the original returns at
+    /// once for an object with its quantity bit set (0x385df), which is isLinked false here, and
+    /// UUObject.stackable is the remake's own test for a link that is a count.
+    ///
+    /// Only on the level the object came from. Here a carried object keeps its link, an index in
+    /// that level's data, and the trigger stays behind on that level, so elsewhere the index is
+    /// another object. The original fires it on any level: a carried object takes its list along
+    /// from level to level (0x78476, 0x7863b), but the trigger's own link to its trap is copied as
+    /// a bare number, so on another level the chain starts from whatever object has that number
+    /// there, run as a trap chosen by the low bits of its type (0x83dad). On its own level the
+    /// two agree. An object whose level is not known is taken to be at home, as
+    /// Wand.GetLinkedSpell() does.
+    /// </remarks>
+    public void SendLookToTrigger()
+    {
+        int loadedLevel = LevelLoader.sLevelLoader.loadedLevel;
+        int homeLevel = originalLevel > 0 ? originalLevel : loadedLevel;
+        if (isLinked && link != 0 && !stackable && homeLevel == loadedLevel && LevelLoader.GetObj(link) is Trigger)
+        {
+            TryChainInteraction(EAction.Look);
+        }
+    }
+
+    /// <summary>
+    /// A look at this object in the inventory or on the paperdoll: the look trigger first, as the
+    /// original's inventory look sends event 5 before the description (UW.EXE 0x2718b), and then
+    /// the primary action.
+    /// </summary>
+    public void InventoryLook()
+    {
+        SendLookToTrigger();
+        TryInventoryUse();
+    }
+
     /// <summary>Inventory / paperdoll primary action — same as gamepad A on an item (inspect by default).</summary>
     public virtual void TryInventoryUse()
     {
