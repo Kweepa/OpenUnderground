@@ -1171,6 +1171,8 @@ public class SaveGameManager : MonoBehaviour
         data.talismansDestroyed = playerData.talismansDestroyed;
         data.garamonAtRest = playerData.garamonAtRest;
         data.enteredGreenMoongate = playerData.enteredGreenMoongate;
+        data.releasedArial = playerData.releasedArial;
+        data.raidedTreasury = playerData.raidedTreasury;
         
         // Game time
         data.gameTime = playerData.gameTime;
@@ -1269,6 +1271,7 @@ public class SaveGameManager : MonoBehaviour
         
         // Restore position and rotation
         player.TeleportTo(data.position, data.rotation);
+        player.ResetMotionAfterLoad();
         
         // Restore player movement state
         // Note: For old save files without this field, JsonUtility will default to false,
@@ -1341,6 +1344,15 @@ public class SaveGameManager : MonoBehaviour
         playerData.talismansCollected = data.talismansCollected;
         playerData.garamonAtRest = data.garamonAtRest;
         playerData.enteredGreenMoongate = data.enteredGreenMoongate;
+        // Saved since the fix for flags that outlived a load: before it, a flag set in one game
+        // stayed set after loading an older one, and level 7 then never brought her out. A save
+        // without the field reads false, which is right for any save in which level 7 is not yet
+        // in the save, the only case where the flag is read (Decal.CreateArial).
+        playerData.releasedArial = data.releasedArial;
+        // The first of the treasury achievement's two steps, a treasure taken inside the room
+        // (UUObject.cs); the second is being outside it (Achievements.CheckTreasury). Unsaved, the
+        // first was lost by a save and a reload in between. A save without the field reads false.
+        playerData.raidedTreasury = data.raidedTreasury;
         
         // Restore game time
         playerData.gameTime = data.gameTime;

@@ -1642,6 +1642,30 @@ public class PlayerObject : MonoBehaviour
     
     
 
+    /// <summary>
+    /// Forgets the motion and the hazard clocks of the game that was running, for a game just
+    /// loaded.
+    /// </summary>
+    /// <remarks>
+    /// None of these is in a save, and before this they carried over from the game left behind:
+    /// falling to your death and loading a save put you on the saved spot still falling at the
+    /// same speed, and the landing killed you there too. A game loaded starts from rest, as a
+    /// fresh one does: no fall, no drift, no jump or flight under way, the time spent under water
+    /// and on lava counted from zero, and no noise for the creatures to hear.
+    /// </remarks>
+    public void ResetMotionAfterLoad()
+    {
+        yVelocity = 0.0f;
+        previousYVelocity = 0.0f;
+        cachedMoveDirection = Vector3.zero;
+        flightVelocity = Vector3.zero;
+        leapMoveSpeed = 0.0f;
+        timeInWater = 0.0f;
+        timeToNextWaterDamage = 0.0f;
+        timeToNextLavaDamage = 3.0f;
+        noise = 0.0f;
+    }
+
     public void TeleportTo(Vector3 pos, Quaternion rot)
     {
         PlayerObject.Player.gameObject.transform.SetPositionAndRotation(pos, rot);

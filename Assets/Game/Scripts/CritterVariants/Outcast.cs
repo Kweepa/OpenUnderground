@@ -191,6 +191,10 @@ namespace Game.Scripts.CritterVariants
                 // Generate deterministic seed from level and objectIndex for consistent appearance
                 int level = originalLevel != 0 ? originalLevel : levelIndex;
                 int deterministicSeed = (level * 1024) + objectIndex;
+                // Put the game's own random sequence back afterwards: every roll in the game draws
+                // from this generator, and left seeded, each load would leave it at the seed of the
+                // last creature set up, so the rolls after a reload would repeat.
+                Random.State gameRandom = Random.state;
                 Random.InitState(deterministicSeed);
                 
                 OutcastCustomization cust;
@@ -209,6 +213,7 @@ namespace Game.Scripts.CritterVariants
                 cust.shirt = Utils.RandomEnum<EShirt>();
                 
                 Customize(cust);
+                Random.state = gameRandom;
             }
         }
 
