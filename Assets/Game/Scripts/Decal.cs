@@ -172,9 +172,20 @@ public class Decal : UUObject
             // also run Look action as that's what some triggers accept
             // for example for the draining the pond puzzle on level 3 (to open the door and access the lever)
             // and the wall in Dantes' cell on level 7
+            // A use - the long press, or Y on the pad - sets the look trigger off with no Search roll
+            // and no wait, as it always did here: it is for a player who already knows where the
+            // door is. A look is what rolls.
             if (action == EAction.Use)
             {
-                TryChainInteraction(EAction.Look);
+                Trigger.skipSearchRoll = true;
+                try
+                {
+                    TryChainInteraction(EAction.Look);
+                }
+                finally
+                {
+                    Trigger.skipSearchRoll = false;
+                }
             }
             TryChainInteraction(action);
         }

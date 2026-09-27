@@ -1119,6 +1119,16 @@ public class PlayerObject : MonoBehaviour
             return;
         }
 
+        // Both this and the roll behind it run on deltaTime, so they stop by themselves during
+        // conversations, cutscenes, the map and the save screen - all of which set timeScale to
+        // zero - rather than banking up rolls to fire the moment play resumes.
+        timeToNextSecretDoorCheck -= Time.deltaTime;
+        if (timeToNextSecretDoorCheck <= 0.0f)
+        {
+            timeToNextSecretDoorCheck = SecretDoorSearch.checkInterval;
+            SecretDoorSearch.Poll();
+        }
+
         if (fadeIn)
         {
             fade = Mathf.Max(0.0f, fade - Time.unscaledDeltaTime);
@@ -1315,6 +1325,12 @@ public class PlayerObject : MonoBehaviour
     private float timeToNextWaterDamage;
 
     private float timeToNextLightSourceDecay = 20.0f;
+
+    /// <summary>
+    /// Countdown to the next round of Search rolls for hidden doors. Starts at zero so the first
+    /// round happens as soon as a level has settled, which is when you most want to be told.
+    /// </summary>
+    private float timeToNextSecretDoorCheck;
 
     private static bool PlayerPanelsWantWasdOnlyMovement()
     {

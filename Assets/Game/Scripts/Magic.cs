@@ -2293,6 +2293,23 @@ public class Magic : MonoBehaviour
 
     private void CastReveal()
     {
+        // A look trigger rolls Search against its difficulty, and the original's Reveal is not
+        // meant to fail that roll: it sets Search to 45 for each look trigger it fires (UW.EXE
+        // 0x34963), which passes every difficulty a player can meet. Trigger.searchSkillOverride
+        // is that 45, for the length of the spell.
+        Trigger.searchSkillOverride = 45;
+        try
+        {
+            RevealAround();
+        }
+        finally
+        {
+            Trigger.searchSkillOverride = -1;
+        }
+    }
+
+    private void RevealAround()
+    {
         int tileX = Tile.GetTileX(PlayerObject.Player.transform.position.x);
         int tileY = Tile.GetTileY(PlayerObject.Player.transform.position.z);
         int radius = 2;

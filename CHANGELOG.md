@@ -2,6 +2,10 @@
 
 ## Current release
 
+- Hidden doors need your Search skill again, as in the original: looking at the wall that hides one rolls Search against the difficulty the original gave that wall, and after a miss you can look again a second later. If you already know where the door is, holding the button on the wall still opens it at once. Every few seconds Search also points out possible secrets in front of you or at your side, without opening them: half as often as a look would find them at Search 0, and nearly as often from Search 10 up.
+
+- Looking at something - a short click, X on the pad, or a look at an item in the inventory - now sets off what looking set off in the original, such as the vision in a crystal ball, where before only using it did.
+
 - Loading a game from the menu no longer ends with a stray look at whatever was under the pointer: the click on Load stays with the menu.
 
 - Arriving on a new level no longer stutters while the game saves by itself.
