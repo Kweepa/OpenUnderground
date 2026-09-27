@@ -12,6 +12,12 @@ public class Interaction : MonoBehaviour
     private float mouseLeftHoldTime;
     private bool mouseLeftUseFired;
 
+    /// <summary>
+    /// Whether the world saw the left button go down. A press taken by a menu - Load acts on the press and closes -
+    /// must not come back as a look when the button is let go, or as a use if it is held.
+    /// </summary>
+    private bool leftPressOwnedByWorld;
+
     /// <summary>Left mouse went down on a portable object in range (world pickup drag-to-inventory intent).</summary>
     private bool leftMouseDownOnPortableNear;
     private Vector2 leftMouseDownScreenPos;
@@ -174,6 +180,12 @@ public class Interaction : MonoBehaviour
 
     private void LateUpdate()
     {
+        // Before any of the returns below: a press that none of the code after them sees does not belong to the world.
+        if (GameInput.CurrentMouse != null && GameInput.CurrentMouse.leftButton.wasPressedThisFrame)
+        {
+            leftPressOwnedByWorld = false;
+        }
+
         if (PlayerObject.Player == null)
         {
             return;
@@ -268,6 +280,7 @@ public class Interaction : MonoBehaviour
         {
             if (mouse.leftButton.wasPressedThisFrame)
             {
+                leftPressOwnedByWorld = true;
                 mouseLeftHoldTime = 0f;
                 mouseLeftUseFired = false;
                 leftMouseDownOnPortableNear = centeredObject != null
@@ -284,7 +297,7 @@ public class Interaction : MonoBehaviour
                 leftMouseDownScreenPos = mouse.position.ReadValue();
                 leftDragDetectedForPickup = false;
             }
-            if (mouse.leftButton.isPressed)
+            if (mouse.leftButton.isPressed && leftPressOwnedByWorld)
             {
                 if (leftMouseDownOnPortableNear
                     && (mouse.position.ReadValue() - leftMouseDownScreenPos).sqrMagnitude > kLeftDragPickupThresholdSq)
@@ -307,11 +320,12 @@ public class Interaction : MonoBehaviour
             }
             if (mouse.leftButton.wasReleasedThisFrame)
             {
-                if (!mouseLeftUseFired && mouseLeftHoldTime < 0.3f
+                if (leftPressOwnedByWorld && !mouseLeftUseFired && mouseLeftHoldTime < 0.3f
                     && (Inventory.sInv == null || !Inventory.sInv.ConsumeSuppressMouseLookOnNextLeftRelease()))
                 {
                     mouseLookFromLeftRelease = true;
                 }
+                leftPressOwnedByWorld = false;
                 mouseLeftHoldTime = 0f;
                 mouseLeftUseFired = false;
                 // Don't clear pickup drag intent while How many? (Pickup) is open — snapshot is taken in AskHowMany.

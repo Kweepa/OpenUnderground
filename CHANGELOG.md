@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Loading a game from the menu no longer ends with a stray look at whatever was under the pointer: the click on Load stays with the menu.
+
 - Arriving on a new level no longer stutters while the game saves by itself.
 
 - The combat music no longer comes back after the victory fanfare when nothing is left to fight. A creature that had just appeared nearby, out of sight behind a wall, used to be enough to start it again.
