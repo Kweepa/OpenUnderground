@@ -138,6 +138,9 @@ public class Credits : MonoBehaviour
         {
             "Unity Port",
             "Steve McCrea",
+            "",
+            "Additional Programming",
+            "Massimo <unbroken75>"
         },
         new []
         {
