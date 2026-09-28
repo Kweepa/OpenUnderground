@@ -34,13 +34,13 @@ public static class PlayerInput
     /// and the tracks run back to back the way they used to.
     /// </summary>
     /// <remarks>
-    /// A key that has never been written reads as its default, so a player carrying preferences
-    /// over from an older build gets the quiet without having to go and find the control.
+    /// It ships at zero, so the music plays the way it always has until the player asks for the
+    /// quiet.
     /// The name says Max because the option is a length rather than a switch, and because the
     /// switch it replaced held 0 or 1 under a shorter name: read as seconds, a stale 1 would mean
     /// one second of quiet, which looks like the feature is broken rather than turned off.
     /// </remarks>
-    public static float AmbientSilenceMax => PlayerPrefs.GetInt("Options_AmbientSilenceMax", 300);
+    public static float AmbientSilenceMax => PlayerPrefs.GetInt("Options_AmbientSilenceMax", 0);
 
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     public static Vector2 ReadMoveVector()

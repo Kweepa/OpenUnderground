@@ -82,7 +82,7 @@
 
 - The flute plays an octave higher, in the register a flute actually sings in, and the whole scale is now one instrument. Four of the ten notes were overblown takes, thin and reedy, so a tune sounded like several players taking turns.
 
-- The exploring music no longer runs wall to wall. A stretch of quiet is left between one track and the next, and after a fight, so the next track lands instead of just carrying on. Options sets how long that quiet can get, and setting it to zero puts the music back the way it was.
+- Options can now leave a stretch of quiet between one exploring track and the next, and after a fight, so the next track lands instead of just carrying on. It ships off, so the music plays the way it always has until you ask for it.
 
 - The title music is no longer cut off the moment you start playing. It plays out first, whether you made a new character or carried an old one on, and the exploring music takes over when it ends. That is what the original does with it.
 
