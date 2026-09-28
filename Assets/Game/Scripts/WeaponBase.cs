@@ -291,6 +291,13 @@ public class WeaponBase : UUObject
                 if (hold && (resetTime < 3.0f || pressingTrigger) && !PlayerObject.Player.isInWater)
                 {
                     ChangeState(EState.Hold);
+                    // The press that lifts a lowered weapon is this frame. Hold does not run
+                    // until the next one, when the button is no longer newly down, so a
+                    // launcher with nothing to launch would refuse without saying so.
+                    if (pressingTrigger)
+                    {
+                        TryStartAttack(attackPressed);
+                    }
                 }
             }
             break;
@@ -302,10 +309,7 @@ public class WeaponBase : UUObject
             }
             else if (pressingTrigger)
             {
-                if (CanStartAttack(attackPressed))
-                {
-                    ChangeState(EState.Prepare);
-                }
+                TryStartAttack(attackPressed);
             }
             else
             {
@@ -589,6 +593,14 @@ public class WeaponBase : UUObject
 
         int steps = (int)((prepareTime - WindUpSeconds) / ChargeStepSeconds);
         return Mathf.Clamp(steps * GetWeaponSpeed(), 0, 100);
+    }
+
+    private void TryStartAttack(bool announce)
+    {
+        if (CanStartAttack(announce))
+        {
+            ChangeState(EState.Prepare);
+        }
     }
 
     /// <summary>
