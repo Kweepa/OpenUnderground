@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A launcher with nothing to launch now says so when the weapon was down. Pulling the trigger with a stowed sling, bow or crossbow and no ammunition used to lift the weapon and then refuse in silence.
+
 - Traps on objects can be found and disarmed again, as in the original: a look, or reaching to take the object, can find one with your Search skill and asks whether to try to disarm it, and your Traps skill decides - with little skill, a clumsy attempt sets the trap off more often than it succeeds. The Remove Trap spell now works, on every trap within three tiles of you, and every few seconds Search also points out a trapped object in front of you.
 
 - Traps that should poison you now poison you, as in the original, instead of taking hit points at once; and a trapped object that had been turned into something else is trapped again - and says it is useless once its trap is gone.
