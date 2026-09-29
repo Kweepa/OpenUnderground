@@ -2,6 +2,10 @@
 
 ## Current release
 
+- Taking an object the original had trapped sets its trap off again: some treasures hurt every time you pick them up from the floor, and a few objects call up a creature - once between all the objects that share it, not once each.
+
+- A pouch that was always found empty now holds what the original put in it, and a game saved before this gets its contents back the first time you load it.
+
 - Traps on objects can be found and disarmed again, as in the original: a look, or reaching to take the object, can find one with your Search skill and asks whether to try to disarm it, and your Traps skill decides - with little skill, a clumsy attempt sets the trap off more often than it succeeds. The Remove Trap spell now works, on every trap within three tiles of you, and every few seconds Search also points out a trapped object in front of you.
 
 - Traps that should poison you now poison you, as in the original, instead of taking hit points at once; and a trapped object that had been turned into something else is trapped again - and says it is useless once its trap is gone.
