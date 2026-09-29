@@ -21,6 +21,7 @@ public class CritterSaveData : UUObjectSaveData
     public int hunger;
     public int whoami;
     public bool elite;
+    public bool lootAlreadyMade;
     public int movementType;
     public int state;
     public float stateTime;
@@ -471,6 +472,13 @@ public class Critter : UUObject
     // neither. It also multiplies the creature's own armour by 5/3, in GetArmourByBodyPart().
     public bool elite;
 
+    // Bit 4 of critterData[6], bit 12 of the original's word at 0x0d: the loot of this creature is
+    // already made, so none is made for it (UW.EXE 0x83a16). The designers set it on 33 of the 595
+    // creatures, most of them named characters whose belongings were placed by hand. It is public so
+    // that Instantiate() carries it into a create-object trap's copy, which copies the whole record
+    // in the original too (0x8418f).
+    public bool lootAlreadyMade;
+
     public float walkSpeed = 1.0f;
     public float confusedSpeed = 2.0f;
     public float runSpeed = 3.0f;
@@ -528,12 +536,22 @@ public class Critter : UUObject
     }
 
     /// <summary>
-    /// Reads the marker back from the level rather than trusting the save. It is static data, and
-    /// a save written before <see cref="elite"/> existed answers false for every creature already
-    /// on a level the player had visited - which would leave the marker dead for anyone carrying
-    /// on an old game. Creatures with no level of origin, summoned ones, keep what they were given.
+    /// Bit 4 of critterData[6]: the loot is already made. UW.EXE 0x83a16 tests it, sets it once the
+    /// loot is made, and the creature initializer 0x7010e clears it on a creature made from nothing.
     /// </summary>
-    private void RefreshEliteFromLevel()
+    private static bool IsLootMadeInData(byte[] critterData)
+    {
+        return critterData != null && (critterData[6] & (1 << 4)) != 0;
+    }
+
+    /// <summary>
+    /// Reads the two markers, <see cref="elite"/> and <see cref="lootAlreadyMade"/>, back from the
+    /// level rather than trusting the save. They are static data, and a save written before a
+    /// marker existed answers false for every creature already on a level the player had visited -
+    /// which would leave it dead for anyone carrying on an old game. Creatures with no level of
+    /// origin, summoned ones, keep what they were given.
+    /// </summary>
+    private void RefreshMarkersFromLevel()
     {
         if (originalLevel <= 0 || objectIndex <= 0 || objectIndex >= 256 || LevelLoader.sLevelLoader == null)
         {
@@ -544,6 +562,7 @@ public class Critter : UUObject
         if (fromLevel != null)
         {
             elite = IsEliteInData(fromLevel);
+            lootAlreadyMade = IsLootMadeInData(fromLevel);
         }
     }
 
@@ -569,6 +588,7 @@ public class Critter : UUObject
             hunger = critterData[17] & 127;
             whoami = (EWhoAmI)critterData[18];
             elite = IsEliteInData(critterData);
+            lootAlreadyMade = IsLootMadeInData(critterData);
 
             movementType = (EMovementType)(stats.Category & 0xf);
         }
@@ -3835,19 +3855,23 @@ public class Critter : UUObject
 
     public List<UUObject> loot = new List<UUObject>();
 
+    // The original makes the loot in UW.EXE 0x83a16, at the start of a conversation or at death,
+    // whichever comes first; the remake makes it once, when the creature first runs, which no
+    // player can tell apart. Nothing is made if the level data says it already was.
     private void SpawnLoot()
     {
+        List<UUObject> placed = new List<UUObject>();
         if (link != 0)
         {
             int next = link;
-            while (next != 0 && loot.Count < 7)
+            while (next != 0 && placed.Count < 7)
             {
                 // follow loot from here
                 UUObject obj = LevelLoader.GetObj(next);
                 if (obj != null)
                 {
                     obj.PostLoadInitialize(restoredFromSave: false);
-                    loot.Add(obj);
+                    placed.Add(obj);
                     next = obj.chainIndex;
                 }
                 else
@@ -3857,25 +3881,22 @@ public class Critter : UUObject
             }
             link = 0; // prevent loot being inventory and getting double spawned when the critter dies
         }
-        else
+
+        // A placed inventory does not stand in for the loot: the original adds the loot to it.
+        List<UUObject> made = new List<UUObject>();
+        if (!lootAlreadyMade)
         {
-            foreach (var lootType in stats.Loot)
-            {
-                if (lootType == 0 && type is not EObjectType.MountainmanA and not EObjectType.MountainmanB)
-                {
-                    Debug.Log("Loot type 0", this);
-                }
-                UUObject lootObj = LevelLoader.CreateObjectOfType(lootType);
-                lootObj.quality = Random.Range(1, 41);
-                lootObj.levelIndex = levelIndex;
-                lootObj.originalLevel = levelIndex;
-                lootObj.PostLoadInitialize();
-                loot.Add(lootObj);
-            }
+            // the original's order: treasure, food, the equipment bytes, the chance words
+            SpawnTreasure(made);
+            SpawnFood(made);
+            SpawnSlotLoot(made);
         }
 
-        SpawnTreasure();
-        SpawnFood();
+        // Each item goes to the head of the creature's inventory (0x29ea1), so the last one made
+        // comes first and the placed inventory last.
+        made.Reverse();
+        loot.AddRange(made);
+        loot.AddRange(placed);
 
         // Ensure containers in loot have their contents filled
         FillLootContainerContents();
@@ -3892,62 +3913,136 @@ public class Critter : UUObject
         }
     }
 
-    private void SpawnFood()
+    private int LootLevel => Mathf.Max(1, LevelLoader.sLevelLoader.loadedLevel);
+
+    // The quality of an item from a loot slot (UW.EXE 0x83821, 0x83942): half the time from a band
+    // that rises with the depth, 4L .. 8L-1, the other half anywhere in 0..63, and six bits kept - so
+    // on level 9 the band wraps. A 0 is possible, and is an item already ruined.
+    private int RollSlotQuality(int level)
     {
-        if (Random.Range(0, 15) < foodProb)
+        int quality = Random.Range(0, 2) == 0 ? 4 * level + Random.Range(0, 4 * level) : Random.Range(0, 64);
+        return quality & 0x3f;
+    }
+
+    // Not the original's: it leaves every piece of food at the 40 it is made with (0x31a9e). Kept by
+    // choice, for food from any slot, so that not every enemy carries food of the best quality.
+    private int RollFoodQuality()
+    {
+        return Random.Range(20, 41);
+    }
+
+    private bool IsFood(EObjectType lootType)
+    {
+        return UUObject.GetClass(lootType) == UUObject.EClass.Comestibles;
+    }
+
+    private void SpawnSlotLoot(List<UUObject> made)
+    {
+        foreach (ObjectsData.LootSlot slot in stats.Loot)
         {
-            UUObject food = LevelLoader.CreateObjectOfType(foodItem);
-            food.quality = Random.Range(20, 41);
-            food.PostLoadInitialize();
-            loot.Add(food);
+            // UW.EXE 0x83942: a word slot drops if rand() % 16 is under its chance
+            if (!slot.equipment && Random.Range(0, 16) >= slot.chance)
+            {
+                continue;
+            }
+
+            if (slot.type == 0 && type is not EObjectType.MountainmanA and not EObjectType.MountainmanB)
+            {
+                Debug.Log("Loot type 0", this);
+            }
+            UUObject lootObj = LevelLoader.CreateObjectOfType(slot.type);
+            lootObj.quality = IsFood(slot.type) ? RollFoodQuality() : RollSlotQuality(LootLevel);
+
+            // UW.EXE 0x83821: ammunition in an equipment slot - a missile whose third byte is 0xC0,
+            // types 16-19 - comes as 4-11. From a chance word it is a single piece in the original too.
+            int slotType = (int)slot.type;
+            if (slot.equipment && (slotType & 0x30) == 0x10 && slotType < 64
+                && DataLoader.sDataLoader.objectsData.missileStats[slotType & 15].marker == 0xc0)
+            {
+                lootObj.quantity = 4 + Random.Range(0, 8);
+            }
+
+            lootObj.levelIndex = levelIndex;
+            lootObj.originalLevel = levelIndex;
+            lootObj.PostLoadInitialize();
+            made.Add(lootObj);
         }
     }
 
-    private void SpawnTreasure()
+    private void SpawnFood(List<UUObject> made)
     {
-        if (Random.Range(0, 16) < treasureProb)
+        // UW.EXE 0x837bb: rand() % 16 against the low nibble
+        if (Random.Range(0, 16) < foodProb)
         {
-            // heavily weight coins, but make other treasure more likely on later levels
-            int levelBias = 3 * LevelLoader.sLevelLoader.loadedLevel;
-            int treasureType = 160 + Mathf.Max(0, Random.Range(0, 37 - levelBias) - (30 - levelBias));
-            int value = DataLoader.sDataLoader.comObjProps[treasureType].monetaryValue;
-            // spawn less of the valuable stuff
-            if (value >= 12)
-            {
-                value = 188 + 8 * value;
-            }
-            else if (value >= 8)
-            {
-                value = 236 + 4 * value;
-            }
-            else if (value >= 4)
-            {
-                value = 252 + 2 * value;
-            }
-            int quant = 0;
-            if (treasureStackProb < value)
-            {
-                if (4 * treasureStackProb < Random.Range(0, value))
-                {
-                    quant = 1;
-                }
-            }
-            else
-            {
-                // nD4
-                int numRolls = 2 * (4 * treasureStackProb / value);
-                quant = Utils.DiceRoll(4, numRolls) / 4;
-            }
-
-            if (quant > 0)
-            {
-                //Create obj
-                UUObject lootObj = LevelLoader.CreateObjectOfType((EObjectType)treasureType);
-                lootObj.quantity = quant;
-                lootObj.PostLoadInitialize();
-                loot.Add(lootObj);
-            }
+            UUObject food = LevelLoader.CreateObjectOfType(foodItem);
+            food.quality = RollFoodQuality();
+            food.PostLoadInitialize();
+            made.Add(food);
         }
+    }
+
+    private void SpawnTreasure(List<UUObject> made)
+    {
+        // UW.EXE 0x8365a
+        if (Random.Range(0, 16) >= treasureProb)
+        {
+            return;
+        }
+
+        int treasureType = RollTreasureType(LootLevel);
+        int quant = RollTreasureQuantity(DataLoader.sDataLoader.comObjProps[treasureType].monetaryValue, treasureStackProb);
+        if (quant < 1)
+        {
+            return;
+        }
+
+        UUObject lootObj = LevelLoader.CreateObjectOfType((EObjectType)treasureType);
+        lootObj.quantity = quant;
+        lootObj.PostLoadInitialize();
+        made.Add(lootObj);
+    }
+
+    // Mostly coins, with the other six more likely deeper down; the level counts from 1, as
+    // DS:0x7278 does. The largest index is 6 on every level. UW.EXE 0x83690.
+    private int RollTreasureType(int level)
+    {
+        return 160 + Mathf.Max(0, Random.Range(0, 40 - 3 * level) - (33 - 3 * level));
+    }
+
+    // How many of a treasure, or 0 for none (UW.EXE 0x836c4-0x8376c). The value is scaled so that
+    // the valuable things come in smaller piles, in 8 bits and SIGNED (cbtw at 0x8371a): a ruby's 25
+    // becomes -124 and a sapphire's 40 -4, which sends them to the dice with no faces - that is,
+    // singly.
+    private int RollTreasureQuantity(int monetaryValue, int stackProb)
+    {
+        int value = unchecked((sbyte)monetaryValue);
+        if (value == 0)
+        {
+            value = 1;
+        }
+        int scaled = value;
+        if (value >= 12)
+        {
+            scaled = unchecked((sbyte)(8 * value + 0xbc));
+        }
+        else if (value >= 8)
+        {
+            scaled = unchecked((sbyte)(4 * value + 0xec));
+        }
+        else if (value >= 4)
+        {
+            scaled = unchecked((sbyte)(2 * value + 0xfc));
+        }
+
+        int stack = 4 * stackProb;
+        if (stack >= scaled)
+        {
+            // 0x38eee(4, faces): four dice of that many faces, a quarter of the total; with no faces
+            // it returns its count, 4, so one piece
+            int faces = unchecked((sbyte)(2 * (stack / scaled)));
+            return (faces > 0 ? Utils.DiceRoll(faces, 4) : 4) / 4;
+        }
+        return Random.Range(0, scaled) < stack ? 1 : 0;
     }
 
     private void SpawnCorpseContents()
@@ -4358,6 +4453,7 @@ public class Critter : UUObject
             critterData.hunger = hunger;
             critterData.whoami = (int)whoami;
             critterData.elite = elite;
+            critterData.lootAlreadyMade = lootAlreadyMade;
             critterData.movementType = (int)movementType;
             critterData.state = (int)state;
             critterData.stateTime = stateTime;
@@ -4444,7 +4540,8 @@ public class Critter : UUObject
             hunger = critterData.hunger;
             whoami = (EWhoAmI)critterData.whoami;
             elite = critterData.elite;
-            RefreshEliteFromLevel();
+            lootAlreadyMade = critterData.lootAlreadyMade;
+            RefreshMarkersFromLevel();
             movementType = (EMovementType)critterData.movementType;
             state = (EState)critterData.state;
             stateTime = critterData.stateTime;

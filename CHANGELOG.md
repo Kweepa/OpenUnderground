@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Creature loot follows the original's rules: things a creature only sometimes carries, like a fighter's lantern, now drop at their own odds instead of always; gear is battered on the upper levels and better deeper down; goblins leave a handful of sling stones; coins come in smaller piles and red and small blue gems are rare, while rubies, sapphires and large blue gems come singly; and characters whose belongings were placed by hand carry only those.
+
 ## Release UUBuild29Sep2026.zip
 
 - Taking an object the original had trapped sets its trap off again: some treasures hurt every time you pick them up from the floor, and a few objects call up a creature - once between all the objects that share it, not once each.
