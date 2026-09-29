@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
 public class RangedWeapon : WeaponBase
 {
@@ -49,6 +51,20 @@ public class RangedWeapon : WeaponBase
     private static Transform sWhirlHead;
     private static Transform sWhirlTip;
     private static RangedWeapon sWhirlUser;
+    // The clip is played through the goblin's own Animator, with the time set by hand. A built game
+    // cannot pose a Generic clip with AnimationClip.SampleAnimation() once the Animator is gone - the
+    // Editor can, from its own copy of the curves, which is why the whirl showed only there.
+    private static PlayableGraph sWhirlGraph;
+    private static AnimationClipPlayable sWhirlPlayable;
+    private static bool sWhirlQuitHooked;
+
+    private static void DestroyWhirlGraph()
+    {
+        if (sWhirlGraph.IsValid())
+        {
+            sWhirlGraph.Destroy();
+        }
+    }
 
     protected override Transform GetLoweredHideExemptChild()
     {
@@ -238,7 +254,8 @@ public class RangedWeapon : WeaponBase
     private void PoseWhirl(float clipTime)
     {
         Transform rig = sWhirlRig.transform;
-        slingWhirlClip.SampleAnimation(sWhirlRig, clipTime);
+        sWhirlPlayable.SetTime(clipTime);
+        sWhirlGraph.Evaluate();
 
         Transform cam = PlayerObject.Player.mainCamera.transform;
         float side = PlayerData.sData.leftHanded ? 1.0f : -1.0f;
@@ -274,7 +291,8 @@ public class RangedWeapon : WeaponBase
     /// Builds the whirl once: a copy of the goblin under the camera, cut down to the sling and the
     /// bones that move it. The other meshes are destroyed rather than hidden - a goblin carries a
     /// dozen of them, heads, eyes, armour and a club - and so is anything that could act by
-    /// itself: animators, colliders, scripts.
+    /// itself: colliders, scripts, and the controller of its Animator, which stays only to be posed
+    /// by hand.
     /// </summary>
     private bool EnsureWhirlRig()
     {
@@ -293,10 +311,37 @@ public class RangedWeapon : WeaponBase
         rig.SetActive(false);
         int layer = slingRoot != null ? slingRoot.gameObject.layer : gameObject.layer;
 
+        // The goblin's own Animator stays, on the root where the clip's paths start, but without its
+        // controller: it only carries the whirl, posed by hand. Any other one goes.
+        if (!rig.TryGetComponent(out Animator whirlAnimator))
+        {
+            whirlAnimator = rig.AddComponent<Animator>();
+        }
         foreach (Animator animator in rig.GetComponentsInChildren<Animator>(true))
         {
-            Destroy(animator);
+            if (animator != whirlAnimator)
+            {
+                Destroy(animator);
+            }
         }
+        whirlAnimator.runtimeAnimatorController = null;
+        whirlAnimator.applyRootMotion = false;
+        whirlAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+
+        // One graph for the one rig. A rig lost with the scene leaves its graph behind, so that
+        // goes first, and the last one goes when the game quits.
+        DestroyWhirlGraph();
+        if (!sWhirlQuitHooked)
+        {
+            sWhirlQuitHooked = true;
+            Application.quitting += DestroyWhirlGraph;
+        }
+        sWhirlGraph = PlayableGraph.Create("Sling whirl");
+        sWhirlGraph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+        sWhirlPlayable = AnimationClipPlayable.Create(sWhirlGraph, slingWhirlClip);
+        sWhirlPlayable.SetApplyFootIK(false);
+        AnimationPlayableOutput output = AnimationPlayableOutput.Create(sWhirlGraph, "Sling whirl", whirlAnimator);
+        output.SetSourcePlayable(sWhirlPlayable);
         foreach (Collider col in rig.GetComponentsInChildren<Collider>(true))
         {
             Destroy(col);
