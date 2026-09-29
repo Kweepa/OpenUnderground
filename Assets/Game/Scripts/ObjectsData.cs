@@ -156,7 +156,8 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
         public byte TheftDetectionRange;
         public byte unk1f;
 
-        public List<EObjectType> Loot;  // A list of item ids that the Npc drops on death or uses in bartering
+        // The four loot slots at 0x20-0x25, which the original rolls in UW.EXE 0x83821 and 0x83942.
+        public List<LootSlot> Loot;
 
         public byte treasureLoot;
         public byte foodLoot;
@@ -170,6 +171,26 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
         public byte unk2E;
         public byte unk2f;
     };
+
+    /// <summary>
+    /// One of the four loot slots of a creature. The two bytes are its equipment and always drop; the
+    /// two words carry a chance out of 16.
+    /// </summary>
+    public readonly struct LootSlot
+    {
+        public const int Always = 16;
+
+        public readonly EObjectType type;
+        public readonly int chance;      // out of 16
+        public readonly bool equipment;  // an equipment slot: ammunition there comes as a stack
+
+        public LootSlot(EObjectType type, int chance, bool equipment)
+        {
+            this.type = type;
+            this.chance = chance;
+            this.equipment = equipment;
+        }
+    }
 
     public struct NutritionData
     {
@@ -270,23 +291,27 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
             critterStats[i].TheftDetectionRange = (byte)(critterStats[i].unk1e >> 4);
             critterStats[i].unk1f = stream.GetByte();
 
-            critterStats[i].Loot = new List<EObjectType>();
+            critterStats[i].Loot = new List<LootSlot>();
 
+            // Two equipment bytes: bit 0 says the slot is there, bits 1-6 are the type (UW.EXE 0x83821
+            // masks six bits). They always drop.
             for (int j = 0; j < 2; ++j)
             {
-                int byte1 = stream.GetByte();
-                if ((byte1 & 1) == 1)
+                int slot = stream.GetByte();
+                if ((slot & 1) == 1)
                 {
-                    critterStats[i].Loot.Add((EObjectType)(byte1 >> 1));
+                    critterStats[i].Loot.Add(new LootSlot((EObjectType)((slot >> 1) & 0x3f), LootSlot.Always, equipment: true));
                 }
             }
 
+            // Two words: the type in bits 4-15, and in the low nibble the chance out of 16 that the
+            // item drops at all (UW.EXE 0x83942).
             for (int j = 0; j < 2; ++j)
             {
-                int byte1 = stream.GetUShort();
-                if (byte1 != 0)
+                int slot = stream.GetUShort();
+                if (slot != 0)
                 {
-                    critterStats[i].Loot.Add((EObjectType)(byte1 >> 4));
+                    critterStats[i].Loot.Add(new LootSlot((EObjectType)((slot >> 4) & 0x1ff), slot & 0xf, equipment: false));
                 }
             }
 
