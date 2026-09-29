@@ -975,11 +975,23 @@ public class LevelLoader : MonoBehaviour
         int child = obj.link;
         while (child != 0)
         {
-            // Stop the content chain as soon as it reaches a non-portable, non-container object
-            // (lock, trigger, door, decal, etc.). Container contents are only portable loot or
+            EObjectType childType = (EObjectType)sLevelLoader.GetObjectType(child);
+
+            // A trap or a trigger in the list is not content: skip it and go on. In the original a
+            // container's contents are its list, and a pick-up trigger a container carries is
+            // unhooked from that list when the pick-up fires it (UW.EXE 0x848c2), so the container
+            // keeps the rest. Stopping here left one pouch in the game empty.
+            if ((int)childType >= 384 && (int)childType < 448)
+            {
+                UUObject skipped = GetObj(child);
+                child = skipped != null ? skipped.chainIndex : sLevelLoader.GetChainIndexFromObjectData(child);
+                continue;
+            }
+
+            // Stop the content chain as soon as it reaches any other non-portable, non-container
+            // object (lock, door, decal, etc.). Container contents are only portable loot or
             // nested containers; a script object here means the chain has run off the real
             // contents list, so don't pull it (or anything after it) into contents.
-            EObjectType childType = (EObjectType)sLevelLoader.GetObjectType(child);
             if (UUObject.GetClass(childType) != UUObject.EClass.Containers && !IsPortableObjectType(childType))
             {
                 break;
@@ -1016,6 +1028,167 @@ public class LevelLoader : MonoBehaviour
                 // Can't find or create the child object, break the chain
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// After a load, puts back into a container the items an older build left out of it.
+    /// </summary>
+    /// <remarks>
+    /// Before FillContainer() skipped a trap or a trigger in a container's list it stopped there,
+    /// so the items after it never got into the container: one pouch in the game was always empty.
+    /// Those items stayed in the level's objects[] with nothing holding them, and a save keeps them
+    /// that way. Only they are put back: an item after a trap or a trigger in the container's list,
+    /// at its own slot of objects[], inactive, and held by nothing - no container or creature of any
+    /// level, not the pack, not what is worn, not the world. Whatever the player took out of a
+    /// container is in one of those places, or gone, so it is never put back, and a container the
+    /// present FillContainer() filled has nothing left to take.
+    ///
+    /// "Held" is counted by the slot an object came from, its level and its index, and NOT by the
+    /// instance: a load rebuilds a container's contents from the save with fresh instances
+    /// (UUObject.RestoreFromSaveData), while the same objects are restored again into objects[]
+    /// from the level's inactive list, so the two are never the same object. Told apart by
+    /// instance, every load put the four items into the pouch once more, on top of those already
+    /// there.
+    ///
+    /// The saved "used" flag does not tell the two apart, which was the first try: it is set on
+    /// tile objects and on the contents FillContainer() has to create, so an item it found already
+    /// made stays unused, and one the player had taken out would have come back.
+    ///
+    /// A container is looked for wherever it now is - any level's objects[] or world list, inside
+    /// another container, in the pack or worn - and its list is read from the level it came from,
+    /// since that is where its link points. In the save this was written against, the pouch had
+    /// been carried from level 3 and left inside another container on level 2.
+    /// </remarks>
+    public static void RefillContainersCutAtTrigger()
+    {
+        int rememberLoaded = sLevelLoader.loadedLevel;
+
+        // Everything something holds, and every container, gathered in one walk.
+        HashSet<int> held = new HashSet<int>();
+        List<UUObject> containers = new List<UUObject>();
+        List<UUObject> inside = new List<UUObject>();
+
+        // The slot an object came from: its level and its index, which survive a load where the
+        // instance does not. 0 for anything made at run time, which is never put back.
+        static int Slot(UUObject obj)
+        {
+            return obj.originalLevel > 0 && obj.objectIndex > 0 ? obj.originalLevel * 1024 + obj.objectIndex : 0;
+        }
+
+        void Consider(UUObject obj, bool isHeld)
+        {
+            if (obj == null)
+            {
+                return;
+            }
+            if (isHeld)
+            {
+                held.Add(Slot(obj));
+            }
+            if (obj.getClass == UUObject.EClass.Containers)
+            {
+                containers.Add(obj);
+            }
+            inside.Clear();
+            obj.GetAllContents(inside);
+            foreach (UUObject child in inside)
+            {
+                if (child != null)
+                {
+                    held.Add(Slot(child));
+                    if (child.getClass == UUObject.EClass.Containers)
+                    {
+                        containers.Add(child);
+                    }
+                }
+            }
+        }
+
+        if (Inventory.sInv != null)
+        {
+            foreach (UUObject item in Inventory.GetAllItems())
+            {
+                Consider(item, true);
+            }
+            foreach (UUObject worn in Inventory.sInv.invSlotContents)
+            {
+                Consider(worn, true);
+            }
+        }
+        foreach (Level lev in sLevelLoader.levels)
+        {
+            if (lev == null)
+            {
+                continue;
+            }
+            foreach (LevelObject obj in lev.worldObj)
+            {
+                Consider(obj as UUObject, true);
+            }
+            foreach (UUObject obj in lev.objects)
+            {
+                // An object sitting in objects[] is not held by that: only its contents are.
+                Consider(obj, false);
+            }
+        }
+
+        try
+        {
+            foreach (UUObject container in containers)
+            {
+                // Containers on level 9 are never filled at all (FillContainer).
+                int home = container.originalLevel;
+                if (home < 1 || home >= 9 || home >= sLevelLoader.levels.Length
+                    || sLevelLoader.levels[home] == null || container.objectIndex <= 0)
+                {
+                    continue;
+                }
+
+                sLevelLoader.loadedLevel = home;
+                if ((EObjectType)sLevelLoader.GetObjectType(container.objectIndex) != container.type)
+                {
+                    continue;
+                }
+
+                UUObject[] objs = sLevelLoader.levels[home].objects;
+                int child = (sLevelLoader.ReadObjectData(container.objectIndex)[3] >> 6) & 1023;
+                bool pastTrigger = false;
+                HashSet<int> walked = new HashSet<int>();
+                while (child != 0 && walked.Add(child))
+                {
+                    EObjectType childType = (EObjectType)sLevelLoader.GetObjectType(child);
+                    if ((int)childType >= 384 && (int)childType < 448)
+                    {
+                        pastTrigger = true;
+                    }
+                    else if (UUObject.GetClass(childType) != UUObject.EClass.Containers && !IsPortableObjectType(childType))
+                    {
+                        break;
+                    }
+                    else if (pastTrigger)
+                    {
+                        UUObject item = objs[child];
+                        if (IsCorrectNativeSlotObject(item, home, child) && item.type == childType
+                            && !item.gameObject.activeSelf && !held.Contains(home * 1024 + child))
+                        {
+                            container.contents ??= new List<UUObject>();
+                            container.contents.Add(item);
+                            held.Add(home * 1024 + child);
+                            if (item.getClass == UUObject.EClass.Containers)
+                            {
+                                FillContainer(item);
+                            }
+                            Debug.Log($"Save repair: put '{item.name}' back into '{container.name}' (level {home} objects[{child}]).", container);
+                        }
+                    }
+                    child = sLevelLoader.GetChainIndexFromObjectData(child);
+                }
+            }
+        }
+        finally
+        {
+            sLevelLoader.loadedLevel = rememberLoaded;
         }
     }
 

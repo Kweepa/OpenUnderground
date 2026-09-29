@@ -763,25 +763,6 @@ public class UUObject : LevelObject
         }
     }
 
-    protected void FirePickupTriggers(UUObject originator)
-    {
-        // find pickup triggers in the contents
-        if (contents != null)
-        {
-            for (int i = 0; i < contents.Count; ++i)
-            {
-                Trigger trig = contents[i] as Trigger;
-                if (trig != null)
-                {
-                    trig.TryInteract(originator, this, EAction.Pickup);
-                    contents.RemoveAt(i);
-                    trig.gameObject.SetActive(false);
-                    break;
-                }
-            }
-        }
-    }
-
     public virtual void TryInteract(UUObject originator, UUObject sender, EAction action)
     {
         if (sender == null && action == EAction.Use) // change to pickup...
@@ -808,7 +789,7 @@ public class UUObject : LevelObject
                             || Interaction.sInt.TryConsumeWorldPickupIntentForImmediatePickup()))
                     {
                         TryStolen();
-                        FirePickupTriggers(originator);
+                        SendPickupToTrigger();
                         gameObject.SetActive(false);
                         LevelLoader.worldObj.Remove(this);
                         Utils.PlayClip2d(PlayerObject.Player.pickupClip);
@@ -819,7 +800,7 @@ public class UUObject : LevelObject
                     }
 
                     TryStolen();
-                    FirePickupTriggers(originator);
+                    SendPickupToTrigger();
             
                     gameObject.SetActive(false);
                     Inventory.Add(this);
@@ -832,6 +813,9 @@ public class UUObject : LevelObject
                     {
                         TutorialManager.NotifyPickup();
                     }
+
+                    // A pick-up does not hand the object's list a use: that is what a use is for.
+                    return;
                 }
             }
             else if (!isLinked || link == 0 || stackable)
@@ -859,7 +843,7 @@ public class UUObject : LevelObject
             return;
 
         TryStolen();
-        FirePickupTriggers(null);
+        SendPickupToTrigger();
         Utils.PlayClip2d(PlayerObject.Player.pickupClip);
 
         if (worldDragToHandOnly)
@@ -947,9 +931,52 @@ public class UUObject : LevelObject
     /// In the original a look sends event 5 down the list of the object looked at, from the view
     /// (UW.EXE 0x26e10) and from the inventory (0x2718b) alike, and a look trigger is the one
     /// thing that answers event 5. Only a trigger is handed the look, because a door, say, opens
-    /// or closes on any action at all. Nor when the link is not a list: the original returns at
-    /// once for an object with its quantity bit set (0x385df), which is isLinked false here, and
-    /// UUObject.stackable is the remake's own test for a link that is a count.
+    /// or closes on any action at all.
+    /// </remarks>
+    public void SendLookToTrigger()
+    {
+        if (GetFirstTrigger() != null)
+        {
+            TryChainInteraction(EAction.Look);
+        }
+    }
+
+    /// <summary>
+    /// The pick-up trigger that taking this object from the world sets off, or null.
+    /// </summary>
+    public Trigger GetPickupTrigger()
+    {
+        Trigger trigger = GetFirstTrigger();
+        return trigger != null && trigger.type == EObjectType.PickupTrigger ? trigger : null;
+    }
+
+    /// <summary>
+    /// Taking this object from the world sets off the pick-up trigger its list starts with.
+    /// </summary>
+    /// <remarks>
+    /// In the original the Get handler (UW.EXE 0x26b8e) takes an object through 0x26b3e, which
+    /// sends event 2 down the object's list while the object is still on its tile, and only then
+    /// unhooks it from that tile (0x29f99). Event 2 has no other sender - 0x26b60 is the only call
+    /// of the event dispatch that pushes it - so taking an object out of a container in the
+    /// inventory sets nothing off. A pick-up trigger answers it with no roll (0x83b3b: the Search
+    /// roll is on event 5 only), and a trap hung straight on the object does not, since the
+    /// dispatch fires one of those only on a use (0x385d6).
+    /// </remarks>
+    private void SendPickupToTrigger()
+    {
+        if (GetPickupTrigger() != null)
+        {
+            TryChainInteraction(EAction.Pickup);
+        }
+    }
+
+    /// <summary>
+    /// The trigger this object's list starts with, or null.
+    /// </summary>
+    /// <remarks>
+    /// Not when the link is not a list: the original returns at once for an object with its
+    /// quantity bit set (0x385df), which is isLinked false here, and UUObject.stackable is the
+    /// remake's own test for a link that is a count.
     ///
     /// Only on the level the object came from. Here a carried object keeps its link, an index in
     /// that level's data, and the trigger stays behind on that level, so elsewhere the index is
@@ -960,14 +987,15 @@ public class UUObject : LevelObject
     /// two agree. An object whose level is not known is taken to be at home, as
     /// Wand.GetLinkedSpell() does.
     /// </remarks>
-    public void SendLookToTrigger()
+    private Trigger GetFirstTrigger()
     {
         int loadedLevel = LevelLoader.sLevelLoader.loadedLevel;
         int homeLevel = originalLevel > 0 ? originalLevel : loadedLevel;
-        if (isLinked && link != 0 && !stackable && homeLevel == loadedLevel && LevelLoader.GetObj(link) is Trigger)
+        if (isLinked && link != 0 && !stackable && homeLevel == loadedLevel)
         {
-            TryChainInteraction(EAction.Look);
+            return LevelLoader.GetObj(link) as Trigger;
         }
+        return null;
     }
 
     /// <summary>

@@ -768,6 +768,8 @@ public class SaveGameManager : MonoBehaviour
             
             if (LevelLoader.sLevelLoader != null)
                 LevelLoader.sLevelLoader.TryRepairLevelObjects();
+            if (LevelLoader.sLevelLoader != null)
+                LevelLoader.RefillContainersCutAtTrigger();
             
             // Call PostLoadInitialize on all loaded objects
             PostLoadInitializeAllLoadedObjects();

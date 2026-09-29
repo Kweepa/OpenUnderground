@@ -225,10 +225,16 @@ public static class TrapSearch
             // trap and for a failure alike. A miss of a pick-up sets the trap off, as a critical
             // failure of the disarm does, and the object is then taken: the user's rule of 27
             // September 2026, and ours.
+            // A trap behind the object's own pick-up trigger is left to the pick-up that follows,
+            // which sets it off as the original does (UUObject.SendPickupToTrigger), so it goes off
+            // once and not twice.
             if (fromPickup)
             {
                 Messages.Add("You set off the " + NameOf(trap) + "!");
-                SetOff(obj, trigger, trap);
+                if (trigger == null || obj.GetPickupTrigger() != trigger)
+                {
+                    SetOff(obj, trigger, trap);
+                }
             }
             return false;
         }

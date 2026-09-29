@@ -81,6 +81,10 @@ public class Trigger : UUObject
             if ((flags & 2) == 0) // should it retrigger?
             {
                 flags &= ~4; // turn off trigger
+                if (type == EObjectType.PickupTrigger)
+                {
+                    SwitchOffTriggersSharingTrap();
+                }
             }
 
             // sender needs to be "this", since the trigger is what is in the same tile as the door
@@ -127,6 +131,38 @@ public class Trigger : UUObject
 
         nextSearchRollTime = Time.time + searchRollCooldown;
         return Skills.GetResult(Skills.GetSkill(ESkill.Search), z) >= Skills.ESkillTestResult.Success;
+    }
+
+    /// <summary>
+    /// Switches off every other trigger of the level that sets off the same trap as this one.
+    /// </summary>
+    /// <remarks>
+    /// In the original a one-shot trigger that fires hands its trap to 0x84983 (UW.EXE 0x83d3a),
+    /// which walks the lists of every tile and of every object (0x848c2), unhooks each trigger
+    /// that links to that trap, as many as the count the trap keeps in its flags, and then deletes
+    /// the trap. So a trap that several one-shot triggers share fires once: three objects that
+    /// each carry a pick-up trigger to the same create object trap make one creature between them,
+    /// at the first one taken. The remake keeps a spent trigger and switches it off instead, so the
+    /// others are switched off too.
+    ///
+    /// The original does this for every one-shot trigger; here it is done for pick-up triggers
+    /// only, the user's decision of 28 September 2026, since the other shared traps of the game
+    /// work today and changing them is still to be tried in play.
+    /// </remarks>
+    private void SwitchOffTriggersSharingTrap()
+    {
+        if (link == 0)
+        {
+            return;
+        }
+
+        foreach (UUObject obj in LevelLoader.GetLevel().objects)
+        {
+            if (obj is Trigger other && other != this && other.link == link)
+            {
+                other.flags &= ~4;
+            }
+        }
     }
 
     public override void Update()
