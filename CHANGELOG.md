@@ -2,6 +2,8 @@
 
 ## Current release
 
+## Release UUBuild29Sep2026.zip
+
 - Taking an object the original had trapped sets its trap off again: some treasures hurt every time you pick them up from the floor, and a few objects call up a creature - once between all the objects that share it, not once each.
 
 - A pouch that was always found empty now holds what the original put in it, and a game saved before this gets its contents back the first time you load it.
