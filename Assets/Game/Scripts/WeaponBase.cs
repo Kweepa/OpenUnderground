@@ -151,10 +151,19 @@ public class WeaponBase : UUObject
         }
     }
 
-    private UUObject FindObjectToDamage(float maxDistance)
+    /// <summary>
+    /// The thing the player's swing lands on: the best placed of what is in front of him that his
+    /// line of sight meets in height, and in <paramref name="aimedPart"/> the body part it meets and
+    /// in <paramref name="aimedPoint"/> where (<see cref="Utils.AimAtBody"/>). A blow aimed over a
+    /// rat or under a bat meets nothing. On a gamepad the bodies count a little taller.
+    /// </summary>
+    private UUObject FindObjectToDamage(float maxDistance, out EBodyPart aimedPart, out Vector3 aimedPoint)
     {
         UUObject best = null;
         float bestCost = 0.0f;
+        float bestShare = 0.5f;
+        aimedPoint = Vector3.zero;
+        float margin = GameInput.LastActiveDevice == GameInputDevice.Gamepad ? Utils.AimMargin : 0.0f;
 
         // doors are marked Environment so things collide with them. need to gather them anyway
         int mask = (1 << LayerMask.NameToLayer("Characters")) | (1 << LayerMask.NameToLayer("Objects")) | LayerMasks.EnvironmentAndCeiling;
@@ -172,14 +181,31 @@ public class WeaponBase : UUObject
                 alreadyChecked.Add(obj);
 
                 Vector3 objPos;
+                float radius;
+                float bottom;
+                float top;
                 CharacterController cc = obj.GetComponentInChildren<CharacterController>();
                 if (cc != null)
                 {
                     objPos = obj.gameObject.transform.TransformPoint(cc.center);
+                    float halfHeight = 0.5f * Mathf.Max(cc.height, 2.0f * cc.radius);
+                    radius = cc.radius;
+                    bottom = objPos.y - halfHeight;
+                    top = objPos.y + halfHeight;
                 }
                 else
                 {
-                    objPos = obj.cachedRenderer != null ? obj.cachedRenderer.bounds.center : obj.transform.position;
+                    Bounds bounds = obj.cachedRenderer != null ? obj.cachedRenderer.bounds : col.bounds;
+                    objPos = obj.cachedRenderer != null ? bounds.center : obj.transform.position;
+                    radius = Mathf.Max(bounds.extents.x, bounds.extents.z);
+                    bottom = bounds.min.y;
+                    top = bounds.max.y;
+                }
+
+                if (!Utils.AimAtBody(cameraPos, PlayerObject.Player.mainCamera.transform.forward, objPos, radius,
+                                     bottom, top, margin, out float share, out Vector3 point))
+                {
+                    continue;
                 }
                 Vector3 direction = objPos - cameraPos;
                 float distance = direction.magnitude;
@@ -199,11 +225,14 @@ public class WeaponBase : UUObject
                         {
                             best = obj;
                             bestCost = cost;
+                            bestShare = share;
+                            aimedPoint = point;
                         }
                     }
                 }
             }
         }
+        aimedPart = best != null ? Utils.AimedBodyPart(bestShare, Random.value) : EBodyPart.Torso;
         return best;
     }
 
@@ -777,7 +806,7 @@ public class WeaponBase : UUObject
 
     protected virtual bool Attack()
     {
-        UUObject obj = FindObjectToDamage(3.0f);
+        UUObject obj = FindObjectToDamage(3.0f, out EBodyPart aimedPart, out Vector3 aimedPoint);
         if (obj != null)
         {
             // What the swing gains for landing on a back. The original works it out once, before
@@ -854,7 +883,8 @@ public class WeaponBase : UUObject
                         // one coming the other way: the original runs both through one routine and
                         // subtracts the protection covering wherever the blow landed
                         // (UW.EXE 0x24dc1, 0x24e14).
-                        damage = critter.AbsorbWithArmour(damage, PlayerObject.Player.GetSwingHeight());
+                        damage = critter.AbsorbWithArmour(damage, aimedPart);
+                        critter.MarkNextBlow(aimedPart, aimedPoint);
                     }
 
                     obj.TryDamage(damage, res);
