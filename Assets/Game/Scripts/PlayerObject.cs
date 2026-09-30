@@ -220,43 +220,51 @@ public class PlayerObject : MonoBehaviour
 
     /// <summary>
     /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on, measured
-    /// against the player's own capsule. <see cref="Utils.PickBodyPart"/> holds the rule, which
+    /// against the player's own body. <see cref="Utils.PickBodyPart"/> holds the rule, which
     /// the original applies to whoever is being hit.
+    /// The body is the original's, <see cref="heightInTheOriginal"/> from the feet of the capsule
+    /// up, and not the capsule itself, which is shorter.
     /// </summary>
-    public EBodyPart PickBodyPart(float strikeHeight)
+    public EBodyPart PickBodyPart(float strikeHeight, bool headInReach = true)
     {
-        CharacterController body = cachedCharacterController;
-        if (body == null)
+        if (cachedCharacterController == null)
         {
             return EBodyPart.Torso;
         }
 
-        float middle = transform.TransformPoint(body.center).y;
-        return Utils.PickBodyPart(strikeHeight, middle - 0.5f * body.height, middle + 0.5f * body.height);
+        GetBody(out float feet, out float top);
+        return Utils.PickBodyPart(strikeHeight, feet, top, headInReach);
     }
 
     /// <summary>
-    /// The height the player's own blow arrives at, which is what decides where on a creature it
-    /// lands. The original works this out from the player's footing and build and hands it to the
-    /// same part picker a creature's swing uses (UW.EXE 0x24876), so the mirror of
-    /// Critter.GetSwingHeight() is the right shape.
-    /// It leaves out one term the original adds only when the swinger is the player, at UW.EXE
-    /// 0x24908: a quarter of the view pitch, which is to say that looking up makes a blow land
-    /// higher on what it hits. The original's pitch is one of the three angles of the viewpoint
-    /// (0x31759 fills it from DS:0x3588), clamped to a sixteenth of a turn either way in steps of
-    /// a sixty-fourth, so four notches up and four down; 0x24908 divides it by 512 and adds -8 to
-    /// +8 to the height of the blow, against a player 23 units tall in COMOBJ.DAT - about a third
-    /// of his own height, enough to move a hit from the chest to the head.
-    /// It is left out because the choice of part is worth almost nothing here: of the sixty-four
-    /// creatures forty-one carry the same protection on all four parts and twenty-one vary by a
-    /// single point, so the part chosen costs at most one point of damage to all but two of them.
-    /// Porting it would also be a design decision rather than a transcription, since mouse look
-    /// here is continuous where the original has four notches.
+    /// Where the player's body goes up and down, for the blows that come at him: from the feet of
+    /// his capsule, <see cref="heightInTheOriginal"/> tall.
     /// </summary>
-    public float GetSwingHeight()
+    public void GetBody(out float feet, out float top)
     {
         CharacterController body = cachedCharacterController;
-        return body != null ? transform.TransformPoint(body.center).y : transform.position.y;
+        feet = body != null ? transform.TransformPoint(body.center).y - 0.5f * body.height : transform.position.y;
+        top = feet + heightInTheOriginal;
+    }
+
+    /// <summary>
+    /// How tall the player is in the original: 23 units, the height COMOBJ.DAT gives the avatar,
+    /// which is 2.16 m. The capsule here is 1.79 m, while the eye is about where the original
+    /// puts it. A creature's blows are worked out on the original's body: on the capsule, whose
+    /// middle sits under the lowest of a creature's three swings, none could ever strike the
+    /// player's legs.
+    /// </summary>
+    private const float heightInTheOriginal = 23 * UUObject.yScale;
+
+    /// <summary>
+    /// Whether a plain jump lifts the player's feet clear over a creature this tall, by the rule
+    /// <see cref="KeepOutOfCreatures"/> applies: the rise of a jump at jumpVelocity under the
+    /// gravity NormalMovement() uses, against the creature's height plus creatureClearance.
+    /// </summary>
+    public bool PlainJumpClears(float creatureHeight)
+    {
+        float rise = jumpVelocity * jumpVelocity / (2.0f * gravity);
+        return creatureHeight + creatureClearance <= rise;
     }
 
     public static void LoadSkills()
@@ -676,14 +684,16 @@ public class PlayerObject : MonoBehaviour
         return Mathf.Max(staminaRecoverTime - 0.5f * staminaRecoverTime * Skills.GetSkill(ESkill.Acrobat) / 30.0f, 5.0f);
     }
 
+    private const float gravity = 9.81f;
+
     private void NormalMovement()
     {
-        float gravity = 9.81f;
+        float fallGravity = gravity;
         if (yVelocity < 0.0f && Magic.sMagic.IsSpellActive(Magic.ESpell.SlowFall))
         {
-            gravity = 2.5f;
+            fallGravity = 2.5f;
         }
-        yVelocity -= gravity * Time.deltaTime;
+        yVelocity -= fallGravity * Time.deltaTime;
 
         // Track velocity before checking for landing
         previousYVelocity = yVelocity;

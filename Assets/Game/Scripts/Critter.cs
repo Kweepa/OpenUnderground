@@ -3448,6 +3448,21 @@ public class Critter : UUObject
         }
     }
 
+    // Where the player's blow about to be spent landed, for the blood; see MarkNextBlow().
+    private EBodyPart? nextBlowPart;
+    private Vector3 nextBlowPoint;
+
+    /// <summary>
+    /// Says where the player's blow that TryDamage() is about to take landed, so that the blood
+    /// shows there (<see cref="Utils.CreateSplats(Critter, EParticleType, int, EBodyPart?, Vector3)"/>).
+    /// It is spent by that one call; anything else that hurts the creature bleeds from its middle.
+    /// </summary>
+    public void MarkNextBlow(EBodyPart part, Vector3 point)
+    {
+        nextBlowPart = part;
+        nextBlowPoint = point;
+    }
+
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
     {
         // Easy mode: increase damage done to enemies by 3/2
@@ -3460,7 +3475,8 @@ public class Critter : UUObject
         CritterHealthDisplay.CritterDamaged(hp / (float)originalHp);
 
         EParticleType particleType = Utils.MapRemainsToParticleType(stats.Remains, blood);
-        Utils.CreateSplats(this, particleType, damage);
+        Utils.CreateSplats(this, particleType, damage, nextBlowPart, nextBlowPoint);
+        nextBlowPart = null;
 
         // make more hostile
         if (attitude > 0)
@@ -3632,14 +3648,98 @@ public class Critter : UUObject
     }
 
     /// <summary>
-    /// The height the swing lands at: the middle of the creature's own body, which is what the
-    /// original compares against the target's extent to pick a body part (UW.EXE 0x2441a).
+    /// Where the swing starts: in one of three bands of the creature's own height, drawn out of
+    /// nine as the original does (rand() % 9, then / 3, at 0x259ee and 0x248db). It sweeps
+    /// <see cref="Utils.SwingSpan"/> up from there, lands only on what that overlaps
+    /// (<see cref="SwingReachesTarget"/>), and is judged at the middle of it
+    /// (<see cref="Utils.GetSwingMiddle"/>), which the original compares against the target's
+    /// extent to pick a body part (UW.EXE 0x2441a).
     /// </summary>
-    private float GetSwingHeight()
+    private float GetSwingBase()
     {
-        return cachedCharacterController != null
-            ? transform.TransformPoint(cachedCharacterController.center).y
-            : transform.position.y;
+        CharacterController body = cachedCharacterController;
+        if (body == null)
+        {
+            return transform.position.y;
+        }
+
+        GetBody(out float feet, out float top);
+        int band = Random.Range(0, 9) / 3;
+        return feet + (top - feet) * band / 3.0f;
+    }
+
+    /// <summary>
+    /// Where this creature's body goes up and down: its capsule, measured as
+    /// PlayerObject.KeepOutOfCreatures() does.
+    /// </summary>
+    public void GetBody(out float feet, out float top)
+    {
+        CharacterController body = cachedCharacterController;
+        float bodyHeight = GetBodyHeight();
+        feet = body != null ? transform.TransformPoint(body.center).y - 0.5f * bodyHeight : transform.position.y;
+        top = feet + bodyHeight;
+    }
+
+    /// <summary>
+    /// Whether a swing starting at <paramref name="swingBase"/> meets the one this creature
+    /// attacks. In the original a creature's blow, like the player's, lands only on what its span
+    /// overlaps in height (UW.EXE 0x2934f, on the same chain for both, 0x259ee -> 0x251ac ->
+    /// 0x24876), so a player floating over its highest swing is out of its reach, and one between
+    /// its swings is reached by the higher ones only.
+    /// </summary>
+    private bool SwingReachesTarget(float swingBase)
+    {
+        float feet;
+        float top;
+        if (attackTarget == null)
+        {
+            PlayerObject.Player.GetBody(out feet, out top);
+        }
+        else
+        {
+            attackTarget.GetBody(out feet, out top);
+        }
+
+        return Utils.SwingReaches(swingBase, feet, top);
+    }
+
+    /// <summary>
+    /// Whether this creature keeps itself in the air: the flyers and the ethereal ones, which
+    /// float. They can come down to whatever they attack, so no height is out of their reach and
+    /// no part of a body either.
+    /// </summary>
+    private bool IsAirborne()
+    {
+        return movementType == EMovementType.Flying || movementType == EMovementType.TwilightZone;
+    }
+
+    /// <summary>
+    /// How tall this creature stands, the way PlayerObject.KeepOutOfCreatures() measures it.
+    /// </summary>
+    private float GetBodyHeight()
+    {
+        CharacterController body = cachedCharacterController;
+        return body != null ? Mathf.Max(body.height, 2.0f * body.radius) : 0.0f;
+    }
+
+    /// <summary>
+    /// Whether this creature is one a plain jump clears and it stays on the ground: the walkers,
+    /// creepers, crawlers and swimmers, not the flyers or the ethereal ones, which float.
+    /// </summary>
+    private bool IsShortOnTheGround()
+    {
+        return !IsAirborne() && PlayerObject.Player.PlainJumpClears(GetBodyHeight());
+    }
+
+    /// <summary>
+    /// Whether this creature's blows can land on the head of the one it attacks. Not the
+    /// original's rule, where a rat's swing, which starts at a third of its height and sweeps 20
+    /// units up, can reach a man's head: here a short creature on the ground does not, unless
+    /// what it attacks is short as well. Flying ones can come down, so they reach everything.
+    /// </summary>
+    private bool ReachesHeadOfTarget()
+    {
+        return !IsShortOnTheGround() || (attackTarget != null && attackTarget.IsShortOnTheGround());
     }
 
     /// <summary>
@@ -3679,7 +3779,7 @@ public class Critter : UUObject
     /// Which body part a blow arriving at <paramref name="strikeHeight"/> lands on, measured
     /// against this creature's own capsule. <see cref="Utils.PickBodyPart"/> holds the rule.
     /// </summary>
-    public EBodyPart PickBodyPart(float strikeHeight)
+    public EBodyPart PickBodyPart(float strikeHeight, bool headInReach = true)
     {
         CharacterController body = cachedCharacterController;
         if (body == null)
@@ -3688,7 +3788,7 @@ public class Critter : UUObject
         }
 
         float middle = transform.TransformPoint(body.center).y;
-        return Utils.PickBodyPart(strikeHeight, middle - 0.5f * body.height, middle + 0.5f * body.height);
+        return Utils.PickBodyPart(strikeHeight, middle - 0.5f * body.height, middle + 0.5f * body.height, headInReach);
     }
 
     /// <summary>
@@ -3734,13 +3834,23 @@ public class Critter : UUObject
             return;
         }
 
+        // A swing that passes under or over what it attacks meets nothing, as in the original,
+        // unless the creature flies and can come down to it.
+        float swingBase = GetSwingBase();
+        if (!IsAirborne() && !SwingReachesTarget(swingBase))
+        {
+            // miss
+            return;
+        }
+
         // Where the blow lands is decided before the roll, not after it. The original writes the
         // body part to DS:0x2672 while it is setting the blow up (UW.EXE 0x24a34), the to-hit roll
         // reads it back to find the protection covering that part (0x24b86), and the damage routine
         // spends the same choice on armour (0x24f6b). One draw per blow, used twice.
+        float swingMiddle = Utils.GetSwingMiddle(swingBase);
         EBodyPart bodyPart = attackTarget == null
-            ? PlayerObject.Player.PickBodyPart(GetSwingHeight())
-            : attackTarget.PickBodyPart(GetSwingHeight());
+            ? PlayerObject.Player.PickBodyPart(swingMiddle, ReachesHeadOfTarget())
+            : attackTarget.PickBodyPart(swingMiddle, ReachesHeadOfTarget());
 
         // The attack score matches the original: the chosen attack's chance-to-hit byte plus half
         // the equipment-damage byte plus a roll. The original's roll is rand() % 6 + 7, which

@@ -198,7 +198,7 @@ public class UUObject : LevelObject
     private static readonly float[] skPartialPortcullis = { 0.1f * 8.0f / 3.0f, 2, 3, 4, 4, 6, 7, 8 - 0.1f * 8.0f / 3.0f };
     private static readonly float[] skPartialDecal = { 1 / 3.0f, 1, 2, 4, 4, 6, 7, 8 - 1.0f / 3.0f };
     protected const float xzScale = 3.0f;
-    protected const float yScale = 3.0f / 32.0f;
+    public const float yScale = 3.0f / 32.0f;
 
     public virtual void Initialize(ushort[] objData, byte[] critterData)
     {

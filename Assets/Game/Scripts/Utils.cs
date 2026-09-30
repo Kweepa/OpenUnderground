@@ -195,15 +195,18 @@ public class Utils
     /// One routine picks the part whoever is swinging: the melee path reaches it at 0x24a2e and
     /// the missile path at 0x25988, and both then read the protection at 0x24dc1. That is why the
     /// player and a creature ask the same question here.
+    /// With <paramref name="headInReach"/> false the head is never the answer, and what would have
+    /// been the head goes to the torso and the arms in their usual two to one. That is ours, not
+    /// the original's: a creature small enough to be jumped over cannot reach a man's head.
     /// </summary>
-    public static EBodyPart PickBodyPart(float strikeHeight, float foot, float head)
+    public static EBodyPart PickBodyPart(float strikeHeight, float foot, float head, bool headInReach = true)
     {
         if (strikeHeight < foot)
         {
             return EBodyPart.Legs;
         }
 
-        if (strikeHeight > head)
+        if (strikeHeight > head && headInReach)
         {
             return EBodyPart.Head;
         }
@@ -215,12 +218,158 @@ public class Utils
                 return EBodyPart.Legs;
             }
         }
-        else if (Random.Range(0, 3) == 0)
+        else if (headInReach && Random.Range(0, 3) == 0)
         {
             return EBodyPart.Head;
         }
 
         return Random.Range(0, 3) == 0 ? EBodyPart.Arms : EBodyPart.Torso;
+    }
+
+    /// <summary>
+    /// How tall a melee swing is. The original sweeps a span, not a point: (2 * reach + 1) * 4
+    /// units of height from the swing's base (UW.EXE 0x248a8), and the reach is 2 for every
+    /// weapon, for the fist and for every creature (0x253e3 reads it from COMOBJ.DAT, 0x259f4
+    /// sets it for a creature), so the span is 20 units for everyone.
+    /// </summary>
+    public const float SwingSpan = 20 * UUObject.yScale;
+
+    /// <summary>
+    /// The height a swing starting at <paramref name="swingBase"/> is judged at: the middle of its
+    /// span, which is what the original compares with the middle of the target to pick a body part
+    /// (0x2441a gets the base and the top of the span).
+    /// </summary>
+    public static float GetSwingMiddle(float swingBase)
+    {
+        return swingBase + 0.5f * SwingSpan;
+    }
+
+    /// <summary>
+    /// Whether a swing starting at <paramref name="swingBase"/> reaches a body standing between
+    /// <paramref name="feet"/> and <paramref name="top"/>. The original only lets a blow land on
+    /// what its span overlaps in height, top above the base and bottom below the top of the span
+    /// (UW.EXE 0x2934f). A creature's swing is held to it; the player's is aimed, see
+    /// <see cref="AimAtBody"/>.
+    /// </summary>
+    public static bool SwingReaches(float swingBase, float feet, float top)
+    {
+        return top > swingBase && feet < swingBase + SwingSpan;
+    }
+
+    /// <summary>
+    /// Where on a body the player's blow lands: below this share of its height the legs, above
+    /// <see cref="AimHeadAbove"/> the head, and the torso or the arms in between. See
+    /// <see cref="AimAtBody"/> and <see cref="AimArmsShare"/>.
+    /// </summary>
+    public const float AimLegsBelow = 0.5f;
+
+    /// <inheritdoc cref="AimLegsBelow"/>
+    public const float AimHeadAbove = 0.85f;
+
+    /// <summary>
+    /// Of the blows aimed between the legs and the head, the share that the arms take, since a body
+    /// holds them in front of itself. The rest land on the torso.
+    /// </summary>
+    public const float AimArmsShare = 0.6f;
+
+    /// <summary>
+    /// How much of its height a body is stretched by, below the feet and above the head, for a
+    /// player on a gamepad to aim at: a little help, since a stick is slower to put the crosshair
+    /// on a rat than a mouse. With the mouse there is none.
+    /// </summary>
+    public const float AimMargin = 0.05f;
+
+    /// <summary>
+    /// Where the player's line of sight meets a body, as a share of its height: 0 at the feet, 1
+    /// at the top. The line starts at <paramref name="eye"/> and runs along
+    /// <paramref name="forward"/>, which is of unit length; the body is an upright cylinder around
+    /// <paramref name="axis"/>, of <paramref name="radius"/>, from <paramref name="bottom"/> to
+    /// <paramref name="top"/>. The line is taken where it enters the cylinder's side, or where it
+    /// passes nearest to its axis if it goes by to one side, since which thing is struck is chosen
+    /// by the caller; and where the side is missed above or below, where it comes in through the top
+    /// or the bottom, which is what looking down on a body from above, or up at one from below,
+    /// does. <paramref name="point"/> is that place. False when it passes over or under the body,
+    /// stretched by <paramref name="margin"/> of its height either way: the blow then meets nothing.
+    /// </summary>
+    /// <remarks>
+    /// This is ours. The original judges a blow from a band of height swept by the swing, set by
+    /// the row of the screen the attack starts in and the tilt of the view (UW.EXE 0x24876), and
+    /// lets it land only on what the band overlaps (0x2934f). The idea that a blow can pass over
+    /// or under what it is aimed at is kept; the band is not.
+    /// </remarks>
+    public static bool AimAtBody(Vector3 eye, Vector3 forward, Vector3 axis, float radius, float bottom, float top,
+                                 float margin, out float share, out Vector3 point)
+    {
+        share = 0.0f;
+        point = eye;
+        if (top <= bottom)
+        {
+            return false;
+        }
+
+        float height = top - bottom;
+        Vector2 across = new Vector2(forward.x, forward.z);
+        float across2 = across.sqrMagnitude;
+        if (across2 >= 1e-4f)
+        {
+            Vector2 toAxis = new Vector2(axis.x - eye.x, axis.z - eye.z);
+            float along = Vector2.Dot(toAxis, across) / across2;
+            float miss2 = (across * along - toAxis).sqrMagnitude;
+            if (miss2 < radius * radius)
+            {
+                along -= Mathf.Sqrt((radius * radius - miss2) / across2);
+            }
+            along = Mathf.Max(along, 0.0f);
+
+            point = eye + forward * along;
+            share = (point.y - bottom) / height;
+            if (share >= -margin && share <= 1.0f + margin)
+            {
+                return true;
+            }
+        }
+
+        // Over the side or under it: looking down, the line may still come in through the top,
+        // and looking up through the bottom.
+        if (Mathf.Abs(forward.y) < 1e-4f)
+        {
+            return false;
+        }
+        float capY = forward.y < 0.0f ? top + margin * height : bottom - margin * height;
+        float down = (capY - eye.y) / forward.y;
+        if (down < 0.0f)
+        {
+            return false;
+        }
+        Vector3 onCap = eye + forward * down;
+        float dx = onCap.x - axis.x;
+        float dz = onCap.z - axis.z;
+        if (dx * dx + dz * dz > radius * radius)
+        {
+            return false;
+        }
+        point = onCap;
+        share = (onCap.y - bottom) / height;
+        return true;
+    }
+
+    /// <summary>
+    /// The body part a blow aimed at <paramref name="share"/> of a body's height lands on.
+    /// <paramref name="roll"/>, from 0 up to 1, decides between the arms and the torso.
+    /// </summary>
+    public static EBodyPart AimedBodyPart(float share, float roll)
+    {
+        if (share < AimLegsBelow)
+        {
+            return EBodyPart.Legs;
+        }
+
+        if (share > AimHeadAbove)
+        {
+            return EBodyPart.Head;
+        }
+
+        return roll < AimArmsShare ? EBodyPart.Arms : EBodyPart.Torso;
     }
 
     /// <summary>
@@ -721,7 +870,22 @@ public class Utils
         }
     }
 
-    public static void CreateSplats(Critter critter, EParticleType particleType, int damage)
+    /// <summary>
+    /// Blood, sparks or chips where a creature was hurt, one splat a point of damage up to six, on
+    /// the joints of its model near the place or, without a model, around it.
+    /// With <paramref name="struckPart"/> the place is the part a blow of the player's landed on,
+    /// so the blood shows where he aimed: the joints in the band of the body that part takes (below
+    /// <see cref="AimLegsBelow"/> of the height for the legs, above <see cref="AimHeadAbove"/> for
+    /// the head, in between for the rest), and in that middle band the ones nearest the body's
+    /// middle for the torso and the ones furthest out, on both sides, for the arms. The head takes
+    /// no joints: the blood goes on the middle of the body at the height struck, up to 20 cm to
+    /// either side, since the joints at the top of a body can be a shoulder or a raised hand, and a
+    /// creature like the headless has nothing else up there.
+    /// <paramref name="struckPoint"/> is where his aim met the body. Without a part, which is every
+    /// other kind of harm, the place is the middle of the body.
+    /// </summary>
+    public static void CreateSplats(Critter critter, EParticleType particleType, int damage,
+                                    EBodyPart? struckPart = null, Vector3 struckPoint = default)
     {
         if (critter == null)
         {
@@ -742,13 +906,55 @@ public class Utils
 
         // Get damage center
         float characterHeight = characterController.height;
-        Vector3 damageCenter = critter.transform.TransformPoint(characterController.center) + 0.1f * characterHeight * Vector3.up;
+        Vector3 bodyMiddle = critter.transform.TransformPoint(characterController.center);
+        Vector3 damageCenter = bodyMiddle + 0.1f * characterHeight * Vector3.up;
         float spread = 0.5f;
+
+        // The band of the body the struck part takes.
+        float bandLow = 0.0f;
+        float bandHigh = 0.0f;
+        Vector3 across = PlayerObject.Player.mainCamera.transform.right;
+        if (struckPart.HasValue)
+        {
+            // the same box the aim was met with, WeaponBase.FindObjectToDamage()
+            float boxHeight = Mathf.Max(characterHeight, 2.0f * characterController.radius);
+            float bottom = bodyMiddle.y - 0.5f * boxHeight;
+            bandLow = struckPart == EBodyPart.Legs ? bottom
+                : struckPart == EBodyPart.Head ? bottom + AimHeadAbove * boxHeight
+                : bottom + AimLegsBelow * boxHeight;
+            bandHigh = struckPart == EBodyPart.Legs ? bottom + AimLegsBelow * boxHeight
+                : struckPart == EBodyPart.Head ? bottom + boxHeight
+                : bottom + AimHeadAbove * boxHeight;
+            damageCenter = new Vector3(bodyMiddle.x, Mathf.Clamp(struckPoint.y, bandLow, bandHigh), bodyMiddle.z);
+            spread = bandHigh - bandLow;
+        }
 
         Vector3 playerPosition = PlayerObject.Player.mainCamera.transform.position;
         Vector3 playerDirection = (playerPosition - damageCenter).normalized;
 
         int numSplats = Mathf.Min(damage, 6);
+
+        if (struckPart == EBodyPart.Head)
+        {
+            // on the front of the body's middle, a little to either side
+            Vector3 towards = new Vector3(playerDirection.x, 0.0f, playerDirection.z).normalized;
+            Vector3 forwardOfCamera = PlayerObject.Player.mainCamera.transform.forward;
+            SplatType fallbackForHead = MapParticleTypeToSplatType(particleType);
+            for (int i = 0; i < numSplats; i++)
+            {
+                Vector3 splatPosition = damageCenter + 0.2f * towards + Random.Range(-0.2f, 0.2f) * across
+                                        + Random.Range(-0.05f, 0.05f) * Vector3.up;
+                Vector3 directionAway = (splatPosition - damageCenter).normalized;
+                Quaternion rotation = Quaternion.LookRotation(forwardOfCamera, directionAway);
+                GameObject particle = ParticleSpawner.SpawnParticle(particleType, splatPosition, rotation);
+                if (particle == null)
+                {
+                    CreateFallbackSplat(splatPosition, fallbackForHead);
+                }
+            }
+            return;
+        }
+
         List<Transform> availableJoints = new List<Transform>();
 
         // Find all SkinnedMeshRenderers and select the one with the most bones
@@ -772,6 +978,16 @@ public class Utils
             {
                 if (bone != null)
                 {
+                    if (struckPart.HasValue)
+                    {
+                        // the bones in the band of the part that was struck
+                        if (bone.position.y >= bandLow && bone.position.y <= bandHigh)
+                        {
+                            availableJoints.Add(bone);
+                        }
+                        continue;
+                    }
+
                     // Only include bones within half character height vertically of damage center
                     float verticalDistance = Mathf.Abs(bone.position.y - damageCenter.y);
                     if (verticalDistance <= spread)
@@ -782,10 +998,44 @@ public class Utils
             }
         }
 
+        if ((struckPart is EBodyPart.Torso or EBodyPart.Arms) && availableJoints.Count >= 2)
+        {
+            // The torso and the arms share a band: the torso is the half of its bones nearest the
+            // creature's own middle line, the arms the half furthest out to its sides, left and
+            // right alike, so the blood falls on either arm at random. Its own sides and not the
+            // player's view, or from the flank the arms would be its chest and back.
+            Vector3 sideways = critter.transform.right;
+            availableJoints.Sort((a, b) => Mathf.Abs(Vector3.Dot(a.position - bodyMiddle, sideways))
+                .CompareTo(Mathf.Abs(Vector3.Dot(b.position - bodyMiddle, sideways))));
+            int half = availableJoints.Count / 2;
+            if (struckPart == EBodyPart.Torso)
+            {
+                availableJoints.RemoveRange(half, availableJoints.Count - half);
+            }
+            else
+            {
+                availableJoints.RemoveRange(0, half);
+            }
+        }
+
         // If no joints found, fall back to cylinder algorithm
         if (availableJoints.Count == 0)
         {
             SplatType fallbackSplatType = MapParticleTypeToSplatType(particleType);
+            if (struckPart == EBodyPart.Arms)
+            {
+                // either arm at random, splat by splat, as many in all as one cloud would have
+                int total = Mathf.Min(damage, 9);
+                int left = 0;
+                for (int i = 0; i < total; i++)
+                {
+                    left += Random.value < 0.5f ? 1 : 0;
+                }
+                Vector3 armOut = 0.8f * characterController.radius * across;
+                CreateSplats(damageCenter - armOut, spread, fallbackSplatType, left);
+                CreateSplats(damageCenter + armOut, spread, fallbackSplatType, total - left);
+                return;
+            }
             CreateSplats(damageCenter, spread, fallbackSplatType, damage);
             return;
         }

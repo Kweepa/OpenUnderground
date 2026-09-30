@@ -2,6 +2,12 @@
 
 ## Current release
 
+- Where you aim now decides where your blow lands: at the legs, the body or the head of what you strike, and the blood shows where it landed. A blow aimed over a rat's head, or under a bat, meets nothing.
+
+- Creatures now strike high, middle or low, as in the original, so a skeleton or a ghoul can reach your head, which before it never did. Rats, spiders and other small creatures on the ground still cannot.
+
+- Levitating or flying over a creature that walks takes you out of its reach, as in the original: first its low swings pass under you, then all of them, and a troll reaches higher than a rat.
+
 - Creature loot follows the original's rules: things a creature only sometimes carries, like a fighter's lantern, now drop at their own odds instead of always; gear is battered on the upper levels and better deeper down; goblins leave a handful of sling stones; coins come in smaller piles and red and small blue gems are rare, while rubies, sapphires and large blue gems come singly; and characters whose belongings were placed by hand carry only those.
 
 ## Release UUBuild29Sep2026.zip
