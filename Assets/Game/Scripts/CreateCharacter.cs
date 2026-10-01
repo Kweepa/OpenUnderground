@@ -210,7 +210,9 @@ public class CreateCharacter : MonoBehaviour
             }
         }
         PlayerData.sData.vitality = PlayerObject.GetMaxHitPoints();
-        PlayerData.sData.hp = PlayerData.sData.vitality;
+        // A new character starts 6 to 11 hit points short of the maximum, as in the original
+        // (UW.EXE 0x6ca5c-0x6ca76: the maximum, less 6, less rand() % 6).
+        PlayerData.sData.hp = PlayerData.sData.vitality - 6 - UnityEngine.Random.Range(0, 6);
 
         for (int i = 0; i < PlayerData.sData.skill.Length; ++i)
         {
