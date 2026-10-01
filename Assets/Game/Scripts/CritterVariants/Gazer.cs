@@ -20,8 +20,6 @@ namespace Game.Scripts.CritterVariants
             }
 
             eyeMesh.material.SetColor(colorPropertyId, Color.green);
-
-            movementType = EMovementType.Flying;
         }
 
         protected override void SetState(EState newState)

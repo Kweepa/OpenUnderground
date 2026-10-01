@@ -11,6 +11,15 @@ public class DoorSaveData : UUObjectSaveData
 
 public class Door : Lockable
 {
+    /// <summary>How high a door's opening is above its base: the frame's top starts there.</summary>
+    public const float OpeningHeight = 52.0f / 64.0f * 3.0f;
+
+    /// <summary>
+    /// The height of the underside of the frame's top. It is on the Ceiling layer, which the
+    /// walkers' capsules leave out and a flyer's does not, so a flyer has to pass under it.
+    /// </summary>
+    public float OpeningTop => transform.position.y + OpeningHeight;
+
     public GameObject door;
     public GameObject hinge;
     public float openAngle = 110.0f; // degrees
@@ -170,7 +179,7 @@ public class Door : Lockable
                 float h = (16 - z / 8) * LevelLoader.yScale;
                 float t = type == EObjectType.Portcullis ? 0.1f : 0.05f; // portcullis needs thicker frame
                 float w = 0.5f * LevelLoader.xzScale;
-                float d = 52.0f / 64.0f * 3.0f;
+                float d = OpeningHeight;
 
                 // create a mesh and texture it
                 Vector3[] vp =

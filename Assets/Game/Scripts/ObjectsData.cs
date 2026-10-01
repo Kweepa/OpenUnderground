@@ -110,11 +110,19 @@ Mask 0x0F is the splatter type, 0 for dust, 8 for red blood.
 Mask 0xF0 is the remains; Nothing = 0x00, RotwormCorpse = 0x20, Rubble = 0x40, WoodChips = 0x60, Bones = 0x80, GreenBloodPool = 0xA0, RedBloodPool = 0xC0, RedBloodPoolGiantSpider = 0xE0.
 09h 	1 	uint8 	GeneralType 	An index into the strings on page 8, offset 370. This string is the generic name for the creature, like "a creature" for "a goblin" or "a rat" for "a giant rat".
 0Ah 	1 	uint8 	Passiveness 	Relative passiveness. 255 will never take a swing at you, even if you kill them.
-0Bh 	1 	magic related to the critter having extra/specific spells.   ?? 	 ?? 	 ??
+Its bits are how the original decides how a creature moves: bit 7 flies and bit 6 swims, each on a movement record
+of its own, and anything else walks (UW.EXE 0x1b270-0x1b2b0). Bit 5 lets a walker jump a tile in the path search
+(0x16196).
+0Bh 	1 	uint8 	WalkSpeed 	The speed a creature wanders at (UW.EXE 0x18cb1) and chases at from afar (0x1a0aa).
 0Ch 	1 	uint8 	MovementSpeed 	Speed of movement; 0 is immobile, maxes out at 12 for vampire bat.
 0Dh 	2 	 ?? 	 ?? 	 ??
 0Fh 	1 	uint8 	PoisonDamage 	Amount of poison damage this is capable of on attack.
 10h 	1 	uint8 	Category 	Ethereal = 0x00 (Ethereal critters like ghosts, wisps, and shadow beasts), Humanoid = 0x01 (Humanlike non-thinking forms like lizardmen, trolls, ghouls, and mages), Flying = 0x02 (Flying critters like bats and imps), Swimming = 0x03 (Swimming critters like lurkers), Creeping = 0x04 (Creeping critters like rats and spiders), Crawling = 0x05 (Crawling critters like slugs, worms, reapers (!), and fire elementals (!!)), EarthGolem = 0x11 (Only used for the earth golem), Human = 0x51 (Humanlike thinking forms like goblins, skeletons, mountainmen, fighters, outcasts, and stone and metal golems).
+WARNING: the remake takes how a creature moves from the low nibble of this byte (Critter.GetMovementTypeFromData()),
+and that is the wrong field: the original moves a creature by bits 7 and 6 of 0Ah and does not read this byte for it
+(UW.EXE 0x1b270-0x1b2b0). The two agree on every type but two: category 0, which holds four flyers - the ghosts, the
+dire ghost, the gazer and the wisp - beside the shadow beast, a walker, and the Ethereal Void's creatures; and Tyball,
+a flyer of category 1. Anything new that asks how a creature moves should ask 0Ah.
 11h 	1 	uint8 	EquipmentDamage 	Amount of equipment damage this is capable of on attack.
 12h 	1 	uint8 	Defence: 	What an attack roll is made against (UW.EXE 0x24b96). For the
 player the game writes his Defense skill plus half the skill of the weapon in his hand into
@@ -134,7 +142,8 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
         public int Remains;
         public int Blood;
         public int Race;
-        public int Passive;
+        public int Passive; // byte 0Ah: bit 7 flies, bit 6 swims, see above
+        public int WalkSpeed;
         public int Speed;
         public byte unk0c;
         public int TradeLevel;
@@ -142,7 +151,7 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
         public int TradeThreshold;
         public int TradePatience;
         public int Poison;
-        public int Category;
+        public int Category; // NOT how the original decides how a creature moves: see 10h above
         public int EquipDamage;
         public int Defence;
         //public int ProbValue1;
@@ -261,7 +270,7 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
             critterStats[i].Race = stream.GetByte();//Uwformats calls this General Type
 
             critterStats[i].Passive = stream.GetByte();//Passiveness
-            critterStats[i].Defence = stream.GetByte();//Defence
+            critterStats[i].WalkSpeed = stream.GetByte();
             critterStats[i].Speed = stream.GetByte();//Speed
             int tradeLevelAndAppraisal = stream.GetByte();
             critterStats[i].TradeLevel = tradeLevelAndAppraisal & 0xf;

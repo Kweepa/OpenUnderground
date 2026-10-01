@@ -2990,6 +2990,7 @@ public class Magic : MonoBehaviour
                         obj.xhome = tileX;
                         obj.yhome = tileY;
                         obj.transform.position = spawnPos;
+                        obj.FitFlightHeight();
                         obj.x = Tile.GetSubTileX(spawnPos.x);
                         obj.y = Tile.GetSubTileY(spawnPos.z);
 
