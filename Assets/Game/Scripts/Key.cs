@@ -128,12 +128,13 @@ public class Key : UUObject
     /// four levels up is dead weight and can be left in a bag on the way past.
     /// originalLevel is where the object was placed in the level data, which for a key is where
     /// it was picked up. A key that never lived in a level has none, and then the name is left
-    /// exactly as it was.
+    /// exactly as it was. A lockpick is a Key too, but any pick fits any lock and picks stack, so
+    /// where one was found says nothing and it keeps its plain name.
     /// </remarks>
     public override string GetLookName()
     {
         string name = base.GetLookName();
-        return originalLevel > 0 ? name + " (level " + originalLevel + ")" : name;
+        return originalLevel > 0 && type != EObjectType.Lockpick ? name + " (level " + originalLevel + ")" : name;
     }
 
     protected override bool TryUseAtAim()
