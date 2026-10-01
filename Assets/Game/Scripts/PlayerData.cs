@@ -423,7 +423,7 @@ public class PlayerData : MonoBehaviour
         {
             GUI.depth = (int)EGUIDepth.PlayerDataDebug;
 
-            for (int i = 0; i < 256; ++i)
+            for (int i = 0; i < questFlags.Length; ++i)
             {
                 GUI.Label(new Rect(20 * (i % 16), 20 * (i / 16), 20, 20), $"{questFlags[i]}");
             }
