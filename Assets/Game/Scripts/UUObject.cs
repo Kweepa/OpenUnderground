@@ -1484,9 +1484,16 @@ public class UUObject : LevelObject
         
         GetQualityString(lookNameBuilder);
 
+        // One routine gives both words, in the same place before the noun: "magical " at the
+        // second level of detail, and at the third "cursed " for a cursed object, which then gets
+        // no " of ..." (UW.EXE 0x7bd5a; the words are at DS:0x1920 and DS:0x1929).
         if (!String.IsNullOrEmpty(enchantmentName) && loreResult == Skills.ESkillTestResult.Success)
         {
             lookNameBuilder.Append("magical ");
+        }
+        else if (IsKnownCursed())
+        {
+            lookNameBuilder.Append("cursed ");
         }
 
         lookNameBuilder.Append(quantity > 1 ? pluralName : singularName);
@@ -1508,24 +1515,27 @@ public class UUObject : LevelObject
 
     protected virtual string GetIdentifiedName(string baseName)
     {
-        if (loreResult == Skills.ESkillTestResult.CriticalSuccess && !String.IsNullOrEmpty(enchantmentName))
+        // A cursed object already says so before its noun; see GetLookName().
+        if (loreResult == Skills.ESkillTestResult.CriticalSuccess && !String.IsNullOrEmpty(enchantmentName)
+            && !IsKnownCursed())
         {
             lookNameBuilder.Clear();
             lookNameBuilder.Append(baseName);
-            // Every one of the sixteen grades, 144 to 159, not just the first.
-            if (Enchantment.KindOf(enchantmentNumber) == Enchantment.KindCursed)
-            {
-                lookNameBuilder.Append(" (Cursed}");
-            }
-            else
-            {
-                lookNameBuilder.Append(" of ");
-                lookNameBuilder.Append(enchantmentName);
-            }
+            lookNameBuilder.Append(" of ");
+            lookNameBuilder.Append(enchantmentName);
             return lookNameBuilder.ToString();
         }
 
         return baseName;
+    }
+
+    /// <summary>
+    /// Identified, and cursed: every one of the sixteen grades, 144 to 159, not just the first.
+    /// </summary>
+    private bool IsKnownCursed()
+    {
+        return loreResult == Skills.ESkillTestResult.CriticalSuccess && !String.IsNullOrEmpty(enchantmentName)
+               && Enchantment.KindOf(enchantmentNumber) == Enchantment.KindCursed;
     }
 
     public string GetNonMagicalName()
