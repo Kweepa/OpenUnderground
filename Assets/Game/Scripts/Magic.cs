@@ -390,6 +390,9 @@ public class Magic : MonoBehaviour
 
     public readonly bool[] castSpells = new bool[spells.Count];
 
+    /// <summary>How often a worn Regeneration or Mana Regeneration gives its point: one world tick.</summary>
+    private const int RegenerationSeconds = 20;
+
     // similar spells with duration
     private static readonly string[][] similarSpells =
     {
@@ -918,8 +921,10 @@ public class Magic : MonoBehaviour
             lastIncrementedMana += 5 * 60;
         }
 
-        // update permanent spells
-        if (PlayerData.sData.gameTime > lastCheckedPermanentSpells + 10)
+        // update permanent spells: the original's world tick gives one hit point or one point of
+        // mana for each of the two regeneration enchantments it finds on (UW.EXE 0x2acbd, at
+        // 0x2ad93-0x2adc9), and a tick is 20 seconds of game time
+        if (PlayerData.sData.gameTime > lastCheckedPermanentSpells + RegenerationSeconds)
         {
             foreach (SPermanentSpell spell in permanentSpells)
             {
@@ -933,7 +938,7 @@ public class Magic : MonoBehaviour
                     break;
                 }
             }
-            lastCheckedPermanentSpells += 10;
+            lastCheckedPermanentSpells += RegenerationSeconds;
         }
 
         if (timeBeforeCanCastAgain > 0.0f)
