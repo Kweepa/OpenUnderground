@@ -62,7 +62,7 @@ public class Tile
    public static int GetSubTileX(float worldX)
    {
       int tileX = GetTileX(worldX);
-      return (int)(2 * (worldX - xzScale * tileX));
+      return EighthOfTile(worldX - xzScale * tileX);
    }
 
    /// <summary>
@@ -71,7 +71,18 @@ public class Tile
    public static int GetSubTileY(float worldZ)
    {
       int tileY = GetTileY(worldZ);
-      return (int)(2 * (worldZ - xzScale * tileY));
+      return EighthOfTile(worldZ - xzScale * tileY);
+   }
+
+   /// <summary>
+   /// Which eighth of the tile an offset into it falls in. The sub-tile coordinates of the level
+   /// data are eighths, 0-7; this used to multiply the offset in metres by 2, which reaches only
+   /// 0-5 on a tile of 3 m, so an object put back from a world position could land up to 75 cm
+   /// from where it was.
+   /// </summary>
+   private static int EighthOfTile(float offset)
+   {
+      return Mathf.Clamp((int)(8.0f * offset / xzScale), 0, 7);
    }
 
    // gets a walkable center for pathfinding
