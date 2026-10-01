@@ -559,7 +559,7 @@ public class RangedWeapon : WeaponBase
                 LevelLoader.AddToWorld(proj);
                 proj.doDamage = true;
                 Rigidbody rb = proj.gameObject.GetComponent<Rigidbody>();
-                if (proj != null)
+                if (rb != null)
                 {
                     if (useGravity)
                     {

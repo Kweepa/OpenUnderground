@@ -2096,7 +2096,7 @@ public class Magic : MonoBehaviour
             proj.gameObject.transform.SetPositionAndRotation(start, Quaternion.LookRotation(dir, Vector3.up));
             LevelLoader.AddToWorld(proj);
             Rigidbody rb = proj.gameObject.GetComponent<Rigidbody>();
-            if (proj != null)
+            if (rb != null)
             {
                 // set velocity
                 rb.linearVelocity = 10.0f * dir;
