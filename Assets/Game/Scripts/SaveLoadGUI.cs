@@ -1553,6 +1553,11 @@ public class SaveLoadGUI : MonoBehaviour
         PlayerPrefs.SetInt("Options_UseKeyAutomatically", useKeyAutomatically ? 1 : 0);
         PlayerPrefs.SetInt("Options_AutoJump", autoJump ? 1 : 0);
         PlayerPrefs.SetInt("Options_InvertLook", invertLook ? 1 : 0);
+        // The options with no row on this panel are written too, at the value in force: a read
+        // creates nothing, so until something writes them they are missing from the registry,
+        // which is the only place they can be changed.
+        PlayerPrefs.SetInt("Options_KeepMusicOnMap", PlayerInput.KeepMusicOnMap ? 1 : 0);
+        PlayerPrefs.SetInt("Options_AmbientSilenceMax", (int)PlayerInput.AmbientSilenceMax);
         PlayerPrefs.Save();
         
         // Apply music volume to MusicPlayer
