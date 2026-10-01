@@ -12,6 +12,9 @@ public class RangedWeapon : WeaponBase
     public float spawnOffset;
     [Tooltip("How far toward the weapon hand the missile leaves from, in metres.")]
     public float spawnSide = 0.1f;
+
+    /// <summary>The farthest point along the view a missile is aimed at, in metres.</summary>
+    private const float AimDistance = 40.0f;
     public float spawnVelocity;
 
     public Transform bowRoot;
@@ -547,17 +550,16 @@ public class RangedWeapon : WeaponBase
             Projectile proj = ammo as Projectile;
             if (proj != null)
             {
-                // The missile leaves from beside the eye, so aim it at what the crosshair is on: a
-                // creature within 15 m along the view, with nothing solid in between. The ray starts
-                // at the camera; it used to start at the forward vector, a point near the world
-                // origin, so it never found anything.
+                // The missile leaves from beside the eye, toward the weapon hand, so it is aimed at
+                // what the crosshair is on - a creature or a wall, the first thing along the view - or
+                // at a point far ahead when there is nothing within reach. Fired parallel to the view
+                // it would land as far to the side of the crosshair as it started.
                 int aimMask = (1 << LayerMask.NameToLayer("Characters")) | LayerMasks.EnvironmentAndCeiling;
                 Transform eye = PlayerObject.Player.mainCamera.transform;
-                if (Physics.Raycast(eye.position, dir, out RaycastHit hit, 15.0f, aimMask)
-                    && hit.collider.gameObject.layer == LayerMask.NameToLayer("Characters"))
-                {
-                    dir = (hit.point - start).normalized;
-                }
+                Vector3 aimPoint = Physics.Raycast(eye.position, dir, out RaycastHit hit, AimDistance, aimMask)
+                    ? hit.point
+                    : eye.position + AimDistance * dir;
+                dir = (aimPoint - start).normalized;
                 
                 proj.projectileOwner = PlayerObject.Player.gameObject;
                 proj.createdByCursedEntity = Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed);
