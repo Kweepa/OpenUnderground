@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Dropping a stack onto an item of the same kind that does not stack, such as one with something tied to it, no longer makes the stack vanish.
+
 - Where you aim now decides where your blow lands: at the legs, the body or the head of what you strike, and the blood shows where it landed. A blow aimed over a rat's head, or under a bat, meets nothing.
 
 - Creatures now strike high, middle or low, as in the original, so a skeleton or a ghoul can reach your head, which before it never did. Rats, spiders and other small creatures on the ground still cannot.
