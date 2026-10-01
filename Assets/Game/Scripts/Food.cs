@@ -170,7 +170,11 @@ public class Food : UUObject
             case EObjectType.Mushroom:
                 Messages.Add(1, 232);
                 defaultMessage = false;
-                // TODO: add to mana
+                // Three points of mana, every time. The original rolls Intelligence against 20 and on
+                // any result but a plain failure adds 0, 1 or 2 points (UW.EXE 0x37615, 0x34656): about
+                // half a point on average, less than any spell of the first circle costs, so this is a
+                // choice and not the original's rule.
+                Magic.sMagic.RestoreMana(3);
                 // turn on hallucination effect
                 PlayerObject.Player.GetComponent<PlayerEffectsController>().StartMushroomTrip();
                 PlayerData.sData.tripped = true;

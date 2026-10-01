@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Eating a mushroom gives three points of mana.
+
 - Dropping a stack onto an item of the same kind that does not stack, such as one with something tied to it, no longer makes the stack vanish.
 
 - Where you aim now decides where your blow lands: at the legs, the body or the head of what you strike, and the blood shows where it landed. A blow aimed over a rat's head, or under a bat, meets nothing.
