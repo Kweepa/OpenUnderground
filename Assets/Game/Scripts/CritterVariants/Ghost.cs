@@ -50,6 +50,20 @@ namespace Game.Scripts.CritterVariants
             }
         }
 
+        /// <summary>
+        /// A ghost flies (Critter.GetMovementTypeFromData()), so it wanders in the air rather than
+        /// down to the floor: 1.5 m over the floor, or over a bridge's deck, never under it - from
+        /// under a deck it could not rise to a player on top. 1.5 m is the height a flyer's path
+        /// keeps, and the one the level data gives most often: 11 of the 27 ghosts and dire ghosts
+        /// start two floor steps up.
+        /// </summary>
+        protected override Vector3 AdjustWanderPoint(Tile tile)
+        {
+            Vector3 point = tile.GetCenter();
+            point.y = GetFlightSurfaceY(tile, float.PositiveInfinity) + 1.5f;
+            return point;
+        }
+
         protected override void SetState(EState newState)
         {
             base.SetState(newState);

@@ -49,6 +49,9 @@ namespace Game.Scripts.CritterVariants
  
             point.y = targetHeight;
 
+            // never under a bridge's deck: from there a flyer cannot rise to a player on top
+            point.y = Mathf.Max(point.y, GetLowestWanderY(tile));
+
             return point;
         }
 

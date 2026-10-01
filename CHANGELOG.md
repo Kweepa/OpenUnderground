@@ -2,6 +2,14 @@
 
 ## Current release
 
+- A creature you press in a fight now steps back, or sometimes aside, as in the original, when it has room to: never into a wall, up or down a step, off a bridge, or into water or lava.
+
+- Ghosts now fly, as in the original, so a step or a pool no longer stops them from coming after you.
+
+- Creatures now follow you across a bridge over water, as in the original, where before they could not find the way onto it.
+
+- A creature that walks and ends up in water, with no dry ground under it, now drowns at once, as in the original, and leaves no experience.
+
 - The stats panel gives each sentence a line of its own, with the values in bold, and now tells you when you are seriously or egregiously poisoned.
 
 - Fireballs and lightning bolts now burst where they stop, as in the original: a fireball does 10 to 60 points of fire to everyone close to where it hits, a lightning bolt 6 to 30, and that includes you if you cast it at something too near. In water they just sink. Both are drawn bigger, to tell them from a magic missile.

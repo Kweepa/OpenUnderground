@@ -588,7 +588,7 @@ public class Critter : UUObject
             elite = IsEliteInData(critterData);
             lootAlreadyMade = IsLootMadeInData(critterData);
 
-            movementType = (EMovementType)(stats.Category & 0xf);
+            movementType = GetMovementTypeFromData();
         }
 
         originalHp = hp;
@@ -680,6 +680,11 @@ public class Critter : UUObject
             case EObjectType.VampireBat:
             case EObjectType.Tyball:
             case EObjectType.Gazer:
+            case EObjectType.GhostA:
+            case EObjectType.GhostB:
+            case EObjectType.GhostC:
+            case EObjectType.DireGhost:
+            case EObjectType.Wisp:
                 // don't want the defaults
                 break;
             default:
@@ -1007,6 +1012,28 @@ public class Critter : UUObject
 
     private bool isTwilightZone => type is EObjectType.TwilightZoneA or EObjectType.TwilightZoneB or EObjectType.TwilightZoneC;
 
+    /// <summary>
+    /// How this creature moves. The original picks it from critterStats byte 0x0a: bit 7 flies and
+    /// bit 6 swims, on movement records of their own, and anything else walks (UW.EXE 0x1b270 to
+    /// 0x1b2b0). WARNING: here it comes from the category, byte 0x10, which is the wrong field: the
+    /// original does not read it for this. The two agree but for category 0, the ethereal, and for
+    /// Tyball, a flyer of category 1 whose path picks walking or flying (GetPath()). Read as
+    /// TwilightZone, category 0 kept the ghosts, the dire ghost, the gazer and the wisp - flyers
+    /// all four - on the ground, where a step that a walker climbs stopped them; so a category-0
+    /// type with bit 7 flies here too. The shadow beast, of the same category and no flyer, and the
+    /// creatures of the Ethereal Void keep TwilightZone, which counts as airborne (IsAirborne()):
+    /// for the shadow beast, a walker in the original, that is a choice and not this rule.
+    /// </summary>
+    private EMovementType GetMovementTypeFromData()
+    {
+        EMovementType fromCategory = (EMovementType)(stats.Category & 0xf);
+        if (fromCategory == EMovementType.TwilightZone && !isTwilightZone && (stats.Passive & 0x80) != 0)
+        {
+            return EMovementType.Flying;
+        }
+        return fromCategory;
+    }
+
     public static bool canBeSummoned(EObjectType type)
     {
         return DataLoader.sDataLoader.comObjProps[(int)type].canBeSummoned;
@@ -1020,6 +1047,180 @@ public class Critter : UUObject
     private readonly Collider[] sphereOverlapCache = new Collider[12];
 
     protected Vector3 swimmerDesiredMotion;
+
+    // The step a walking creature takes in its combat stance when it is crowded: where to, how
+    // fast, how long it has left, and how long until it decides again. See UpdateCombatStep().
+    private Vector3 combatStepDirection;
+    private float combatStepSpeed;
+    private float combatStepTime;
+    private float combatStepDecisionTime;
+
+    /// <summary>How often a crowded creature decides its step again. Ours: the original decides on every tick.</summary>
+    private const float CombatStepPeriod = 0.5f;
+
+    /// <summary>
+    /// A creature that its target has come too close to steps away, as the original's does.
+    /// UW.EXE 0x197af, read whole, runs on every thinking tick of a creature in its combat stance.
+    /// It points the heading at the target and, closer than 7/8 of a tile, one time in four sets the
+    /// move 90 degrees to the left or the right at two thirds of the creature's walking speed, and
+    /// the other three times straight back at speed 2 (0x1981c-0x198d6). The speeds are in the units
+    /// of critterStats byte 0x0b, the walking speed (0x18cb1), which become a velocity at 47 to the
+    /// unit (0x2b799 in 0x2b5dc). So every creature steps back at the same speed, while the step
+    /// aside depends on the type: for a goblin both are half its walk, and a slug does not move
+    /// aside at all. As the decision is taken again on every tick, the creature keeps stepping while
+    /// it is too close and stops as soon as it is not, and its attack roll goes on meanwhile
+    /// (0x19a01). It keeps facing the target, as the user saw in the original. Its attack reach is
+    /// 10/8 of a tile, so too close is 0.7 of that reach, here of meleeAttackRange. Only where
+    /// IsCombatStepSafe() finds room, and only for the creatures of StepsInCombat().
+    /// </summary>
+    /// <returns>Whether the creature steps this frame.</returns>
+    private bool UpdateCombatStep()
+    {
+        bool wasStepping = combatStepTime > 0.0f;
+        combatStepDecisionTime -= Time.deltaTime;
+        combatStepTime -= Time.deltaTime;
+        if (combatStepTime > 0.0f && IsCrowdedInCombat() && IsCombatStepSafe(combatStepDirection))
+        {
+            MoveCombatStep();
+            return true;
+        }
+        combatStepTime = 0.0f;
+
+        if (combatStepDecisionTime <= 0.0f)
+        {
+            combatStepDecisionTime = CombatStepPeriod;
+            if (TryStartCombatStep())
+            {
+                MoveCombatStep();
+                return true;
+            }
+        }
+
+        if (wasStepping)
+        {
+            ChangeAnimation("CombatIdle");
+        }
+        return false;
+    }
+
+    /// <summary>Whether this creature takes the step and its target is closer than the original's 7/8 of a tile.</summary>
+    private bool IsCrowdedInCombat()
+    {
+        return StepsInCombat()
+            && cachedCharacterController != null && cachedCharacterController.enabled
+            && GetDistanceToTarget() < 0.7f * meleeAttackRange;
+    }
+
+    /// <summary>
+    /// Who takes the step. In the original every creature does: 0x197af looks at the type only to
+    /// set a flyer's height. Here the shadow beast moves on the ground (EMovementType.TwilightZone),
+    /// so it steps as a walker does; a swimmer keeps its stance, as its moves are those of the
+    /// water, and so do the Ethereal Void's creatures, which only idle.
+    /// </summary>
+    private bool StepsInCombat()
+    {
+        return movementType switch
+        {
+            EMovementType.Walking or EMovementType.Creeping or EMovementType.Crawling or EMovementType.Flying => true,
+            EMovementType.TwilightZone => !isTwilightZone,
+            _ => false,
+        };
+    }
+
+    private bool TryStartCombatStep()
+    {
+        if (!IsCrowdedInCombat())
+        {
+            return false;
+        }
+
+        Vector3 toTarget = GetTargetFootPos() - transform.position;
+        toTarget.y = 0.0f;
+        if (toTarget.sqrMagnitude < 1e-6f)
+        {
+            return false;
+        }
+        toTarget.Normalize();
+
+        bool aside = Random.Range(0, 4) == 0;
+        Vector3 direction = aside
+            ? Quaternion.AngleAxis(Random.Range(0, 2) == 0 ? 90.0f : -90.0f, Vector3.up) * toTarget
+            : -toTarget;
+        // The original's units, with a walk of 4 - goblins, humans and trolls, the commonest -
+        // taken as walkSpeed, since here every type walks at the speed of its prefab. Ours.
+        int units = aside ? 2 * stats.WalkSpeed / 3 : 2;
+        if (units == 0 || !IsCombatStepSafe(direction))
+        {
+            return false;
+        }
+
+        combatStepDirection = direction;
+        combatStepSpeed = units * walkSpeed / 4.0f;
+        combatStepTime = CombatStepPeriod;
+        ChangeAnimation("Walk");
+        return true;
+    }
+
+    /// <summary>Moves one frame of the step, facing the target.</summary>
+    private void MoveCombatStep()
+    {
+        TurnTo(GetTargetFootPos(), combatTurnSpeed, 30.0f);
+        Vector3 motion = combatStepDirection * (combatStepSpeed * Time.deltaTime);
+        if (movementType != EMovementType.Flying)
+        {
+            motion -= 3.0f * Time.deltaTime * Vector3.up;
+        }
+        motion = ApplyOverlapAvoidance(motion, updateWallRubTime: false);
+        cachedCharacterController.Move(motion);
+    }
+
+    /// <summary>
+    /// Room for a step: nothing solid within a body's width along it, and at half that width and
+    /// at all of it a floor to stand on. In the original a walker that moves without a path - as
+    /// this step does - is stopped by its contact callback at a step up, a drop, water and lava
+    /// (UW.EXE 0x15ed1), lava only for one that fire hurts (0x1b2c7). Here the floor is the tile's,
+    /// slopes included, or a bridge at the creature's height, and it has to be within half a floor
+    /// step of its feet, which also keeps it from backing off the edge of a bridge. A flyer needs
+    /// room only: the original's is not stopped at a drop, water or lava (its callback 0x1609e is
+    /// not asked about them). The shadow beast, which hovers on the ground, keeps the floor test.
+    /// </summary>
+    private bool IsCombatStepSafe(Vector3 direction)
+    {
+        float radius = cachedCharacterController.radius;
+        Vector3 center = transform.TransformPoint(cachedCharacterController.center);
+        if (Physics.SphereCast(center, 0.9f * radius, direction, out _, 2.0f * radius, LayerMasks.EnvironmentAndCeiling))
+        {
+            return false;
+        }
+        if (movementType == EMovementType.Flying)
+        {
+            return true;
+        }
+
+        GetBody(out float feet, out _);
+        return IsCombatStepFloor(transform.position + radius * direction, feet)
+            && IsCombatStepFloor(transform.position + 2.0f * radius * direction, feet);
+    }
+
+    private bool IsCombatStepFloor(Vector3 point, float feet)
+    {
+        Tile tile = LevelLoader.GetTile(point);
+        if (tile == null || tile.type == 0)
+        {
+            return false;
+        }
+        if (HasBridgeAtHeight(tile, feet))
+        {
+            return true;
+        }
+        if (Mathf.Abs(tile.GetFloorY(point.x, point.z) - feet) > 0.5f * Tile.yScale)
+        {
+            return false;
+        }
+
+        ETerrainType terrain = tile.GetFloorTerrain();
+        return terrain != ETerrainType.Water && (terrain != ETerrainType.Lava || !AvoidsLava());
+    }
 
     /// <summary>
     /// Applies overlap avoidance to prevent critters from moving into each other/separate critters.
@@ -1078,11 +1279,7 @@ public class Critter : UUObject
     /// </summary>
     private Vector3 GetSteeringForDoors(Vector3 movementDir, float lookaheadDistance)
     {
-        if (movementType == EMovementType.Flying)
-        {
-            return Vector3.zero; // Flyers don't need door steering
-        }
-
+        // Flyers steer too: a ghost is as wide as a man, and the frame catches it as it does him.
         Vector3 currentPos = transform.position;
 
         // Check if we're approaching a door by looking at upcoming path points
@@ -1185,6 +1382,7 @@ public class Critter : UUObject
     bool MoveAlongPath(float moveSpeed, float doneDistance)
     {
         bool done = false;
+        bool climbFirst = false;
         Vector3 off = path[0] - transform.position;
         if (movementType != EMovementType.Flying)
         {
@@ -1192,9 +1390,34 @@ public class Critter : UUObject
         }
         else
         {
-            // bob
-            flyerBobTime += Time.deltaTime;
-            off.y += flyerBobMagnitude * Mathf.Sin(flyerBobTime * flyerBobSpeed);
+            Tile next = LevelLoader.GetTile(path[0]);
+            float targetY = path[0].y;
+            if (GetFlightLimitByDoors(cachedCurrentTile) < float.PositiveInfinity || GetFlightLimitByDoors(next) < float.PositiveInfinity)
+            {
+                // by a door: no bob, so as to pass under the frame
+            }
+            else
+            {
+                // bob
+                flyerBobTime += Time.deltaTime;
+                targetY += flyerBobMagnitude * Mathf.Sin(flyerBobTime * flyerBobSpeed);
+            }
+
+            float currentY = transform.position.y;
+            float deckTop = GetBridgeDeckUnder(path[0], path[0].y);
+            float overDeck = deckTop + FlyerBodyBelow + 0.25f;
+            if (currentY < overDeck - 0.05f && !IsUnderBridge(transform.position, currentY))
+            {
+                // the next point is over a bridge and this flyer is lower, beside it: it rises
+                // where it is first, or it would fly in under the deck and stay there
+                climbFirst = true;
+                targetY = Mathf.Min(overDeck, GetFlightLimit(cachedCurrentTile, currentY));
+            }
+            else
+            {
+                targetY = Mathf.Min(targetY, GetFlightLimit(cachedCurrentTile, currentY), GetFlightLimit(next, currentY));
+            }
+            off.y = targetY - currentY;
         }
 
         float distanceToNextPathPoint = Mathf.Sqrt(off.x * off.x + off.z * off.z);
@@ -1210,13 +1433,17 @@ public class Critter : UUObject
         {
             float distance = Mathf.Min(moveSpeed * Time.deltaTime, off.magnitude);
             Vector3 motion = distance * off.normalized;
+            if (climbFirst)
+            {
+                motion = Mathf.Min(moveSpeed * Time.deltaTime, Mathf.Max(0.0f, off.y)) * Vector3.up;
+            }
 
             // Apply steering corrections for doors
             float lookaheadDistance = Mathf.Min(off.magnitude, 2.0f);
             Vector3 doorSteering = GetSteeringForDoors(off.normalized, lookaheadDistance);
 
             // Blend steering correction into movement direction
-            if (doorSteering.sqrMagnitude > 0.01f)
+            if (doorSteering.sqrMagnitude > 0.01f && !climbFirst)
             {
                 // Blend the steering correction with the original direction
                 // Use a weighted average to avoid completely overriding path following
@@ -1252,6 +1479,251 @@ public class Critter : UUObject
         }
 
         return done;
+    }
+
+    /// <summary>
+    /// Brings a flyer down, smoothly, when it is above GetFlightLimit(): one put too high by what
+    /// spawned it - a trap, a summoning, the creature cheat lifts a flyer 2 m - or one whose tile
+    /// has just changed to one under a lower ceiling.
+    /// </summary>
+    private void KeepFlyerUnderLimit()
+    {
+        if (movementType != EMovementType.Flying || state is EState.Die or EState.Dead or EState.Cleanup
+            || cachedCharacterController == null || !cachedCharacterController.enabled)
+        {
+            return;
+        }
+
+        float excess = transform.position.y - GetFlightLimit(cachedCurrentTile, transform.position.y);
+        if (excess > 0.05f)
+        {
+            cachedCharacterController.Move(Mathf.Min(excess, 3.0f * Time.deltaTime) * Vector3.down);
+        }
+    }
+
+    /// <summary>
+    /// Puts a flyer just spawned under GetFlightLimit() at once, so that it does not appear inside
+    /// the ceiling and drop out of it.
+    /// </summary>
+    public void FitFlightHeight()
+    {
+        if (movementType != EMovementType.Flying)
+        {
+            return;
+        }
+
+        Vector3 p = transform.position;
+        p.y = Mathf.Min(p.y, GetFlightLimit(LevelLoader.GetTile(p), p.y));
+        transform.position = p;
+    }
+
+    /// <summary>
+    /// In its combat stance a flyer rises or sinks to GetFlyerCombatY(), at 1 m a second (ours), and
+    /// keeps still within one unit of it, as the original's does.
+    /// </summary>
+    private void UpdateFlyerCombatHeight()
+    {
+        if (movementType != EMovementType.Flying || cachedCharacterController == null || !cachedCharacterController.enabled)
+        {
+            return;
+        }
+
+        float currentY = transform.position.y;
+        float wanted = Mathf.Min(GetFlyerCombatY(), GetFlightLimit(cachedCurrentTile, currentY));
+        float dz = wanted - currentY;
+        if (Mathf.Abs(dz) > yScale)
+        {
+            cachedCharacterController.Move(Mathf.Sign(dz) * Mathf.Min(Mathf.Abs(dz), 1.0f * Time.deltaTime) * Vector3.up);
+        }
+    }
+
+    private static readonly int[] sideX = { 0, 1, 0, -1 };
+    private static readonly int[] sideY = { 1, 0, -1, 0 };
+
+    /// <summary>How far a flyer's body reaches above its position, and how far it hangs below.</summary>
+    private float FlyerBodyTop => cachedCharacterController.center.y + 0.5f * cachedCharacterController.height;
+    private float FlyerBodyBelow => Mathf.Max(0.0f, 0.5f * cachedCharacterController.height - cachedCharacterController.center.y);
+
+    /// <summary>The ceiling of every level but the Ethereal Void, as Flyer.AdjustWanderPoint() takes it.</summary>
+    private const float CeilingY = 12.0f;
+
+    /// <summary>
+    /// The height of a flyer's combat stance: its position 14 units above its target's, which is
+    /// where the original's rises or sinks to in its stance (UW.EXE 0x19988-0x199fd: up when the
+    /// difference is over one unit, down when under minus one). A unit is an eighth of a floor step.
+    /// </summary>
+    private float FlyerCombatHeight => 14.0f * yScale;
+
+    /// <summary>
+    /// Where a flyer holds its position in a fight: the original's 14 units over its target's feet,
+    /// but no higher than puts the middle of its body at the target's chest (ours). The original
+    /// measures from an object's base; here a body sits on its position as its model was made -
+    /// a ghost's reaches 1.7 m above it and 0.5 m below - so at 14 units over the player's feet a
+    /// ghost fought with its head 3 m up, above his. The bound is the chest, raised for the tall
+    /// flyers by FlyerCombatLift.
+    /// </summary>
+    private float GetFlyerCombatY()
+    {
+        return Mathf.Min(GetTargetFootPos().y + FlyerCombatHeight,
+            GetTargetPos().y + FlyerCombatLift - cachedCharacterController.center.y);
+    }
+
+    /// <summary>
+    /// How far over the target's chest a flyer holds the middle of its body, set by eye in play
+    /// (ours): a ghost a little higher, a gazer higher still, so that its eye meets the player's;
+    /// a bat at the chest.
+    /// </summary>
+    private float FlyerCombatLift => type switch
+    {
+        EObjectType.GhostA or EObjectType.GhostB or EObjectType.GhostC or EObjectType.DireGhost => 0.25f,
+        EObjectType.Gazer => 0.7f,
+        _ => 0.0f,
+    };
+
+    /// <summary>
+    /// What a flyer at height <paramref name="flightY"/> flies over on <paramref name="t"/>: the
+    /// top of a bridge's deck it is not below, or else the tile's floor. A ghost over the water
+    /// beside a bridge took the floor of the water for its own and flew under the deck to reach a
+    /// player on it, and stayed there.
+    /// </summary>
+    protected float GetFlightSurfaceY(Tile t, float flightY)
+    {
+        float surface = t.GetCenter().y;
+        for (int i = 0; i < 2; ++i)
+        {
+            Bridge bridge = i == 0 ? t.bridge : t.upperBridge;
+            if (bridge != null)
+            {
+                float deck = bridge.z * yScale;
+                if (flightY >= deck - 0.5f && deck + BridgeDeckThickness > surface)
+                {
+                    surface = deck + BridgeDeckThickness;
+                }
+            }
+        }
+
+        return surface;
+    }
+
+    /// <summary>
+    /// The lowest a wandering flyer may aim on <paramref name="t"/>: a quarter of a metre over the
+    /// floor, or over a bridge's deck there - never under it.
+    /// </summary>
+    protected float GetLowestWanderY(Tile t)
+    {
+        return GetFlightSurfaceY(t, float.PositiveInfinity) + FlyerBodyBelow + 0.25f;
+    }
+
+    /// <summary>How thick a bridge's deck is: the cube of 356Bridge.prefab, 0.1875 high, on the bridge's position.</summary>
+    private const float BridgeDeckThickness = 0.1875f;
+
+    /// <summary>
+    /// The top of the highest bridge deck under this flyer's body at <paramref name="p"/> - on the
+    /// tile of its centre or of any side of it - that a flyer at <paramref name="flightY"/> is not
+    /// below; negative infinity where there is none.
+    /// </summary>
+    private float GetBridgeDeckUnder(Vector3 p, float flightY)
+    {
+        float deckTop = float.NegativeInfinity;
+        for (int i = -1; i < sideX.Length; ++i)
+        {
+            Tile t = GetFootprintTile(p, i);
+            for (int j = 0; t != null && j < 2; ++j)
+            {
+                Bridge bridge = j == 0 ? t.bridge : t.upperBridge;
+                if (bridge != null && flightY >= bridge.z * yScale - 0.5f)
+                {
+                    deckTop = Mathf.Max(deckTop, bridge.z * yScale + BridgeDeckThickness);
+                }
+            }
+        }
+
+        return deckTop;
+    }
+
+    /// <summary>Whether this flyer's body at <paramref name="p"/> and <paramref name="flightY"/> is under a bridge's deck.</summary>
+    private bool IsUnderBridge(Vector3 p, float flightY)
+    {
+        for (int i = -1; i < sideX.Length; ++i)
+        {
+            Tile t = GetFootprintTile(p, i);
+            for (int j = 0; t != null && j < 2; ++j)
+            {
+                Bridge bridge = j == 0 ? t.bridge : t.upperBridge;
+                if (bridge != null && flightY < bridge.z * yScale - 0.5f)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The tile under <paramref name="p"/> for -1, and for 0..3 the tile one body radius and a bit to that side of it.</summary>
+    private Tile GetFootprintTile(Vector3 p, int side)
+    {
+        if (side >= 0)
+        {
+            float reach = cachedCharacterController.radius + 0.1f;
+            p += new Vector3(sideX[side] * reach, 0.0f, sideY[side] * reach);
+        }
+        return LevelLoader.GetTile(p);
+    }
+
+    /// <summary>
+    /// The highest a flyer at height <paramref name="flightY"/> may be over <paramref name="t"/>,
+    /// so that its body stays under the ceiling, under a bridge's deck it is below, and under the
+    /// top of a door's frame on that tile or beside it; with 0.1 m to spare. The paths kept 1.5 m up, and
+    /// higher at the edges of tiles, and Flyer.AdjustWanderPoint() up to the ceiling less a metre:
+    /// a ghost's body, 1.7 m above its position, went into the ceiling where a floor is high, into
+    /// a door's frame, and into a bridge from below.
+    /// </summary>
+    private float GetFlightLimit(Tile t, float flightY)
+    {
+        if (t == null || cachedCharacterController == null)
+        {
+            return float.PositiveInfinity;
+        }
+
+        float limit = Mathf.Min(GetFlightLimitByDoors(t), CeilingY - FlyerBodyTop - 0.1f);
+        for (int i = 0; i < 2; ++i)
+        {
+            Bridge bridge = i == 0 ? t.bridge : t.upperBridge;
+            if (bridge != null && flightY < bridge.z * yScale - 0.5f)
+            {
+                limit = Mathf.Min(limit, bridge.z * yScale - FlyerBodyTop - 0.1f);
+            }
+        }
+
+        return limit;
+    }
+
+    /// <summary>
+    /// The highest this flyer may be over <paramref name="t"/> for its body to pass under the top
+    /// of a door's frame on that tile or on one beside it; infinity where there is no door. A
+    /// flyer's path keeps 1.5 m up, which put a ghost's or a gazer's head into the frame, and
+    /// there it stopped.
+    /// </summary>
+    private float GetFlightLimitByDoors(Tile t)
+    {
+        float limit = float.PositiveInfinity;
+        if (t == null || cachedCharacterController == null)
+        {
+            return limit;
+        }
+
+        float bodyTop = cachedCharacterController.center.y + 0.5f * cachedCharacterController.height;
+        for (int i = -1; i < sideX.Length; ++i)
+        {
+            Tile n = i < 0 ? t : LevelLoader.GetTile(t.x + sideX[i], t.y + sideY[i]);
+            if (n != null && n.door != null)
+            {
+                limit = Mathf.Min(limit, n.door.OpeningTop - bodyTop - 0.1f);
+            }
+        }
+
+        return limit;
     }
 
     private string currentAnimation = "Idle";
@@ -1409,6 +1881,31 @@ public class Critter : UUObject
         }
     }
 
+    private bool attackLungeChecked;
+    private bool attackHasLunge;
+
+    /// <summary>Whether any clip of this creature's animator calls OnLunge(), as an attack clip does.</summary>
+    private bool AttackHasLungeEvent()
+    {
+        if (!attackLungeChecked)
+        {
+            attackLungeChecked = true;
+            RuntimeAnimatorController controller = cachedAnimator != null ? cachedAnimator.runtimeAnimatorController : null;
+            if (controller != null)
+            {
+                foreach (AnimationClip clip in controller.animationClips)
+                {
+                    foreach (AnimationEvent clipEvent in clip.events)
+                    {
+                        attackHasLunge |= clipEvent.functionName == nameof(OnLunge);
+                    }
+                }
+            }
+        }
+
+        return attackHasLunge;
+    }
+
     /// <summary>
     /// Animation event callback to start the lunge forward during attack.
     /// </summary>
@@ -1421,10 +1918,10 @@ public class Critter : UUObject
         // Calculate lunge destination and direction
         Vector3 targetPos = GetTargetFootPos();
 
-        // For flyers, target 2m above player feet
+        // For flyers, the height of their combat stance, under the ceiling
         if (movementType == EMovementType.Flying)
         {
-            targetPos.y += 2.0f;
+            targetPos.y = Mathf.Min(GetFlyerCombatY(), GetFlightLimit(LevelLoader.GetTile(targetPos), transform.position.y));
         }
 
         float dist = Vector3.Distance(transform.position, targetPos);
@@ -1492,7 +1989,7 @@ public class Critter : UUObject
     private bool deathProcessed;
     private bool remainsSpawned;
 
-    private void EnsureDeathProcessedOnce()
+    private void EnsureDeathProcessedOnce(bool drowned = false)
     {
         if (deathProcessed)
         {
@@ -1505,11 +2002,14 @@ public class Critter : UUObject
         SpawnInventory();
         SpawnCorpseContents();
         SpawnRandomReplacement();
-        BloodStain.TrySpawnDeathStain(transform.position, stats.Remains, blood);
+        if (!drowned)
+        {
+            BloodStain.TrySpawnDeathStain(transform.position, stats.Remains, blood);
 
-        // TODO: reduce based on relative level of player and enemy
-        // also maybe reduce based on max abyss level reached...?
-        PlayerObject.AddXP(10 * stats.Exp);
+            // TODO: reduce based on relative level of player and enemy
+            // also maybe reduce based on max abyss level reached...?
+            PlayerObject.AddXP(10 * stats.Exp);
+        }
 
         if (whoami == EWhoAmI.Gazer)
         {
@@ -1617,6 +2117,8 @@ public class Critter : UUObject
             slot = 0;
             stateTime = Random.Range(0.5f, 2.5f);
             ChangeAnimation("CombatIdle");
+            combatStepTime = 0.0f;
+            combatStepDecisionTime = 0.0f;
             NotifyRaceOfAttack();
             PlayerObject.Player.RegisterEncounteredCritter(type, levelIndex, objectIndex, originalHp);
             break;
@@ -1643,6 +2145,13 @@ public class Critter : UUObject
             mLungeTime = 0.0f; // Reset lunge timer - will be set by animation event
             mLungeDirection = Vector3.zero;
             mLungeDestination = Vector3.zero;
+            if (cachedAnimator != null && movementType != EMovementType.Swimming && !AttackHasLungeEvent())
+            {
+                // The ghosts' and the fire elemental's attacks have no lunge of their own, so they
+                // struck from wherever they stood, up to meleeAttackRange away; this lunges as the
+                // other creatures' clips do, to the 2 m every one of them asks for.
+                OnLunge(2.0f);
+            }
             Music.InCombat(this);
             break;
         case EState.ProjectileIdle:
@@ -2069,6 +2578,7 @@ public class Critter : UUObject
 
         // Update cached current tile
         cachedCurrentTile = LevelLoader.GetTile(transform.position);
+        KeepFlyerUnderLimit();
 
         // Check PVS visibility and update renderer visibility
         if (LevelLoader.GetLevel().pvs.IsVisible(cachedCurrentTile) && !IsOccludedByDoor())
@@ -2150,6 +2660,11 @@ public class Critter : UUObject
         if (state != EState.Die && state != EState.Dead && state != EState.Cleanup)
         {
             UpdateLavaBurn();
+            if (StandsOnlyInWater())
+            {
+                Drown();
+                return;
+            }
             if (hp <= 0 && !isTwilightZone && !IsGolemWithShieldOfValor())
             {
                 SetState(EState.Die);
@@ -2446,6 +2961,16 @@ public class Critter : UUObject
                 break;
             case EState.CombatIdle:
                 TryCloseDoorIfTrapped();
+                UpdateFlyerCombatHeight();
+                if (UpdateCombatStep())
+                {
+                    stateTime -= Time.deltaTime;
+                    if (stateTime < 0.0f)
+                    {
+                        CheckTransitionToAttack();
+                    }
+                    break;
+                }
                 if (cachedAnimator == null)
                 {
                     TurnTo(GetTargetFootPos(), combatTurnSpeed, 30.0f);
@@ -3030,8 +3555,9 @@ public class Critter : UUObject
 
             if (movementType == EMovementType.Flying)
             {
-                // move up off the ground. the path will get shrinkwrapped in the post process.
-                center.y = center.y + 1.5f;
+                // move up off the ground, or off a bridge on the way. the path will get
+                // shrinkwrapped in the post process.
+                center.y = GetFlightSurfaceY(tiles[i], Mathf.Max(start.y, end.y)) + 1.5f;
             }
 
             vecPath.Add(center);
@@ -3055,6 +3581,7 @@ public class Critter : UUObject
         if (found && movementType == EMovementType.Flying)
         {
             PostProcessPath(start, vecPath);
+            FitFlightPath(start, vecPath);
         }
 
         // Debug draw the final path for 5 seconds (including current position at start)
@@ -3065,6 +3592,98 @@ public class Critter : UUObject
             {
                 Debug.DrawLine(vecPath[i], vecPath[i + 1], Color.cyan, 5.0f);
             }
+        }
+    }
+
+    /// <summary>How far above the floor a flyer's body passes over a tile's edge: a quarter of a metre, ours.</summary>
+    private const float FlyerEdgeClearance = 0.25f;
+
+    private readonly int[] edgeHeights = new int[4];
+
+    /// <summary>
+    /// The highest floor of <paramref name="t"/> for a flyer at <paramref name="flightY"/>: the
+    /// highest of the tile's four corners, so a slope's high side, or the top of a bridge's deck
+    /// it is not under. A corner of 16 is the solid half of a diagonal tile, not a floor: taken
+    /// for one, it put a ghost's path at the ceiling wherever it passed a diagonal wall.
+    /// </summary>
+    private float GetFlightFloorTopY(Tile t, float flightY)
+    {
+        float top = t.floorHeight * Tile.yScale;
+        if (t.movingPlatform != null)
+        {
+            top = t.movingPlatform.h * Tile.yScale;
+        }
+        else
+        {
+            LevelLoader.sLevelLoader.GetFloorHeights(edgeHeights, t.x, t.y, 0, 0, null);
+            foreach (int corner in edgeHeights)
+            {
+                if (corner < 16)
+                {
+                    top = Mathf.Max(top, corner * Tile.yScale);
+                }
+            }
+        }
+
+        return Mathf.Max(top, GetFlightSurfaceY(t, flightY));
+    }
+
+    /// <summary>
+    /// Fits a flyer's path to its body. A node over a bridge, on a path that ends on the deck or
+    /// above it, goes over the deck: the line of heights PostProcessPath() lays from a flyer low over
+    /// the water to a player on the bridge ran under it. Every node goes under the
+    /// ceiling and under door frames (GetFlightLimit()). And a flyer that starts under a deck, for a
+    /// goal higher up and not under one, first leaves the bridge sideways at its own height, to the
+    /// nearest tile beside it with no bridge: rising where it was, it would meet the deck.
+    /// </summary>
+    private void FitFlightPath(Vector3 start, List<Vector3> vecPath)
+    {
+        if (vecPath.Count == 0 || cachedCharacterController == null)
+        {
+            return;
+        }
+
+        float endY = vecPath[vecPath.Count - 1].y;
+        for (int i = 0; i < vecPath.Count; ++i)
+        {
+            Vector3 v = vecPath[i];
+            v.y = Mathf.Max(v.y, GetBridgeDeckUnder(v, Mathf.Max(v.y, endY)) + FlyerBodyBelow + 0.25f);
+            v.y = Mathf.Min(v.y, GetFlightLimit(LevelLoader.GetTile(v), v.y));
+            vecPath[i] = v;
+        }
+
+        Tile here = LevelLoader.GetTile(start);
+        if (here == null || !IsUnderBridge(start, start.y) || IsUnderBridge(vecPath[vecPath.Count - 1], endY) || endY < start.y + 0.5f)
+        {
+            return;
+        }
+
+        Vector3 exit = Vector3.zero;
+        float exitDistance = float.PositiveInfinity;
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                Tile t = LevelLoader.GetTile(here.x + dx, here.y + dy);
+                if (t == null || t.type == 0 || t.bridge != null || t.upperBridge != null)
+                {
+                    continue;
+                }
+
+                Vector3 c = t.GetCenter();
+                c.y = start.y;
+                float d = (c - start).sqrMagnitude;
+                if (d < exitDistance)
+                {
+                    exit = c;
+                    exitDistance = d;
+                }
+            }
+        }
+
+        if (exitDistance < float.PositiveInfinity)
+        {
+            vecPath.Insert(0, exit);
         }
     }
 
@@ -3095,7 +3714,6 @@ public class Critter : UUObject
             // Prepend current position so we can add a clearance node between start and first path point.
             vecPath.Insert(0, start);
 
-            float h = cachedCharacterController.height;
             List<Vector3> processedPath = new List<Vector3>(vecPath.Count * 2);
 
             for (int j = 0; j < vecPath.Count - 1; ++j)
@@ -3113,14 +3731,19 @@ public class Critter : UUObject
                     continue;
                 }
 
-                // If path height is below edge height + 2*h, insert a clearance node.
-                float crossingEdgeY = Mathf.Max(currentTile.floorHeight, nextTile.floorHeight) * Tile.yScale + 2.0f * h;
+                // If the body would cross the edge lower than the higher of the two floors there, insert a
+                // clearance node that carries it over: the top of that floor - a slope's high side, or a
+                // bridge's deck it is not under - plus what the body hangs below its position, plus a
+                // margin. It was 2 x the capsule's height over the floor's base, 1.2 m for a bat and
+                // 4.4 m for a ghost, whatever the step.
+                float refY = Mathf.Max(current.y, next.y);
+                float crossingEdgeY = Mathf.Max(GetFlightFloorTopY(currentTile, refY), GetFlightFloorTopY(nextTile, refY))
+                    + FlyerBodyBelow + FlyerEdgeClearance;
                 float crossingPathY = (current.y + next.y) / 2.0f;
 
                 if (crossingPathY < crossingEdgeY)
                 {
-                    // Position the clearance node on the edge between the two tiles (midpoint of centers in XZ),
-                    // at a height of newFloorY + 2*h.
+                    // Position the clearance node on the edge between the two tiles (midpoint of centers in XZ).
                     Vector3 currentCenter = currentTile.GetCenter();
                     Vector3 nextCenter = nextTile.GetCenter();
                     Vector3 edgePos = 0.5f * (currentCenter + nextCenter);
@@ -3133,7 +3756,10 @@ public class Critter : UUObject
             // Add the final point.
             processedPath.Add(vecPath[vecPath.Count - 1]);
 
-            vecPath = processedPath;
+            // Into the caller's list: "vecPath = processedPath" reassigned the parameter, and from here to
+            // the end every step, the clearance nodes included, never reached the path (fix 281).
+            vecPath.Clear();
+            vecPath.AddRange(processedPath);
 
             // 3) Raise central points: for each triplet (A, B, C), if B is lower than the midpoint of A and C, raise B.
             bool smoothed = true;
@@ -3202,6 +3828,61 @@ public class Critter : UUObject
     private bool KeepsOutOf(Tile t)
     {
         return !lavaCrossable && IsLavaToAvoid(t);
+    }
+
+    /// <summary>
+    /// Whether this walker stands in water and nowhere else: on the water's floor, not on a bridge,
+    /// and with no tile of dry floor under any side of its body. In the original a walker whose only
+    /// terrain contact is water drowns there and then (UW.EXE 0x15f16, in the walkers' contact
+    /// callback 0x15ed1); one that touches water and something else is only stopped at the edge.
+    /// The path search keeps walkers out of water, so it is one that fell or was put there.
+    /// </summary>
+    private bool StandsOnlyInWater()
+    {
+        if (movementType is not (EMovementType.Walking or EMovementType.Creeping or EMovementType.Crawling)
+            || cachedCharacterController == null || !cachedCharacterController.enabled)
+        {
+            return false;
+        }
+
+        Tile t = cachedCurrentTile;
+        if (t == null || t.GetFloorTerrain() != ETerrainType.Water)
+        {
+            return false;
+        }
+
+        GetBody(out float feet, out _);
+        Vector3 p = transform.position;
+        if (feet > t.GetFloorY(p.x, p.z) + 0.25f || HasBridgeAtHeight(t, feet))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < sideX.Length; ++i)
+        {
+            Tile side = GetFootprintTile(p, i);
+            if (side != null && side.type != 0 && side.GetFloorTerrain() != ETerrainType.Water)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The original's drowning: a splash, then the creature goes as a dead one does, its belongings
+    /// spilled where it stood, with no death played and no experience - the state the creature tick's
+    /// dying branch takes at its last phase, written without the damage that gives experience
+    /// (0x15f16: the splash, object 454, through 0x3aca3; state 12, phase 3).
+    /// </summary>
+    private void Drown()
+    {
+        SpawnSplash(DataLoader.sDataLoader.splash, DataLoader.sDataLoader.waterSplashParticle, 5.0f * Vector3.down);
+        Music.EnemyDied();
+        hp = 0;
+        EnsureDeathProcessedOnce(drowned: true);
+        Utils.DestroyCritter(this);
     }
 
     /// <summary>
@@ -3429,7 +4110,8 @@ public class Critter : UUObject
             }
         default:
             // Slasher of Veils shouldn't try shortcutting corners
-            return terrainType != ETerrainType.Water && !KeepsOutOf(t)
+            // water, unless a bridge spans it (see CanStepBetweenTiles())
+            return (terrainType != ETerrainType.Water || t.bridge != null) && !KeepsOutOf(t)
                 && (LevelLoader.sLevelLoader.loadedLevel != 9 || t.floorTexture != 9);
         }
     }
@@ -3469,6 +4151,17 @@ public class Critter : UUObject
         {
             // going to this tile, we want to pass the direction to the tile
             LevelLoader.sLevelLoader.GetFloorHeights(toHeights, to.x, to.y, dx, dy, null);
+        }
+
+        // A bridge is the floor of its tile for a walker, as in the original's path search: there a
+        // standable object - COMOBJ byte 3 bit 1, which the bridge has - raises the tile's height to
+        // the object's top, (z + COMOBJ height) / 8, and the tile's own terrain is not tested
+        // (UW.EXE 0x163c2-0x16457 and 0x16499). Without it a walker never found a path over a bridge
+        // across water, whose floor is many steps below the deck.
+        if (movementType is not (EMovementType.Flying or EMovementType.Swimming))
+        {
+            RaiseToBridgeDeck(from, fromHeights);
+            RaiseToBridgeDeck(to, toHeights);
         }
 
         // Map direction to edge corners
@@ -3529,6 +4222,21 @@ public class Critter : UUObject
         bool canDropFar = state == EState.TurnToFlee || confusionTime > 0.0f;
         float allowedDropHeight = canDropFar ? maxDropHeight : stepOffset;
         return maxStepUp <= stepOffset && maxDrop <= allowedDropHeight;
+    }
+
+    /// <summary>Raises the four corner heights of <paramref name="t"/> to the top of its bridge's deck, in floor units.</summary>
+    private static void RaiseToBridgeDeck(Tile t, int[] heights)
+    {
+        if (t.bridge == null)
+        {
+            return;
+        }
+
+        int deck = (t.bridge.z + DataLoader.sDataLoader.comObjProps[(int)t.bridge.type].height) >> 3;
+        for (int i = 0; i < heights.Length; ++i)
+        {
+            heights[i] = Mathf.Max(heights[i], deck);
+        }
     }
 
     private List<Tile> GetValidNeighbours(Tile t, Tile home, int maxRange, Tile exclude)
@@ -4434,6 +5142,7 @@ public class Critter : UUObject
             if (critter != null && critter.movementType == EMovementType.Flying)
             {
                 critter.transform.position += 2.0f * Vector3.up;
+                critter.FitFlightHeight();
             }
         }
     }
@@ -4905,6 +5614,11 @@ public class Critter : UUObject
             lootAlreadyMade = critterData.lootAlreadyMade;
             RefreshMarkersFromLevel();
             movementType = (EMovementType)critterData.movementType;
+            if (movementType == EMovementType.TwilightZone)
+            {
+                // a save from before the ghosts flew
+                movementType = GetMovementTypeFromData();
+            }
             state = (EState)critterData.state;
             stateTime = critterData.stateTime;
             playerAlly = critterData.playerAlly;
