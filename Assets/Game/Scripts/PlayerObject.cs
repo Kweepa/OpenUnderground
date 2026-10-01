@@ -172,23 +172,24 @@ public class PlayerObject : MonoBehaviour
         Weapon weapon = Inventory.sInv.invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand)] as Weapon;
         defenceScore += Skills.GetSkill(weapon != null ? weapon.skill : ESkill.Unarmed) / 2;
 
-        if (asKnown)
-        {
-            // Magic protection is per body part, so it cannot be added whole to a single figure.
-            // The panel shows the flat terms above plus the average of the four parts; the roll
-            // does not come through here, it takes the exact part being struck off the attacker's
-            // score in Critter.TryDamageTarget(). Adding it to the real score as well would count
-            // it twice.
-            defenceScore += Inventory.AverageOverBodyParts(
-                Inventory.sInv.GetMagicProtectionByBodyPart(asKnown: true));
-        }
-
         bool cursed = asKnown
             ? Magic.sMagic.IsSpellKnownActive(Magic.ESpell.Cursed)
             : Magic.sMagic.IsSpellActive(Magic.ESpell.Cursed);
         if (cursed)
         {
             defenceScore /= 2;
+        }
+
+        if (asKnown)
+        {
+            // Magic protection is per body part, so it cannot be added whole to a single figure.
+            // The panel shows the flat terms above plus the average of the four parts; the roll
+            // does not come through here, it takes the exact part being struck off the attacker's
+            // score in Critter.TryDamageTarget(). Adding it to the real score as well would count
+            // it twice. It comes after the halving for Cursed, because the roll takes it off the
+            // attacker's score whole, curse or not.
+            defenceScore += Inventory.AverageOverBodyParts(
+                Inventory.sInv.GetMagicProtectionByBodyPart(asKnown: true));
         }
 
         return defenceScore;
