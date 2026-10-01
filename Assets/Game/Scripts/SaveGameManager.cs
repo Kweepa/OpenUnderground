@@ -1916,8 +1916,14 @@ public class SaveGameManager : MonoBehaviour
             // Restore state from save data
             plat.LoadFromSaveData(mpData);
             
-            // Link tile
-            tile.movingPlatform = plat;
+            // Link tile, but only on the platform's own level. GetTile(x, y) above is the loaded
+            // level's tile, which for a platform of another level is the tile of the same number
+            // there - levels 4 and 5 both have one at (60,33) - and LinkObjectsToTiles() links the
+            // right tile once initialTile has been restored.
+            if (LevelLoader.GetTile(data.level, mpData.initialTileX, mpData.initialTileY) == tile)
+            {
+                tile.movingPlatform = plat;
+            }
             
             return plat;
         }
