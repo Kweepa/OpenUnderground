@@ -511,6 +511,12 @@ public class Interaction : MonoBehaviour
         return obj != null && GetWorldInteractionDistance(obj) < GetInteractionDistance(obj);
     }
 
+    /// <summary>Within reach for a use, as the crosshair judges it: Telekinesis and a carried pole count.</summary>
+    public bool IsWithinUseReach(UUObject obj)
+    {
+        return HasSomethingToInteractWith(obj);
+    }
+
     /// <summary>Within the object's own reach for a use, with no Telekinesis and no pole.</summary>
     public bool IsWithinHandReach(UUObject obj)
     {

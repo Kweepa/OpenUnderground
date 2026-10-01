@@ -41,6 +41,63 @@ public abstract class Lockable : UUObject
         }
     }
 
+    /// <summary>
+    /// Unlocks with a key, a pick or the Open spell, and then takes the lock away unless it is one
+    /// that survives being opened. The original frees the lock when bit 10 of its first word is
+    /// clear and only clears the locked bit otherwise (UW.EXE 0x3831b, at 0x384a2); bit 10 is flags
+    /// bit 1 here. Three of the game's 84 locks have it clear, one on a door and the two on chests,
+    /// so that door cannot be locked again once it has been opened.
+    /// </summary>
+    private void UnlockAndUseUp()
+    {
+        if (!Locked(out UUObject lockObj))
+        {
+            return;
+        }
+
+        Unlock();
+
+        // The lock is always the first object on the list in the level data, which is the only
+        // place Locked() looks for it.
+        if ((lockObj.flags & (1 << 1)) == 0 && link == lockObj.objectIndex)
+        {
+            link = lockObj.chainIndex;
+            lockObj.chainIndex = 0;
+        }
+    }
+
+    /// <summary>
+    /// Whether a skill may try this lock at all. The original's lock routine refuses a lock at
+    /// difficulty 15 before any roll, so only its key opens it, and one at 14 to any skill below
+    /// 31 (UW.EXE 0x3831b, at 0x38412). Picklock stops at 30, so a lock at 14 opens without its
+    /// key only to the Open spell, whose skill is 45. The difficulty is the lock's z.
+    /// </summary>
+    private static bool SkillMayTryLock(int skill, UUObject lockObj)
+    {
+        return lockObj.z != 15 && (lockObj.z != 14 || skill >= 31);
+    }
+
+    /// <summary>
+    /// The Open spell on this door or chest: the original rolls the spell's skill against three
+    /// times the lock's difficulty, like a pick (UW.EXE 0x3831b, called from 0x3599f).
+    /// </summary>
+    /// <returns>True when the lock opened.</returns>
+    public bool TryUnlockWithSpell(int skill)
+    {
+        if (!Locked(out UUObject lockObj) || !SkillMayTryLock(skill, lockObj))
+        {
+            return false;
+        }
+
+        if (Skills.GetResult(skill, 3 * lockObj.z) < Skills.ESkillTestResult.Success)
+        {
+            return false;
+        }
+
+        UnlockAndUseUp();
+        return true;
+    }
+
     /// <summary>Clears the locked flag without unlock audio or chain reactions.</summary>
     public void ClearLockedFlag()
     {
@@ -111,7 +168,7 @@ public abstract class Lockable : UUObject
                 {
                     if (lockObj != null)
                     {
-                        Messages.Add(1, 6); // that is already open
+                        Messages.Add(1, 122); // that is not locked (UW.EXE 0x36ade)
                     }
                     else
                     {
@@ -239,7 +296,7 @@ public abstract class Lockable : UUObject
         {
             if (Locked(out UUObject lockObj) && KeyMatchesLock(key, lockObj))
             {
-                Unlock();
+                UnlockAndUseUp();
                 unlocked = true;
                 Messages.Add(1, 5); // the key unlocks the lock
                 unlocker = key;
@@ -260,12 +317,25 @@ public abstract class Lockable : UUObject
     protected void TryUseLockpick(Key lockpick, UUObject lockObj)
     {
         // try to pick lock. borrowed logic from Hank once again :)
-        Skills.ESkillTestResult result = Skills.GetResult(1 + Skills.GetSkill(ESkill.Picklock), 3 * lockObj.z);
+        // The original's lock routine refuses the two key-only difficulties before rolling
+        // (UW.EXE 0x3831b), so those never open to a pick. The roll is still made there, so a pick
+        // can break on them as on any other lock; the original's pick never breaks. The original
+        // rolls plain Picklock (0x36a78); the +1 here is kept, since a new character rarely has more
+        // than 10. The gate reads the skill without it: at 30 + 1 a pick would reach Open's 31.
+        int skill = Skills.GetSkill(ESkill.Picklock);
+        Skills.ESkillTestResult result = Skills.GetResult(1 + skill, 3 * lockObj.z);
+        if (!SkillMayTryLock(skill, lockObj) && result > Skills.ESkillTestResult.Failure)
+        {
+            result = Skills.ESkillTestResult.Failure;
+        }
 
         switch (result)
         {
         case Skills.ESkillTestResult.CriticalFailure:
-            if (Skills.GetResult(PlayerData.sData.dexterity, 20) < Skills.ESkillTestResult.Success)
+            // Against 15, not 20: with the key-only locks rolling too, 20 broke about 40% of the
+            // picks tried on locks of difficulty 13 and up; 15 brings that to about 30% (the
+            // user's number, 2 October 2026).
+            if (Skills.GetResult(PlayerData.sData.dexterity, 15) < Skills.ESkillTestResult.Success)
             {
                 Messages.Add("The pick broke.");
                 Utils.PlayClip(lockpick.lockpickBreak, transform.position);
@@ -290,7 +360,7 @@ public abstract class Lockable : UUObject
             break;
         case Skills.ESkillTestResult.Success:
         case Skills.ESkillTestResult.CriticalSuccess:
-            Unlock();
+            UnlockAndUseUp();
             Messages.Add(1, 121);
             break;
         }
