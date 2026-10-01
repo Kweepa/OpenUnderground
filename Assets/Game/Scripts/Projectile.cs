@@ -34,6 +34,88 @@ public class Projectile : UUObject
         quality = 63;
     }
 
+    /// <summary>
+    /// The sling stone's picture fills only the bottom rows of its frame, 11 to 15 of 16 in
+    /// OBJECTS.GR. In an inventory cell it lay on the cell's lower edge while a click on it lands
+    /// in the middle, and carried on the cursor it showed below the point that clicks. In the pack
+    /// and on the cursor it is drawn raised, its middle at a third of the frame's height; the world
+    /// keeps the frame as it is, since there the stone rests on the floor.
+    /// </summary>
+    public override Texture2D GetInventoryTex()
+    {
+        Texture2D tex = base.GetInventoryTex();
+        return type == EObjectType.SlingStone ? Raised(tex) : tex;
+    }
+
+    private static Texture2D raisedSource;
+    private static Texture2D raised;
+
+    private static Texture2D Raised(Texture2D source)
+    {
+        if (source == null || source == raisedSource)
+        {
+            return source == null ? null : raised;
+        }
+
+        raisedSource = source;
+        raised = source;
+        try
+        {
+            int w = source.width;
+            int h = source.height;
+            Color[] pixels = source.GetPixels();
+
+            // The rows the picture covers. Texture rows count up from the bottom.
+            int low = -1;
+            int high = -1;
+            for (int y = 0; y < h; ++y)
+            {
+                for (int x = 0; x < w; ++x)
+                {
+                    if (pixels[y * w + x].a > 0.0f)
+                    {
+                        if (low < 0)
+                        {
+                            low = y;
+                        }
+                        high = y;
+                        break;
+                    }
+                }
+            }
+
+            int shift = low < 0 ? 0 : Mathf.RoundToInt(h / 3.0f - (low + high + 1) / 2.0f);
+            if (shift <= 0)
+            {
+                return raised;
+            }
+
+            Color[] moved = new Color[pixels.Length];
+            for (int y = 0; y + shift < h; ++y)
+            {
+                for (int x = 0; x < w; ++x)
+                {
+                    moved[(y + shift) * w + x] = pixels[y * w + x];
+                }
+            }
+
+            raised = new Texture2D(w, h, TextureFormat.RGBA32, mipChain: false)
+            {
+                name = source.name + " (raised)",
+                filterMode = source.filterMode,
+                wrapMode = source.wrapMode
+            };
+            raised.SetPixels(moved);
+            raised.Apply();
+        }
+        catch (UnityException)
+        {
+            // an unreadable texture: the stone keeps its frame as it was
+        }
+
+        return raised;
+    }
+
     private void HitSomething()
     {
         // depending on missile skill you can keep more weapon projectiles
