@@ -530,7 +530,7 @@ public class UUObject : LevelObject
             switch (objectIndex)
             {
             case 867: // chest is facing the wall, so rotate 180
-                angle = (angle + 4) % 7;
+                angle = (angle + 4) & 7; // eight headings of 45 degrees: % 7 turned 3 into 0, not 7
                 break;
             case 914: // move ring out from under rock
                 x = 0;
