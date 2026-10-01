@@ -10,6 +10,8 @@ public class RangedWeapon : WeaponBase
 
     public float spawnForward;
     public float spawnOffset;
+    [Tooltip("How far toward the weapon hand the missile leaves from, in metres.")]
+    public float spawnSide = 0.1f;
     public float spawnVelocity;
 
     public Transform bowRoot;
@@ -535,7 +537,7 @@ public class RangedWeapon : WeaponBase
             Vector3 horizontalOffset = PlayerData.sData.leftHanded 
                 ? -PlayerObject.Player.transform.right 
                 : PlayerObject.Player.transform.right;
-            Vector3 start = PlayerObject.Player.transform.position + 0.1f * horizontalOffset + spawnOffset * Vector3.up + spawnForward * PlayerObject.Player.mainCamera.transform.forward;
+            Vector3 start = PlayerObject.Player.transform.position + spawnSide * horizontalOffset + spawnOffset * Vector3.up + spawnForward * PlayerObject.Player.mainCamera.transform.forward;
             Vector3 dir = PlayerObject.Player.mainCamera.transform.forward;
             Projectile proj = ammo as Projectile;
             if (proj != null)

@@ -337,6 +337,7 @@ MonoBehaviour:
   successfulShot: {fileID: 8300000, guid: f96f99e73bc650440a8655e70ddbcd02, type: 3}
   spawnForward: 0.3
   spawnOffset: 0.8
+  spawnSide: 0.2
   spawnVelocity: 15
   bowRoot: {fileID: 1029447769483494404}
   projectileRoot: {fileID: 7525961065130327053}
