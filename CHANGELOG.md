@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A toadstool now makes you ill, as its message says and as in the original.
+
 - A new character starts a little hurt, 6 to 11 hit points short of the maximum, as in the original.
 
 - Eating a mushroom gives three points of mana.
