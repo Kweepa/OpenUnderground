@@ -1590,7 +1590,10 @@ public class PlayerObject : MonoBehaviour
             // Easy mode: reduce damage taken by player to 2/3
             int actualDamage = PlayerData.sData.easy ? (damage * 2 / 3) : damage;
             PlayerData.sData.hp -= actualDamage;
-            if (PlayerData.sData.hp < 0)
+            // A blow that takes every hit point left kills, as in the original: the damage routine
+            // sets the hit points to 0 when the blow is at least what is left (UW.EXE 0x1c3ea), and
+            // the world tick calls the death of the player as soon as they are 0 (0x26565).
+            if (PlayerData.sData.hp <= 0)
             {
                 PlayerData.sData.hp = 0;
                 PlayerData.sData.dead = true;
