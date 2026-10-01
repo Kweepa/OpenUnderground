@@ -2478,48 +2478,73 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>The skill the Open spell tries a lock with (UW.EXE 0x3599f, `push $0xffd3`).</summary>
+    private const int OpenSpellSkill = 45;
+
+    /// <summary>
+    /// Open, as the original casts it: on the one door or chest aimed at, within reach. The
+    /// original arms a targeted cast (UW.EXE 0x359e5) whose callback hands the object clicked to
+    /// the lock routine with a skill of 45 (0x35900, 0x3831b), refuses an object out of reach with
+    /// message 94 (0x270bc), and says 270 when the lock opens and 271 otherwise. Its reach is 1.5
+    /// tiles (0x2661b, DS:0x286); this uses the remake's own reach for using the object.
+    /// </summary>
     void CastOpen(Vector3? aimDirFromCameraOpt = null)
     {
-        // find doors/chests around and open them
-        float radius = 3.0f * Tile.xzScale;
-        Vector3 fwd = aimDirFromCameraOpt ?? PlayerObject.Player.mainCamera.transform.forward;
-        if (fwd.sqrMagnitude < 1e-8f)
+        Camera c = PlayerObject.Player.mainCamera;
+        UUObject target = null;
+        if (aimDirFromCameraOpt.HasValue)
         {
-            fwd = PlayerObject.Player.mainCamera.transform.forward;
+            Vector3 d = aimDirFromCameraOpt.Value;
+            if (d.sqrMagnitude < 1e-8f)
+            {
+                d = c.transform.forward;
+            }
+            else
+            {
+                d.Normalize();
+            }
+
+            TryGetBestUuObjectAlongAimRay(c.transform.position, d, out target, out _);
         }
         else
         {
-            fwd.Normalize();
+            target = Interaction.sInt.centeredObject;
         }
 
-        int count = Physics.OverlapSphereNonAlloc(
-                     PlayerObject.Player.mainCamera.transform.position + radius * fwd, radius,
-                     cachedColliders, LayerMasks.EnvironmentAndCeiling);
-        List<Lockable> lockablesAttempted = new List<Lockable>();
-        for (int i = 0; i < count; i++)
+        if (target == null)
         {
-            Collider col = cachedColliders[i];
-            Lockable lockable = col.transform.root.gameObject.GetComponent<Lockable>();
-            if (lockable != null && lockable.Locked(out UUObject lockObj) && !lockablesAttempted.Contains(lockable))
-            {
-                lockablesAttempted.Add(lockable);
-                if (lockable is Door)
-                {
-                    Quaternion q = lockable.transform.rotation;
-                    // maybe rotate the particle 180 so it's on the same side of the door as the player
-                    if (Vector3.Dot(PlayerObject.Player.mainCamera.transform.position - lockable.transform.position, lockable.transform.forward) < 0.0f)
-                    {
-                        q *= Quaternion.AngleAxis(180.0f, Vector3.up);
-                    }
-                    ParticleSpawner.SpawnParticle(EParticleType.MagicOpenDoor, lockable.transform.position, q);
-                }
-                else if (lockable is Chest)
-                {
-                    ParticleSpawner.SpawnParticle(EParticleType.MagicOpenChest, lockable.transform.position, lockable.transform.rotation);
-                }
-                lockable.Unlock();
-            }
+            Messages.Add(1, 271); // the spell has no discernable effect
+            return;
         }
+
+        if (!Interaction.sInt.IsWithinUseReach(target))
+        {
+            Messages.Add(1, 94); // you cannot reach that
+            return;
+        }
+
+        Lockable lockable = target as Lockable;
+        if (lockable == null || !lockable.TryUnlockWithSpell(OpenSpellSkill))
+        {
+            Messages.Add(1, 271); // the spell has no discernable effect
+            return;
+        }
+
+        if (lockable is Door)
+        {
+            Quaternion q = lockable.transform.rotation;
+            // maybe rotate the particle 180 so it's on the same side of the door as the player
+            if (Vector3.Dot(c.transform.position - lockable.transform.position, lockable.transform.forward) < 0.0f)
+            {
+                q *= Quaternion.AngleAxis(180.0f, Vector3.up);
+            }
+            ParticleSpawner.SpawnParticle(EParticleType.MagicOpenDoor, lockable.transform.position, q);
+        }
+        else if (lockable is Chest)
+        {
+            ParticleSpawner.SpawnParticle(EParticleType.MagicOpenChest, lockable.transform.position, lockable.transform.rotation);
+        }
+        Messages.Add(1, 270); // the spell unlocks the lock
     }
 
     void CastSmiteUndead()

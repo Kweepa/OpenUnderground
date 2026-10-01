@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The Open spell works as in the original: it opens the one door or chest you aim at, within reach, and a hard lock can resist it. Locks the original keeps for their own key no longer give way to it, nor to a lockpick, so the spell no longer lets you skip a part of the game.
+
 - A toadstool now makes you ill, as its message says and as in the original.
 
 - A new character starts a little hurt, 6 to 11 hit points short of the maximum, as in the original.
