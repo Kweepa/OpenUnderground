@@ -340,7 +340,12 @@ public class RangedWeapon : WeaponBase
         }
         sWhirlGraph = PlayableGraph.Create("Sling whirl");
         sWhirlGraph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
-        sWhirlPlayable = AnimationClipPlayable.Create(sWhirlGraph, slingWhirlClip);
+        // The goblins' clip calls PlaySound on the goblin's Critter, which the rig does not keep,
+        // and the whirl plays its own sound: posing the clip as it is made Unity warn that the event
+        // has no receiver, at every pose. A copy of the clip without its events is posed instead.
+        AnimationClip quietClip = Instantiate(slingWhirlClip);
+        quietClip.events = System.Array.Empty<AnimationEvent>();
+        sWhirlPlayable = AnimationClipPlayable.Create(sWhirlGraph, quietClip);
         sWhirlPlayable.SetApplyFootIK(false);
         AnimationPlayableOutput output = AnimationPlayableOutput.Create(sWhirlGraph, "Sling whirl", whirlAnimator);
         output.SetSourcePlayable(sWhirlPlayable);
