@@ -180,10 +180,19 @@ public class Food : UUObject
                 PlayerData.sData.tripped = true;
                 break;
             case EObjectType.Toadstool:
+            {
                 Messages.Add(1, 231);
                 defaultMessage = false;
-                // TODO: poison the player
+                // The original sets the poison straight, with no resistance: to 4 when it is
+                // lower, 2 higher from 4 to 12, and from 13 up not at all (UW.EXE 0x374ee, at
+                // 0x377a5-0x377ef).
+                int poison = PlayerData.sData.poison;
+                if (poison <= 12)
+                {
+                    PlayerObject.PoisonAtLeast(poison < 4 ? 4 : poison + 2);
+                }
                 break;
+            }
             case EObjectType.PlantB:
             case EObjectType.PlantC:
                 Messages.Add(1, 236); // eat around thorny flowers
