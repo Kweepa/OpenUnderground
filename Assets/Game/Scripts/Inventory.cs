@@ -2363,6 +2363,14 @@ public class Inventory : MonoBehaviour
     /// <summary>Stack merge identity beyond type. Keys also require matching lock id (ownerIndex).</summary>
     private static bool SameStackMergeIdentity(UUObject a, UUObject b)
     {
+        // Both sides have to be stacks. An object of a stackable type whose special holds a link
+        // or an enchantment - 368 or more - is not one: setting its quantity writes nothing, so a
+        // merge into it destroyed the stack carried onto it, and a merge of it into a stack
+        // destroyed it and whatever its link carried.
+        if (!a.stackable || !b.stackable)
+        {
+            return false;
+        }
         if (a.quality != b.quality)
         {
             return false;
