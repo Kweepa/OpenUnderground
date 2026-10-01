@@ -388,7 +388,7 @@ public class Magic : MonoBehaviour
 
     private readonly List<SPermanentSpell> permanentSpells = new();
 
-    public readonly bool[] castSpells = new bool[52];
+    public readonly bool[] castSpells = new bool[spells.Count];
 
     // similar spells with duration
     private static readonly string[][] similarSpells =
