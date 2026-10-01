@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A new character starts a little hurt, 6 to 11 hit points short of the maximum, as in the original.
+
 - Eating a mushroom gives three points of mana.
 
 - Dropping a stack onto an item of the same kind that does not stack, such as one with something tied to it, no longer makes the stack vanish.
