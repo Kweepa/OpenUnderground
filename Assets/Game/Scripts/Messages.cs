@@ -26,6 +26,19 @@ public class Messages : MonoBehaviour
 
     private List<SDisplayMessage> messages = new ();
 
+    struct SPendingMessage
+    {
+        public string message;
+        public float time;
+        public float delay;
+    }
+
+    /// <summary>Messages waiting for their delay to run out, in the order they were added.</summary>
+    private List<SPendingMessage> pendingMessages = new ();
+
+    /// <summary>While above zero, Add() holds every message back by this many seconds.</summary>
+    private static float sAddDelay;
+
     protected void Start()
     {
         sMessages = this;
@@ -33,6 +46,28 @@ public class Messages : MonoBehaviour
 
     protected void Update()
     {
+        // BeginDelay() and EndDelay() come in pairs within one call, so by now the delay is off;
+        // this only matters if a spell threw in between, which would leave every message late.
+        sAddDelay = 0.0f;
+
+        // Game time, not real time: with timeScale at 0 - paused, on the map, in a conversation,
+        // on the save screen - a delayed message waits too, instead of turning up behind it.
+        for (int i = 0; i < pendingMessages.Count; )
+        {
+            SPendingMessage pending = pendingMessages[i];
+            pending.delay -= Time.deltaTime;
+            if (pending.delay <= 0.0f)
+            {
+                pendingMessages.RemoveAt(i);
+                AddMessageInternal(pending.message, pending.time);
+            }
+            else
+            {
+                pendingMessages[i] = pending;
+                ++i;
+            }
+        }
+
         for (int i = messages.Count - 1; i >= 0; --i)
         {
             SDisplayMessage mess = messages[i];
@@ -80,7 +115,34 @@ public class Messages : MonoBehaviour
 
     public static void Add(string messageText, float time = 7.0f)
     {
-        sMessages.AddMessageInternal(messageText, time);
+        if (sAddDelay > 0.0f)
+        {
+            AddLater(messageText, sAddDelay, time);
+        }
+        else
+        {
+            sMessages.AddMessageInternal(messageText, time);
+        }
+    }
+
+    /// <summary>
+    /// Shows a message once delay seconds of game time have passed, on screen and in its place
+    /// among the others, so it can follow a line that is printed after it is added.
+    /// </summary>
+    public static void AddLater(string messageText, float delay, float time = 7.0f)
+    {
+        sMessages.pendingMessages.Add(new SPendingMessage { message = messageText, time = time, delay = delay });
+    }
+
+    /// <summary>Until EndDelay(), every message added comes out delay seconds later.</summary>
+    public static void BeginDelay(float delay)
+    {
+        sAddDelay = delay;
+    }
+
+    public static void EndDelay()
+    {
+        sAddDelay = 0.0f;
     }
 
     public static void Add(int block, int index)
@@ -91,6 +153,7 @@ public class Messages : MonoBehaviour
     public static void Clear()
     {
         sMessages.messages.Clear();
+        sMessages.pendingMessages.Clear();
     }
 
     void AddMessageInternal(string messageText, float time)
