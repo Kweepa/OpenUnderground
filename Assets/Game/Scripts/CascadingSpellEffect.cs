@@ -242,6 +242,12 @@ public class CascadingSpellEffect : LevelObject
         }
     }
     
+    /// <summary>
+    /// The kind of damage the blasts do: Flame Wind's are fire and magic, Sheet Lightning's magic
+    /// alone (the original's table at DS:0x9d3, read by UW.EXE 0x35bca).
+    /// </summary>
+    private int DamageMask => particlePrefab == Magic.sMagic.flameWindParticle ? Resistance.FlameWind : Resistance.SheetLightning;
+
     private void DealDamageAtPosition(Vector3 position)
     {
         // If owner is null or is the player, damage enemies
@@ -255,7 +261,7 @@ public class CascadingSpellEffect : LevelObject
                 if (critter != null && !hitList.Contains(critter))
                 {
                     hitList.Add(critter);
-                    critter.TryDamage(Random.Range(minDamage, maxDamage), Skills.ESkillTestResult.Success);
+                    critter.TryDamage(Random.Range(minDamage, maxDamage), Skills.ESkillTestResult.Success, DamageMask);
                 }
             }
         }
@@ -268,12 +274,11 @@ public class CascadingSpellEffect : LevelObject
             {
                 if (!Physics.Raycast(position, off.normalized, 6.0f, LayerMasks.EnvironmentAndCeiling))
                 {
+                    // Neither armour nor the shield spells take anything off a blast: the original
+                    // sends it straight to the damage gate, past the blow routine, and only its
+                    // kind can stop it (UW.EXE 0x35bca).
                     int damage = Random.Range(minDamage, maxDamage);
-                    if (Magic.sMagic != null && Magic.sMagic.IsSpellActive(Magic.ESpell.ResistBlows))
-                    {
-                        damage /= 2;
-                    }
-                    PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Damage);
+                    PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Damage, DamageMask);
                 }
             }
         }

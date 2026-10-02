@@ -2,6 +2,10 @@
 
 ## Current release
 
+- Resistances work as in the original: they stop a kind of damage outright instead of cutting it. Flameproof stops all fire, lava included; Missile Protection stops arrows, stones and magic missiles, but no longer fireballs or lightning; a ring of Magic Protection now stops one magic hit in three; your fire no longer hurts a fire elemental; and Smite Undead now takes the ghouls too.
+
+- Poison works as in the original: a venomous bite always poisons you, the poison does its level in damage once a minute and then weakens by one, sleeping pays what is left at once, and Poison Resistance keeps you from being poisoned at all, by a trap too.
+
 - Resist Blows, Thick Skin and Iron Flesh now take 1, 2 and 3 points off every blow, down from 2, 3 and 5, whether cast or worn. The original's data says 2, 3 and 5, but the code in the original makes them do nothing at all; at 2, a first-circle spell shrugged off most bites on the first level.
 
 - The Open spell works as in the original: it opens the one door or chest you aim at, within reach, and a hard lock can resist it. Locks the original keeps for their own key no longer give way to it, nor to a lockpick, so the spell no longer lets you skip a part of the game.

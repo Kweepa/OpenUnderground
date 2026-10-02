@@ -1283,6 +1283,19 @@ public class UUObject : LevelObject
     {
     }
 
+    /// <summary>The kinds of damage this object is immune to, from its type (COMOBJ.DAT byte 8).</summary>
+    public int resistances => DataLoader.sDataLoader.comObjProps[(int)type].resistances;
+
+    /// <summary>
+    /// Damage of a kind, with <paramref name="mask"/> in the bits of <see cref="Resistance"/>: the
+    /// original filters it first (UW.EXE 0x25f0a), and a damage stopped there still reaches the
+    /// target as 0, so a creature turns on whoever hit it all the same (0x1c2d2).
+    /// </summary>
+    public void TryDamage(int damage, Skills.ESkillTestResult result, int mask)
+    {
+        TryDamage(Resistance.Filter(damage, mask, resistances), result);
+    }
+
     protected virtual void StolenFrom(UUObject item, int race)
     {
     }

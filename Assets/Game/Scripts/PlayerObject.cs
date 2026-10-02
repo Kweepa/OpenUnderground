@@ -807,7 +807,7 @@ public class PlayerObject : MonoBehaviour
             {
                 timeToNextLavaDamage += Random.Range(2.0f, 3.0f);
                 Skills.ESkillTestResult result = Skills.GetResult(4, 0); // small chance of damaging armor 
-                Damage(result, Random.Range(1, 3), EDamageType.Lava);
+                Damage(result, Random.Range(1, 3), EDamageType.Lava, Resistance.Fire);
             }
         }
         else
@@ -869,7 +869,7 @@ public class PlayerObject : MonoBehaviour
 
                 if (shouldBeBurned)
                 {
-                    Damage(Skills.ESkillTestResult.Success, Random.Range(2, 4), EDamageType.Lava);
+                    Damage(Skills.ESkillTestResult.Success, Random.Range(2, 4), EDamageType.Lava, Resistance.Fire);
                 }
                 else
                 {
@@ -1167,18 +1167,26 @@ public class PlayerObject : MonoBehaviour
         {
             remainingCarryWeight = 2 * PlayerData.sData.strength - (int)Inventory.sInv.GetInventoryWeight();
 
+            // The poison, as the original has it: once a game minute - every third world tick,
+            // UW.EXE 0x2adee - damage equal to the level, typed poison, and then the level drops by
+            // one (0x2ae02-0x2ae3b). A game minute of the original is a minute of real time,
+            // measured in DOSBox by the user. The minute starts when the player is poisoned, and
+            // a stronger poisoning raises the level without starting it again.
             if (PlayerData.sData.poison > 0)
             {
-                // poison wears off quicker
-                bool havePoisonProtection = Magic.sMagic.IsSpellActive(Magic.ESpell.PoisonResistance);
-                timeToDecrementPoison -= (havePoisonProtection ? 3.0f : 1.0f) * Time.deltaTime;
-                if (timeToDecrementPoison <= 0.0f)
+                timeToNextPoisonTick -= Time.deltaTime;
+                if (timeToNextPoisonTick <= 0.0f)
                 {
+                    timeToNextPoisonTick += PoisonTickSeconds;
+                    Damage(Skills.ESkillTestResult.Success, PlayerData.sData.poison, EDamageType.Poison, Resistance.Poison);
                     --PlayerData.sData.poison;
-                    timeToDecrementPoison += Random.Range(25.0f, 35.0f);
                 }
             }
-            
+            else
+            {
+                timeToNextPoisonTick = PoisonTickSeconds;
+            }
+
             if (PlayerData.sData.drunkenness > 0)
             {
                 // Drunkenness wears off over time
@@ -1188,19 +1196,6 @@ public class PlayerObject : MonoBehaviour
                     --PlayerData.sData.drunkenness;
                     // Reset the timer for the next point to wear off
                     timeToDecrementDrunkenness += Random.Range(2.0f, 5.0f);
-                }
-            }
-
-            if (PlayerData.sData.poison > 0)
-            {
-                // damage applied less often
-                bool havePoisonProtection = Magic.sMagic.IsSpellActive(Magic.ESpell.PoisonResistance);
-                timeToNextPoisonDamage -= Time.deltaTime / (havePoisonProtection ? 3.0f : 1.0f);
-                if (timeToNextPoisonDamage <= 0.0f)
-                {
-                    int damage = Utils.GetDamageRoll(PlayerData.sData.poison);
-                    Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Poison);
-                    timeToNextPoisonDamage += Random.Range(15.0f, 20.0f);
                 }
             }
 
@@ -1327,9 +1322,11 @@ public class PlayerObject : MonoBehaviour
     }
 
     public int remainingCarryWeight;
-    private float timeToDecrementPoison;
+    private float timeToNextPoisonTick = PoisonTickSeconds;
     private float timeToDecrementDrunkenness;
-    private float timeToNextPoisonDamage;
+
+    /// <summary>A minute of the original's game time: three world ticks of 20 seconds.</summary>
+    private const float PoisonTickSeconds = 60.0f;
 
     private float timeToNextLavaDamage;
     private float timeToNextVoidDamage;
@@ -1584,8 +1581,22 @@ public class PlayerObject : MonoBehaviour
         yawDelta = delta.x * sens;
     }
 
-    public void Damage(Skills.ESkillTestResult result, int damage, EDamageType damageType)
+    /// <summary>
+    /// Takes hit points off the player. <paramref name="mask"/> says what kinds of damage this is,
+    /// in the bits of <see cref="Resistance"/>, and 0 for none of them.
+    /// </summary>
+    /// <remarks>
+    /// A damage the player's resistances stop does nothing at all, and nothing shows: no flash,
+    /// no grunt, no rumble, no shake and no wear on the armour. Standing in lava under Flameproof
+    /// in the original, the user saw none of it.
+    /// </remarks>
+    public void Damage(Skills.ESkillTestResult result, int damage, EDamageType damageType, int mask = 0)
     {
+        if (damage > 0 && Resistance.Filter(damage, mask, Resistance.Player) == 0)
+        {
+            return;
+        }
+
         if (!PlayerData.sData.dead && !Cheats.sCheats.invincible)
         {
             // Easy mode: reduce damage taken by player to 2/3
@@ -1685,6 +1696,7 @@ public class PlayerObject : MonoBehaviour
         timeInWater = 0.0f;
         timeToNextWaterDamage = 0.0f;
         timeToNextLavaDamage = 3.0f;
+        timeToNextPoisonTick = PoisonTickSeconds;
         noise = 0.0f;
     }
 
@@ -1813,35 +1825,64 @@ public class PlayerObject : MonoBehaviour
         }
     }
 
+    /// <summary>The highest poison level: four bits in the original (P1[0x5f], bits 2-5).</summary>
+    private const int MaxPoison = 15;
+
     /// <summary>
-    /// Raises the poison to a level when it is lower, the way a damage trap with an owner poisons
-    /// in the original: it sets the level and does no damage (UW.EXE 0x73e22, the negative branch).
+    /// Raises the poison to a level when it is lower, with no resistance: the toadstool does this
+    /// in the original (UW.EXE 0x374ee, at 0x377a5).
     /// </summary>
-    /// <remarks>
-    /// The original tests only the resistances of the player's own object type there (0x25eaf with
-    /// mask 0x10), not a spell, so Poison Resistance does not lessen it, unlike AddPoison.
-    /// </remarks>
     public static void PoisonAtLeast(int level)
     {
-        level = Math.Min(level, 15);
-        if (level <= PlayerData.sData.poison)
+        level = Math.Min(level, MaxPoison);
+        if (level > PlayerData.sData.poison)
         {
-            return;
+            PlayerData.sData.poison = level;
         }
-
-        PlayerData.sData.poison = level;
-        Player.timeToDecrementPoison = Random.Range(25.0f, 35.0f);
-        Player.timeToNextPoisonDamage = Random.Range(15.0f, 20.0f);
     }
 
+    /// <summary>
+    /// Poisons the player up to a level, the way a venomous bite and a poison trap do in the
+    /// original: the level is set when it is higher and nothing is added, unless the player
+    /// resists poison (UW.EXE 0x25adf and 0x73e73). Says whether the player was poisoned.
+    /// </summary>
+    public static bool TryPoison(int level)
+    {
+        if (Resistance.PlayerResistsPoisoning())
+        {
+            return false;
+        }
+
+        PoisonAtLeast(level);
+        return true;
+    }
+
+    /// <summary>
+    /// Adds to the poison, unless the player resists it. For the rotten food and the potion of
+    /// Poison, which are this project's; the original's own poisonings set a level instead
+    /// (<see cref="TryPoison"/>).
+    /// </summary>
     public static void AddPoison(int poison)
     {
-        // poison less effective
-        bool havePoisonProtection = Magic.sMagic.IsSpellActive(Magic.ESpell.PoisonResistance);
-        int appliedPoison = poison / (havePoisonProtection ? 3 : 1);
-        PlayerData.sData.poison = Math.Min(PlayerData.sData.poison + appliedPoison, 15);
-        Player.timeToDecrementPoison = Random.Range(25.0f, 35.0f);
-        Player.timeToNextPoisonDamage = Random.Range(15.0f, 20.0f);
+        if (!Resistance.PlayerResistsPoisoning())
+        {
+            PlayerData.sData.poison = Math.Min(PlayerData.sData.poison + poison, MaxPoison);
+        }
+    }
+
+    /// <summary>
+    /// Sleep pays the poison left at once: what the minutes still to come would have done,
+    /// p + (p - 1) + ... + 1, typed poison, and then the poison is gone (UW.EXE 0x81f8f, at
+    /// 0x82073-0x820c1). The original does it before the rest heals anything, so a sleep can kill.
+    /// </summary>
+    public void PayPoisonInSleep()
+    {
+        int poison = PlayerData.sData.poison;
+        if (poison > 0)
+        {
+            Damage(Skills.ESkillTestResult.Success, (poison + 1) * poison / 2, EDamageType.Poison, Resistance.Poison);
+            PlayerData.sData.poison = 0;
+        }
     }
 
     public void GoToEtherealVoid()

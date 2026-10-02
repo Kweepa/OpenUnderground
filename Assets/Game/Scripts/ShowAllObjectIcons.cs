@@ -44,7 +44,7 @@ public class ShowAllObjectIcons : MonoBehaviour
                 {
                     GUI.DrawTexture(new Rect(100 * x + 2, 90 * y + 2, 3 * tex.width, 3.6f * tex.height), tex);
                     GUI.Label(new Rect(100 * x, 90 * y + 55, 90, 40), $"{i}. {DataLoader.GetCleanedObjectName((EObjectType)i)}");
-                    GUI.Label(new Rect(100 * x + 64, 90 * y, 20, 20), $"{DataLoader.sDataLoader.comObjProps[i].scale}");
+                    GUI.Label(new Rect(100 * x + 64, 90 * y, 20, 20), $"{DataLoader.sDataLoader.comObjProps[i].resistances}");
                 
                     ++j;
                 }

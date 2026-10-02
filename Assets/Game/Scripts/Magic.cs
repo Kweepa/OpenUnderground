@@ -31,8 +31,9 @@ public struct SSpell
     /// <summary>
     /// The same spell's index in block 6's lower table, which is the one an item carries:
     /// kind * 16 + parameter, taken from the original's own spell table at UW.EXE 0x59ef0.
-    /// -1 for the four entries that are not spells there at all - Cursed, the two Regenerations
-    /// and Poison Resistance - whose stringIndex is already a number from that lower table.
+    /// -1 for the six entries that are not spells there at all - Cursed, the two Regenerations,
+    /// Poison Resistance and the two Magic Protections - whose stringIndex is already a number
+    /// from that lower table.
     /// </summary>
     public readonly int itemIndex;
 }
@@ -271,7 +272,11 @@ public class Magic : MonoBehaviour
         ManaRegeneration,
         Regeneration,
         PoisonResistance,
-        Acid
+        Acid,
+
+        // after Acid, so that no spell already in a save changes its number
+        MagicProtection,
+        GreaterMagicProtection
     }
 
     [EnumNamedArray(typeof(ESpell))]
@@ -282,6 +287,8 @@ public class Magic : MonoBehaviour
     // STRINGS.PAK block 6 indices used for enchantment matching (language-stable).
     // public const int StringIndexMagicLantern = 4; // not read any more: ResolveWornEffect() decodes kind 0
     public const int StringIndexPoisonResistance = 55;
+    public const int StringIndexMagicProtection = 56;
+    public const int StringIndexGreaterMagicProtection = 57;
     public const int StringIndexCursed = 144;
     public const int StringIndexRegeneration = 190;
     public const int StringIndexManaRegeneration = 191;
@@ -360,7 +367,9 @@ public class Magic : MonoBehaviour
         new SSpell("", "Mana Regeneration", 0, -1, 0, StringIndexManaRegeneration),
         new SSpell("", "Regeneration", 0, -1, 0, StringIndexRegeneration),
         new SSpell("", "Poison Resistance", 0, -1, 0, StringIndexPoisonResistance),
-        new SSpell("ZZZ", "Acid", 0, -1, 0, 305, 84)
+        new SSpell("ZZZ", "Acid", 0, -1, 0, 305, 84),
+        new SSpell("", "Magic Protection", 0, -1, 0, StringIndexMagicProtection),
+        new SSpell("", "Greater Magic Protection", 0, -1, 0, StringIndexGreaterMagicProtection)
     };
 
     /// <summary>
@@ -550,13 +559,14 @@ public class Magic : MonoBehaviour
             case 3: return ESpell.Conceal;
             case 4: return ESpell.Invisibility;
 
-            // Parameters 5 to 9 are the five resistances. In the original they make damage of a
-            // matching type miss outright, which this engine has no vocabulary for, so these two
-            // stay mapped to the spells they were mapped to before: this change is about how an
-            // enchantment is identified, not about what it does. Flameproof (6) and the two Magic
-            // Protections (8, 9) had no mapping before and still have none.
+            // Parameters 5 to 9 are the five resistances: the original ORs DS:0x1b00[parameter]
+            // into the player's resistances, 0x40, 0x08, 0x10, 0x01 and 0x02 (UW.EXE 0x7e007,
+            // case 3). See GetResistances().
             case 5: return ESpell.MissileProtection;
+            case 6: return ESpell.Flameproof;
             case 7: return ESpell.PoisonResistance;
+            case 8: return ESpell.MagicProtection;
+            case 9: return ESpell.GreaterMagicProtection;
             }
             // Parameter 1 is Curse, which the original adds to the protection of every body part
             // rather than making it an effect. Left alone here on purpose.
@@ -577,6 +587,43 @@ public class Magic : MonoBehaviour
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// The player's resistances, in the bits of <see cref="Resistance"/>: the player's own row of
+    /// the original's resistance table, object type 127, which it rebuilds from nothing out of the
+    /// spells in force and the enchanted items worn (UW.EXE 0x7e444, 0x7dea4, case 3 of 0x7e007).
+    /// Flameproof and Missile Protection come cast or worn, Poison Resistance and the two Magic
+    /// Protections only worn.
+    /// </summary>
+    public int GetResistances()
+    {
+        int resistances = 0;
+        if (IsSpellActive(ESpell.MissileProtection))
+        {
+            resistances |= Resistance.Missile;
+        }
+        if (IsSpellActive(ESpell.Flameproof))
+        {
+            resistances |= Resistance.Fire;
+        }
+        if (IsSpellActive(ESpell.PoisonResistance))
+        {
+            resistances |= Resistance.Poison;
+        }
+
+        // Ours: the stronger wins. In the original the two bits add up to 3, and Magic Protection
+        // worn with Greater Magic Protection stops every magic hit; here it stays two in three.
+        if (IsSpellActive(ESpell.GreaterMagicProtection))
+        {
+            resistances |= Resistance.MagicGreater;
+        }
+        else if (IsSpellActive(ESpell.MagicProtection))
+        {
+            resistances |= Resistance.MagicLesser;
+        }
+
+        return resistances;
     }
 
     public void EquipEnchantedItem(UUObject obj)
@@ -2142,7 +2189,8 @@ public class Magic : MonoBehaviour
             if (col is CharacterController)
             {
                 Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null && (critter.attitude is Critter.EAttitude.Upset or Critter.EAttitude.Hostile))
+                if (critter != null && (critter.attitude is Critter.EAttitude.Upset or Critter.EAttitude.Hostile)
+                    && !critter.SavesAgainstMagic())
                 {
                     critter.CreateFear();
                 }
@@ -2568,6 +2616,13 @@ public class Magic : MonoBehaviour
         Messages.Add(1, 270); // the spell unlocks the lock
     }
 
+    /// <summary>
+    /// What Smite Undead does to a creature it reaches: the original picks the ones with the
+    /// undead mark in their resistances (UW.EXE 0x34b98, 0x25eaf with mask 0x80) and hands each 255
+    /// points of magic damage (0x34bc4).
+    /// </summary>
+    private const int SmiteUndeadDamage = 255;
+
     void CastSmiteUndead()
     {
         // find enemies around and if undead, smite
@@ -2581,9 +2636,11 @@ public class Magic : MonoBehaviour
             if (col is CharacterController)
             {
                 Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null && (critter.type is EObjectType.Skeleton or EObjectType.GhostA or EObjectType.GhostB or EObjectType.GhostC or EObjectType.DireGhost))
+                // not a body: a creature already smitten is still in the overlap while it dies,
+                // and a second cast would hit it again
+                if (critter != null && critter.IsDamageable() && (critter.resistances & Resistance.Undead) != 0)
                 {
-                    critter.TryDamage(99, Skills.ESkillTestResult.Success);
+                    critter.TryDamage(SmiteUndeadDamage, Skills.ESkillTestResult.Success, Resistance.Magic);
                 }
             }
         }
@@ -2602,7 +2659,7 @@ public class Magic : MonoBehaviour
             if (col is CharacterController)
             {
                 Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null)
+                if (critter != null && !critter.SavesAgainstMagic())
                 {
                     critter.TryParalyze();
                 }
@@ -2779,7 +2836,7 @@ public class Magic : MonoBehaviour
             if (col is CharacterController)
             {
                 Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null)
+                if (critter != null && !critter.SavesAgainstMagic())
                 {
                     critter.TryAlly();
                 }
@@ -2800,7 +2857,7 @@ public class Magic : MonoBehaviour
             if (col is CharacterController)
             {
                 Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null)
+                if (critter != null && !critter.SavesAgainstMagic())
                 {
                     critter.TryConfuse();
                 }
@@ -2890,7 +2947,6 @@ public class Magic : MonoBehaviour
 
     public void CastFlameWind(MonoBehaviour owner)
     {
-        // TODO: pass damage type and filter damage to critters based on vulnerabilities
         SpawnCascadingEffect(owner, flameWindParticle, "FlameWind", 14, 18);
     }
     

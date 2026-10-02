@@ -10,7 +10,7 @@ public class ComObjProps
       monetaryValue = (byte) stream.GetUShort();
       qualityClass = stream.GetByte();
       otherFlags = stream.GetByte();
-      scale = stream.GetByte();
+      resistances = stream.GetByte();
       unknown = stream.GetByte();
       qualityType = stream.GetByte();
    }
@@ -27,12 +27,12 @@ public class ComObjProps
       }
       
 #if false
-      string s = "i height mass flags value qclass flags2 scale unk qtype type\n";
+      string s = "i height mass flags value qclass flags2 resist unk qtype type\n";
       for (int i = 0; i < numProps; ++i)
       {
           ComObjProps p = props[i];
           s += $"{i:000} {p.height:x2} {p.massStuff:x4} {p.flags:x2} {p.monetaryValue:x2} {p.qualityClass:x2}" +
-               $" {p.otherFlags:x2} {p.scale:x2} {p.unknown:x2} {p.qualityType:x2} // {(EObjectType)i}\n";
+               $" {p.otherFlags:x2} {p.resistances:x2} {p.unknown:x2} {p.qualityType:x2} // {(EObjectType)i}\n";
       }
       System.IO.File.WriteAllText("comobjflags.txt", s);
 #endif
@@ -63,7 +63,11 @@ public class ComObjProps
    public readonly byte monetaryValue;
    public readonly byte qualityClass;
    private readonly byte otherFlags;
-   public readonly byte scale;
+   /// <summary>
+   /// The kinds of damage this type of object is immune to, in the bits of <see cref="Resistance"/>:
+   /// byte 8, which the original's damage filter reads (UW.EXE 0x25ec4).
+   /// </summary>
+   public readonly byte resistances;
    private readonly byte unknown;
    public readonly byte qualityType;
 
