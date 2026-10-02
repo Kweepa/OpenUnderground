@@ -1890,9 +1890,19 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>Seconds a spell's own messages wait, so that they follow the casting line.</summary>
+    const float SpellMessageDelay = 0.1f;
+
     bool Cast(int _index, bool anonymous, Vector3? mouseWorldAimDirOpt = null, UUObject nameEnchantInventoryItem = null)
     {
         bool success = true;
+
+        // A spell may print its own messages, and they belong after the casting line printed
+        // below: they come out a moment later instead of first.
+        if (!anonymous)
+        {
+            Messages.BeginDelay(SpellMessageDelay);
+        }
 
         switch (spells[_index].runes)
         {
@@ -1984,6 +1994,8 @@ public class Magic : MonoBehaviour
             CastCurse();
             break;
         }
+
+        Messages.EndDelay();
 
         if (success)
         {
