@@ -91,6 +91,14 @@ public class Bedroll : UUObject
 
         PlayerData.sData.gameTime += 8 * 60 * 60; // 8 hours
 
+        PlayerObject.Player.PayPoisonInSleep();
+        if (PlayerData.sData.dead)
+        {
+            // the poison cost the player's life: the death takes over from here
+            PlayerObject.DisableControls(EControlMask.Resting, false);
+            yield break;
+        }
+
         // play appropriate message (depends on hunger and maybe more?)
         if (PlayerData.sData.hunger >= 224 || poisonRating >= EPoisonRating.Badly)
         {
@@ -103,8 +111,7 @@ public class Bedroll : UUObject
             PlayerData.sData.fatigue = 0;
             PlayerObject.Player.RestoreHealth(PlayerData.sData.vitality / 2);
         }
-        PlayerData.sData.poison = 0;
-        
+
         // add to hunger
         PlayerData.sData.hunger = Mathf.Min(PlayerData.sData.hunger + 80, 255);
 

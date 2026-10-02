@@ -27,14 +27,15 @@ public class Trap : UUObject
         {
         case EObjectType.DamageTrap:
             // An owner makes it a poison trap: the original passes minus the quality, which on the
-            // player sets the poison to that level and does no damage (UW.EXE 0x840bd, 0x73e22).
+            // player sets the poison to that level, unless resisted, and does no damage
+            // (UW.EXE 0x840bd, 0x73e22, the resistance at 0x73e73). Otherwise it is a blow.
             if (ownerIndex > 0)
             {
-                PlayerObject.PoisonAtLeast(quality);
+                PlayerObject.TryPoison(quality);
             }
             else
             {
-                PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, quality, EDamageType.Damage);
+                PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, quality, EDamageType.Damage, Resistance.Blow);
             }
             break;
         case EObjectType.TeleportTrap:

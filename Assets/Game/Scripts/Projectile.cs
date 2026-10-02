@@ -246,24 +246,22 @@ public class Projectile : UUObject
             {
                 int damage = GetDamage();
 
+                // What kind of damage the missile does, which the target's resistances are
+                // asked about once armour has had its share (UW.EXE 0x2b2bd to 0x258cf to
+                // 0x24cb5, whose gate 0x25f0a filters): so Missile Protection stops ammunition and
+                // the magic missile, and Flameproof a fireball.
+                int mask = Resistance.OfMissile(type);
+
                 PlayerObject player = root.GetComponent<PlayerObject>();
                 if (player != null)
                 {
-                    if (!Magic.sMagic.IsSpellActive(Magic.ESpell.MissileProtection))
+                    // Missiles and melee share the damage routine in the original (UW.EXE
+                    // 0x259e7 and 0x2527e), so armour soaks an arrow exactly as it soaks a
+                    // swing, by the protection covering wherever it struck.
+                    damage = player.AbsorbWithArmour(damage, transform.position.y);
+                    if (damage > 0)
                     {
-                        if (type == EObjectType.Fireball && Magic.sMagic.IsSpellActive(Magic.ESpell.Flameproof))
-                        {
-                            damage = 0;
-                        }
-
-                        // Missiles and melee share the damage routine in the original (UW.EXE
-                        // 0x259e7 and 0x2527e), so armour soaks an arrow exactly as it soaks a
-                        // swing, by the protection covering wherever it struck.
-                        damage = player.AbsorbWithArmour(damage, transform.position.y);
-                        if (damage > 0)
-                        {
-                            player.Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Damage);
-                        }
+                        player.Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Damage, mask);
                     }
                 }
                 else
@@ -275,7 +273,7 @@ public class Projectile : UUObject
                         // call 0x24cb5), and the missile path picks a body part of its own before
                         // it gets there (0x25988), so a creature's armour soaks an arrow too.
                         damage = critter.AbsorbWithArmour(damage, transform.position.y);
-                        critter.TryDamage(damage, Skills.ESkillTestResult.Success);
+                        critter.TryDamage(damage, Skills.ESkillTestResult.Success, mask);
                         PlayerObject.Player.SetLastEngagedInCombat(critter);
                     }
                     else if (projectileOwner == PlayerObject.Player.gameObject)
@@ -283,7 +281,7 @@ public class Projectile : UUObject
                         Door door = root.GetComponentInParent<Door>();
                         if (door != null)
                         {
-                            door.TryDamage(damage, Skills.ESkillTestResult.Success);
+                            door.TryDamage(damage, Skills.ESkillTestResult.Success, mask);
                         }
                     }
                 }

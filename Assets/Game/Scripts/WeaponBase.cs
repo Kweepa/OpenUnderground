@@ -887,7 +887,7 @@ public class WeaponBase : UUObject
                         critter.MarkNextBlow(aimedPart, aimedPoint);
                     }
 
-                    obj.TryDamage(damage, res);
+                    obj.TryDamage(damage, res, Resistance.Blow);
                 
                     PlayerObject.Rumble(0.05f, 0.4f, 0.2f);
                 

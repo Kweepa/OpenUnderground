@@ -3914,27 +3914,17 @@ public class Critter : UUObject
         default:
             if (attackTarget == null)
             {
-                bool poisoning = false;
-                // apply poison
-                int poisonStat = poison;
-                if (poisonStat > 0)
-                {
-                    int poisonProtection = Magic.sMagic.IsSpellActive(Magic.ESpell.PoisonResistance) ? 10 : 0;
-                    Skills.ESkillTestResult poisonResult = Skills.GetResult(poisonStat, PlayerData.sData.strength / 2 + poisonProtection);
-                    if (poisonResult >= Skills.ESkillTestResult.Success)
-                    {
-                        int appliedPoison = Utils.GetDamageRoll(poisonStat);
-                        PlayerObject.AddPoison(appliedPoison);
-                        poisoning = true;
-                    }
-                }
+                // A venomous blow that lands poisons the player, with no roll, up to the
+                // creature's venom - the higher of the two, never added - unless the player
+                // resists poison (UW.EXE 0x259ee at 0x25aba-0x25afc).
+                bool poisoning = poison > PlayerData.sData.poison && PlayerObject.TryPoison(poison);
                 damage = PlayerObject.Player.AbsorbWithArmour(damage, bodyPart);
-                PlayerObject.Player.Damage(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage);
+                PlayerObject.Player.Damage(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage, Resistance.Blow);
             }
             else
             {
                 damage = attackTarget.AbsorbWithArmour(damage, bodyPart);
-                attackTarget.TryDamage(damage, result);
+                attackTarget.TryDamage(damage, result, Resistance.Blow);
             }
             break;
         }
@@ -4463,6 +4453,16 @@ public class Critter : UUObject
     }
 
     private float paralyzeTime;
+
+    /// <summary>
+    /// The save the original grants against Paralyze, Confusion, Cause Fear and Ally: one point
+    /// of magic damage through the filter, which only a creature resisting magic stops (UW.EXE
+    /// 0x34c36 and 0x34ca5, 0x25eaf with mask 3).
+    /// </summary>
+    public bool SavesAgainstMagic()
+    {
+        return Resistance.Filter(1, Resistance.Magic, resistances) == 0;
+    }
 
     public void TryParalyze()
     {
