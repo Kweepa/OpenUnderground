@@ -870,8 +870,9 @@ public class Critter : UUObject
             }
             else
             {
-                // Non-swimmers and non-flyers avoid water and lava
-                safeTerrain = terrainType != ETerrainType.Water && terrainType != ETerrainType.Lava;
+                // Non-swimmers and non-flyers avoid water, and lava unless fire does not hurt them
+                safeTerrain = terrainType != ETerrainType.Water
+                    && (terrainType != ETerrainType.Lava || !AvoidsLava());
 
                 // Check if there's a bridge at approximately the correct height
                 // If so, mark as safe terrain even if the floor below is water or lava
@@ -2163,6 +2164,7 @@ public class Critter : UUObject
                     TryDamage(Random.Range(2, 4), Skills.ESkillTestResult.Success);
                 }
             }
+            UpdateLavaBurn();
             if (hp <= 0 && !isTwilightZone && !IsGolemWithShieldOfValor())
             {
                 SetState(EState.Die);
@@ -2288,7 +2290,7 @@ public class Critter : UUObject
                         }
                     }
 
-                    GetPath(out path, transform.position, GetTargetFootPos());
+                    GetPath(out path, transform.position, GetTargetFootPos(), mayCrossLava: Time.time >= lavaCrossingBarredUntil);
                     // A path is never shorter than the straight line CheckIdleToCombat() already
                     // checked, and GetTilePath() keeps every path within range tiles of home, so a
                     // third leash on the path length only rejects reachable targets.
@@ -2309,7 +2311,8 @@ public class Critter : UUObject
                         Tile target = FindWanderPoint();
                         Vector3 targetCenter = AdjustWanderPoint(target);
 
-                        GetPath(out path, transform.position, targetCenter);
+                        // A wanderer keeps out of lava, as the original's stops at its edge.
+                        GetPath(out path, transform.position, targetCenter, mayCrossLava: false);
                         if (path.Count > 0 && path.Count < detectionRange / Tile.xzScale)
                         {
                             //path[path.Count - 1] += new Vector3( Random.Range( -1.0f, 1.0f ), 0.0f, Random.Range( -1.0f, 1.0f ) );
@@ -2428,16 +2431,20 @@ public class Critter : UUObject
                 }
                 break;
             case EState.Approach:
+                {
                 TryCloseDoorIfTrapped();
                 AdvanceAnim(0.5f);
                 TurnTo(GetLookahead(0.5f), approachTurnSpeed, 30.0f);
+
+                // One crossing lava does not stop in it to fight: its path ends out of the lava.
+                bool crossingLava = AvoidsLava() && StandsInLava();
                 if (MoveAlongPath(runSpeed, 0.3f))
                 {
                     // idle will repath
                     SetState(EState.Idle);
                 }
                 // see if we're close enough to the target to attack
-                else if (GetDistanceToTarget() < meleeAttackRange && IsViewToTargetClear())
+                else if (!crossingLava && GetDistanceToTarget() < meleeAttackRange && IsViewToTargetClear())
                 {
                     Music.InCombat(this);
                     SetState(EState.CombatIdle);
@@ -2446,9 +2453,10 @@ public class Critter : UUObject
                 {
                     SetState(EState.CombatIdle);
                 }
-                else if (CanDoProjectileAttack(0.0f) && IsViewToTargetClear())
+                else if (!crossingLava && CanDoProjectileAttack(0.0f) && IsViewToTargetClear())
                 {
                     SetState(EState.ProjectileIdle);
+                }
                 }
                 break;
             case EState.CombatIdle:
@@ -2885,7 +2893,7 @@ public class Critter : UUObject
 
     private static ulong sTag;
 
-    private bool GetTilePath(out List<Tile> tilePath, Tile source, Tile target)
+    private bool GetTilePath(out List<Tile> tilePath, Tile source, Tile target, bool mayCrossLava = true)
     {
         ++sTag;
 
@@ -2894,13 +2902,19 @@ public class Critter : UUObject
 
         Tile home = LevelLoader.GetTile(xhome, yhome);
         Tile cur = source;
+        lavaCrossable = mayCrossLava;
+
+        // A path may cross lava but not end in it: lava is never the goal, nor the nearest
+        // tile that stands in for a goal out of reach.
+        Tile lavaTarget = IsLavaToAvoid(target) ? target : null;
+
         openSet.Add(cur);
         cur.g = 0.0f;
         cur.h = cur.HeuristicTo(target);
         cur.openTag = sTag;
         cur.parent = null;
 
-        Tile closest = cur;
+        Tile closest = IsLavaToAvoid(cur) ? null : cur;
 
         while (openSet.Count > 0)
         {
@@ -2922,7 +2936,7 @@ public class Critter : UUObject
             }
             else if (cur != null)
             {
-                if (cur.h < closest.h)
+                if (!IsLavaToAvoid(cur) && (closest == null || cur.h < closest.h))
                 {
                     closest = cur;
                 }
@@ -2932,7 +2946,7 @@ public class Critter : UUObject
                 List<Tile> neighbs = GetValidNeighbours(cur, home, range, null);
                 foreach (Tile t in neighbs)
                 {
-                    if (t.closedTag != sTag)
+                    if (t.closedTag != sTag && t != lavaTarget)
                     {
                         float newG = cur.g + cur.HeuristicTo(t);
                         if (t.openTag != sTag)
@@ -2953,6 +2967,8 @@ public class Critter : UUObject
             }
         }
 
+        lavaCrossable = false;
+
         bool found = false;
         if (cur == target)
         {
@@ -2960,7 +2976,7 @@ public class Critter : UUObject
         }
         else
         {
-            cur = closest;
+            cur = closest != null ? closest : source;
         }
 
         while (cur != null)
@@ -2974,7 +2990,7 @@ public class Critter : UUObject
         return found;
     }
 
-    private void GetPath(out List<Vector3> vecPath, Vector3 start, Vector3 end)
+    private void GetPath(out List<Vector3> vecPath, Vector3 start, Vector3 end, bool mayCrossLava = true)
     {
         Tile source = LevelLoader.GetTile(Tile.GetTileX(start.x), Tile.GetTileY(start.z));
         Tile target = LevelLoader.GetTile(Tile.GetTileX(end.x), Tile.GetTileY(end.z));
@@ -2986,15 +3002,15 @@ public class Critter : UUObject
 
         if (type != EObjectType.Tyball)
         {
-            found = GetTilePath(out tiles, source, target);
+            found = GetTilePath(out tiles, source, target, mayCrossLava);
         }
         else
         {
             // try walking and flying, and choose flying if it gets us closer
             movementType = EMovementType.Flying;
-            bool flightFound = GetTilePath(out List<Tile> flyingTiles, source, target);
+            bool flightFound = GetTilePath(out List<Tile> flyingTiles, source, target, mayCrossLava);
             movementType = EMovementType.Walking;
-            bool walkFound = GetTilePath(out tiles, source, target);
+            bool walkFound = GetTilePath(out tiles, source, target, mayCrossLava);
 
             if (flightFound && walkFound)
             {
@@ -3164,6 +3180,246 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// Whether lava is a danger to this creature: one that stays on the ground, and that fire
+    /// hurts. The fire-immune ones walk in it, as in the original, which takes the lava bit out
+    /// of their movement masks for the step (UW.EXE 0x1b2c7).
+    /// </summary>
+    /// <remarks>
+    /// In the original a walker moving without a computed path - wandering, or going straight at
+    /// what it wants - stops at the edge of lava as at a drop, the step taken back (0x15fe6, in
+    /// the walkers' contact callback 0x15ed1); one that follows a computed path is let in. Its
+    /// path search lets a walker through lava for nothing and charges 2, against the creature's
+    /// morale, only to a path that ends on it (0x16196). Here every creature moves along a path,
+    /// so the wanderer's search keeps out of lava, any other may cross it, and none may end in
+    /// it.
+    /// </remarks>
+    private bool AvoidsLava()
+    {
+        return !IsAirborne() && (resistances & Resistance.Fire) == 0;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="t"/> is lava that is a danger to this creature. A tile with a
+    /// bridge is not: the bridge is the way across.
+    /// </summary>
+    private bool IsLavaToAvoid(Tile t)
+    {
+        return t.GetFloorTerrain() == ETerrainType.Lava && t.bridge == null && AvoidsLava();
+    }
+
+    /// <summary>
+    /// Whether the path being searched may go through lava: set by GetTilePath() for its search,
+    /// false otherwise, so FindWanderPoint() keeps out.
+    /// </summary>
+    private bool lavaCrossable;
+
+    private bool KeepsOutOf(Tile t)
+    {
+        return !lavaCrossable && IsLavaToAvoid(t);
+    }
+
+    /// <summary>
+    /// Whether this creature stands on a lava floor: on the ground, not on a bridge over it.
+    /// </summary>
+    private bool StandsInLava()
+    {
+        Tile t = cachedCurrentTile;
+        if (t == null || IsAirborne() || t.GetFloorTerrain() != ETerrainType.Lava)
+        {
+            return false;
+        }
+
+        GetBody(out float feet, out _);
+        Vector3 p = transform.position;
+        return feet < t.GetFloorY(p.x, p.z) + 0.25f && !HasBridgeAtHeight(t, feet);
+    }
+
+    /// <summary>Whether this creature is on its way along a path, which leaves any lava it is in.</summary>
+    private bool IsCrossingOnPath()
+    {
+        return path != null && path.Count > 0
+            && state is EState.TurnToApproach or EState.Approach or EState.TurnToFlee or EState.Flee
+                or EState.TurnToWander or EState.Wander;
+    }
+
+    private bool wasInLava;
+    private float timeOutOfLava;
+    private float timeToNextLavaDamage;
+    private float nextLavaExitTime;
+
+    /// <summary>
+    /// Until when this creature's way to what it fights keeps out of lava: set when it had to
+    /// step out of lava to fight, so it does not walk straight back in.
+    /// </summary>
+    private float lavaCrossingBarredUntil;
+
+    /// <summary>
+    /// Lava burns a creature once as it goes in, the share of its hit points it takes from the
+    /// player in a second (PlayerObject.RollLavaBurn()). One that crosses it along its path is
+    /// burnt only that once, which is ours; one that is not on its way does not stay - it walks
+    /// out, to the side of what it is fighting if it is fighting - and burns again every second
+    /// for as long as it is still in. The original takes 1 point one physics step in five from a
+    /// creature as the player's condition tick does once a frame, typed fire (UW.EXE 0x2ba2f,
+    /// 0x31622). Nobody did it, so the creature is not angered and nobody is blamed: the original
+    /// passes no attacker (0x2ba2f).
+    /// </summary>
+    private void UpdateLavaBurn()
+    {
+        if (!AvoidsLava() || !StandsInLava())
+        {
+            // A moment out - a hop, the edge of a tile - is not a way out: it takes a second.
+            timeOutOfLava += Time.deltaTime;
+            if (timeOutOfLava > 1.0f)
+            {
+                wasInLava = false;
+            }
+            return;
+        }
+
+        timeOutOfLava = 0.0f;
+        if (!wasInLava)
+        {
+            wasInLava = true;
+            timeToNextLavaDamage = PlayerObject.LavaBurnSeconds;
+            nextLavaExitTime = 0.0f;
+            BurnInLava();
+            return;
+        }
+
+        if (IsCrossingOnPath())
+        {
+            return;
+        }
+
+        if (Time.time >= nextLavaExitTime
+            && hp > 0
+            && state is EState.Idle or EState.Fidget or EState.CombatIdle or EState.CombatTurn or EState.ProjectileIdle)
+        {
+            nextLavaExitTime = Time.time + 1.0f;
+            LeaveLava();
+        }
+
+        timeToNextLavaDamage -= Time.deltaTime;
+        if (timeToNextLavaDamage <= 0.0f)
+        {
+            timeToNextLavaDamage += PlayerObject.LavaBurnSeconds;
+            BurnInLava();
+        }
+    }
+
+    private void BurnInLava()
+    {
+        hp -= PlayerObject.RollLavaBurn(originalHp);
+        Utils.PlayClipOccluded(DataLoader.sDataLoader.lavaBurn, transform.position);
+    }
+
+    /// <summary>
+    /// Walks out of the lava by the shortest way: to the nearest point of the nearest tiles out
+    /// of it, searched outward a step at a time, where nobody stands - not the tile of what it is
+    /// fighting, whose body would stop it before it is out. A fighter picks one from which it can
+    /// still strike, fights on from there, and for a few seconds does not come back through lava.
+    /// </summary>
+    private void LeaveLava()
+    {
+        Tile source = cachedCurrentTile;
+        Tile home = LevelLoader.GetTile(xhome, yhome);
+        bool fighting = attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5 || attackTarget != null;
+        Tile targetTile = fighting ? LevelLoader.GetTile(GetTargetFootPos()) : null;
+
+        lavaCrossable = true;
+        var seen = new HashSet<Tile> { source };
+        var frontier = new List<Tile> { source };
+        var exits = new List<Tile>();
+        while (frontier.Count > 0 && seen.Count < 64 && exits.Count == 0)
+        {
+            var next = new List<Tile>();
+            foreach (Tile step in frontier)
+            {
+                foreach (Tile t in GetValidNeighbours(step, home, range, null))
+                {
+                    if (seen.Add(t))
+                    {
+                        (IsLavaToAvoid(t) ? next : exits).Add(t);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        lavaCrossable = false;
+
+        Tile exit = null;
+        Vector3 exitPoint = Vector3.zero;
+        float exitCost = Mathf.Infinity;
+        foreach (Tile t in exits)
+        {
+            Vector3 point = GetNearestPointIn(t, transform.position);
+            float cost = (point - transform.position).sqrMagnitude;
+            if (t == targetTile || IsTakenByAnother(point))
+            {
+                cost += 10000.0f;
+            }
+            else if (fighting && (GetTargetPos() - point).magnitude > meleeAttackRange - 0.25f)
+            {
+                cost += 1000.0f;
+            }
+
+            if (cost < exitCost)
+            {
+                exit = t;
+                exitPoint = point;
+                exitCost = cost;
+            }
+        }
+
+        if (exit != null)
+        {
+            GetPath(out path, transform.position, exitPoint);
+            if (path.Count > 0)
+            {
+                if (fighting)
+                {
+                    lavaCrossingBarredUntil = Time.time + 5.0f;
+                }
+                SetState(fighting ? EState.TurnToApproach : EState.TurnToWander);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The point of <paramref name="t"/> nearest <paramref name="from"/>, far enough inside it for
+    /// this creature to stand there wholly; the walkable centre of a diagonal tile.
+    /// </summary>
+    private Vector3 GetNearestPointIn(Tile t, Vector3 from)
+    {
+        if (t.type is >= 2 and <= 5)
+        {
+            return t.GetCenter();
+        }
+
+        float margin = Mathf.Min(cachedCharacterController.radius + 0.3f, 0.45f * Tile.xzScale);
+        float px = Mathf.Clamp(from.x, t.x * Tile.xzScale + margin, (t.x + 1) * Tile.xzScale - margin);
+        float pz = Mathf.Clamp(from.z, t.y * Tile.xzScale + margin, (t.y + 1) * Tile.xzScale - margin);
+        return new Vector3(px, t.GetFloorY(px, pz), pz);
+    }
+
+    /// <summary>Whether another creature, or the player, stands where this one would stand at <paramref name="point"/>.</summary>
+    private bool IsTakenByAnother(Vector3 point)
+    {
+        float radius = cachedCharacterController.radius;
+        int count = Physics.OverlapSphereNonAlloc(point + (radius + 0.1f) * Vector3.up, radius, sphereOverlapCache,
+            1 << LayerMask.NameToLayer("Characters"));
+        for (int i = 0; i < count; ++i)
+        {
+            if (sphereOverlapCache[i] is CharacterController cc && cc != cachedCharacterController && cc.enabled)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool CanTraverseTerrain(Tile t)
     {
         ETerrainType terrainType = t.GetFloorTerrain();
@@ -3188,7 +3444,8 @@ public class Critter : UUObject
             }
         default:
             // Slasher of Veils shouldn't try shortcutting corners
-            return terrainType != ETerrainType.Water && (LevelLoader.sLevelLoader.loadedLevel != 9 || t.floorTexture != 9);
+            return terrainType != ETerrainType.Water && !KeepsOutOf(t)
+                && (LevelLoader.sLevelLoader.loadedLevel != 9 || t.floorTexture != 9);
         }
     }
 
@@ -3327,7 +3584,8 @@ public class Critter : UUObject
 
                             if (t1 == null || t2 == null
                                 || !CanStepBetweenTiles(t, t1, dir1)
-                                || !CanStepBetweenTiles(t, t2, dir2))
+                                || !CanStepBetweenTiles(t, t2, dir2)
+                                || (movementType != EMovementType.Flying && (KeepsOutOf(t1) || KeepsOutOf(t2))))
                             {
                                 continue;
                             }

@@ -799,20 +799,13 @@ public class PlayerObject : MonoBehaviour
         touchingLava = TouchingTerrain(ETerrainType.Lava, t);
         bool shouldBeBurned = !Magic.sMagic.IsSpellActive(Magic.ESpell.Flameproof) && !Inventory.sInv.Wearing(EObjectType.DragonskinBoots) && touchingLava; 
 
-        if (shouldBeBurned)
+        // The burn comes at once on the way in and then once a second; a step out and back in
+        // within the second does not start it over.
+        timeToNextLavaDamage = Mathf.Max(0.0f, timeToNextLavaDamage - Time.deltaTime);
+        if (shouldBeBurned && timeToNextLavaDamage <= 0.0f)
         {
-            // damage every so often
-            timeToNextLavaDamage -= Time.deltaTime;
-            if (timeToNextLavaDamage <= 0.0f)
-            {
-                timeToNextLavaDamage += Random.Range(2.0f, 3.0f);
-                Skills.ESkillTestResult result = Skills.GetResult(4, 0); // small chance of damaging armor 
-                Damage(result, Random.Range(1, 3), EDamageType.Lava, Resistance.Fire);
-            }
-        }
-        else
-        {
-            timeToNextLavaDamage = 3.0f;
+            timeToNextLavaDamage = LavaBurnSeconds;
+            Damage(Skills.ESkillTestResult.Success, RollLavaBurn(PlayerData.sData.vitality), EDamageType.Lava, Resistance.Fire);
         }
 
         // damage if off the main path
@@ -1331,6 +1324,22 @@ public class PlayerObject : MonoBehaviour
     private float timeToNextLavaDamage;
     private float timeToNextVoidDamage;
 
+    /// <summary>How often lava burns whoever stands in it, the player or a creature.</summary>
+    public const float LavaBurnSeconds = 1.0f;
+
+    /// <summary>
+    /// What lava takes every <see cref="LavaBurnSeconds"/> from one whose hit points are at most
+    /// <paramref name="maxHitPoints"/>: 8 to 12 percent of them, at least 1. The original takes 1
+    /// point when rand() % 5 == 0, once a frame (UW.EXE 0x31622 in the condition tick 0x314fd,
+    /// from the per-frame 0x30fc6), so its pace is the frame rate's: under DOSBox today a
+    /// character with 255 hit points dies in it in about 5.5 seconds. That is ours to soften: a
+    /// share of the hit points burns as hard whatever the level, and kills in about ten seconds.
+    /// </summary>
+    public static int RollLavaBurn(int maxHitPoints)
+    {
+        return Mathf.Max(1, Mathf.RoundToInt(maxHitPoints * Random.Range(0.08f, 0.12f)));
+    }
+
     private float timeToNextHunger = 60.0f;
     private float timeToNextFatigue = 300.0f;
     private float timeToNextHungerDamage;
@@ -1625,8 +1634,9 @@ public class PlayerObject : MonoBehaviour
 
             PlayDamageGrunt(Math.Min(0.75f + damage / 8.0f, 1.0f));
 
-            // try to damage armour
-            if (damageType is not EDamageType.Drowning and not EDamageType.Poison and not EDamageType.Direct)
+            // try to damage armour - not by lava, which in the original wears nothing
+            if (damageType is not EDamageType.Drowning and not EDamageType.Poison and not EDamageType.Direct
+                and not EDamageType.Lava)
             {
                 UUObject armour = Inventory.sInv.GetRandomArmourPiece();
                 if (armour != null)
@@ -1695,7 +1705,7 @@ public class PlayerObject : MonoBehaviour
         leapMoveSpeed = 0.0f;
         timeInWater = 0.0f;
         timeToNextWaterDamage = 0.0f;
-        timeToNextLavaDamage = 3.0f;
+        timeToNextLavaDamage = 0.0f;
         timeToNextPoisonTick = PoisonTickSeconds;
         noise = 0.0f;
     }
