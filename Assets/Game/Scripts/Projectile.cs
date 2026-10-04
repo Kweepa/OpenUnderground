@@ -26,6 +26,7 @@ public class Projectile : UUObject
 
     public Vector3 oldPos = Vector3.zero;
     private Collider[] overlapCache = new Collider[8];
+    private static readonly Collider[] burstCache = new Collider[32];
 
     public override void PostLoadInitialize(bool restoredFromSave = false)
     {
@@ -137,7 +138,20 @@ public class Projectile : UUObject
         
         Rigidbody rb = transform.root.GetComponentInChildren<Rigidbody>();
 
-        if (hitEffect != null)
+        bool sank = false;
+        if (type is EObjectType.Fireball or EObjectType.LightningBolt)
+        {
+            sank = Burst(GetContactPoint());
+        }
+
+        if (sank)
+        {
+            // Ours: on water the missile sinks with a splash, as a dropped object does, instead of
+            // its burst
+            SpawnSplash(DataLoader.sDataLoader.splash, DataLoader.sDataLoader.waterSplashParticle,
+                rb != null ? rb.linearVelocity : Vector3.zero);
+        }
+        else if (hitEffect != null)
         {
             Vector3 offset = Vector3.zero;
             if (rb != null)
@@ -161,6 +175,90 @@ public class Projectile : UUObject
                 rb.useGravity = true; // for arrows/bolts so they fall and rest
             }
         }
+    }
+
+    /// <summary>
+    /// How far the blast of a fireball or a lightning bolt reaches from where it stops. Ours: the
+    /// original blasts the one tile, 3 m a side, where the missile comes to rest (UW.EXE 0x2be7f,
+    /// 0x3abca), so how far it reaches depends on where in the tile it stops; a sphere around the
+    /// point of contact reaches as far every way.
+    /// </summary>
+    private const float BurstRadius = 2.2f;
+
+    /// <summary>
+    /// A fireball or a lightning bolt bursts where it stops, whatever stopped it - a wall, the floor,
+    /// a door or a creature, after its direct hit. In the original these two have landing class 9
+    /// (COMOBJ byte 7) and never bounce (elasticity 0), so a contact leaves them at rest, and a missile
+    /// at rest of that class becomes an explosion or a splash and blasts its tile (UW.EXE 0x2be7f,
+    /// 0x3abca, 0x35bca): every object there takes, rolled for each, 10d6 typed fire and magic from a
+    /// fireball or 6d5 typed magic from a lightning bolt (the table at DS:0x9d3), straight through the
+    /// damage gate, so no armour takes anything off it, and the one who cast it is not spared. On water
+    /// it only splashes. A creature's missile hurts the creatures caught in it too, as its direct hit
+    /// does. Ours: the objects lying there are left alone. Returns whether it stopped on water, where
+    /// it does not burst.
+    /// </summary>
+    private bool Burst(Vector3 point)
+    {
+        Tile tile = LevelLoader.GetTile(point);
+        if (tile != null && tile.GetFloorTerrain() == ETerrainType.Water && point.y < tile.GetFloorY(point.x, point.z) + 0.25f)
+        {
+            return true;
+        }
+
+        bool fireball = type == EObjectType.Fireball;
+        bool playersMissile = projectileOwner == PlayerObject.Player.gameObject;
+        int mask = fireball ? Resistance.Fire | Resistance.Magic : Resistance.Magic;
+        int layers = (1 << LayerMask.NameToLayer("Characters")) | (1 << LayerMask.NameToLayer("Player"));
+        int count = Physics.OverlapSphereNonAlloc(point, BurstRadius, burstCache, layers);
+        for (int i = 0; i < count; ++i)
+        {
+            if (burstCache[i] is not CharacterController body)
+            {
+                continue;
+            }
+
+            int damage = fireball ? Utils.DiceRoll(6, 10) : Utils.DiceRoll(5, 6);
+            if (createdByCursedEntity)
+            {
+                damage /= 2;
+            }
+
+            PlayerObject player = body.GetComponent<PlayerObject>();
+            if (player != null)
+            {
+                player.Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Direct, mask);
+                continue;
+            }
+
+            Critter critter = body.transform.root.GetComponent<Critter>();
+            if (critter != null && critter.IsDamageable())
+            {
+                critter.TryDamage(damage, Skills.ESkillTestResult.Success, mask);
+                if (playersMissile)
+                {
+                    PlayerObject.Player.SetLastEngagedInCombat(critter);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Where the missile met what stopped it: the wall or the floor along its last step if it ran
+    /// into one, otherwise where it is.
+    /// </summary>
+    private Vector3 GetContactPoint()
+    {
+        Vector3 step = transform.position - oldPos;
+        float length = step.magnitude;
+        if (oldPos != Vector3.zero && length > 0.0f
+            && Physics.Raycast(oldPos, step / length, out RaycastHit hit, length + collisionRadius, LayerMasks.EnvironmentAndCeiling))
+        {
+            return hit.point;
+        }
+
+        return transform.position;
     }
 
     public override void Update()

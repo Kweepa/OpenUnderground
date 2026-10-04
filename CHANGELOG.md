@@ -2,6 +2,12 @@
 
 ## Current release
 
+- Fireballs and lightning bolts now burst where they stop, as in the original: a fireball does 10 to 60 points of fire to everyone close to where it hits, a lightning bolt 6 to 30, and that includes you if you cast it at something too near. In water they just sink. Both are drawn bigger, to tell them from a magic missile.
+
+- The Poison spell now does 5 to 20 points at once to the creature you aim at, as in the original, instead of poisoning everyone nearby for a while. Only creatures that bleed are hurt, so it is wasted on a golem or a skeleton. A potion of Poison is now thrown, hurting a creature with that spell, instead of poisoning you.
+
+- A creature you curse now glows with runes, the effect of Name Enchantment, so you can see the Curse take hold.
+
 - The potion of Poison Resistance now works, keeping you from being poisoned for about five minutes, and casting Curse now curses the creatures in front of you; before, both did nothing.
 
 - The spell icons are no longer stretched sideways, so Flameproof's sphere is round again. Poison Resistance, Magic Protection, Regeneration, Mana Regeneration and the dragon skin boots now show an icon when worn, and a few icons move gently, like the Light icon, at the same pace on any screen.

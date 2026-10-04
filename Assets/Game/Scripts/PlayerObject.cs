@@ -1868,8 +1868,8 @@ public class PlayerObject : MonoBehaviour
     }
 
     /// <summary>
-    /// Adds to the poison, unless the player resists it. For the rotten food and the potion of
-    /// Poison, which are this project's; the original's own poisonings set a level instead
+    /// Adds to the poison, unless the player resists it. For the rotten food, which is this
+    /// project's; the original's own poisonings set a level instead
     /// (<see cref="TryPoison"/>).
     /// </summary>
     public static void AddPoison(int poison)

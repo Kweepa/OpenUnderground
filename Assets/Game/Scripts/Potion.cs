@@ -88,12 +88,24 @@ public class Potion : UUObject
         return string.IsNullOrEmpty(enchantmentName) ? baseName : baseName + " of " + enchantmentName;
     }
     
+    /// <summary>The enchantment of the potion of Poison.</summary>
+    private const int PoisonPotion = 277;
+
     public override EEquipAction Equip()
     {
         // assume potions can't be stacked for now
 
-        Utils.PlayClip2d(quaff);
-        Messages.Add(1, 240); // quaff
+        // Ours: the potion of Poison is thrown at a creature, not drunk (see below)
+        if (!isLinked && enchantmentNumber == PoisonPotion)
+        {
+            Utils.PlayClip2d(Inventory.sInv.throwClip);
+            Messages.Add("You throw the flask.");
+        }
+        else
+        {
+            Utils.PlayClip2d(quaff);
+            Messages.Add(1, 240); // quaff
+        }
 
         if (isLinked)
         {
@@ -102,16 +114,10 @@ public class Potion : UUObject
             // 0x385d6). With no trap left there is nothing else to it.
             TrapSearch.SetOffOnUse(this);
         }
-        else if (enchantmentNumber == 277) // Poison
-        {
-            if (!Magic.sMagic.IsSpellActive(Magic.ESpell.PoisonResistance))
-            {
-                int appliedPoison = Utils.GetDamageRoll(15);
-                PlayerObject.AddPoison(appliedPoison);
-            }
-        }
         else
         {
+            // Every potion casts its spell with the drinker as the caster (UW.EXE 0x384e4, mode 1),
+            // the potion of Poison too: it hurts a creature ahead, and never the one who drinks it.
             UseEnchantedScrollOrPotion(true);
         }
 

@@ -2538,24 +2538,77 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>What the Poison spell does, at once: 5d4 (UW.EXE 0x34bd4, through 0x38eee(5, 4)).</summary>
+    private const int PoisonDice = 5;
+    private const int PoisonDieFaces = 4;
+
+    /// <summary>The colour a creature Poison hurts bleeds: a sickly yellow, apart from any blood. Ours.</summary>
+    private static readonly Color PoisonSplatTint = new(0.8f, 0.8f, 0.1f, 1.0f);
+
+    /// <summary>
+    /// Poison: the original's damage, on a creature of our choosing. The original casts it as effect
+    /// 7 (UW.EXE 0x351a0), which hands one target to its callback: the first creature a walk of 6 x 6
+    /// tiles ahead finds, of any attitude and seen or not (0x34d67). That creature takes 5d4 at once,
+    /// typed poison and magic (0x34bd4, mask 0x13), so the ghosts and the Slasher of Veils resist it;
+    /// nothing lasts. Ours: the creature is the one nearest the aim among those in sight inside the
+    /// sphere ahead, and only one that bleeds is hurt - on any other the spell is wasted, as the
+    /// original's is on a ghost.
+    /// </summary>
     void CastPoison()
     {
-        // find enemies around and poison them
+        Transform eye = PlayerObject.Player.mainCamera.transform;
         float radius = 3.0f * Tile.xzScale;
-        int count = Physics.OverlapSphereNonAlloc(
-                     PlayerObject.Player.mainCamera.transform.position + radius * PlayerObject.Player.mainCamera.transform.forward, radius,
-                     cachedColliders, 1 << LayerMask.NameToLayer("Characters"));
+        int count = Physics.OverlapSphereNonAlloc(eye.position + radius * eye.forward, radius, cachedColliders,
+                     1 << LayerMask.NameToLayer("Characters"));
+
+        Critter target = null;
+        Vector3 targetCentre = Vector3.zero;
+        float nearestAngle = float.MaxValue;
         for (int i = 0; i < count; i++)
         {
-            Collider col = cachedColliders[i];
-            if (col is CharacterController)
+            if (cachedColliders[i] is not CharacterController body)
             {
-                Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null && (critter.attitude is Critter.EAttitude.Upset or Critter.EAttitude.Hostile))
-                {
-                    critter.Poison();
-                }
+                continue;
             }
+
+            Critter critter = body.transform.root.GetComponent<Critter>();
+            if (critter == null || !critter.IsDamageable())
+            {
+                continue;
+            }
+
+            Vector3 centre = body.bounds.center;
+            Vector3 toCritter = centre - eye.position;
+            float distance = toCritter.magnitude;
+            if (distance > 0.0f
+                && Physics.Raycast(eye.position, toCritter / distance, distance, LayerMasks.EnvironmentAndCeiling))
+            {
+                continue;
+            }
+
+            float angle = Vector3.Angle(eye.forward, toCritter);
+            if (angle < nearestAngle)
+            {
+                nearestAngle = angle;
+                target = critter;
+                targetCentre = centre;
+            }
+        }
+
+        if (target == null)
+        {
+            return;
+        }
+
+        // Ours: a creature it hurts bleeds a sickly yellow, as from a blow to the body, and one it does not
+        // shows nothing. The original puts its spell effect, object 455, on either (UW.EXE 0x34beb).
+        if (target.Bleeds)
+        {
+            target.MarkNextBlow(EBodyPart.Torso, targetCentre);
+            target.MarkNextSplat(EParticleType.PoisonSplat, PoisonSplatTint);
+            target.TryDamage(Utils.DiceRoll(PoisonDieFaces, PoisonDice), Skills.ESkillTestResult.Success,
+                Resistance.Poison | Resistance.Magic);
+            PlayerObject.Player.SetLastEngagedInCombat(target);
         }
     }
 
@@ -2694,6 +2747,9 @@ public class Magic : MonoBehaviour
                 if (critter != null)
                 {
                     critter.TryCurse();
+
+                    // Ours: the curse shows on the creature, with the glow and runes of Name Enchantment
+                    ParticleSpawner.SpawnParticle(EParticleType.MagicNameEnchantment, col.bounds.center);
                 }
             }
         }
