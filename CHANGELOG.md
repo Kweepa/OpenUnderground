@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Lava now burns 8 to 12 percent of your hit points every second, so about ten seconds in it kill, where before it barely hurt; it no longer damages your armour. It now matters to creatures too: one that wanders stops at its edge, one that chases you may cut across it and is burnt on the way, and one left standing in it burns and walks out; the fire elemental walks in it freely. And lava spares what it spares in the original: keys and rune stones come through, while a moonstone burns; a burning sack, pack, box or pouch spills what it holds into the lava first.
+
 - Resistances work as in the original: they stop a kind of damage outright instead of cutting it. Flameproof stops all fire, lava included; Missile Protection stops arrows, stones and magic missiles, but no longer fireballs or lightning; a ring of Magic Protection now stops one magic hit in three; your fire no longer hurts a fire elemental; and Smite Undead now takes the ghouls too.
 
 - Poison works as in the original: a venomous bite always poisons you, the poison does its level in damage once a minute and then weakens by one, sleeping pays what is left at once, and Poison Resistance keeps you from being poisoned at all, by a trap too.

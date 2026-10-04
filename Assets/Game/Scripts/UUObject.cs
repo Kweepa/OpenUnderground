@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine.InputSystem;
@@ -1673,6 +1674,126 @@ public class UUObject : LevelObject
         return CloseToFloor(c.point, t);
     }
 
+    /// <summary>
+    /// Whether lava spares this type. The original's rule: a type of the indestructible quality
+    /// class, or one that resists fire (UW.EXE 0x2c46c, and the filter at 0x2c48c), so every key
+    /// and rune stone comes through and a moonstone does not. Ours on top of it: incense, and the
+    /// containers of cloth, leather or wood, burn, though the data makes them indestructible.
+    /// </summary>
+    private bool IsSparedByLava()
+    {
+        switch (type)
+        {
+        case EObjectType.Sack:
+        case EObjectType.OpenSack:
+        case EObjectType.Pack:
+        case EObjectType.OpenPack:
+        case EObjectType.Box:
+        case EObjectType.OpenBox:
+        case EObjectType.Pouch:
+        case EObjectType.OpenPouch:
+        case EObjectType.BlockOfIncense:
+        case EObjectType.BlockOfBurningIncense:
+            return false;
+        }
+
+        ComObjProps props = DataLoader.sDataLoader.comObjProps[(int)type];
+        return ((props.qualityClass >> 2) & 3) == 3 || (props.resistances & Resistance.Fire) != 0;
+    }
+
+    /// <summary>Whether this object, come to rest in lava on <paramref name="t"/>, burns there.</summary>
+    private bool BurnsInLava(Tile t)
+    {
+        // Tyball's key (marked with quality = 255) is invulnerable to lava
+        bool isTyballKey = this is Key && quality == 255;
+        return !TryDestroyTalisman(t) && !IsSparedByLava() && !isTyballKey;
+    }
+
+    /// <summary>
+    /// Until when an object spilled from a container that burned stays in the lava before its own
+    /// turn comes, so the player sees what was in it.
+    /// </summary>
+    private float lavaGraceUntil;
+
+    private const float LavaSpillSeconds = 1.0f;
+
+    private void BurnInLava()
+    {
+        Utils.PlayClipOccluded(DataLoader.sDataLoader.lavaBurn, transform.position);
+        if (getClass == EClass.Books || type == EObjectType.ExplodingBook)
+        {
+            ++PlayerData.sData.booksBurned;
+        }
+        SpillIntoLava();
+        Utils.DestroyItem(this);
+    }
+
+    /// <summary>
+    /// What a burning container holds falls out into the lava where it burns, and after a second
+    /// each piece burns or not by its own type.
+    /// </summary>
+    private void SpillIntoLava()
+    {
+        if (contents == null || contents.Count == 0)
+        {
+            return;
+        }
+
+        var spilled = new List<UUObject>(contents);
+        contents.Clear();
+        foreach (UUObject item in spilled)
+        {
+            if (item == null)
+            {
+                continue;
+            }
+
+            if (item.transform.IsChildOf(transform))
+            {
+                item.transform.SetParent(transform.parent, true);
+            }
+
+            Vector2 jitter = 0.3f * Random.insideUnitCircle;
+            item.transform.position = transform.position + new Vector3(jitter.x, 0.25f, jitter.y);
+            item.lavaGraceUntil = Time.time + LavaSpillSeconds;
+            LevelLoader.AddToWorld(item);
+
+            if (item.GetComponentInChildren<Rigidbody>() == null)
+            {
+                item.gameObject.AddComponent<Rigidbody>();
+            }
+
+            foreach (Rigidbody rig in item.GetComponentsInChildren<Rigidbody>())
+            {
+                rig.isKinematic = false;
+                rig.WakeUp();
+            }
+        }
+
+        LevelLoader.sLevelLoader.StartCoroutine(BurnSpilledAfterGrace(spilled));
+    }
+
+    private static IEnumerator BurnSpilledAfterGrace(List<UUObject> spilled)
+    {
+        yield return new WaitForSeconds(LavaSpillSeconds);
+
+        foreach (UUObject item in spilled)
+        {
+            if (item == null || !item.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Vector3 p = item.transform.position;
+            Tile t = LevelLoader.GetClosestTile(p);
+            if (t != null && t.GetFloorTerrain() == ETerrainType.Lava && p.y < t.GetFloorY(p.x, p.z) + 0.5f
+                && item.BurnsInLava(t))
+            {
+                item.BurnInLava();
+            }
+        }
+    }
+
     public virtual void OnCollisionEnter(Collision collision)
     {
         bool floating = false;
@@ -1684,17 +1805,9 @@ public class UUObject : LevelObject
         {
         case ETerrainType.Lava:
             {
-                // Tyball's key (marked with quality = 255) is invulnerable to lava
-                bool isTyballKey = this is Key && quality == 255;
-                
-                if (!TryDestroyTalisman(t) && !DataLoader.sDataLoader.comObjProps[(int)type].floats && !isTyballKey)
+                if (BurnsInLava(t) && Time.time >= lavaGraceUntil)
                 {
-                    Utils.PlayClipOccluded(DataLoader.sDataLoader.lavaBurn, transform.position);
-                    if (getClass == EClass.Books || type == EObjectType.ExplodingBook)
-                    {
-                        ++PlayerData.sData.booksBurned;
-                    }
-                    Utils.DestroyItem(this);
+                    BurnInLava();
                 }
                 else
                 {
