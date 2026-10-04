@@ -35,8 +35,6 @@ public class CritterSaveData : UUObjectSaveData
     public string currentAnimation; // Bookkeeping variable for current animation name
     
     // Status effect timers
-    public float poisonTime;
-    public float timeToNextPoisonDamage;
     public float paralyzeTime;
     public float confusionTime;
     public float curseTime;
@@ -2116,9 +2114,6 @@ public class Critter : UUObject
             attitude = EAttitude.Mellow;
             hp = Mathf.Max(1, hp);
 
-            // stop being poisoned
-            poisonTime = 0.0f;
-
             // find incoming missiles and destroy them
             int layerMask = 1 << LayerMask.NameToLayer("Ignore Raycast"); // projectiles are marked this
 
@@ -2154,16 +2149,6 @@ public class Critter : UUObject
 
         if (state != EState.Die && state != EState.Dead && state != EState.Cleanup)
         {
-            if (poisonTime > 0.0f)
-            {
-                poisonTime -= Time.deltaTime;
-                timeToNextPoisonDamage -= Time.deltaTime;
-                if (timeToNextPoisonDamage < 0.0f)
-                {
-                    timeToNextPoisonDamage = 5.0f;
-                    TryDamage(Random.Range(2, 4), Skills.ESkillTestResult.Success);
-                }
-            }
             UpdateLavaBurn();
             if (hp <= 0 && !isTwilightZone && !IsGolemWithShieldOfValor())
             {
@@ -3710,6 +3695,10 @@ public class Critter : UUObject
     private EBodyPart? nextBlowPart;
     private Vector3 nextBlowPoint;
 
+    // What the next blow bleeds, when it is not the creature's own blood, and its colour; see MarkNextSplat().
+    private EParticleType? nextBlowSplat;
+    private Color? nextBlowTint;
+
     /// <summary>
     /// Says where the player's blow that TryDamage() is about to take landed, so that the blood
     /// shows there (<see cref="Utils.CreateSplats(Critter, EParticleType, int, EBodyPart?, Vector3)"/>).
@@ -3719,6 +3708,16 @@ public class Critter : UUObject
     {
         nextBlowPart = part;
         nextBlowPoint = point;
+    }
+
+    /// <summary>
+    /// Says what the next blow TryDamage() takes bleeds, and in what colour, whatever the creature's
+    /// own blood: the Poison spell's is a sickly yellow. Spent by that one call, like <see cref="MarkNextBlow"/>.
+    /// </summary>
+    public void MarkNextSplat(EParticleType splat, Color tint)
+    {
+        nextBlowSplat = splat;
+        nextBlowTint = tint;
     }
 
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
@@ -3732,9 +3731,11 @@ public class Critter : UUObject
 
         CritterHealthDisplay.CritterDamaged(hp / (float)originalHp);
 
-        EParticleType particleType = Utils.MapRemainsToParticleType(stats.Remains, blood);
-        Utils.CreateSplats(this, particleType, damage, nextBlowPart, nextBlowPoint);
+        EParticleType particleType = nextBlowSplat ?? Utils.MapRemainsToParticleType(stats.Remains, blood);
+        Utils.CreateSplats(this, particleType, damage, nextBlowPart, nextBlowPoint, nextBlowTint);
         nextBlowPart = null;
+        nextBlowSplat = null;
+        nextBlowTint = null;
 
         // make more hostile
         if (attitude > 0)
@@ -3846,18 +3847,13 @@ public class Critter : UUObject
         }
     }
 
-    private float poisonTime;
-    private float timeToNextPoisonDamage;
-
-    public void Poison()
-    {
-        // some creatures are immune to poison (those that do poison damage)
-        if (poison == 0)
-        {
-            poisonTime = 30.0f;
-            timeToNextPoisonDamage = 5.0f;
-        }
-    }
+    /// <summary>
+    /// Whether the creature bleeds, by the splats its stats row gives it: blood or a pool of it,
+    /// rather than sparks, dust or wood. The Poison spell hurts only these - our rule, not the
+    /// original's, which spares only those that resist poison, the ghosts and the Slasher of Veils.
+    /// It is the same set as the original's blood byte (UW.EXE 0x24f55).
+    /// </summary>
+    public bool Bleeds => Utils.MapRemainsToParticleType(stats.Remains, blood) is EParticleType.BloodSplat or EParticleType.PoisonSplat;
 
     protected override void StolenFrom(UUObject item, int ownerRace)
     {
@@ -4848,8 +4844,6 @@ public class Critter : UUObject
             }
 
             // Save status effect timers
-            critterData.poisonTime = poisonTime;
-            critterData.timeToNextPoisonDamage = timeToNextPoisonDamage;
             critterData.paralyzeTime = paralyzeTime;
             critterData.confusionTime = confusionTime;
             critterData.curseTime = curseTime;
@@ -4923,8 +4917,6 @@ public class Critter : UUObject
             currentAnimation = critterData.currentAnimation ?? "Idle"; // Restore currentAnimation verbatim
 
             // Restore status effect timers
-            poisonTime = critterData.poisonTime;
-            timeToNextPoisonDamage = critterData.timeToNextPoisonDamage;
             paralyzeTime = critterData.paralyzeTime;
             confusionTime = critterData.confusionTime;
             curseTime = critterData.curseTime;

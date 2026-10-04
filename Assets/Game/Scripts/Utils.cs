@@ -767,6 +767,7 @@ public class Utils
             Vector3 pos = lr + 0.5f * spread * r.x * Vector3.up;
             
             GameObject particle = ParticleSpawner.SpawnParticle(particleType, pos);
+            Tint(particle);
             if (particle == null)
             {
                 CreateFallbackSplat(pos, splatType);
@@ -875,10 +876,67 @@ public class Utils
             Quaternion rotation = Quaternion.LookRotation(cameraForward, directionAway);
             
             GameObject particle = ParticleSpawner.SpawnParticle(particleType, splatPosition, rotation);
+            Tint(particle);
             if (particle == null)
             {
                 CreateFallbackSplat(splatPosition, splatType);
             }
+        }
+    }
+
+    /// <summary>The colour the splats being made are tinted with, or none; see CreateSplats().</summary>
+    private static Color? splatTint;
+
+    private static readonly int ColorProperty = Shader.PropertyToID("_Color");
+    private static MaterialPropertyBlock tintBlock;
+
+    /// <summary>
+    /// Tints a splat just made with <see cref="splatTint"/>, and starts it again in that colour. The
+    /// colour goes in place of the materials' own, some of which are coloured (the poison splat's
+    /// spikes are green), so that the splat takes the tint alone; the particles start white.
+    /// </summary>
+    private static void Tint(GameObject splat)
+    {
+        if (splat == null || !splatTint.HasValue)
+        {
+            return;
+        }
+
+        tintBlock ??= new MaterialPropertyBlock();
+        ParticleSystem[] systems = splat.GetComponentsInChildren<ParticleSystem>();
+        foreach (ParticleSystem system in systems)
+        {
+            ParticleSystem.MainModule main = system.main;
+            main.startColor = Color.white;
+            if (system.TryGetComponent(out ParticleSystemRenderer renderer))
+            {
+                renderer.GetPropertyBlock(tintBlock);
+                tintBlock.SetColor(ColorProperty, splatTint.Value);
+                renderer.SetPropertyBlock(tintBlock);
+            }
+        }
+        if (systems.Length > 0)
+        {
+            systems[0].Clear(true);
+            systems[0].Play(true);
+        }
+    }
+
+    /// <summary>
+    /// The splats of a blow on a creature, tinted when <paramref name="tint"/> is given: the Poison
+    /// spell's are a sickly yellow, so that they stand apart from any creature's own blood.
+    /// </summary>
+    public static void CreateSplats(Critter critter, EParticleType particleType, int damage,
+                                    EBodyPart? struckPart, Vector3 struckPoint, Color? tint)
+    {
+        splatTint = tint;
+        try
+        {
+            CreateSplats(critter, particleType, damage, struckPart, struckPoint);
+        }
+        finally
+        {
+            splatTint = null;
         }
     }
 
@@ -959,6 +1017,7 @@ public class Utils
                 Vector3 directionAway = (splatPosition - damageCenter).normalized;
                 Quaternion rotation = Quaternion.LookRotation(forwardOfCamera, directionAway);
                 GameObject particle = ParticleSpawner.SpawnParticle(particleType, splatPosition, rotation);
+                Tint(particle);
                 if (particle == null)
                 {
                     CreateFallbackSplat(splatPosition, fallbackForHead);
@@ -1084,6 +1143,7 @@ public class Utils
             Quaternion rotation = Quaternion.LookRotation(cameraForward, directionAway);
             
             GameObject particle = ParticleSpawner.SpawnParticle(particleType, splatPosition, rotation);
+            Tint(particle);
             if (particle == null)
             {
                 CreateFallbackSplat(splatPosition, fallbackSplatTypeForJoint);
