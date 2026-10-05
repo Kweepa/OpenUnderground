@@ -2,6 +2,10 @@
 
 ## Current release
 
+- The potion of Poison Resistance now works, keeping you from being poisoned for about five minutes, and casting Curse now curses the creatures in front of you; before, both did nothing.
+
+- The spell icons are no longer stretched sideways, so Flameproof's sphere is round again. Poison Resistance, Magic Protection, Regeneration, Mana Regeneration and the dragon skin boots now show an icon when worn, and a few icons move gently, like the Light icon, at the same pace on any screen.
+
 - Lava now burns 8 to 12 percent of your hit points every second, so about ten seconds in it kill, where before it barely hurt; it no longer damages your armour. It now matters to creatures too: one that wanders stops at its edge, one that chases you may cut across it and is burnt on the way, and one left standing in it burns and walks out; the fire elemental walks in it freely. And lava spares what it spares in the original: keys and rune stones come through, while a moonstone burns; a burning sack, pack, box or pouch spills what it holds into the lava first.
 
 - Resistances work as in the original: they stop a kind of damage outright instead of cutting it. Flameproof stops all fire, lava included; Missile Protection stops arrows, stones and magic missiles, but no longer fireballs or lightning; a ring of Magic Protection now stops one magic hit in three; your fire no longer hurts a fire elemental; and Smite Undead now takes the ghouls too.

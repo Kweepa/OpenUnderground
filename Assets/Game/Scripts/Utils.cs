@@ -97,6 +97,18 @@ public class Utils
 {
     private static readonly Collider[] cachedColliders = new Collider[32];
     
+    /// <summary>Seconds between two steps of a colour cycle: the moving spell icons and the lit lights in the inventory.</summary>
+    public const float ColourCycleSeconds = 0.5f;
+
+    /// <summary>
+    /// The step every colour cycle is at. A clock and not the frame count, so the speed does not follow
+    /// the screen's refresh rate, and unscaled, so the icons keep moving while the game is paused.
+    /// </summary>
+    public static int ColourCycleStep()
+    {
+        return (int)(Time.unscaledTime / ColourCycleSeconds);
+    }
+
     public static float DampedApproachUnscaledTime(float current, float target, float time)
     {
         float threshold = 0.99f; // the value will reach 99% of the 'target' in 'time'

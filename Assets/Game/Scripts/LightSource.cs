@@ -247,7 +247,7 @@ public class LightSource : UUObject
 
             if (texs != null)
             {
-                int cycle = (Time.frameCount / 16) % texs.Length;
+                int cycle = Utils.ColourCycleStep() % texs.Length;
                 return texs[cycle];
             }
         }
