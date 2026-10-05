@@ -50,6 +50,11 @@ MonoBehaviour:
   bButton: {fileID: 2800000, guid: 30ef8c8f932fbcc4c99ee7b9b89dffc8, type: 3}
   xButton: {fileID: 2800000, guid: fc5689391c16d3542969bd5aa2fc51cf, type: 3}
   flask: {fileID: 2800000, guid: 3764b2d0113e54b49868b231f151edbc, type: 3}
+  sphereIconMask: {fileID: 2800000, guid: 43c716aac17249989762e44a4dc9a487, type: 3}
+  sphereIconBorder: {fileID: 2800000, guid: 8d58d37856ba4470bd6f17d9876aa6dc, type: 3}
+  poisonResistanceIconOverlay: {fileID: 2800000, guid: 8614e36232af459689d98fef6903a4d9, type: 3}
+  magicProtectionIconSpark: {fileID: 2800000, guid: f7ac83925fdb48268279d3cbc64fff4d, type: 3}
+  regenerationIconFrames: {fileID: 2800000, guid: 3b169f0004f748c68352342d0c771931, type: 3}
   defaultCastSound: {fileID: 8300000, guid: 92f4b5a3cc12c144495e9ec3352b99ed, type: 3}
   runeOfWarding: {fileID: 7913567576391355843, guid: 483e3831cf61e9a4b8c7beae0855c2f7,
     type: 3}

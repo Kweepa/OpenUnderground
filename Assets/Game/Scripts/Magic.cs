@@ -81,6 +81,12 @@ public class Magic : MonoBehaviour
     public Texture2D bButton;
     public Texture2D xButton;
     public Texture2D flask;
+    // For SpellIcons: masks and pixels drawn for the icons the original does not have.
+    public Texture2D sphereIconMask;
+    public Texture2D sphereIconBorder;
+    public Texture2D poisonResistanceIconOverlay;
+    public Texture2D magicProtectionIconSpark;
+    public Texture2D regenerationIconFrames;
     public AudioClip defaultCastSound;
     public UUObject runeOfWarding;
     public GameObject sheetLightningParticle;
@@ -364,12 +370,14 @@ public class Magic : MonoBehaviour
 
         // uncastable - get from rings, crowns, etc (low-table / special block 6 indices)
         new SSpell("", "Cursed", 0, 5, 0, StringIndexCursed),
-        new SSpell("", "Mana Regeneration", 0, -1, 0, StringIndexManaRegeneration),
-        new SSpell("", "Regeneration", 0, -1, 0, StringIndexRegeneration),
-        new SSpell("", "Poison Resistance", 0, -1, 0, StringIndexPoisonResistance),
+        new SSpell("", "Mana Regeneration", 0, SpellIcons.ManaRegeneration, 0, StringIndexManaRegeneration),
+        new SSpell("", "Regeneration", 0, SpellIcons.Regeneration, 0, StringIndexRegeneration),
+        // Worn, and from the potion that debris can give, which lasts five minutes - about the middle of
+        // the original's Flameproof, so it covers most of a poisoning. The original has no such potion.
+        new SSpell("", "Poison Resistance", 0, SpellIcons.PoisonResistance, 300, StringIndexPoisonResistance),
         new SSpell("ZZZ", "Acid", 0, -1, 0, 305, 84),
-        new SSpell("", "Magic Protection", 0, -1, 0, StringIndexMagicProtection),
-        new SSpell("", "Greater Magic Protection", 0, -1, 0, StringIndexGreaterMagicProtection)
+        new SSpell("", "Magic Protection", 0, SpellIcons.MagicProtection, 0, StringIndexMagicProtection),
+        new SSpell("", "Greater Magic Protection", 0, SpellIcons.MagicProtection, 0, StringIndexGreaterMagicProtection)
     };
 
     /// <summary>
@@ -864,6 +872,9 @@ public class Magic : MonoBehaviour
 
     public void Start()
     {
+        SpellIcons.Build(sphereIconMask, sphereIconBorder, poisonResistanceIconOverlay, magicProtectionIconSpark,
+                         regenerationIconFrames);
+
         if (flask != null)
         {
             flaskCopy = new Texture2D(flask.width, flask.height);
@@ -1828,8 +1839,9 @@ public class Magic : MonoBehaviour
         // level / char level
         timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
 
-        // duration spell?
-        if (spells[i].icon >= 0)
+        // duration spell? Decided by the duration, not the icon: Curse has an icon, the one worn
+        // Cursed items show, and was taken for a spell that lasts nothing, so its effect never ran.
+        if (spells[i].duration > 0)
         {
             if (activeSpells.Count == 3)
             {
@@ -3220,14 +3232,23 @@ public class Magic : MonoBehaviour
 
     private Texture2D GetSpellIcon(int spellIndex)
     {
-        if (spellIndex == (int)ESpell.Light)
+        return SpellIcons.Get(spells[spellIndex].icon);
+    }
+
+    /// <summary>
+    /// Draws an icon at the given height, with square pixels, centred in a square slot as wide as that.
+    /// The icons are 16 x 18 and drawn for square pixels - Flameproof's sphere is round only so - and
+    /// a square slot stretched them an eighth wider.
+    /// </summary>
+    private void DrawIcon(float slotX, float y, float height, Texture2D tex)
+    {
+        if (tex == null)
         {
-            Texture2D[] texs = DataLoader.sDataLoader.lightSpellTex;
-            int cycle = (Time.frameCount / 16) % texs.Length;
-            return texs[cycle];
+            return;
         }
 
-        return DataLoader.sDataLoader.spellsTex[spells[spellIndex].icon];
+        float width = height * tex.width / tex.height;
+        DrawTex(slotX + (height - width) / 2, y, width, height, tex);
     }
 
     public void OnGUI()
@@ -3245,26 +3266,39 @@ public class Magic : MonoBehaviour
         {
             SSpell spell = spells[activeSpells[i].spell];
             Texture2D tex = GetSpellIcon(activeSpells[i].spell);
-            DrawTex(100, Screen.height - 120 - 64 * i, 64, 64, tex);
+            DrawIcon(100, Screen.height - 120 - 64 * i, 64, tex);
             GUI.Label(new Rect(168, Screen.height - 100 - 64 * i, 100, 20), spell.name, style);
             DrawTex(168, Screen.height - 70 - 64 * i,
                 150 * activeSpells[i].time / spells[activeSpells[i].spell].duration, 5, Texture2D.whiteTexture);
         }
 
         {
-            int psx = 100;
+            float psx = 100;
+            // The worn icons sat 64 apart, which left 21 pixels between two of them once they were
+            // drawn their own width; half of that gap is enough.
+            const float wornIconWidth = 48f * 16 / 18;
+            const float wornIconStep = (64 + wornIconWidth) / 2;
+            // Only the stronger of the two protections counts (GetResistances()), so only it is shown.
+            bool greaterProtectionShown = IsSpellKnownActive(ESpell.GreaterMagicProtection);
             foreach (SPermanentSpell spell in permanentSpells)
             {
-                if (IsPermanentSpellKnown(spell))
+                if (IsPermanentSpellKnown(spell)
+                    && !(spell.spell == ESpell.MagicProtection && greaterProtectionShown))
                 {
                     int icon = spells[(int)spell.spell].icon;
-                    // if there isn't an icon for it (mana regen, regen, poison resistance) just don't draw anything
-                    if (icon >= 0 && icon < DataLoader.sDataLoader.spellsTex.Length)
+                    if (icon >= 0)
                     {
-                        DrawTex(psx, Screen.height - 60, 48, 48, DataLoader.sDataLoader.spellsTex[icon]);
-                        psx += 64;
+                        DrawIcon(psx, Screen.height - 60, 48, SpellIcons.Get(icon));
+                        psx += wornIconStep;
                     }
                 }
+            }
+
+            // The dragon skin boots are no enchantment: PlayerObject checks for them by type to stop
+            // the lava, so they are not among the permanent spells. Nothing to identify on them.
+            if (Inventory.sInv != null && Inventory.sInv.Wearing(EObjectType.DragonskinBoots))
+            {
+                DrawIcon(psx, Screen.height - 60, 48, SpellIcons.Get(SpellIcons.LavaResistance));
             }
         }
 

@@ -191,6 +191,27 @@ public class GraphicsLoader
         return indices;
     }
     
+    /// <summary>
+    /// The palette indices of one image of a .gr file, bottom row first as a texture holds them, for
+    /// code that works on the colours by number (SpellIcons).
+    /// </summary>
+    public static byte[] GetImageIndices(string relativePath, int texIndex, out int width, out int height)
+    {
+        Stream stream = new Stream(relativePath);
+        byte isForcedSize = stream.GetByte();
+        width = 0;
+        if (isForcedSize == 2)
+        {
+            width = stream.GetByte();
+        }
+
+        height = width;
+        int count = stream.GetUShort();
+        int[] offsets = stream.GetIntArray(count);
+        stream.Seek(offsets[texIndex]);
+        return GetPaletteIndices(stream, ref width, ref height);
+    }
+
     public static Texture2D[] GetTextures(string relativePath, float zeroAlpha, TextureWrapMode wrapMode, int paletteIndex = 0, List<Vector2> explicitSizes = null, bool mips = true)
     {
         Stream stream = new Stream(relativePath);
