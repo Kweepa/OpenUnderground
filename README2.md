@@ -6,13 +6,13 @@ This project is a wrapper for the well-known 1992 dungeon crawler by Blue Sky Pr
 
 ## What's new
 
-![Two ghosts by a grave](Docs/images/ghosts.jpg)
-
 **Looks and sound**
 
   - 3D models for critters and objects
   - better lighting and particles
   - full audio
+
+![Two ghosts by a grave](Docs/images/ghosts.jpg)
 
 **Modern conveniences**
 
@@ -26,9 +26,9 @@ This project is a wrapper for the well-known 1992 dungeon crawler by Blue Sky Pr
 
 **Faithful to the original**
 
-Every change is listed in the [CHANGELOG](CHANGELOG.md).
-
 ![A conversation, with the inventory open beside it](Docs/images/conversation.jpg)
+
+Every change is listed in the [CHANGELOG](CHANGELOG.md).
 
 ## Download and play
 
