@@ -2,21 +2,25 @@
 
 ## Current release
 
+- The stats panel gives each sentence a line of its own, with the values in bold, and now tells you when you are seriously or egregiously poisoned.
+
 - Fireballs and lightning bolts now burst where they stop, as in the original: a fireball does 10 to 60 points of fire to everyone close to where it hits, a lightning bolt 6 to 30, and that includes you if you cast it at something too near. In water they just sink. Both are drawn bigger, to tell them from a magic missile.
 
 - The Poison spell now does 5 to 20 points at once to the creature you aim at, as in the original, instead of poisoning everyone nearby for a while. Only creatures that bleed are hurt, so it is wasted on a golem or a skeleton. A potion of Poison is now thrown, hurting a creature with that spell, instead of poisoning you.
 
 - A creature you curse now glows with runes, the effect of Name Enchantment, so you can see the Curse take hold.
 
-- The potion of Poison Resistance now works, keeping you from being poisoned for about five minutes, and casting Curse now curses the creatures in front of you; before, both did nothing.
+- The potion of Poison Resistance now works, for about five minutes, and casting Curse now curses the creatures in front of you; before, both did nothing.
 
 - The spell icons are no longer stretched sideways, so Flameproof's sphere is round again. Poison Resistance, Magic Protection, Regeneration, Mana Regeneration and the dragon skin boots now show an icon when worn, and a few icons move gently, like the Light icon, at the same pace on any screen.
 
-- Lava now burns 8 to 12 percent of your hit points every second, so about ten seconds in it kill, where before it barely hurt; it no longer damages your armour. It now matters to creatures too: one that wanders stops at its edge, one that chases you may cut across it and is burnt on the way, and one left standing in it burns and walks out; the fire elemental walks in it freely. And lava spares what it spares in the original: keys and rune stones come through, while a moonstone burns; a burning sack, pack, box or pouch spills what it holds into the lava first.
+- Lava now burns 16 to 24 percent of your hit points every second, so about five seconds in it kill, where before it barely hurt; it no longer damages your armour. It now matters to creatures too: one that wanders stops at its edge, one that chases you may cut across it and is burnt on the way, and one left standing in it burns and walks out; the fire elemental walks in it freely. And lava spares what it spares in the original: keys and rune stones come through, while a moonstone burns; a burning sack, pack, box or pouch spills what it holds into the lava first.
 
-- Resistances work as in the original: they stop a kind of damage outright instead of cutting it. Flameproof stops all fire, lava included; Missile Protection stops arrows, stones and magic missiles, but no longer fireballs or lightning; a ring of Magic Protection now stops one magic hit in three; your fire no longer hurts a fire elemental; and Smite Undead now takes the ghouls too.
+- Resistances work as in the original, each against its own kind of damage: Missile Protection stops arrows, stones and magic missiles, but no longer fireballs or lightning; a ring of Magic Protection now stops one magic hit in three; your fire no longer hurts a fire elemental; and Smite Undead now takes the ghouls too.
 
-- Poison works as in the original: a venomous bite always poisons you, the poison does its level in damage once a minute and then weakens by one, sleeping pays what is left at once, and Poison Resistance keeps you from being poisoned at all, by a trap too.
+- Poison works as in the original: a venomous bite always poisons you, the poison does its level in damage every minute, one point at a time, and then weakens by one, and sleeping pays what is left at once.
+
+- Flameproof and Poison Resistance let a third of the damage through, and Poison Resistance does not stop acid; the dragon skin boots still keep lava off entirely.
 
 - Resist Blows, Thick Skin and Iron Flesh now take 1, 2 and 3 points off every blow, down from 2, 3 and 5, whether cast or worn. The original's data says 2, 3 and 5, but the code in the original makes them do nothing at all; at 2, a first-circle spell shrugged off most bites on the first level.
 

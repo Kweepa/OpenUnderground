@@ -10,6 +10,10 @@ using UnityEngine;
 /// is object type 127, and the game rebuilds that row from the spells in force and the enchanted
 /// items worn (0x7e444, case 3 of 0x7e007), so the player's resistances are the same kind of byte.
 /// A resistance does not cut the damage: it stops it, or it does not.
+///
+/// Ours, behind <see cref="PlayerInput.PartialResistances"/>: the player's Flameproof and Poison
+/// Resistance cut their damage to a third instead of stopping it, so they leave the player's byte.
+/// Flameproof's cut is <see cref="CutForPlayer"/>, Poison Resistance's is in <see cref="PoisonClock"/>.
 /// </remarks>
 public static class Resistance
 {
@@ -86,6 +90,37 @@ public static class Resistance
 
     /// <summary>The player's resistances now. See <see cref="global::Magic.GetResistances"/>.</summary>
     public static int Player => global::Magic.sMagic != null ? global::Magic.sMagic.GetResistances() : 0;
+
+    /// <summary>
+    /// Whether the player's Flameproof cuts fire to a third instead of stopping it. Ours.
+    /// </summary>
+    public static bool FlameproofCuts =>
+        PlayerInput.PartialResistances && global::Magic.sMagic != null && global::Magic.sMagic.IsSpellActive(global::Magic.ESpell.Flameproof);
+
+    /// <summary>
+    /// Whether the player's Poison Resistance cuts the poison to a third instead of stopping it. Ours.
+    /// It leaves being poisoned alone, and acid too: it is not a resistance to acid.
+    /// </summary>
+    public static bool PoisonResistanceCuts =>
+        PlayerInput.PartialResistances && global::Magic.sMagic != null && global::Magic.sMagic.IsSpellActive(global::Magic.ESpell.PoisonResistance);
+
+    /// <summary>
+    /// What reaches the player of a damage the filter let through: a third of it when it is fire
+    /// and Flameproof is on, all of it otherwise. Ours.
+    /// </summary>
+    public static int CutForPlayer(int amount, int mask)
+    {
+        return (mask & Fire) != 0 && FlameproofCuts ? Third(amount, Random.Range(0, 3)) : amount;
+    }
+
+    /// <summary>
+    /// A third of <paramref name="amount"/>, the remainder rounded at random so that the average is
+    /// a third exactly: 7 gives 2, or 3 one time in three. <paramref name="roll"/> is 0, 1 or 2.
+    /// </summary>
+    public static int Third(int amount, int roll)
+    {
+        return amount / 3 + (roll < amount % 3 ? 1 : 0);
+    }
 
     /// <summary>
     /// Whether the player escapes a poisoning: the original asks the filter for one point of

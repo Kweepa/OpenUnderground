@@ -144,6 +144,11 @@ public class StatsPanel : MonoBehaviour
         lerpIn = Utils.DampedApproachUnscaledTime(lerpIn, lerpTarget, 0.2f);
     }
 
+    private static string Bold(string text)
+    {
+        return "<b>" + text + "</b>";
+    }
+
     public void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Stats;
@@ -214,20 +219,22 @@ public class StatsPanel : MonoBehaviour
                 GUI.Label(r, vals[i], rightStyle);
             }
 
+            // One sentence a line, as the strings' own line breaks have it, with what changes in bold.
             style.wordWrap = true;
+            style.richText = true;
             int day = 1 + (int) (PlayerData.sData.gameTime / (24 * 60 * 60));
             string status = StringLoader.GetString(1, 91);
-            status += StringLoader.GetString(1, 104 + (255 - PlayerData.sData.hunger) / 30);
+            status += Bold(StringLoader.GetString(1, 104 + (255 - PlayerData.sData.hunger) / 30));
             status += StringLoader.GetString(1, 103);
-            status += StringLoader.GetString(1, 113 + Mathf.Min((30 - PlayerData.sData.fatigue) / 5, 5));
-            status += ". ";
+            status += Bold(StringLoader.GetString(1, 113 + Mathf.Min((30 - PlayerData.sData.fatigue) / 5, 5)));
+            status += ".\n";
             status += StringLoader.GetString(1, 65);
-            status += StringLoader.GetString(1, 410 + LevelLoader.sLevelLoader.loadedLevel);
+            status += Bold(StringLoader.GetString(1, 410 + LevelLoader.sLevelLoader.loadedLevel));
             status += StringLoader.GetString(1, 66);
             if (day < 100)
             {
                 status += StringLoader.GetString(1, 67);
-                status += StringLoader.GetString(1, 410 + day);
+                status += Bold(StringLoader.GetString(1, 410 + day));
                 status += StringLoader.GetString(1, 68);
             }
             else
@@ -237,23 +244,27 @@ public class StatsPanel : MonoBehaviour
 
             int thour = (int) (PlayerData.sData.gameTime % (24 * 60 * 60)) / (2 * 60 * 60);
             status += StringLoader.GetString(1, 70);
-            status += StringLoader.GetString(1, 71 + thour) + ". ";
+            status += Bold(StringLoader.GetString(1, 71 + thour)) + ".\n";
 
             if (PlayerData.sData.poison > 0)
             {
-                status += " " + StringLoader.GetString(1, 91);
-                status += StringLoader.GetString(1, 84 + PlayerData.sData.poison / 6);
+                // The original's scale, UW.EXE 0x262b7-0x262bf: 84 + (level - 1) / 3, so the levels
+                // 1 to 15 take the five adverbs three each.
+                status += StringLoader.GetString(1, 91);
+                status += Bold(StringLoader.GetString(1, 84 + Mathf.Clamp((PlayerData.sData.poison - 1) / 3, 0, 4)));
                 status += StringLoader.GetString(1, 92);
             }
 
-            status = status.Replace("\r", " ");
-            status = status.Replace("\n", " ");
-            status = status.Replace("  ", " ");
+            status = status.Replace("\r", "");
             status = status.Replace("imprisonment", "captivity");
+            status = status.TrimEnd('\n');
 
-            style.fontSize = 22;
+            // Size 20 and 365 wide keep the longest case - an uncountable day, a long time of day
+            // and the poison - to seven lines, above the skills.
+            style.fontSize = 20;
             style.fontStyle = FontStyle.Normal;
-            GUI.Label(new Rect(invPosition + 30, 30 + 200, 360, 150), status, style);
+            GUI.Label(new Rect(invPosition + 30, 30 + 200, 365, 177), status, style);
+            style.richText = false;
 
             style.fontSize = 24;
             style.fontStyle = PlayerData.sData.skillPoints > 0 ? FontStyle.Italic : FontStyle.Normal;

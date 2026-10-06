@@ -49,6 +49,14 @@ public static class PlayerInput
     /// </summary>
     public static bool ShieldSpellsSoak => PlayerPrefs.GetInt("Options_ShieldSpellsSoak", 1) == 1;
 
+    /// <summary>
+    /// Whether Flameproof and Poison Resistance let a third of their damage through, and the
+    /// poison hurts one point at a time over the minute. Off, the two stop their damage outright
+    /// and the poison hurts once a minute, which is what the original does. On unless the player
+    /// turns it off.
+    /// </summary>
+    public static bool PartialResistances => PlayerPrefs.GetInt("Options_PartialResistances", 1) == 1;
+
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     public static Vector2 ReadMoveVector()
     {
