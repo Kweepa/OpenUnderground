@@ -604,18 +604,23 @@ public class Magic : MonoBehaviour
     /// Flameproof and Missile Protection come cast or worn, Poison Resistance and the two Magic
     /// Protections only worn.
     /// </summary>
+    /// <remarks>
+    /// With <see cref="PlayerInput.PartialResistances"/> on, Flameproof and Poison Resistance are
+    /// not in the byte: they cut their damage instead of stopping it (<see cref="Resistance"/>).
+    /// </remarks>
     public int GetResistances()
     {
         int resistances = 0;
+        bool partial = PlayerInput.PartialResistances;
         if (IsSpellActive(ESpell.MissileProtection))
         {
             resistances |= Resistance.Missile;
         }
-        if (IsSpellActive(ESpell.Flameproof))
+        if (!partial && IsSpellActive(ESpell.Flameproof))
         {
             resistances |= Resistance.Fire;
         }
-        if (IsSpellActive(ESpell.PoisonResistance))
+        if (!partial && IsSpellActive(ESpell.PoisonResistance))
         {
             resistances |= Resistance.Poison;
         }

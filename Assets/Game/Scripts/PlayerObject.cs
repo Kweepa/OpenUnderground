@@ -795,9 +795,13 @@ public class PlayerObject : MonoBehaviour
         touchingWater = TouchingTerrain(ETerrainType.Water, t);
         isInWater = !Magic.sMagic.IsSpellActive(Magic.ESpell.WaterWalk) && touchingWater;
 
-        // flameproof?
+        // The dragon skin boots keep lava off whatever else is worn (DS:0x1b01 in the original), and
+        // so does Flameproof in the original. Ours, with PlayerInput.PartialResistances: Flameproof
+        // lets a third of the burn through, which Damage() takes off as it does any fire.
         touchingLava = TouchingTerrain(ETerrainType.Lava, t);
-        bool shouldBeBurned = !Magic.sMagic.IsSpellActive(Magic.ESpell.Flameproof) && !Inventory.sInv.Wearing(EObjectType.DragonskinBoots) && touchingLava; 
+        bool lavaWard = Inventory.sInv.Wearing(EObjectType.DragonskinBoots)
+            || (!PlayerInput.PartialResistances && Magic.sMagic.IsSpellActive(Magic.ESpell.Flameproof));
+        bool shouldBeBurned = !lavaWard && touchingLava;
 
         // The burn comes at once on the way in and then once a second; a step out and back in
         // within the second does not start it over.
@@ -1160,24 +1164,35 @@ public class PlayerObject : MonoBehaviour
         {
             remainingCarryWeight = 2 * PlayerData.sData.strength - (int)Inventory.sInv.GetInventoryWeight();
 
-            // The poison, as the original has it: once a game minute - every third world tick,
-            // UW.EXE 0x2adee - damage equal to the level, typed poison, and then the level drops by
-            // one (0x2ae02-0x2ae3b). A game minute of the original is a minute of real time,
-            // measured in DOSBox by the user. The minute starts when the player is poisoned, and
-            // a stronger poisoning raises the level without starting it again.
+            // The poison: see PoisonClock.
             if (PlayerData.sData.poison > 0)
             {
-                timeToNextPoisonTick -= Time.deltaTime;
-                if (timeToNextPoisonTick <= 0.0f)
+                bool spread = PlayerInput.PartialResistances;
+                int points = poisonClock.Step(Time.deltaTime, PlayerData.sData.poison, spread, Resistance.PoisonResistanceCuts,
+                    out bool minuteOver);
+                if (spread)
                 {
-                    timeToNextPoisonTick += PoisonTickSeconds;
-                    Damage(Skills.ESkillTestResult.Success, PlayerData.sData.poison, EDamageType.Poison, Resistance.Poison);
+                    // Ours: every point flashes and grunts, and a random one in five rumbles and
+                    // shakes the screen.
+                    for (int i = 0; i < points; ++i)
+                    {
+                        Damage(Skills.ESkillTestResult.Success, 1, EDamageType.Poison, Resistance.Poison,
+                            true, Random.Range(0, 5) == 0);
+                    }
+                }
+                else if (points > 0)
+                {
+                    Damage(Skills.ESkillTestResult.Success, points, EDamageType.Poison, Resistance.Poison);
+                }
+
+                if (minuteOver)
+                {
                     --PlayerData.sData.poison;
                 }
             }
             else
             {
-                timeToNextPoisonTick = PoisonTickSeconds;
+                poisonClock.Reset();
             }
 
             if (PlayerData.sData.drunkenness > 0)
@@ -1315,11 +1330,8 @@ public class PlayerObject : MonoBehaviour
     }
 
     public int remainingCarryWeight;
-    private float timeToNextPoisonTick = PoisonTickSeconds;
+    private readonly PoisonClock poisonClock = new PoisonClock();
     private float timeToDecrementDrunkenness;
-
-    /// <summary>A minute of the original's game time: three world ticks of 20 seconds.</summary>
-    private const float PoisonTickSeconds = 60.0f;
 
     private float timeToNextLavaDamage;
     private float timeToNextVoidDamage;
@@ -1329,15 +1341,15 @@ public class PlayerObject : MonoBehaviour
 
     /// <summary>
     /// What lava takes every <see cref="LavaBurnSeconds"/> from one whose hit points are at most
-    /// <paramref name="maxHitPoints"/>: 8 to 12 percent of them, at least 1. The original takes 1
+    /// <paramref name="maxHitPoints"/>: 16 to 24 percent of them, at least 1. The original takes 1
     /// point when rand() % 5 == 0, once a frame (UW.EXE 0x31622 in the condition tick 0x314fd,
     /// from the per-frame 0x30fc6), so its pace is the frame rate's: under DOSBox today a
-    /// character with 255 hit points dies in it in about 5.5 seconds. That is ours to soften: a
-    /// share of the hit points burns as hard whatever the level, and kills in about ten seconds.
+    /// character with 255 hit points dies in it in about 5.5 seconds. Ours: a share of the hit
+    /// points burns as hard whatever the level, and kills in about five seconds.
     /// </summary>
     public static int RollLavaBurn(int maxHitPoints)
     {
-        return Mathf.Max(1, Mathf.RoundToInt(maxHitPoints * Random.Range(0.08f, 0.12f)));
+        return Mathf.Max(1, Mathf.RoundToInt(maxHitPoints * Random.Range(0.16f, 0.24f)));
     }
 
     private float timeToNextHunger = 60.0f;
@@ -1597,13 +1609,34 @@ public class PlayerObject : MonoBehaviour
     /// <remarks>
     /// A damage the player's resistances stop does nothing at all, and nothing shows: no flash,
     /// no grunt, no rumble, no shake and no wear on the armour. Standing in lava under Flameproof
-    /// in the original, the user saw none of it.
+    /// in the original, the user saw none of it. The same goes for a damage Flameproof's third
+    /// leaves at nothing (<see cref="Resistance.CutForPlayer"/>).
     /// </remarks>
     public void Damage(Skills.ESkillTestResult result, int damage, EDamageType damageType, int mask = 0)
     {
-        if (damage > 0 && Resistance.Filter(damage, mask, Resistance.Player) == 0)
+        Damage(result, damage, damageType, mask, true, true);
+    }
+
+    /// <summary>
+    /// <see cref="Damage(Skills.ESkillTestResult, int, EDamageType, int)"/>, with the grunt and with
+    /// the rumble and the screen shake each left out when false: the poison's pulses use it.
+    /// </summary>
+    private void Damage(Skills.ESkillTestResult result, int damage, EDamageType damageType, int mask, bool grunt, bool shake)
+    {
+        if (damage > 0)
         {
-            return;
+            int left = Resistance.Filter(damage, mask, Resistance.Player);
+            if (left > 0)
+            {
+                left = Resistance.CutForPlayer(left, mask);
+            }
+
+            if (left == 0)
+            {
+                return;
+            }
+
+            damage = left;
         }
 
         if (!PlayerData.sData.dead && !Cheats.sCheats.invincible)
@@ -1630,9 +1663,15 @@ public class PlayerObject : MonoBehaviour
                 flash.Flash(damage / 4.0f + (result == Skills.ESkillTestResult.CriticalSuccess ? 0.5f : 0.0f), damageType);
             }
 
-            Rumble(0.1f, 0.2f, 0.3f);
+            if (shake)
+            {
+                Rumble(0.1f, 0.2f, 0.3f);
+            }
 
-            PlayDamageGrunt(Math.Min(0.75f + damage / 8.0f, 1.0f));
+            if (grunt)
+            {
+                PlayDamageGrunt(Math.Min(0.75f + damage / 8.0f, 1.0f));
+            }
 
             // try to damage armour - not by lava, which in the original wears nothing
             if (damageType is not EDamageType.Drowning and not EDamageType.Poison and not EDamageType.Direct
@@ -1645,7 +1684,10 @@ public class PlayerObject : MonoBehaviour
                 }
             }
             
-            GetComponentInChildren<ScreenShake>().Shake();
+            if (shake)
+            {
+                GetComponentInChildren<ScreenShake>().Shake();
+            }
         }
     }
 
@@ -1706,7 +1748,7 @@ public class PlayerObject : MonoBehaviour
         timeInWater = 0.0f;
         timeToNextWaterDamage = 0.0f;
         timeToNextLavaDamage = 0.0f;
-        timeToNextPoisonTick = PoisonTickSeconds;
+        poisonClock.Reset();
         noise = 0.0f;
     }
 
@@ -1884,14 +1926,28 @@ public class PlayerObject : MonoBehaviour
     /// Sleep pays the poison left at once: what the minutes still to come would have done,
     /// p + (p - 1) + ... + 1, typed poison, and then the poison is gone (UW.EXE 0x81f8f, at
     /// 0x82073-0x820c1). The original does it before the rest heals anything, so a sleep can kill.
+    /// With the damage spread over the minute, the points the minute under way has already done
+    /// are not paid twice, and Poison Resistance pays what its slower pulses would have done (ours).
     /// </summary>
     public void PayPoisonInSleep()
     {
         int poison = PlayerData.sData.poison;
         if (poison > 0)
         {
-            Damage(Skills.ESkillTestResult.Success, (poison + 1) * poison / 2, EDamageType.Poison, Resistance.Poison);
+            bool spread = PlayerInput.PartialResistances;
+            int left = PoisonClock.Left(poison, spread, Resistance.PoisonResistanceCuts);
+            if (spread)
+            {
+                left = Math.Max(0, left - poisonClock.PulsesThisMinute);
+            }
+
+            if (left > 0)
+            {
+                Damage(Skills.ESkillTestResult.Success, left, EDamageType.Poison, Resistance.Poison);
+            }
+
             PlayerData.sData.poison = 0;
+            poisonClock.Reset();
         }
     }
 
