@@ -582,7 +582,8 @@ public class Achievements : MonoBehaviour
 
     private bool CheckDieWithSeed()
     {
-        return (PlayerData.sData?.hp ?? 1) <= 0
+        // The death itself, not the hit points: the flag is set only when the player dies (issue #56).
+        return (PlayerData.sData?.dead ?? false)
             && (Inventory.sInv?.FindObjectInInventory(EObjectType.SilverSeed) ?? false);
     }
 
