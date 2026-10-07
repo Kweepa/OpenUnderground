@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The achievement for dying with the silver seed comes when you die, and no longer while you are still alive at 0 hit points.
+
 - A creature you press in a fight now steps back, or sometimes aside, as in the original, when it has room to: never into a wall, up or down a step, off a bridge, or into water or lava.
 
 - Ghosts now fly, as in the original, so a step or a pool no longer stops them from coming after you.
