@@ -42,10 +42,11 @@ public class Wand : UUObject
             return;
         }
 
-        int spellIndex = special - 368;
-        if (spellIndex >= 0)
+        // An unlinked wand carries its enchantment itself, and only with bit 12 set
+        // (UW.EXE 0x38b5c). The frog wand on level 4 is the one in the game.
+        if (isEnchanted)
         {
-            SetEnchantment(spellIndex);
+            SetEnchantment(Enchantment.NameIndexOf(special, Enchantment.HasBit11(this)));
         }
     }
 
@@ -55,8 +56,7 @@ public class Wand : UUObject
 
         if (!isLinked && !IsBrokenWand)
         {
-            // TODO: investigate and fix this
-            if (special - 368 >= 0)
+            if (isEnchanted)
             {
                 UpdateEnchantmentState();
 
@@ -87,14 +87,9 @@ public class Wand : UUObject
                 int spellIndex = obj.special;
                 if (spellIndex >= 512)
                 {
-                    if (spellIndex < 576)
-                    {
-                        SetEnchantment(spellIndex - 256);
-                    }
-                    else
-                    {
-                        SetEnchantment(spellIndex - 368);
-                    }
+                    // The spell's own bit 11 picks the decoding (UW.EXE 0x38b5c). Every linked
+                    // spell in the game has it set and a special of 512-575, which names a spell.
+                    SetEnchantment(Enchantment.NameIndexOf(spellIndex, Enchantment.HasBit11(obj)));
 
                     if (!restoredFromSave || recoverChargesFromLinkedSpell)
                     {
