@@ -12,9 +12,9 @@
 ///
 /// Matching the printed name instead, which is what this code used to do, only works while
 /// one strings file is loaded, because block 6 carries the same names in three parallel
-/// tables: item enchantments low down, spell names from 256, a third set from 384. An
-/// armour's number is <c>special - 512</c>, so a ring of Resist Blows is 34 while the spell
-/// is 257, and the name was the only bridge between them.
+/// runs: item enchantments low down, spell names from 256, and the active effect icons from
+/// 384. An armour's number is <c>special - 512</c>, so a ring of Resist Blows is 34 while the
+/// spell is 257, and the name was the only bridge between them.
 /// </remarks>
 public static class Enchantment
 {
@@ -75,6 +75,39 @@ public static class Enchantment
     public static int ParameterOf(int index)
     {
         return index >= 0 && index < FirstSpellName ? index & 0xf : -1;
+    }
+
+    /// <summary>
+    /// The block 6 number the original names an enchantment by, from the <c>special</c> of the
+    /// object that carries it - the object itself, or the spell a wand is linked to - and bit 11
+    /// of that object's first word, which is bit 2 of <see cref="UUObject.flags"/>.
+    /// </summary>
+    /// <remarks>
+    /// UW.EXE 0x38b5c decodes it in two ways. With bit 11 set the kind is
+    /// <c>((special &amp; 0x1ff) &gt;&gt; 6) + 12</c> and the parameter has six bits, and a zero
+    /// there is no kind at all: 0x7bdbc then names a spell, <c>256 + parameter</c> (0x7be3a).
+    /// With bit 11 clear it is the grid of <see cref="KindOf"/>, which comes back to
+    /// <c>special &amp; 0x1ff</c>. Kind 12, the weapon and armour bonuses named from 448
+    /// (0x7be06), is left to WeaponBase and Armour.
+    /// Neither way gives 384-415, the third run of names in block 6: those are the names of the
+    /// active effect icons, which UW.EXE 0x78d09 looks up as 384 plus the icon.
+    /// </remarks>
+    public static int NameIndexOf(int special, bool bit11)
+    {
+        if (!bit11)
+        {
+            return special & 0x1ff;
+        }
+
+        int group = (special & 0x1ff) >> 6;
+        int parameter = special & 0x3f;
+        return group == 0 ? FirstSpellName + parameter : (group + 12) * 16 + parameter;
+    }
+
+    /// <summary>Bit 11 of an object's first word, as <see cref="NameIndexOf"/> wants it.</summary>
+    public static bool HasBit11(UUObject obj)
+    {
+        return (obj.flags & 4) != 0;
     }
 
     // The kinds, named after what the applicator's case actually does.
