@@ -1119,7 +1119,10 @@ public class SaveLoadGUI : MonoBehaviour
 
             float w = 5.0f * background.width;
             float h = 4.0f * background.height;
-            float x = Screen.width / 3 - w / 2;
+            // the panel and the detail panel beside it are centred together: the panel alone used to
+            // sit centred on a third of the screen, which left the pair off to one side
+            float pairWidth = w + 10f + SaveUIHelper.GetSaveSlotDetailPanelRect(0f, 0f, background).width;
+            float x = (Screen.width - pairWidth) / 2;
             float y = Screen.height / 2 - h / 2;
             Rect panelRect = new Rect(x, y, w, h);
             GuiInput.RegisterBlockingRect(panelRect);

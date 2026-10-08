@@ -110,8 +110,14 @@ public class Inventory : MonoBehaviour
 
     public static Inventory sInv;
 
+    /// <summary>Top of the panel; every place on it is measured from here.</summary>
+    private const int PanelTop = PlayerPanelState.PanelMargin;
+
+    /// <summary>How far the panel slides in: its width, 83 pixels at 3x, and the side margin.</summary>
+    private const float InvSlide = PlayerPanelState.PanelMargin + 3 * 83;
+
     private int ix = 15;
-    private int iy = 300;
+    private int iy = PanelTop + 270;
     private int dx = 57;
     private int dy = 66;
 
@@ -137,8 +143,7 @@ public class Inventory : MonoBehaviour
 
     public void GetInventoryPanelLayout(out float panelLeft, out float invSlidePixels)
     {
-        const float kExtendedInvPosition = 16 + 4 * 64;
-        invSlidePixels = lerpIn * kExtendedInvPosition;
+        invSlidePixels = lerpIn * InvSlide;
         panelLeft = Screen.width - invSlidePixels;
     }
 
@@ -334,7 +339,7 @@ public class Inventory : MonoBehaviour
     private static Rect PaperdollSlotHitRect(float panelLeft, int slotIndex)
     {
         float x = panelLeft + 3 * invSlots[slotIndex].cx;
-        float y = 30 + 3.6f * invSlots[slotIndex].cy;
+        float y = PanelTop + 3.6f * invSlots[slotIndex].cy;
         return new Rect(x, y, 48, 58);
     }
 
@@ -872,7 +877,7 @@ public class Inventory : MonoBehaviour
             Texture2D upArrow = DataLoader.sDataLoader.buttonsTex[27];
             if (upArrow != null)
             {
-                Rect r = new Rect(scrollIndicatorX, 256, 3 * upArrow.width, 3.6f * upArrow.height);
+                Rect r = new Rect(scrollIndicatorX, PanelTop + 226, 3 * upArrow.width, 3.6f * upArrow.height);
                 if (r.Contains(guiMouse))
                 {
                     return TryApplyStuffViewScroll(-1, itemsToDisplayCount);
@@ -886,7 +891,7 @@ public class Inventory : MonoBehaviour
             Texture2D downArrow = DataLoader.sDataLoader.buttonsTex[28];
             if (downArrow != null)
             {
-                Rect r = new Rect(scrollIndicatorX + downArrow.width * 3 + 6, 256, 3 * downArrow.width, 3.6f * downArrow.height);
+                Rect r = new Rect(scrollIndicatorX + downArrow.width * 3 + 6, PanelTop + 226, 3 * downArrow.width, 3.6f * downArrow.height);
                 if (r.Contains(guiMouse))
                 {
                     return TryApplyStuffViewScroll(1, itemsToDisplayCount);
@@ -1048,15 +1053,13 @@ public class Inventory : MonoBehaviour
 
     public Rect GetPanelGuiRectForOutsideClick()
     {
-        const float kExtendedInvPosition = 16 + 4 * 64;
-        return GetInventoryPanelScreenRect(lerpIn * kExtendedInvPosition);
+        return GetInventoryPanelScreenRect(lerpIn * InvSlide);
     }
 
     /// <summary>Same horizontal slide distance as <see cref="GetPanelGuiRectForOutsideClick"/>.</summary>
     public float GetCurrentInventoryPanelInvPosition()
     {
-        const float kExtendedInvPosition = 16 + 4 * 64;
-        return lerpIn * kExtendedInvPosition;
+        return lerpIn * InvSlide;
     }
 
     public bool IsGuiMouseOverInventoryPanelGui(Vector2 guiMouse)
@@ -1144,8 +1147,8 @@ public class Inventory : MonoBehaviour
             return default;
         float panelLeft = Screen.width - invPosition;
         float w = 3f * tex.width;
-        float h = Mathf.Min(Screen.height - 30f, 3.6f * tex.height + 3.6f * 50f);
-        return new Rect(panelLeft, 30f, w, h);
+        float h = Mathf.Min(Screen.height - PanelTop, 3.6f * tex.height + 3.6f * 50f);
+        return new Rect(panelLeft, PanelTop, w, h);
     }
 
     private static bool IsPlayerTradeSlotIndex(int slotIndex)
@@ -3787,8 +3790,7 @@ public class Inventory : MonoBehaviour
                     break;
                 }
 
-                const float kExtendedInvMouse = 16f + 4f * 64f;
-                float invMousePx = lerpIn * kExtendedInvMouse;
+                float invMousePx = lerpIn * InvSlide;
 
                 // When true, run mouse hit-tests and button handling on the panel (paperdoll before stuff grid). Gamepad path ignores this.
                 // Also handle clicks over the panel when LastActiveDevice is still Gamepad (hybrid input) so RMB/LMB are not dropped.
@@ -5160,29 +5162,28 @@ public class Inventory : MonoBehaviour
         if (lerpIn > 0.001f)
         {
             // draw the inventory
-            const float kExtendedInvPosition = (16 + 4 * 64);
-            float invPosition = lerpIn * kExtendedInvPosition;
+            float invPosition = lerpIn * InvSlide;
 
             // panel
             {
                 Texture2D tex = DataLoader.sDataLoader.panelsTex[0];
-                GUI.DrawTexture(new Rect(Screen.width - invPosition, 30, 3 * tex.width, 3.6f * tex.height), tex);
+                GUI.DrawTexture(new Rect(Screen.width - invPosition, PanelTop, 3 * tex.width, 3.6f * tex.height), tex);
                 // now draw a section at the bottom to extend the panel by two rows
                 GUI.DrawTextureWithTexCoords(
-                    new Rect(Screen.width - invPosition, 30 + 3.6f * (tex.height - 4), 3 * tex.width, 3.6f * 40),
+                    new Rect(Screen.width - invPosition, PanelTop + 3.6f * (tex.height - 4), 3 * tex.width, 3.6f * 40),
                     tex,
                     new Rect(0, 0, 1, 40.0f / 114));
                 // finally draw the patch to cover the crack
-                GUI.DrawTexture(new Rect(Screen.width - invPosition + 9, 30 + 3.6f * (tex.height - crackPatchHeight), 3 * crackPatch.width, 3.6f * crackPatch.height), crackPatch);
+                GUI.DrawTexture(new Rect(Screen.width - invPosition + 9, PanelTop + 3.6f * (tex.height - crackPatchHeight), 3 * crackPatch.width, 3.6f * crackPatch.height), crackPatch);
             }
             // woman
             {
                 Texture2D tex = DataLoader.sDataLoader.bodiesTex[(PlayerData.sData.female ? 5 : 0) + PlayerData.sData.portrait];
-                GUI.DrawTexture(new Rect(Screen.width - invPosition + 72, 45, 3 * tex.width, 3.6f * tex.height), tex);
+                GUI.DrawTexture(new Rect(Screen.width - invPosition + 72, PanelTop + 15, 3 * tex.width, 3.6f * tex.height), tex);
             }
             // carry weight remaining
             int remainingCarryWeight = Mathf.Max(0, PlayerObject.Player.remainingCarryWeight);
-            GUI.Label(new Rect(Screen.width - invPosition + 196, 219, 20, 20), remainingCarryWeight.ToString(), carryStyle);
+            GUI.Label(new Rect(Screen.width - invPosition + 196, PanelTop + 189, 20, 20), remainingCarryWeight.ToString(), carryStyle);
 
             // scroll indicators
             List<UUObject> itemsToDisplay = GetCurrentListInternal();
@@ -5194,7 +5195,7 @@ public class Inventory : MonoBehaviour
                 Texture2D upArrow = DataLoader.sDataLoader.buttonsTex[27];
                 if (upArrow != null)
                 {
-                    GUI.DrawTexture(new Rect(scrollIndicatorX, 256, 3 * upArrow.width, 3.6f * upArrow.height), upArrow);
+                    GUI.DrawTexture(new Rect(scrollIndicatorX, PanelTop + 226, 3 * upArrow.width, 3.6f * upArrow.height), upArrow);
                 }
             }
             
@@ -5204,7 +5205,7 @@ public class Inventory : MonoBehaviour
                 Texture2D downArrow = DataLoader.sDataLoader.buttonsTex[28];
                 if (downArrow != null)
                 {
-                    GUI.DrawTexture(new Rect(scrollIndicatorX + downArrow.width * 3 + 6, 256, 3 * downArrow.width, 3.6f * downArrow.height), downArrow);
+                    GUI.DrawTexture(new Rect(scrollIndicatorX + downArrow.width * 3 + 6, PanelTop + 226, 3 * downArrow.width, 3.6f * downArrow.height), downArrow);
                 }
             }
 
@@ -5263,14 +5264,14 @@ public class Inventory : MonoBehaviour
                             : DataLoader.sDataLoader.armor_mTex[armorTexIndex];
 
                         float x = Screen.width - invPosition + 3 * invSlots[i].ax;
-                        float y = 30 + 3.6f * invSlots[i].ay;
+                        float y = PanelTop + 3.6f * invSlots[i].ay;
                         GUI.DrawTexture(new Rect(x, y, 3 * tex.width, 3.6f * tex.height), tex);
                     }
                     else
                     {
                         Texture2D tex = obj.GetInventoryTex();
                         float x = Screen.width - invPosition + 3 * invSlots[i].cx;
-                        float y = 30 + 3.6f * invSlots[i].cy;
+                        float y = PanelTop + 3.6f * invSlots[i].cy;
                         GUI.DrawTexture(new Rect(x, y, 3 * tex.width, 3.6f * tex.height), tex);
                     }
                 }
@@ -5286,7 +5287,7 @@ public class Inventory : MonoBehaviour
                 // are the single number this used to show.
                 EInvSlot shieldHandSlot = PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand;
                 float x = Screen.width - invPosition + 3 * invSlots[(int)shieldHandSlot].cx;
-                float y = 30 + 3.6f * invSlots[(int)shieldHandSlot].cy;
+                float y = PanelTop + 3.6f * invSlots[(int)shieldHandSlot].cy;
 
                 DrawRatingPair(x, y + 40, PlayerObject.Player.GetKnownDefence(), GetKnownArmourScore());
             }
@@ -5304,7 +5305,7 @@ public class Inventory : MonoBehaviour
 
                 EInvSlot swordHandSlot = PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand;
                 float x = Screen.width - invPosition + 3 * invSlots[(int)swordHandSlot].cx;
-                float y = 30 + 3.6f * invSlots[(int)swordHandSlot].cy;
+                float y = PanelTop + 3.6f * invSlots[(int)swordHandSlot].cy;
 
                 DrawRatingPair(x, y + 40,
                     weapon != null ? weapon.GetKnownAttackScore() : 0,
@@ -5344,7 +5345,7 @@ public class Inventory : MonoBehaviour
                         if (showPaperdollCursor)
                         {
                             float px = Screen.width - invPosition + 3 * invSlots[pdSlot].cx;
-                            float py = 30 + 3.6f * invSlots[pdSlot].cy;
+                            float py = PanelTop + 3.6f * invSlots[pdSlot].cy;
                             if (handsSecond)
                                 px += 72;
                             GUI.DrawTexture(new Rect(px, py, 48, 58), cursor);
@@ -5377,12 +5378,12 @@ public class Inventory : MonoBehaviour
                 case EInventoryArea.Paperdoll:
                     GUI.DrawTexture(
                         new Rect(Screen.width - invPosition + 3 * invSlots[equipSlot].cx,
-                            30 + 3.6f * invSlots[equipSlot].cy, 48, 58), cursor);
+                            PanelTop + 3.6f * invSlots[equipSlot].cy, 48, 58), cursor);
                     if (equipSlot == (int)EInvSlot.Hands)
                     {
                         GUI.DrawTexture(
                             new Rect(Screen.width - invPosition + 3 * invSlots[equipSlot].cx + 72,
-                                30 + 3.6f * invSlots[equipSlot].cy, 48, 58), cursor);
+                                PanelTop + 3.6f * invSlots[equipSlot].cy, 48, 58), cursor);
                     }
                     break;
                 case EInventoryArea.Stuff:
@@ -5480,7 +5481,7 @@ public class Inventory : MonoBehaviour
                     if (hoverPaperdoll)
                     {
                         descriptionStyle.alignment = TextAnchor.LowerLeft;
-                        Utils.DropShadowText(hoverDesc.GetLookName(), Screen.width - invPosition + ix, 10, 240, 40,
+                        Utils.DropShadowText(hoverDesc.GetLookName(), Screen.width - invPosition + ix, PanelTop - 20, 240, 40,
                             descriptionStyle);
                         descriptionStyle.alignment = TextAnchor.UpperLeft;
                     }
@@ -5519,7 +5520,7 @@ public class Inventory : MonoBehaviour
 
                 {
                     float x = Screen.width - invPosition + 20;
-                    float y = 590;
+                    float y = PanelTop + 560;
                     if (holdTime > 1.8f && mouseInventoryUi && inventoryPointerHover && hoverDesc != null
                         && Conversations.runningConversation == null)
                     {
@@ -5672,13 +5673,13 @@ public class Inventory : MonoBehaviour
                 if (!mouseInventoryUi && invSlotContents[equipSlot] != null)
                 {
                     descriptionStyle.alignment = TextAnchor.LowerLeft;
-                    Utils.DropShadowText(invSlotContents[equipSlot].GetLookName(), Screen.width - invPosition + ix, 10,
+                    Utils.DropShadowText(invSlotContents[equipSlot].GetLookName(), Screen.width - invPosition + ix, PanelTop - 20,
                         240, 40, descriptionStyle);
                     descriptionStyle.alignment = TextAnchor.UpperLeft;
                     if (holdTime > 1.8f)
                     {
                         float x = Screen.width - invPosition + 20;
-                        float y = 590;
+                        float y = PanelTop + 560;
                         UUObject pdObj = invSlotContents[equipSlot];
                         if (pdObj is LightSource && Conversations.runningConversation == null)
                         {
@@ -5698,7 +5699,7 @@ public class Inventory : MonoBehaviour
                     && Conversations.runningConversation == null)
                 {
                     float px = Screen.width - invPosition + 20;
-                    float py = 590;
+                    float py = PanelTop + 560;
                     UUObject carried = mouseCursorCarriedPortable;
                     string lookMovePaper = null;
                     bool showLmbHint = false;

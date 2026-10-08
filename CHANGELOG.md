@@ -2,6 +2,16 @@
 
 ## Current release
 
+- The rune shelf is always on screen, beside the mana flask, as in the original, so the runes laid out for a spell can be seen without opening the magic panel. A click on it casts, while a panel is open.
+
+- Runes can be typed: Enter opens the magic panel for typing, each letter lays its rune, Enter casts and Esc stops. The movement keys are only taken while typing.
+
+- A rune laid on a full shelf now pushes the first one off, as in the original, where before it was ignored.
+
+- The character panel opens on the right, where it no longer covers the spells and the mana flask.
+
+- The save, load and options menu is centred, and the magic panel has lost its four black corners.
+
 - The achievement for dying with the silver seed comes when you die, and no longer while you are still alive at 0 hit points.
 
 - A creature you press in a fight now steps back, or sometimes aside, as in the original, when it has room to: never into a wall, up or down a step, off a bridge, or into water or lava.
