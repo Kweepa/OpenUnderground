@@ -153,6 +153,8 @@ public class DataLoader : MonoBehaviour
         animoTex = GraphicsLoader.GetTextures("../Data/animo.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
         List<Vector2> panelsSizes = new List<Vector2> { new Vector2(83, 114), new Vector2(83, 114), new Vector2(83, 114), new Vector2(6, 60) };
         panelsTex = GraphicsLoader.GetTextures("../Data/panels.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp, explicitSizes: panelsSizes);
+        ClearPanelCorners(panelsTex[1]);
+        ClearPanelCorners(panelsTex[2]);
         flasksTex = GraphicsLoader.GetTextures("../Data/flasks.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
         bodiesTex = GraphicsLoader.GetTextures("../Data/bodies.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
         armor_fTex = GraphicsLoader.GetTextures("../Data/armor_f.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
@@ -214,5 +216,32 @@ public class DataLoader : MonoBehaviour
                 File.WriteAllBytes(Application.dataPath + "/../ObjectPNGs/" + i.ToString("0000") + " " + cleanedName + ".png", bytes);
             }
         }
+    }
+
+    /// <summary>
+    /// Panels 1 and 2 of PANELS.GR round their corners with palette index 1, which is black, where
+    /// panel 0 uses index 0, the transparent one; so the magic panel showed four black corners.
+    /// The same eight pixels in each corner, as the file has them, are cleared.
+    /// </summary>
+    private static void ClearPanelCorners(Texture2D tex)
+    {
+        if (tex == null)
+        {
+            return;
+        }
+
+        int[,] corner = { { 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }, { 0, 1 }, { 1, 1 }, { 0, 2 }, { 0, 3 } };
+        Color clear = new Color(0, 0, 0, 0);
+        for (int i = 0; i < corner.GetLength(0); ++i)
+        {
+            int x = corner[i, 0];
+            int y = corner[i, 1];
+            tex.SetPixel(x, y, clear);
+            tex.SetPixel(tex.width - 1 - x, y, clear);
+            tex.SetPixel(x, tex.height - 1 - y, clear);
+            tex.SetPixel(tex.width - 1 - x, tex.height - 1 - y, clear);
+        }
+
+        tex.Apply();
     }
 }

@@ -106,10 +106,13 @@ public class Messages : MonoBehaviour
 
             allMessages.Trim('\n');
 
+            // the box ends just above the row of flasks, rune shelf and worn spells; four lines fill
+            // only part of it, so the text starts a line lower
+            float top = Magic.HudRowTop - 4 - 120 + fontStyle.lineHeight;
             fontStyle.normal.textColor = new Color(0, 0, 0, 1.0f);
-            GUI.Label(new Rect(380, Screen.height - 140, Screen.width / 2, 120), allMessages, fontStyle);
+            GUI.Label(new Rect(380, top, Screen.width / 2, 120), allMessages, fontStyle);
             fontStyle.normal.textColor = Color.white;
-            GUI.Label(new Rect(381, Screen.height - 141, Screen.width / 2, 120), allMessages, fontStyle);
+            GUI.Label(new Rect(381, top - 1, Screen.width / 2, 120), allMessages, fontStyle);
         }
     }
 

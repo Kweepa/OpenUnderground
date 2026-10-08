@@ -177,8 +177,14 @@ Look speed and invert options are in Options.
 |-|-|
 |Click runes|Build a spell|
 |Click the spell runes (or primed cast)|Cast|
-|Letter keys A–W and Y|Type runes (Y is Ylem; X and Z are not used as runes)|
-|Enter or C|Cast the built spell|
+|Enter|Start typing runes; opens the magic panel|
+|Letter keys A–W and Y, while typing|Lay a rune on the shelf (Y is Ylem; X and Z are not runes)|
+|Space, while typing|Shift the runes left, dropping the first|
+|Backspace, while typing|Take back the last rune|
+|Enter, while typing|Cast the spell and stop typing|
+|Esc, while typing|Stop typing; the runes stay on the shelf and the panel stays open|
+|C|Cast the built spell|
+|Click the rune shelf, with a panel open|Cast the built spell|
 |Click the clear bar|Clear runes|
 |Q, Esc, or right-click outside|Close the panel|
 

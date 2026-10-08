@@ -114,17 +114,64 @@ public class Magic : MonoBehaviour
     private Texture2D flaskCopy;
     private Texture2D flaskBase;
 
+    /// <summary>The rune shelf as the original draws it, cut out of its screen. See <see cref="GetRuneShelf"/>.</summary>
+    private Texture2D runeShelf;
+
+    // The original's shelf is no image of its own: it is part of MAIN.BYT, the 320 x 200 screen
+    // behind the view, right of the compass. The piece cut out, in that screen's pixels, is the
+    // recess, x 175-218 and y 137-152, without the frame around it.
+    private static readonly RectInt RuneShelfSource = new(175, 137, 44, 16);
+
+    // The runes are the stones of their images, which are 16 x 16 with the stone in the top-left
+    // 14 x 14, drawn the size they have in the magic panel, 3 by 3.6, and laid with one shelf
+    // pixel at its edges. The height, 1 + 14 + 1, is the shelf's own; across, the 44 pixels are
+    // stretched to about 45 so the stones fit with a gap between them. The layout is in whole
+    // screen pixels, or the two gaps come out a pixel apart.
+    private const int RuneStone = 14;
+    private const int RuneShelfGapPixels = 1;
+    private const int RuneShelfEdgeX = 3;
+    private const int RuneShelfEdgeY = 4;
+    private const int RuneOnShelfWidth = 3 * RuneStone;
+    private const int RuneOnShelfHeight = HudRowHeight - 2 * RuneShelfEdgeY;
+    private const float RuneShelfWidth
+        = 2 * RuneShelfEdgeX + MaxRunesOnShelf * RuneOnShelfWidth + (MaxRunesOnShelf - 1) * RuneShelfGapPixels;
+
+    // The row at the bottom left: the mana flask, the rune shelf beside it, then the worn spells as
+    // tall as the shelf; the timed spells stack above the shelf. The row is 16 pixels of the shelf at
+    // 3.6, rounded, and stands as far from the bottom edge as the panels from the top.
+    private const float FlaskWidth = 3 * 24;
+    private const float HudRowX = PlayerPanelState.PanelMargin + FlaskWidth + 10;
+    private const int HudRowHeight = 58;
+    private const float HudRowFromBottom = PlayerPanelState.PanelMargin + HudRowHeight;
+
+    /// <summary>Top of the bottom row, for whatever has to keep clear of it: the messages.</summary>
+    public static float HudRowTop => Screen.height - HudRowFromBottom;
+
+    /// <summary>Top of the magic panel; every place on it is measured from here.</summary>
+    private const float PanelTop = PlayerPanelState.PanelMargin;
+
     /// <summary>Runes laid out on the shelf, ready to cast. Persisted via MagicSaveData.runeShelf.</summary>
     private readonly List<int> spellInProgress = new();
 
     /// <summary>Runes the shelf holds. Three, as in the original.</summary>
     private const int MaxRunesOnShelf = 3;
+
+    /// <summary>Runes are being typed: Enter started it, Enter or Esc ends it. See HandleRuneTypingGui().</summary>
+    private bool typingRunes;
+
+    /// <summary>
+    /// Typing has ended but the game's keys are still held back, until the Enter or Esc that ended
+    /// it is up. The key reaches OnGUI a frame before the Input System reports it pressed, so
+    /// giving the keys back at once let the panels read the same Esc and close the magic panel.
+    /// </summary>
+    private bool typingKeysHeld;
+
+    /// <summary>The runes laid out, drawn under the magic panel, centred on it however many there are.</summary>
+    private const float PanelShelfSlot = 48;
+    private float PanelShelfX => (3 * 83 - spellInProgress.Count * PanelShelfSlot) / 2;
     private bool castASpellWithTheseRunes;
 
     private bool wasExploringMagic;
-
-    /// <summary>Set from <see cref="Update"/> so <see cref="OnGUI"/> can read IMGUI keyboard events only while the magic panel is interactable.</summary>
-    private bool magicPanelExploring;
 
     /// <summary>Grid rune under the mouse (mouse/keyboard mode); -1 if none.</summary>
     private int magicGridHoverRuneIndex = -1;
@@ -868,11 +915,11 @@ public class Magic : MonoBehaviour
         if (lerpIn < 0.02f)
             return default;
         const float kExtendedInvPosition = 16f + 4f * 60f;
-        float invPosition = lerpIn * kExtendedInvPosition - kExtendedInvPosition + 16f;
+        float invPosition = lerpIn * kExtendedInvPosition - kExtendedInvPosition + PlayerPanelState.PanelMargin;
         Texture2D tex = DataLoader.sDataLoader.panelsTex[1];
         float w = 3 * tex.width;
-        float bottom = Mathf.Max(30f + 3.6f * tex.height, 514f + 70f);
-        return new Rect(invPosition, 30f, w, bottom - 30f);
+        float bottom = Mathf.Max(PanelTop + 3.6f * tex.height, PanelTop + 484f + 70f);
+        return new Rect(invPosition, PanelTop, w, bottom - PanelTop);
     }
 
     public void Start()
@@ -984,7 +1031,27 @@ public class Magic : MonoBehaviour
             holdTime = 0.0f;
         }
         wasExploringMagic = exploring;
-        magicPanelExploring = exploring;
+
+        // Typing ends with the panel, however it went away, and when a text entry takes the
+        // keyboard: that one holds the keyboard mask itself, so it is left set for it.
+        if (typingRunes || typingKeysHeld)
+        {
+            bool textEntryOpen = KeyboardGUI.sKeyboard != null && KeyboardGUI.sKeyboard.IsVisible();
+            if (textEntryOpen)
+            {
+                typingRunes = false;
+                typingKeysHeld = false;
+            }
+            else if (typingRunes && !exploring)
+            {
+                StopTypingRunes();
+            }
+
+            if (typingKeysHeld)
+            {
+                ReleaseTypingKeys();
+            }
+        }
 
         // recover mana over time
         if (PlayerData.sData.gameTime > lastIncrementedMana + 5 * 60)
@@ -1021,10 +1088,7 @@ public class Magic : MonoBehaviour
         if (exploring)
         {
             holdTime = 2.0f;
-            if (!PlayerData.sData.leftHanded)
-            {
-                StatsPanel.sStatsPanel.Hide();
-            }
+            // the stats panel is no longer hidden here: it is on the right, so the two fit together
 
             int column = index % 4;
             bool padLeft = GameInput.DpadOrArrowLeftPressedThisFrame();
@@ -1056,16 +1120,7 @@ public class Magic : MonoBehaviour
             {
                 if ((GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false) && hasRunestone[index])
                 {
-                    if (castASpellWithTheseRunes)
-                    {
-                        spellInProgress.Clear();
-                    }
-                    if (spellInProgress.Count < MaxRunesOnShelf)
-                    {
-                        spellInProgress.Add(index);
-                        Utils.PlayClip2d(moveToRune);
-                        castASpellWithTheseRunes = false;
-                    }
+                    LayOnShelf(index);
                 }
 
                 if (GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
@@ -3087,41 +3142,155 @@ public class Magic : MonoBehaviour
         return -1;
     }
 
-    /// <summary>
-    /// Mouse/keyboard spell typing uses IMGUI <see cref="Event"/>s (see <see cref="Event.keyCode"/>); gamepad is unchanged.
-    /// </summary>
-    private void HandleMagicPanelKeyboardGui()
+    /// <summary>The letter that types a rune: A to W in order, then Y for Ylem.</summary>
+    private static char RuneKey(int rune)
     {
-        if (!magicPanelExploring)
-            return;
-        if (GameInput.LastActiveDevice == GameInputDevice.Gamepad)
-            return;
-        if (Event.current.type != EventType.KeyDown)
-            return;
+        return rune == 23 ? 'Y' : (char)('A' + rune);
+    }
 
-        KeyCode k = Event.current.keyCode;
-        if (k == KeyCode.Return || k == KeyCode.KeypadEnter)
-        {
-            if (spellInProgress.Count > 1)
-                TryCastFromSpellRunes();
-            Event.current.Use();
-            return;
-        }
-
-        int runeIndex = KeyCodeToRuneIndex(k);
-        if (runeIndex < 0 || !hasRunestone[runeIndex])
-            return;
-
+    /// <summary>
+    /// Lays a rune, or a gap, on the shelf. A full shelf shifts left and drops its first entry, as
+    /// the original does (UW.EXE 0x78bae, the shift at 0x78c80).
+    /// </summary>
+    private void LayOnShelf(int rune)
+    {
         if (castASpellWithTheseRunes)
-            spellInProgress.Clear();
-        if (spellInProgress.Count < MaxRunesOnShelf)
         {
-            spellInProgress.Add(runeIndex);
-            Utils.PlayClip2d(moveToRune);
+            spellInProgress.Clear();
             castASpellWithTheseRunes = false;
         }
 
-        Event.current.Use();
+        if (spellInProgress.Count == MaxRunesOnShelf)
+        {
+            spellInProgress.RemoveAt(0);
+        }
+
+        spellInProgress.Add(rune);
+        Utils.PlayClip2d(moveToRune);
+    }
+
+    private bool CanStartTypingRunes()
+    {
+        PlayerObject player = PlayerObject.Player;
+        return player != null
+               && PlayerPanelState.ArePanelsAvailable
+               && (player.controlsDisabled & ~(EControlMask.Magic | EControlMask.Inventory)) == 0
+               && Conversations.runningConversation == null
+               && !MapScreen.IsMapScreenVisible();
+    }
+
+    private void StartTypingRunes()
+    {
+        typingRunes = true;
+        typingKeysHeld = false;
+
+        // the magic panel takes over from whatever panel was open, the stats one included
+        if (PlayerPanelState.ActivePanel == EPlayerPanel.Inventory)
+        {
+            Inventory.HidePanel(fromUserToggle: false);
+        }
+
+        StatsPanel.sStatsPanel?.Hide();
+        if (PlayerPanelState.ActivePanel != EPlayerPanel.Magic)
+        {
+            PlayerPanelState.SetPanel(EPlayerPanel.Magic);
+        }
+
+        // the game's own keys are off while typing: W, A, S and D are runes here, not steps
+        PlayerObject.DisableControls(EControlMask.Keyboard, true);
+    }
+
+    private void StopTypingRunes()
+    {
+        typingRunes = false;
+        typingKeysHeld = true;
+    }
+
+    /// <summary>Gives the game its keys back once the key that ended typing is up.</summary>
+    private void ReleaseTypingKeys()
+    {
+        Keyboard kb = GameInput.CurrentKeyboard;
+        bool endKeyDown = kb != null
+                          && (kb.escapeKey.isPressed || kb.escapeKey.wasPressedThisFrame
+                              || kb.enterKey.isPressed || kb.enterKey.wasPressedThisFrame
+                              || kb.numpadEnterKey.isPressed || kb.numpadEnterKey.wasPressedThisFrame);
+        if (!endKeyDown)
+        {
+            typingKeysHeld = false;
+            PlayerObject.DisableControls(EControlMask.Keyboard, false);
+        }
+    }
+
+    /// <summary>
+    /// Runes typed on the keyboard, ours. Enter starts typing and opens the magic panel; a letter
+    /// lays its rune, A to W and Y for Ylem; Space lays a gap; Backspace takes the last rune back,
+    /// with any gap it leaves at the end; Enter casts and stops; Esc stops, leaving the runes on the
+    /// shelf and the panel open. Kweepa's first version
+    /// typed straight into the open panel, and was taken out because the letters are also WASD.
+    /// Handled in OnGUI, after every Update of the frame, so the Esc or Enter that ends typing is
+    /// not read again by the panels' own keys once the keyboard is given back.
+    /// </summary>
+    private void HandleRuneTypingGui()
+    {
+        Event e = Event.current;
+        if (e.type != EventType.KeyDown)
+        {
+            return;
+        }
+
+        KeyCode k = e.keyCode;
+        if (!typingRunes)
+        {
+            if ((k == KeyCode.Return || k == KeyCode.KeypadEnter) && CanStartTypingRunes())
+            {
+                StartTypingRunes();
+                e.Use();
+            }
+
+            return;
+        }
+
+        switch (k)
+        {
+        case KeyCode.Return:
+        case KeyCode.KeypadEnter:
+            StopTypingRunes();
+            TryCastFromSpellRunes();
+            break;
+        case KeyCode.Escape:
+            StopTypingRunes();
+            break;
+        case KeyCode.Space:
+            // shifts the runes left and drops the first, leaving no gap of its own: A B, Space,
+            // C, D is B C D
+            if (spellInProgress.Count > 0)
+            {
+                spellInProgress.RemoveAt(0);
+                Utils.PlayClip2d(moveToEmpty);
+            }
+            break;
+        case KeyCode.Backspace:
+            if (spellInProgress.Count > 0)
+            {
+                spellInProgress.RemoveAt(spellInProgress.Count - 1);
+                Utils.PlayClip2d(clearSpell);
+            }
+            break;
+        default:
+            int rune = KeyCodeToRuneIndex(k);
+            if (rune < 0)
+            {
+                return;
+            }
+
+            if (hasRunestone[rune])
+            {
+                LayOnShelf(rune);
+            }
+            break;
+        }
+
+        e.Use();
     }
 
     private void UpdateMagicGridHover(float invPosition)
@@ -3138,7 +3307,7 @@ public class Magic : MonoBehaviour
             Texture2D tex = DataLoader.sDataLoader.objTex[232 + i];
             float rw = 3 * tex.width;
             float rh = 3.6f * tex.height;
-            Rect r = new Rect(invPosition + 54 * (i % 4) + 21, 48 + 53 * (i / 4), rw, rh);
+            Rect r = new Rect(invPosition + 54 * (i % 4) + 21, PanelTop + 18 + 53 * (i / 4), rw, rh);
             if (r.Contains(guiMouse))
             {
                 magicGridHoverRuneIndex = i;
@@ -3167,7 +3336,7 @@ public class Magic : MonoBehaviour
                 Texture2D stex = DataLoader.sDataLoader.objTex[232 + ri];
                 float rw = 3 * stex.width;
                 float rh = 3.6f * stex.height;
-                Rect spellRuneRect = new Rect(invPosition + 90 + 48 * i, 444, rw, rh);
+                Rect spellRuneRect = new Rect(invPosition + PanelShelfX + PanelShelfSlot * i, PanelTop + 414, rw, rh);
                 if (!spellRuneRect.Contains(m))
                     continue;
                 TryCastFromSpellRunes();
@@ -3184,17 +3353,10 @@ public class Magic : MonoBehaviour
             Texture2D tex = DataLoader.sDataLoader.objTex[232 + i];
             float rw = 3 * tex.width;
             float rh = 3.6f * tex.height;
-            Rect r = new Rect(invPosition + 54 * (i % 4) + 21, 48 + 53 * (i / 4), rw, rh);
+            Rect r = new Rect(invPosition + 54 * (i % 4) + 21, PanelTop + 18 + 53 * (i / 4), rw, rh);
             if (!r.Contains(m))
                 continue;
-            if (castASpellWithTheseRunes)
-                spellInProgress.Clear();
-            if (spellInProgress.Count < MaxRunesOnShelf)
-            {
-                spellInProgress.Add(i);
-                Utils.PlayClip2d(moveToRune);
-                castASpellWithTheseRunes = false;
-            }
+            LayOnShelf(i);
             Event.current.Use();
             return;
         }
@@ -3202,7 +3364,7 @@ public class Magic : MonoBehaviour
         // Bottom bar [R]->[bag]: clear spell
         if (spellInProgress.Count > 0)
         {
-            Rect clearBarRect = new Rect(invPosition + 63f, 30 +343f, 123f, 52f);
+            Rect clearBarRect = new Rect(invPosition + 63f, PanelTop + 343f, 123f, 52f);
             if (clearBarRect.Contains(m))
             {
                 spellInProgress.Clear();
@@ -3212,7 +3374,7 @@ public class Magic : MonoBehaviour
         }
 
         {
-            Rect todoClickRect = new Rect(invPosition + 7f, 30 + 373f, 54f, 85f);
+            Rect todoClickRect = new Rect(invPosition + 7f, PanelTop + 373f, 54f, 85f);
             if (todoClickRect.Contains(m))
             {
                 Messages.Add($"{StringLoader.GetString(1, 90)}{PlayerData.sData.mana}/{PlayerData.sData.maxMana}.");
@@ -3292,6 +3454,66 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// The shelf, cut once out of MAIN.BYT. ReadBYT stores the file's top row at the top of the
+    /// texture, y = 199, so the plate's rows start at 200 - y - height.
+    /// </summary>
+    private Texture2D GetRuneShelf()
+    {
+        if (runeShelf == null)
+        {
+            Texture2D screen = GraphicsLoader.ReadBYT("../Data/main.byt");
+            RectInt r = RuneShelfSource;
+            runeShelf = new Texture2D(r.width, r.height, TextureFormat.RGB24, mipChain: false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            runeShelf.SetPixels(screen.GetPixels(r.x, 200 - r.y - r.height, r.width, r.height));
+            runeShelf.Apply();
+            Destroy(screen);
+        }
+
+        return runeShelf;
+    }
+
+    /// <summary>
+    /// The rune shelf at the given place, HudRowHeight tall, with the runes laid on it. A click on
+    /// it casts them, as in the original, whose manual says "left-click on the runes on the rune
+    /// shelf, regardless of whether your rune bag is open or closed". Here only while a panel is
+    /// open: with none, the mouse looks around.
+    /// </summary>
+    private void DrawRuneShelf(float x, float y)
+    {
+        Texture2D shelf = GetRuneShelf();
+        Rect shelfRect = new Rect(x, y, RuneShelfWidth, HudRowHeight);
+        DrawTex(shelfRect.x, shelfRect.y, shelfRect.width, shelfRect.height, shelf);
+
+        bool panelOpen = PlayerPanelState.ActivePanel != EPlayerPanel.None
+                         || (StatsPanel.sStatsPanel != null && StatsPanel.sStatsPanel.ShouldDismissWithEscape());
+        if (panelOpen
+            && (PlayerObject.Player.controlsDisabled
+                & (EControlMask.Map | EControlMask.SaveLoad | EControlMask.Conversation | EControlMask.Cutscene)) == 0)
+        {
+            GuiInput.RegisterBlockingRect(shelfRect);
+            if (GameInput.LastActiveDevice != GameInputDevice.Gamepad && GuiInput.TryConsumeClickInRect(shelfRect))
+            {
+                TryCastFromSpellRunes();
+            }
+        }
+
+        for (int i = 0; i < spellInProgress.Count; ++i)
+        {
+            Texture2D tex = DataLoader.sDataLoader.objTex[232 + spellInProgress[i]];
+            // only the stone: the top-left RuneStone pixels of the image, whose top is v = 1
+            Rect stone = new Rect(0, 1 - (float)RuneStone / tex.height, (float)RuneStone / tex.width, (float)RuneStone / tex.height);
+            GUI.DrawTextureWithTexCoords(
+                new Rect(x + RuneShelfEdgeX + (RuneOnShelfWidth + RuneShelfGapPixels) * i, y + RuneShelfEdgeY,
+                         RuneOnShelfWidth, RuneOnShelfHeight),
+                tex, stone);
+        }
+    }
+
     private Texture2D GetSpellIcon(int spellIndex)
     {
         return SpellIcons.Get(spells[spellIndex].icon);
@@ -3317,29 +3539,34 @@ public class Magic : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.Magic;
 
+        HandleRuneTypingGui();
+
         ScrubUpFlaskTextures();
 
         style.font = font;
         style.fontSize = 20;
         style.normal.textColor = Color.yellow;
 
-        // draw active spells
+        // draw active spells, stacked up from just above the rune shelf
         for (int i = 0; i < activeSpells.Count; ++i)
         {
             SSpell spell = spells[activeSpells[i].spell];
             Texture2D tex = GetSpellIcon(activeSpells[i].spell);
-            DrawIcon(100, Screen.height - 120 - 64 * i, 64, tex);
-            GUI.Label(new Rect(168, Screen.height - 100 - 64 * i, 100, 20), spell.name, style);
-            DrawTex(168, Screen.height - 70 - 64 * i,
+            float y = Screen.height - HudRowFromBottom - 4 - 64 * (i + 1);
+            DrawIcon(HudRowX, y, 64, tex);
+            GUI.Label(new Rect(HudRowX + 68, y + 20, 100, 20), spell.name, style);
+            DrawTex(HudRowX + 68, y + 50,
                 150 * activeSpells[i].time / spells[activeSpells[i].spell].duration, 5, Texture2D.whiteTexture);
         }
 
         {
-            float psx = 100;
-            // The worn icons sat 64 apart, which left 21 pixels between two of them once they were
-            // drawn their own width; half of that gap is enough.
-            const float wornIconWidth = 48f * 16 / 18;
-            const float wornIconStep = (64 + wornIconWidth) / 2;
+            // The worn icons sat 64 apart, which left 21 pixels between two 48 tall icons once they
+            // were drawn their own width; half of that gap is enough, and it stays as they grow.
+            const float wornIconWidth = HudRowHeight * 16f / 18;
+            const float wornIconGap = (64 - 48f * 16 / 18) / 2;
+            const float wornIconStep = wornIconWidth + wornIconGap;
+            // after the rune shelf, with the gap there is between two icons
+            float psx = HudRowX + RuneShelfWidth + (wornIconStep - wornIconWidth) - (HudRowHeight - wornIconWidth) / 2;
             // Only the stronger of the two protections counts (GetResistances()), so only it is shown.
             bool greaterProtectionShown = IsSpellKnownActive(ESpell.GreaterMagicProtection);
             foreach (SPermanentSpell spell in permanentSpells)
@@ -3350,7 +3577,7 @@ public class Magic : MonoBehaviour
                     int icon = spells[(int)spell.spell].icon;
                     if (icon >= 0)
                     {
-                        DrawIcon(psx, Screen.height - 60, 48, SpellIcons.Get(icon));
+                        DrawIcon(psx, Screen.height - HudRowFromBottom, HudRowHeight, SpellIcons.Get(icon));
                         psx += wornIconStep;
                     }
                 }
@@ -3360,7 +3587,7 @@ public class Magic : MonoBehaviour
             // the lava, so they are not among the permanent spells. Nothing to identify on them.
             if (Inventory.sInv != null && Inventory.sInv.Wearing(EObjectType.DragonskinBoots))
             {
-                DrawIcon(psx, Screen.height - 60, 48, SpellIcons.Get(SpellIcons.LavaResistance));
+                DrawIcon(psx, Screen.height - HudRowFromBottom, HudRowHeight, SpellIcons.Get(SpellIcons.LavaResistance));
             }
         }
 
@@ -3369,20 +3596,18 @@ public class Magic : MonoBehaviour
             GuiInput.RegisterBlockingRect(GetPanelGuiRectForOutsideClick());
 
             const float kExtendedInvPosition = 16 + 4 * 60;
-            float invPosition = lerpIn * kExtendedInvPosition - kExtendedInvPosition + 16;
+            float invPosition = lerpIn * kExtendedInvPosition - kExtendedInvPosition + PlayerPanelState.PanelMargin;
 
             if (!MapScreen.IsMapScreenVisible())
             {
                 UpdateMagicGridHover(invPosition);
-                // this is deliberately removed - prefer player movement with WASD over typing spells
-                //HandleMagicPanelKeyboardGui();
                 HandleMagicRuneGuiMouse(invPosition);
             }
 
             // background
             {
                 Texture2D tex = DataLoader.sDataLoader.panelsTex[1];
-                DrawTex(invPosition, 30, 3 * tex.width, 3.6f * tex.height, tex);
+                DrawTex(invPosition, PanelTop, 3 * tex.width, 3.6f * tex.height, tex);
             }
 
             // draw owned runes
@@ -3391,25 +3616,38 @@ public class Magic : MonoBehaviour
                 if (hasRunestone[i])
                 {
                     Texture2D tex = DataLoader.sDataLoader.objTex[232 + i];
-                    DrawTex(invPosition + 54 * (i % 4) + 21, 48 + 53 * (i / 4), 3 * tex.width, 3.6f * tex.height, tex);
+                    DrawTex(invPosition + 54 * (i % 4) + 21, PanelTop + 18 + 53 * (i / 4), 3 * tex.width, 3.6f * tex.height, tex);
+                    if (typingRunes)
+                    {
+                        // the key that types it, in the bottom right corner of the stone
+                        style.fontSize = 16;
+                        TextAnchor previousAlignment = style.alignment;
+                        Color previousColour = style.normal.textColor;
+                        style.alignment = TextAnchor.LowerRight;
+                        style.normal.textColor = Color.white;
+                        Utils.DropShadowText(RuneKey(i).ToString(), invPosition + 54 * (i % 4) + 21 - 2,
+                            PanelTop + 18 + 53 * (i / 4), 3 * RuneStone, 3.6f * RuneStone, style);
+                        style.alignment = previousAlignment;
+                        style.normal.textColor = previousColour;
+                    }
                 }
             }
 
             if (GameInput.LastActiveDevice == GameInputDevice.Gamepad)
             {
                 // draw cursor
-                DrawTex(invPosition + 54 * (index % 4) + 21 - 3, 48 + 53 * (index / 4) - 2, 3 * cursor.width, 3.6f * cursor.height, cursor);
+                DrawTex(invPosition + 54 * (index % 4) + 21 - 3, PanelTop + 18 + 53 * (index / 4) - 2, 3 * cursor.width, 3.6f * cursor.height, cursor);
 
                 if (hasRunestone[index])
                 {
                     style.fontSize = 16;
-                    GUI.Label(new Rect(invPosition + 5, 30, 100, 20), DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + index), style);
+                    GUI.Label(new Rect(invPosition + 5, PanelTop, 100, 20), DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + index), style);
                 }
             }
             else if (magicGridHoverRuneIndex >= 0 && hasRunestone[magicGridHoverRuneIndex])
             {
                 style.fontSize = 16;
-                GUI.Label(new Rect(invPosition + 5, 30, 100, 20),
+                GUI.Label(new Rect(invPosition + 5, PanelTop, 100, 20),
                     DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + magicGridHoverRuneIndex), style);
             }
 
@@ -3417,9 +3655,9 @@ public class Magic : MonoBehaviour
             for (int i = 0; i < spellInProgress.Count; ++i)
             {
                 Texture2D tex = DataLoader.sDataLoader.objTex[232 + spellInProgress[i]];
-                DrawTex(invPosition + 90 + 48 * i, 444, 3 * tex.width, 3.6f * tex.height, tex);
+                DrawTex(invPosition + PanelShelfX + PanelShelfSlot * i, PanelTop + 414, 3 * tex.width, 3.6f * tex.height, tex);
                 style.fontSize = 16;
-                GUI.Label(new Rect(invPosition + 96 + 48 * i, 490, 40, 20), runeShortNames[spellInProgress[i]], style);
+                GUI.Label(new Rect(invPosition + PanelShelfX + 6 + PanelShelfSlot * i, PanelTop + 460, 40, 20), runeShortNames[spellInProgress[i]], style);
             }
 
             if (lerpIn > 0.02f && GameInput.LastActiveDevice == GameInputDevice.Gamepad)
@@ -3429,17 +3667,17 @@ public class Magic : MonoBehaviour
 
                 if (hasRunestone[index])
                 {
-                    DrawTex(invPosition + 60, 514, sz, sz, aButton);
-                    GUI.Label(new Rect(invPosition + 90, 514, 100, 60), "Select", style);
+                    DrawTex(invPosition + 60, PanelTop + 484, sz, sz, aButton);
+                    GUI.Label(new Rect(invPosition + 90, PanelTop + 484, 100, 60), "Select", style);
                 }
                 if (spellInProgress.Count > 1)
                 {
-                    DrawTex(invPosition + 140, 514, sz, sz, xButton);
-                    GUI.Label(new Rect(invPosition + 170, 514, 100, 60), "Cast", style);
+                    DrawTex(invPosition + 140, PanelTop + 484, sz, sz, xButton);
+                    GUI.Label(new Rect(invPosition + 170, PanelTop + 484, 100, 60), "Cast", style);
                 }
                 if (spellInProgress.Count > 0)
                 {
-                    DrawTex(invPosition + 50, 374, sz, sz, bButton);
+                    DrawTex(invPosition + 50, PanelTop + 344, sz, sz, bButton);
                 }
             }
 
@@ -3451,7 +3689,7 @@ public class Magic : MonoBehaviour
                     if (spells[i].icon != -1)
                     {
                         Texture2D tex = GetSpellIcon(i);
-                        DrawTex(x, 600, 3 * tex.width, 3.6f * tex.height, tex);
+                        DrawTex(x, PanelTop + 570, 3 * tex.width, 3.6f * tex.height, tex);
                         x += 60;
                     }
                 }
@@ -3466,11 +3704,15 @@ public class Magic : MonoBehaviour
             {
                 manaSegs = 0;
             }
-            DrawFlask(18, Screen.height - 50, 1, manaSegs);
+            // the flasks stand on the bottom of the row, like the shelf, the worn spells and the
+            // compass: DrawFlask() draws the base down to flaskY + 21
+            int flaskY = Screen.height - (int)(HudRowFromBottom - HudRowHeight) - 21;
+            DrawFlask(PlayerPanelState.PanelMargin, flaskY, 1, manaSegs);
+            DrawRuneShelf(HudRowX, Screen.height - HudRowFromBottom);
 
             int numSegs = PlayerData.sData.vitality > 0 ? 13 * PlayerData.sData.hp / PlayerData.sData.vitality : 13;
             int type = PlayerData.sData.poison > 0 ? 2 : 0;
-            DrawFlask(Screen.width - 90, Screen.height - 50, type, numSegs);
+            DrawFlask((int)(Screen.width - PlayerPanelState.PanelMargin - FlaskWidth), flaskY, type, numSegs);
         }
     }
     

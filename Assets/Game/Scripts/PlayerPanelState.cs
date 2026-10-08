@@ -15,6 +15,12 @@ public static class PlayerPanelState
 {
     public static EPlayerPanel ActivePanel { get; private set; }
 
+    /// <summary>
+    /// Gap between a panel (inventory, magic, stats) and the screen's top and side edges: the
+    /// same as between the compass and the bottom edge, so the frame is even all round.
+    /// </summary>
+    public const int PanelMargin = 12;
+
     public static bool IsExploringMagic => ActivePanel == EPlayerPanel.Magic;
     public static bool IsExploringInventory => ActivePanel == EPlayerPanel.Inventory;
 

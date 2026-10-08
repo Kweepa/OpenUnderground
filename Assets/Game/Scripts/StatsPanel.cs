@@ -75,14 +75,27 @@ public class StatsPanel : MonoBehaviour
             return default;
         }
 
-        Texture2D tex = background;
-        float extendedInvPosition = 5 * tex.width;
-        float w = 5 * tex.width;
-        float h = 6 * tex.height;
-        float invPosition = PlayerData.sData.leftHanded
-            ? Screen.width - lerpIn * extendedInvPosition - 16
-            : lerpIn * extendedInvPosition - extendedInvPosition + 16;
-        return new Rect(invPosition, 30f, w, h);
+        return GetPanelRect();
+    }
+
+    // The panel is drawn without the outer row of pixels on its top, bottom and right, to take
+    // less room (7 October 2026). The text keeps its place on the wood, so it is laid out from
+    // where the uncut top would be.
+    private const int CropTop = 1;
+    private const int CropBottom = 1;
+    private const int CropRight = 1;
+    private const float ScaleX = 5;
+    private const float ScaleY = 6;
+
+    /// <summary>
+    /// The panel as drawn: on the right, whichever the hand - on the left it covered the timed
+    /// spells and the mana flask - and sliding in from that side.
+    /// </summary>
+    private Rect GetPanelRect()
+    {
+        float w = ScaleX * (background.width - CropRight);
+        float h = ScaleY * (background.height - CropTop - CropBottom);
+        return new Rect(Screen.width - lerpIn * (w + PlayerPanelState.PanelMargin), PlayerPanelState.PanelMargin, w, h);
     }
 
     private bool statsAnalogTriggerWasHeld;
@@ -160,35 +173,28 @@ public class StatsPanel : MonoBehaviour
             // draw the stats panel
             Texture2D tex = background; // was this: DataLoader.sDataLoader.panelsTex[2];
 
-            float extendedInvPosition = 5 * tex.width;
-
-            // draw stats and skills on the left (or right for left-handed players)
-            float invPosition;
-            if (PlayerData.sData.leftHanded)
-            {
-                // Slide in from the right side
-                invPosition = Screen.width - lerpIn * extendedInvPosition - 16;
-            }
-            else
-            {
-                // Slide in from the left side
-                invPosition = lerpIn * extendedInvPosition - extendedInvPosition + 16;
-            }
+            Rect panel = GetPanelRect();
+            float invPosition = panel.x;
+            // where the top of the uncut texture would be: everything below is placed from it
+            float top = panel.y - ScaleY * CropTop;
 
             GUIStyle style = new GUIStyle { fontSize = 30, font = font, fontStyle = FontStyle.Italic };
 
             GUIStyle rightStyle = new GUIStyle(style) { alignment = TextAnchor.UpperRight };
             
-            GUI.DrawTexture(new Rect(invPosition, 30, 5 * tex.width, 6 * tex.height), tex);
+            GUI.DrawTextureWithTexCoords(panel, tex,
+                new Rect(0, (float)CropBottom / tex.height, (float)(tex.width - CropRight) / tex.width,
+                         (float)(tex.height - CropTop - CropBottom) / tex.height));
 
             style.alignment = TextAnchor.UpperCenter;
-            GUI.Label(new Rect(invPosition + 33, 30 + 20, 300, style.fontSize), PlayerData.sData.playerName, style);
+            // centred over the two columns of stats below, which run from 33 to 370
+            GUI.Label(new Rect(invPosition + 33, top + 20, 337, style.fontSize), PlayerData.sData.playerName, style);
             style.alignment = TextAnchor.UpperLeft;
-            GUI.Label(new Rect(invPosition + 33, 30 + 57, 170, style.fontSize), PlayerData.sData.playerClass.ToString(), style);
+            GUI.Label(new Rect(invPosition + 33, top + 57, 170, style.fontSize), PlayerData.sData.playerClass.ToString(), style);
             string level = PlayerData.sData.charLevel < 4
                 ? new [] { "1st", "2nd", "3rd" }[PlayerData.sData.charLevel - 1]
                 : PlayerData.sData.charLevel.ToString() + "th"; 
-            GUI.Label(new Rect(invPosition + 33, 30 + 57, 333, style.fontSize), level, rightStyle);
+            GUI.Label(new Rect(invPosition + 33, top + 57, 337, style.fontSize), level, rightStyle);
 
             style.fontSize = 24;
             rightStyle.fontSize = 24;
@@ -207,7 +213,7 @@ public class StatsPanel : MonoBehaviour
             };
             for (int i = 0; i < 6; ++i)
             {
-                Rect r = new Rect(invPosition + 33 + 187 * (i / 3), 30 + 97 + 30 * (i % 3), 150, style.fontSize);
+                Rect r = new Rect(invPosition + 33 + 187 * (i / 3), top + 97 + 30 * (i % 3), 150, style.fontSize);
                 if (i == 5 && vals[i].Length > 2)
                 {
                     GUI.Label(r, "Exp.", style);
@@ -263,27 +269,34 @@ public class StatsPanel : MonoBehaviour
             // and the poison - to seven lines, above the skills.
             style.fontSize = 20;
             style.fontStyle = FontStyle.Normal;
-            GUI.Label(new Rect(invPosition + 30, 30 + 200, 365, 177), status, style);
+            GUI.Label(new Rect(invPosition + 30, top + 200, 365, 177), status, style);
             style.richText = false;
 
             style.fontSize = 24;
             style.fontStyle = PlayerData.sData.skillPoints > 0 ? FontStyle.Italic : FontStyle.Normal;
-            GUI.Label(new Rect(invPosition + 50, 662, 333, style.fontSize), $"Skill points {PlayerData.sData.skillPoints}", style);
+            // "Available skill points" is ours: the original shows no such line, nor any string for it
+            GUI.Label(new Rect(invPosition + 47, top + 635, 333, style.fontSize), $"Available skill points {PlayerData.sData.skillPoints}", style);
 
             style.fontSize = 24;
             rightStyle.fontSize = 24;
+            // The dark box of the skills runs from 30 to 385. The two columns were 20 from its left
+            // and 35 from its right; both margins are now 15, and the columns take the room.
+            const float skillsLeft = 30 + 15;
+            const float skillsRight = 385 - 15;
+            const float columnGap = 34;
+            const float columnWidth = (skillsRight - skillsLeft - columnGap) / 2;
             for (int i = 0; i < 20; ++i)
             {
-                int x = 50 + 167 * (i / 10);
-                int y = 30 + 377 + 25 * (i % 10);
+                float x = skillsLeft + (columnWidth + columnGap) * (i / 10);
+                float y = top + 374 + 25 * (i % 10);
                 
                 style.fontStyle = PlayerData.sData.skill[i] > 0 ? FontStyle.Italic : FontStyle.Normal;
                 rightStyle.fontStyle = style.fontStyle;
                 style.normal.textColor = new Color(0.5f, 0.5f, 0.7f) * (1.0f + PlayerData.sData.skill[i] / 60.0f);
                 rightStyle.normal.textColor = style.normal.textColor;
 
-                GUI.Label(new Rect(invPosition + x, y, 133, style.fontSize), ((ESkill)i).ToString(), style);
-                GUI.Label(new Rect(invPosition + x, y, 133, style.fontSize), PlayerData.sData.skill[i].ToString(), rightStyle);
+                GUI.Label(new Rect(invPosition + x, y, columnWidth, style.fontSize), ((ESkill)i).ToString(), style);
+                GUI.Label(new Rect(invPosition + x, y, columnWidth, style.fontSize), PlayerData.sData.skill[i].ToString(), rightStyle);
             }
         }
     }
