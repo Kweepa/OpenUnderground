@@ -90,7 +90,7 @@ public class SaveLoadGUI : MonoBehaviour
         "Controls how quickly the camera turns when using the mouse. Does not affect gamepad look.",
         "Reverses up and down when looking with the mouse or gamepad.",
         "Enabled: a locked door unlocks automatically if you have the correct key and use the door. Disabled: you must manually unlock a door by finding the correct key in your inventory and using the key.",
-        "Enabled: the player jumps automatically as close to the edge as possible when running toward a gap and holding down the jump button or key.",
+        "Enabled: the player jumps automatically at the edge when running straight ahead toward a gap or a deep drop. To step off a ledge instead, hold A or D as well, or push the stick only partway.",
     };
     private const string OptionsApplyFooter = "Changes are only saved when you select Apply All.";
     private string[] availableSoundFonts = new string[0];

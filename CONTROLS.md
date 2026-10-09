@@ -4,9 +4,11 @@ Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select
 
 If you use the **Left-handed** option, Attack and Stats swap triggers on the gamepad (see notes under each section).
 
-\---
+**[Gamepad](#gamepad)** · **[Keyboard & Mouse](#keyboard--mouse)**
 
-## Gamepad
+---
+
+## GAMEPAD
 
 ### Movement \& camera
 
@@ -15,7 +17,9 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |Left stick|Move|
 |Right stick|Look|
 |Left stick click (L3)|Sprint (forward only; uses stamina)|
-|A|Jump (press and release)|
+|A|Jump|
+
+*Auto jump* (in Options): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, push the stick only partway or to one side.
 
 ### Interaction \& combat
 
@@ -122,9 +126,9 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |B|Clear|
 |X|Cancel (when allowed)|
 
-\---
+---
 
-## Keyboard \& Mouse
+## KEYBOARD \& MOUSE
 
 ### Movement \& camera
 
@@ -133,9 +137,11 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |W A S D or Arrow keys|Move|
 |Mouse (cursor locked)|Look|
 |Left Shift (hold)|Sprint (forward only; uses stamina)|
-|Space|Jump (press and release)|
+|Space|Jump|
 
 Look speed and invert options are in Options.
+
+*Auto jump* (in Options): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, hold A or D as well.
 
 ### Interaction \& combat
 
