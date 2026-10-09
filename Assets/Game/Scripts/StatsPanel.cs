@@ -8,8 +8,12 @@ public class StatsPanel : MonoBehaviour
     private float lerpIn;
     private float holdTime;
     private bool pinnedOpen;
+    private bool onLeft;
 
     public static StatsPanel sStatsPanel;
+
+    /// <summary>Whether the panel is on the left of the screen, where it covers the magic panel.</summary>
+    public bool IsOnLeft => onLeft;
 
     public void Show()
     {
@@ -18,6 +22,8 @@ public class StatsPanel : MonoBehaviour
             return;
         }
 
+        // on the side it last opened on: a shrine or a book shows it, and the click or key that got
+        // there says nothing of the hand
         holdTime = 2.0f;
         PlayerPanelInput.ResetWalkDismissTimer();
     }
@@ -28,7 +34,8 @@ public class StatsPanel : MonoBehaviour
         pinnedOpen = false;
     }
 
-    public void TogglePinnedOpen()
+    /// <param name="fromGamepad">Opened by the pad's trigger, which puts the panel on that trigger's side.</param>
+    public void TogglePinnedOpen(bool fromGamepad = false)
     {
         if (!PlayerPanelState.ArePanelsAvailable)
         {
@@ -41,6 +48,11 @@ public class StatsPanel : MonoBehaviour
         }
 
         bool opening = !pinnedOpen;
+        if (opening)
+        {
+            ChooseSide(fromGamepad);
+        }
+
         pinnedOpen = !pinnedOpen;
         holdTime = pinnedOpen ? 2.0f : 0.0f;
         if (pinnedOpen && opening)
@@ -88,14 +100,29 @@ public class StatsPanel : MonoBehaviour
     private const float ScaleY = 6;
 
     /// <summary>
-    /// The panel as drawn: on the right, whichever the hand - on the left it covered the timed
-    /// spells and the mana flask - and sliding in from that side.
+    /// Picks the side the panel comes in from when the player opens it. From the pad it is the
+    /// side of the trigger that opens it, the left one for a right-handed player. From the keyboard
+    /// it is the right, where it leaves the timed spells and the mana flask in view. A panel still
+    /// on screen stays where it is, and one shown by the game keeps the last side.
     /// </summary>
+    private void ChooseSide(bool fromGamepad)
+    {
+        if (lerpIn > 0.002f)
+        {
+            return;
+        }
+
+        onLeft = fromGamepad && PlayerData.sData != null && !PlayerData.sData.leftHanded;
+    }
+
+    /// <summary>The panel as drawn, on its side and sliding in from it.</summary>
     private Rect GetPanelRect()
     {
         float w = ScaleX * (background.width - CropRight);
         float h = ScaleY * (background.height - CropTop - CropBottom);
-        return new Rect(Screen.width - lerpIn * (w + PlayerPanelState.PanelMargin), PlayerPanelState.PanelMargin, w, h);
+        float slide = lerpIn * (w + PlayerPanelState.PanelMargin);
+        float x = onLeft ? slide - w : Screen.width - slide;
+        return new Rect(x, PlayerPanelState.PanelMargin, w, h);
     }
 
     private bool statsAnalogTriggerWasHeld;
@@ -140,7 +167,7 @@ public class StatsPanel : MonoBehaviour
             statsAnalogTriggerWasHeld = held;
             if (edge)
             {
-                TogglePinnedOpen();
+                TogglePinnedOpen(fromGamepad: true);
             }
         }
         else
@@ -165,6 +192,11 @@ public class StatsPanel : MonoBehaviour
     public void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Stats;
+
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
 
         if (lerpIn > 0.001f)
         {

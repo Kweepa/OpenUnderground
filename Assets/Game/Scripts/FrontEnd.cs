@@ -832,6 +832,7 @@ public class FrontEnd : MonoBehaviour
         
         // New game - explicitly load the starting level
         LevelLoader.sLevelLoader.LoadLevel(Cheats.sCheats.level);
+        PlayerObject.Player.StartAfterLoad();
         
         Destroy(gameObject);
     }

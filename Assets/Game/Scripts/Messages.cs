@@ -326,6 +326,11 @@ public class Messages : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.Messages;
 
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
+
         if (Event.current.type != EventType.Repaint)
         {
             return;

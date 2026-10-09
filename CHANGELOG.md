@@ -2,9 +2,19 @@
 
 ## Current release
 
+- The magic panel opens only when you carry a rune bag, and typing runes only starts when the bag holds a rune.
+
+- Loading a game fades in from black, and the compass, the flasks and the rune shelf fade in with it.
+
+- After loading a game, Search and Track wait a full round before their first report, and with no points in Search it points out nothing.
+
+- In the How many? prompt a left click outside it takes one, as a right click takes them all, and it no longer reaches what is behind the prompt.
+
+- C no longer casts a spell while the options menu is open and the game is paused.
+
 - Page Up and Page Down, or the d-pad when no panel is open, scroll back through the last hundred messages, so a line missed in a fight can still be read. The messages sit in a box at the bottom of the screen, and loading a game clears them.
 
-- The Track skill now does what the manual says: every few seconds it tells you of creatures nearby and every direction they are in, and the better your Track, the more often it tells you what they are and whether they are hostile. It stays quiet during a fight, and does not mention the same creature twice within a minute.
+- The Track skill now does what the manual says: every few seconds it tells you of creatures nearby and every direction they are in, and the better your Track, the more often it tells you what they are and whether they are hostile. It stays quiet during a fight, and does not mention the same creature twice within two minutes.
 
 - Detect Monster reaches as far as in the original and counts every creature, friendly or not. It names every direction they are in, and the better of your Track and Casting skills can tell you what they are and whether they are hostile.
 
@@ -24,7 +34,7 @@
 
 - A rune laid on a full shelf now pushes the first one off, as in the original, where before it was ignored.
 
-- The character panel opens on the right, where it no longer covers the spells and the mana flask.
+- The character panel opens on the right, where it no longer covers the spells and the mana flask. On the gamepad it opens on the side of the trigger that opens it.
 
 - The save, load and options menu is centred, and the magic panel has lost its four black corners.
 

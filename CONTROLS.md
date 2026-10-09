@@ -37,9 +37,9 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 
 |Control|Action|
 |-|-|
-|LB|Open / close magic panel|
+|LB|Open / close magic panel (requires a rune bag)|
 |RB|Open / close inventory|
-|Left trigger|Show / hide character stats|
+|Left trigger|Show / hide character stats, on the trigger's side|
 |Select (Back)|Open / close map (requires a map in your inventory)|
 |Start|Open Save / Load / Options (closes open panels first)|
 |Attack trigger (press)|Also closes open panels|
@@ -161,9 +161,9 @@ Look speed and invert options are in Options.
 
 |Control|Action|
 |-|-|
-|Q|Open / close magic panel|
+|Q|Open / close magic panel (requires a rune bag)|
 |E|Open / close inventory|
-|R|Show / hide character stats|
+|R|Show / hide character stats, on the right|
 |Tab|Open / close map (requires a map in your inventory)|
 |Esc|Close open panels; if none are open, open Save / Load / Options|
 |Page Up / Page Down|Scroll back through recent messages (hold to repeat)|
@@ -191,7 +191,7 @@ Look speed and invert options are in Options.
 |-|-|
 |Click runes|Build a spell|
 |Click the spell runes (or primed cast)|Cast|
-|Enter|Start typing runes; opens the magic panel|
+|Enter|Start typing runes; opens the magic panel (requires a rune in the rune bag)|
 |Letter keys A–W and Y, while typing|Lay a rune on the shelf (Y is Ylem; X and Z are not runes)|
 |Space, while typing|Shift the runes left, dropping the first|
 |Backspace, while typing|Take back the last rune|
@@ -220,6 +220,7 @@ Look speed and invert options are in Options.
 |-|-|
 |Mouse (drag arrows)|Adjust the count|
 |Right click|Confirm (all / hurl path when that applies)|
+|Left click outside the prompt|Take one|
 |Esc|Cancel|
 
 **Flute / instrument**

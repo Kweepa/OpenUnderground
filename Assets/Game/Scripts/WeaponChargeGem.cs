@@ -59,6 +59,11 @@ public class WeaponChargeGem : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.WeaponChargeGem;
 
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
+
         Texture2D tex = powerTex[power < 1.0f ? (int)(power * (powerTex.Length - 5)) : powerTex.Length - 5 + sparkleIndex];
         float width = 3 * tex.width;
         float height = 3 * tex.height;

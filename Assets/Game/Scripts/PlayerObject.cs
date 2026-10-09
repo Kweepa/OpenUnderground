@@ -1117,8 +1117,8 @@ public class PlayerObject : MonoBehaviour
     /// - using the skill calls Detect Monster with a radius of 8 and the skill's own value, one
     /// roll per creature (UW.EXE 0x81270) - but nothing in the game reaches it, so this is an
     /// addition with the original's numbers. The timer is ours, and so are the silence when nothing
-    /// is found, the minute before the same creature is reported again, and the line itself (see
-    /// Magic.ReportNearbyCreatures). With no points in Track there is no roll.
+    /// is found, the two minutes before the same creature is reported again, and the line itself
+    /// (see Magic.ReportNearbyCreatures). With no points in Track there is no roll.
     /// </remarks>
     private void CheckTrack()
     {
@@ -1188,9 +1188,12 @@ public class PlayerObject : MonoBehaviour
             CheckTrack();
         }
 
+        // The step is capped, so the long frame that loads a game or a level does not use up the
+        // fade by itself: the view, and the panels drawn under the fade, come in over a second
+        // of frames that are seen.
         if (fadeIn)
         {
-            fade = Mathf.Max(0.0f, fade - Time.unscaledDeltaTime);
+            fade = Mathf.Max(0.0f, fade - Mathf.Min(Time.unscaledDeltaTime, MaxFadeStep));
             if (fade == 0.0f)
             {
                 fadeIn = false;
@@ -1407,11 +1410,11 @@ public class PlayerObject : MonoBehaviour
     private float timeToNextLightSourceDecay = 20.0f;
 
     /// <summary>
-    /// Countdown to the next round of Search rolls for hidden doors. Starts at zero so the first
-    /// round happens as soon as a level has settled, which is when you most want to be told.
+    /// Countdown to the next round of Search rolls for hidden doors, and for traps. Both start
+    /// full, as Track's does, so the first roll of a game waits a whole interval.
     /// </summary>
-    private float timeToNextSecretDoorCheck;
-    private float timeToNextTrapCheck;
+    private float timeToNextSecretDoorCheck = SecretDoorSearch.checkInterval;
+    private float timeToNextTrapCheck = TrapSearch.checkInterval;
 
     /// <summary>Seconds between two Track rolls.</summary>
     private const float trackCheckInterval = 20.0f;
@@ -1419,9 +1422,7 @@ public class PlayerObject : MonoBehaviour
     /// <summary>How far Track reaches, in tiles: the original's own Track use, UW.EXE 0x812a7.</summary>
     private const int trackRadius = 8;
 
-    // Starts at 0, so the first check is made on the first frame, and loading a save gives a
-    // reading at once.
-    private float timeToNextTrackCheck;
+    private float timeToNextTrackCheck = trackCheckInterval;
 
     private static bool PlayerPanelsWantWasdOnlyMovement()
     {
@@ -1817,6 +1818,39 @@ public class PlayerObject : MonoBehaviour
 
     public float fade = 1.0f; // start faded out
     public bool fadeIn = true;
+
+    /// <summary>
+    /// Whether the HUD keeps off the screen: with no player, before the game has started, and while
+    /// the screen is all black. Under the fade it would be covered anyway, but not on the frames of
+    /// a new player before its game is loaded, as from the main menu: Unity has no depth yet for
+    /// the GUI scripts just made and draws them on top of the fade, and the fade itself runs out
+    /// over the empty screen while the game is still loading.
+    /// </summary>
+    public static bool HudHidden => Player == null || !Player.gameStarted || Player.fade >= 1.0f;
+
+    /// <summary>Set once the game is loaded or started, by StartAfterLoad.</summary>
+    private bool gameStarted;
+
+    /// <summary>Whether the player is made and its game not loaded or started yet: a black screen.</summary>
+    public static bool GameStarting => Player != null && !Player.gameStarted;
+
+    /// <summary>The most the fade clears in one frame: a twentieth of a second.</summary>
+    private const float MaxFadeStep = 0.05f;
+
+    /// <summary>
+    /// Fades the view in from black, with the HUD, and puts the automatic rolls - Search, Traps and
+    /// Track - a whole interval away. Called when a saved game is loaded and when a new one has its
+    /// first level.
+    /// </summary>
+    public void StartAfterLoad()
+    {
+        gameStarted = true;
+        fade = 1.0f;
+        fadeIn = true;
+        timeToNextSecretDoorCheck = SecretDoorSearch.checkInterval;
+        timeToNextTrapCheck = TrapSearch.checkInterval;
+        timeToNextTrackCheck = trackCheckInterval;
+    }
 
     private void OnGUI()
     {
