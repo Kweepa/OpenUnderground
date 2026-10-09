@@ -2,6 +2,12 @@
 
 ## Current release
 
+- A running spell can be dispelled, as in the original: click its icon with a panel open, or on the gamepad go down from the runes in the magic panel onto it and press A.
+
+- Casting a spell that is still running renews it instead of taking a second slot: it moves to the top of the list, keeps the longer of the two times, and its bar is full again.
+
+- Levitate and Fly end with a few seconds of Slow Fall, as in the original, whether they run out or you dispel them, so you no longer drop like a stone.
+
 - The rune shelf is always on screen, beside the mana flask, as in the original, so the runes laid out for a spell can be seen without opening the magic panel. A click on it casts, while a panel is open.
 
 - Runes can be typed: Enter opens the magic panel for typing, each letter lays its rune, Enter casts and Esc stops. The movement keys are only taken while typing.

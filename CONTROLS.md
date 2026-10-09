@@ -68,6 +68,8 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |A|Add the selected rune|
 |X|Cast (needs at least two runes)|
 |B|Clear the spell|
+|D-pad down, from the bottom row|Move onto the active spells; up past the top one goes back to the runes|
+|A, on an active spell|Dispel it|
 |LB|Close the magic panel|
 
 ### Map
@@ -186,6 +188,7 @@ Look speed and invert options are in Options.
 |C|Cast the built spell|
 |Click the rune shelf, with a panel open|Cast the built spell|
 |Click the clear bar|Clear runes|
+|Click an active spell, with a panel open|Dispel it|
 |Q, Esc, or right-click outside|Close the panel|
 
 ### Map
