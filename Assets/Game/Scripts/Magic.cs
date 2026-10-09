@@ -43,6 +43,9 @@ public class SActiveSpell
 {
     public int spell;
     public float time;
+    /// <summary>The time the spell started with, which its bar is measured against. Zero in a
+    /// save from before it was kept: the bar then falls back to the spell's duration.</summary>
+    public float fullTime;
 }
 
 [System.Serializable]
@@ -107,6 +110,10 @@ public class Magic : MonoBehaviour
     private float lerpIn;
     private float holdTime;
     private int index;
+
+    /// <summary>On the gamepad, the active spell the panel's cursor is on, or -1 when it is on the
+    /// runes. D-pad down from the bottom row of runes reaches the active spells.</summary>
+    private int activeSpellCursor = -1;
 
     private float bubbleTime;
     private float bubbleDelay;
@@ -1031,6 +1038,11 @@ public class Magic : MonoBehaviour
             holdTime = 0.0f;
         }
         wasExploringMagic = exploring;
+        if (!exploring || GameInput.LastActiveDevice != GameInputDevice.Gamepad)
+        {
+            activeSpellCursor = -1;
+        }
+        activeSpellCursor = Mathf.Min(activeSpellCursor, activeSpells.Count - 1);
 
         // Typing ends with the panel, however it went away, and when a text entry takes the
         // keyboard: that one holds the keyboard mask itself, so it is left set for it.
@@ -1095,7 +1107,28 @@ public class Magic : MonoBehaviour
             bool padRight = GameInput.DpadOrArrowRightPressedThisFrame();
             bool padUp = GameInput.DpadOrArrowUpPressedThisFrame();
             bool padDown = GameInput.DpadOrArrowDownPressedThisFrame();
-            if (padLeft && column > 0)
+            // The active spells are stacked upwards below the panel, the last one on top, so the
+            // cursor steps down onto the top one and back up onto the runes.
+            if (activeSpellCursor >= 0)
+            {
+                if (padDown && activeSpellCursor > 0)
+                {
+                    --activeSpellCursor;
+                    PlayMoveSound();
+                }
+                else if (padUp)
+                {
+                    activeSpellCursor = activeSpellCursor < activeSpells.Count - 1 ? activeSpellCursor + 1 : -1;
+                    PlayMoveSound();
+                }
+            }
+            else if (padDown && index >= 20 && activeSpells.Count > 0
+                     && GameInput.LastActiveDevice == GameInputDevice.Gamepad)
+            {
+                activeSpellCursor = activeSpells.Count - 1;
+                PlayMoveSound();
+            }
+            else if (padLeft && column > 0)
             {
                 --index;
                 PlayMoveSound();
@@ -1118,9 +1151,17 @@ public class Magic : MonoBehaviour
 
             if (GameInput.LastActiveDevice == GameInputDevice.Gamepad)
             {
-                if ((GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false) && hasRunestone[index])
+                if (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
                 {
-                    LayOnShelf(index);
+                    if (activeSpellCursor >= 0)
+                    {
+                        DispelSpell(activeSpellCursor);
+                        activeSpellCursor = Mathf.Min(activeSpellCursor, activeSpells.Count - 1);
+                    }
+                    else if (hasRunestone[index])
+                    {
+                        LayOnShelf(index);
+                    }
                 }
 
                 if (GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
@@ -1157,7 +1198,7 @@ public class Magic : MonoBehaviour
             activeSpells[i].time -= Time.deltaTime;
             if (activeSpells[i].time < 0.0f)
             {
-                RemoveSpell(i);
+                EndSpell(i);
             }
         }
 
@@ -1871,6 +1912,59 @@ public class Magic : MonoBehaviour
             Messages.Add("Not a spell.");
     }
 
+    /// <summary>
+    /// Levitate and Fly end with Slow Fall, as in the original, where an effect with either runs
+    /// out into one more tick of Slow Fall (UW.EXE 0x2ab8c, at 0x2aba0-0x2abf8). The three roll
+    /// 2d3 ticks there, four on average, so the tail is a quarter of the remake's Slow Fall.
+    /// </summary>
+    private float SlowFallTailSeconds => spells[(int)ESpell.SlowFall].duration / 4f;
+
+    /// <summary>A spell that runs out, or that the player dispels: Levitate and Fly become Slow Fall in
+    /// the same place, the rest go.</summary>
+    private void EndSpell(int _index)
+    {
+        ESpell spell = (ESpell)activeSpells[_index].spell;
+        if (spell != ESpell.Levitate && spell != ESpell.Fly)
+        {
+            RemoveSpell(_index);
+            return;
+        }
+
+        // a Slow Fall already running is kept if it lasts longer, so it is never there twice
+        for (int j = 0; j < activeSpells.Count; ++j)
+        {
+            if ((ESpell)activeSpells[j].spell == ESpell.SlowFall && activeSpells[j].time >= SlowFallTailSeconds)
+            {
+                RemoveSpell(_index);
+                return;
+            }
+        }
+        for (int j = activeSpells.Count - 1; j >= 0; --j)
+        {
+            if ((ESpell)activeSpells[j].spell == ESpell.SlowFall)
+            {
+                RemoveSpell(j);
+                if (j < _index)
+                {
+                    --_index;
+                }
+            }
+        }
+
+        activeSpells[_index].spell = (int)ESpell.SlowFall;
+        activeSpells[_index].time = activeSpells[_index].fullTime = SlowFallTailSeconds;
+    }
+
+    /// <summary>
+    /// The player ends an active spell, as a left click on its symbol does in the original (manual,
+    /// page 27): a click on its icon with a panel open, or A on it in the magic panel on the gamepad.
+    /// </summary>
+    private void DispelSpell(int _index)
+    {
+        EndSpell(_index);
+        Utils.PlayClip2d(clearSpell);
+    }
+
     private void RemoveSpell(int _index)
     {
         int spell = activeSpells[_index].spell;
@@ -1903,19 +1997,29 @@ public class Magic : MonoBehaviour
         // Cursed items show, and was taken for a spell that lasts nothing, so its effect never ran.
         if (spells[i].duration > 0)
         {
+            // determine time (could depend on skills)
+            float time = Random.Range(0.8f, 1.1f) * spells[i].duration;
+
+            // The same spell cast again replaces the one running, however many there are, and keeps
+            // the longer of the two times with its bar back at full. It goes to the top, so the list
+            // stays in the order of casting. The original adds a second copy (UW.EXE 0x2b109, no
+            // check for one there), which only takes up a slot here.
+            SActiveSpell running = activeSpells.Find(a => a.spell == i);
+            if (running != null)
+            {
+                running.time = running.fullTime = Mathf.Max(running.time, time);
+                activeSpells.Remove(running);
+                activeSpells.Add(running);
+                PlayCastSound(i);
+                return true;
+            }
+
             if (activeSpells.Count == 3)
             {
                 // remove one. use some heuristics to determine which
                 // first, if there's already a similar spell, replace it
                 for (int j = 0; j < activeSpells.Count; ++j)
                 {
-                    // same spell
-                    if (activeSpells[j].spell == i)
-                    {
-                        RemoveSpell(j);
-                        break;
-                    }
-
                     // check for similar but weaker
                     for (int k = 0; k < similarSpells.Length; ++k)
                     {
@@ -1957,8 +2061,7 @@ public class Magic : MonoBehaviour
 
             SActiveSpell activeSpell = new();
             activeSpell.spell = i;
-            // determine time (could depend on skills)
-            activeSpell.time = Random.Range(0.8f, 1.1f) * spells[i].duration;
+            activeSpell.time = activeSpell.fullTime = time;
             activeSpells.Add(activeSpell);
             
             PlayCastSound(i);
@@ -3478,6 +3581,19 @@ public class Magic : MonoBehaviour
     }
 
     /// <summary>
+    /// Whether the HUD's rune shelf and active spells take a click: only while a panel is open, since
+    /// with none the mouse looks around.
+    /// </summary>
+    private static bool HudTakesClicks()
+    {
+        bool panelOpen = PlayerPanelState.ActivePanel != EPlayerPanel.None
+                         || (StatsPanel.sStatsPanel != null && StatsPanel.sStatsPanel.ShouldDismissWithEscape());
+        return panelOpen
+               && (PlayerObject.Player.controlsDisabled
+                   & (EControlMask.Map | EControlMask.SaveLoad | EControlMask.Conversation | EControlMask.Cutscene)) == 0;
+    }
+
+    /// <summary>
     /// The rune shelf at the given place, HudRowHeight tall, with the runes laid on it. A click on
     /// it casts them, as in the original, whose manual says "left-click on the runes on the rune
     /// shelf, regardless of whether your rune bag is open or closed". Here only while a panel is
@@ -3489,11 +3605,7 @@ public class Magic : MonoBehaviour
         Rect shelfRect = new Rect(x, y, RuneShelfWidth, HudRowHeight);
         DrawTex(shelfRect.x, shelfRect.y, shelfRect.width, shelfRect.height, shelf);
 
-        bool panelOpen = PlayerPanelState.ActivePanel != EPlayerPanel.None
-                         || (StatsPanel.sStatsPanel != null && StatsPanel.sStatsPanel.ShouldDismissWithEscape());
-        if (panelOpen
-            && (PlayerObject.Player.controlsDisabled
-                & (EControlMask.Map | EControlMask.SaveLoad | EControlMask.Conversation | EControlMask.Cutscene)) == 0)
+        if (HudTakesClicks())
         {
             GuiInput.RegisterBlockingRect(shelfRect);
             if (GameInput.LastActiveDevice != GameInputDevice.Gamepad && GuiInput.TryConsumeClickInRect(shelfRect))
@@ -3548,6 +3660,8 @@ public class Magic : MonoBehaviour
         style.normal.textColor = Color.yellow;
 
         // draw active spells, stacked up from just above the rune shelf
+        bool hudTakesClicks = HudTakesClicks() && GameInput.LastActiveDevice != GameInputDevice.Gamepad;
+        int dispelled = -1;
         for (int i = 0; i < activeSpells.Count; ++i)
         {
             SSpell spell = spells[activeSpells[i].spell];
@@ -3555,8 +3669,31 @@ public class Magic : MonoBehaviour
             float y = Screen.height - HudRowFromBottom - 4 - 64 * (i + 1);
             DrawIcon(HudRowX, y, 64, tex);
             GUI.Label(new Rect(HudRowX + 68, y + 20, 100, 20), spell.name, style);
-            DrawTex(HudRowX + 68, y + 50,
-                150 * activeSpells[i].time / spells[activeSpells[i].spell].duration, 5, Texture2D.whiteTexture);
+            float fullTime = activeSpells[i].fullTime > 0 ? activeSpells[i].fullTime : spell.duration;
+            DrawTex(HudRowX + 68, y + 50, 150 * Mathf.Min(activeSpells[i].time / fullTime, 1), 5, Texture2D.whiteTexture);
+
+            if (i == activeSpellCursor && tex != null)
+            {
+                // the panel's rune cursor, scaled from the rune it frames to the icon
+                float iconWidth = 64f * tex.width / tex.height;
+                float sx = iconWidth / 48, sy = 64 / 57.6f;
+                DrawTex(HudRowX + (64 - iconWidth) / 2 - 3 * sx, y - 2 * sy,
+                    3 * cursor.width * sx, 3.6f * cursor.height * sy, cursor);
+            }
+
+            Rect iconRect = new Rect(HudRowX, y, 64, 64);
+            if (hudTakesClicks)
+            {
+                GuiInput.RegisterBlockingRect(iconRect);
+                if (GuiInput.TryConsumeClickInRect(iconRect))
+                {
+                    dispelled = i;
+                }
+            }
+        }
+        if (dispelled >= 0)
+        {
+            DispelSpell(dispelled);
         }
 
         {
@@ -3635,13 +3772,16 @@ public class Magic : MonoBehaviour
 
             if (GameInput.LastActiveDevice == GameInputDevice.Gamepad)
             {
-                // draw cursor
-                DrawTex(invPosition + 54 * (index % 4) + 21 - 3, PanelTop + 18 + 53 * (index / 4) - 2, 3 * cursor.width, 3.6f * cursor.height, cursor);
-
-                if (hasRunestone[index])
+                // draw cursor, unless it is down on the active spells
+                if (activeSpellCursor < 0)
                 {
-                    style.fontSize = 16;
-                    GUI.Label(new Rect(invPosition + 5, PanelTop, 100, 20), DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + index), style);
+                    DrawTex(invPosition + 54 * (index % 4) + 21 - 3, PanelTop + 18 + 53 * (index / 4) - 2, 3 * cursor.width, 3.6f * cursor.height, cursor);
+
+                    if (hasRunestone[index])
+                    {
+                        style.fontSize = 16;
+                        GUI.Label(new Rect(invPosition + 5, PanelTop, 100, 20), DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + index), style);
+                    }
                 }
             }
             else if (magicGridHoverRuneIndex >= 0 && hasRunestone[magicGridHoverRuneIndex])
@@ -3665,10 +3805,11 @@ public class Magic : MonoBehaviour
                 style.fontSize = 16;
                 int sz = 24;
 
-                if (hasRunestone[index])
+                if (activeSpellCursor >= 0 || hasRunestone[index])
                 {
                     DrawTex(invPosition + 60, PanelTop + 484, sz, sz, aButton);
-                    GUI.Label(new Rect(invPosition + 90, PanelTop + 484, 100, 60), "Select", style);
+                    GUI.Label(new Rect(invPosition + 90, PanelTop + 484, 100, 60),
+                        activeSpellCursor >= 0 ? "Dispel" : "Select", style);
                 }
                 if (spellInProgress.Count > 1)
                 {
@@ -3736,7 +3877,8 @@ public class Magic : MonoBehaviour
             saveData.activeSpells.Add(new SActiveSpell
             {
                 spell = activeSpell.spell,
-                time = activeSpell.time
+                time = activeSpell.time,
+                fullTime = activeSpell.fullTime
             });
         }
 
@@ -3786,7 +3928,8 @@ public class Magic : MonoBehaviour
                 activeSpells.Add(new SActiveSpell
                 {
                     spell = savedSpell.spell,
-                    time = savedSpell.time
+                    time = savedSpell.time,
+                    fullTime = savedSpell.fullTime
                 });
             }
         }
