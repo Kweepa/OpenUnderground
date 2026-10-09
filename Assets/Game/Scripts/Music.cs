@@ -136,7 +136,13 @@ public class Music : MonoBehaviour
         StartExploringMusic();
     }
     
-    public static bool IsInCombat() => sMusic != null && sMusic.musicState == EMusicState.Combat;
+    /// <summary>
+    /// True while a fight is on: the Combat track, or the two that take its place as the fight
+    /// turns, Injured when the player is badly hurt and Winning when the creature is. Victory,
+    /// after the kill, does not count.
+    /// </summary>
+    public static bool IsInCombat() => sMusic != null
+        && sMusic.musicState is EMusicState.Combat or EMusicState.Injured or EMusicState.Winning;
 
     /// <param name="fighter">
     /// The creature that is fighting, when there is one, so that <see cref="HostileStillFighting"/>

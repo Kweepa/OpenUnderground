@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A fight still counts as one when you are badly hurt or your foe is: you cannot sprint, and Search does not point out hidden doors or trapped objects.
+
 - After a fight, Search waits a full round before it points out hidden doors and trapped objects again.
 
 - A running spell can be dispelled, as in the original: click its icon with a panel open, or on the gamepad go down from the runes in the magic panel onto it and press A.
