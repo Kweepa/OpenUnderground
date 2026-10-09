@@ -59,6 +59,11 @@ public class CritterHealthDisplay : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.CritterHealth;
 
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
+
         int index = 0;
         if (enabledFraction > 0.0f)
         {

@@ -163,7 +163,7 @@ public class PlayerPanelInput : MonoBehaviour
         {
             PlayerPanelState.SetPanel(EPlayerPanel.None);
         }
-        else
+        else if (Magic.HasRuneBag())
         {
             StatsPanel.sStatsPanel?.Hide();
             PlayerPanelState.SetPanel(EPlayerPanel.Magic);

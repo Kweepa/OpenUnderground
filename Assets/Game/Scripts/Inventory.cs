@@ -5115,6 +5115,11 @@ public class Inventory : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.Inventory;
 
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
+
         if (PlayerPanelState.IsEffectivelyExploringInventory)
         {
             GuiInput.RegisterBlockingRect(GetPanelGuiRectForOutsideClick());

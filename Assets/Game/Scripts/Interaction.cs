@@ -563,9 +563,38 @@ public class Interaction : MonoBehaviour
         return greyscaleCursorTex != null ? greyscaleCursorTex : originalTex;
     }
 
+    /// <summary>The crosshair at the centre of the screen, tinted.</summary>
+    private void DrawCentreCrosshair(Color color)
+    {
+        Texture2D cursorTex = GetGreyscaleCursor(DataLoader.sDataLoader.cursorTex[0]);
+        if (cursorTex == null)
+        {
+            return;
+        }
+
+        float w = 5 * cursorTex.width;
+        float h = 6 * cursorTex.height;
+        Color originalColor = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h), cursorTex);
+        GUI.color = originalColor;
+    }
+
     private void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Crosshair;
+
+        if (PlayerObject.HudHidden)
+        {
+            // On the black screen of a game still loading, the crosshair alone, so the game does
+            // not look stuck. It goes with the rest of the HUD once the game is in.
+            if (PlayerObject.GameStarting)
+            {
+                DrawCentreCrosshair(Color.gray);
+            }
+
+            return;
+        }
 
         bool freeCursor = Cursor.lockState != CursorLockMode.Locked;
         suppressWorldHoverUi = freeCursor && GuiInput.BlocksPointer(GuiInput.MousePositionGuiSpace);
@@ -613,11 +642,7 @@ public class Interaction : MonoBehaviour
 
                 if (drawCenterCrosshair)
                 {
-                    // Apply color tint
-                    Color originalColor = GUI.color;
-                    GUI.color = cursorColor;
-                    GUI.DrawTexture(new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h), cursorTex);
-                    GUI.color = originalColor;
+                    DrawCentreCrosshair(cursorColor);
                 }
 
                 // Display object name at bottom-right of center reticle (locked) or near software cursor (free); hidden over slide-outs (see suppressWorldHoverUi).

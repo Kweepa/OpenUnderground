@@ -87,6 +87,11 @@ namespace Game.Scripts
 
             GUI.depth = (int)EGUIDepth.Compass;
 
+            if (PlayerObject.HudHidden)
+            {
+                return;
+            }
+
             ScrubUpTextures();
         
             int angle = (int)(PlayerObject.Player.mainCamera.transform.eulerAngles.y * 16.0f / 360.0f + 0.5f);

@@ -796,6 +796,7 @@ public class SaveGameManager : MonoBehaviour
             LevelLoader.sLevelLoader.CreateLavaLights();
 
             PlayerObject.Player?.GetComponent<PlayerEffectsController>()?.ResetMushroomTripAfterLoad();
+            PlayerObject.Player?.StartAfterLoad();
             
             ++gamesLoaded;
             Debug.Log($"Game loaded successfully in {Time.realtimeSinceStartup - startTime:F3}s");

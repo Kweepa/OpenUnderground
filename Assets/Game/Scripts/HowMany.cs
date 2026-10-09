@@ -44,6 +44,9 @@ public class HowMany : MonoBehaviour
     
     protected bool initialButtonsReleased;
 
+    /// <summary>The frame the dialog opened on: a click of that frame is the one that opened it.</summary>
+    private int openedFrame;
+
     public EHowManyReason howManyReason;
 
     /// <summary>Set when Pickup dialog opened from right-hold/drag on world object; <see cref="UUObject.PickUpSome"/> uses hand-only path.</summary>
@@ -59,6 +62,7 @@ public class HowMany : MonoBehaviour
         sHowMany.initialButtonsReleased = false;
         sHowMany.quantityRepeatDirection = 0;
         sHowMany.cachedHasArrowRects = false;
+        sHowMany.openedFrame = Time.frameCount;
         sHowMany.pickupFromWorldDragIntent =
             reason == EHowManyReason.Pickup
             && Interaction.sInt != null
@@ -468,6 +472,16 @@ public class HowMany : MonoBehaviour
             }
 
             GuiInput.TryConsumeClickInPanel(r);
+
+            // A left click outside the dialog takes one, as the right button takes them all, and it
+            // goes no further: marked as used, the world behind neither looks nor acts on it.
+            if (GuiInput.IsLeftMouseDownGui && Time.frameCount > openedFrame)
+            {
+                Event.current.Use();
+                GuiInput.MarkPrimaryClickConsumed();
+                howMany = 1;
+                SubmitHowMany(false);
+            }
         }
     }
 }

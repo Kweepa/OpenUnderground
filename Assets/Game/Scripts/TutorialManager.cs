@@ -806,6 +806,11 @@ public class TutorialManager : MonoBehaviour
 
         GUI.depth = (int)EGUIDepth.Tutorial;
 
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
+
         const float maxTextWidthFraction = 0.55f;
         float textWidth = Screen.width * maxTextWidthFraction;
         GUIContent content = new GUIContent(text);

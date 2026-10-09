@@ -482,6 +482,13 @@ public static class TrapSearch
             return;
         }
 
+        // The roll is Search's, and with no points in it there is none, as with Track.
+        int skill = Skills.GetSkill(ESkill.Search);
+        if (skill <= 0)
+        {
+            return;
+        }
+
         Vector3 playerPos = PlayerObject.Player.transform.position;
         int tileX = Tile.GetTileX(playerPos.x);
         int tileY = Tile.GetTileY(playerPos.z);
@@ -516,7 +523,7 @@ public static class TrapSearch
 
         // Nearest first, and one message a round.
         candidates.Sort((a, b) => a.tileDistance.CompareTo(b.tileDistance));
-        float chance = SecretDoorSearch.ReportChance(Skills.GetSkill(ESkill.Search), difficulty);
+        float chance = SecretDoorSearch.ReportChance(skill, difficulty);
         foreach (Candidate candidate in candidates)
         {
             if (Random.value >= chance)

@@ -1100,7 +1100,11 @@ public class Magic : MonoBehaviour
         if (exploring)
         {
             holdTime = 2.0f;
-            // the stats panel is no longer hidden here: it is on the right, so the two fit together
+            // the stats panel on the right fits beside this one; on the left it would cover it
+            if (StatsPanel.sStatsPanel != null && StatsPanel.sStatsPanel.IsOnLeft)
+            {
+                StatsPanel.sStatsPanel.Hide();
+            }
 
             int column = index % 4;
             bool padLeft = GameInput.DpadOrArrowLeftPressedThisFrame();
@@ -1178,8 +1182,11 @@ public class Magic : MonoBehaviour
         // With the panel open as well as closed. C is the cast key, and the panel that shows the
         // runes about to be cast was the one place it did nothing - so laying a spell out and
         // pressing C, which is the obvious thing to do, cast nothing at all. A successful cast
-        // puts the panel away by itself, so one press casts and closes.
-        if ((PlayerObject.Player.controlsDisabled & EControlMask.Map) == 0
+        // puts the panel away by itself, so one press casts and closes. Not while anything else
+        // has the player: the options menu, which pauses the game, a conversation, the map, a
+        // dialog, sleep. The two panels and Roaming Sight are the masks that leave C free.
+        const EControlMask castKeyFree = EControlMask.Magic | EControlMask.Inventory | EControlMask.RoamingSight;
+        if ((PlayerObject.Player.controlsDisabled & ~castKeyFree) == 0
             && GameInput.MagicCastKeyboardConfirmPressedThisFrame())
         {
             TryCastFromSpellRunes();
@@ -1221,6 +1228,16 @@ public class Magic : MonoBehaviour
     {
         // After OnGUI so <see cref="GuiInput.BlocksPointer"/> sees the magic panel; before <see cref="Interaction"/> LateUpdate.
         UpdateMousePrimedSpellAiming();
+    }
+
+    /// <summary>
+    /// Whether the player carries a rune bag, anywhere in the pack. The magic panel lays out what
+    /// is in it, so without one the panel does not open. The runestone cheat counts as a bag.
+    /// </summary>
+    public static bool HasRuneBag()
+    {
+        return (Inventory.sInv != null && Inventory.sInv.FindObjectInInventory(EObjectType.RuneBag) != null)
+               || (Cheats.sCheats != null && !string.IsNullOrEmpty(Cheats.sCheats.giveRunestones));
     }
 
     private void RefreshRunestones()
@@ -2397,7 +2414,7 @@ public class Magic : MonoBehaviour
     public const int hostileCreatureDifficulty = 5;
 
     /// <summary>Seconds before the Track skill reports the same creature again.</summary>
-    public const float creatureReportDelay = 60.0f;
+    public const float creatureReportDelay = 120.0f;
 
     // Time.time each creature was last part of a report. The spell writes it and the Track skill
     // reads it, so a creature the spell has just shown is not reported again by Track.
@@ -3448,14 +3465,21 @@ public class Magic : MonoBehaviour
         Utils.PlayClip2d(moveToRune);
     }
 
+    /// <summary>Typing needs a rune to type: a rune bag with at least one rune in it.</summary>
     private bool CanStartTypingRunes()
     {
         PlayerObject player = PlayerObject.Player;
-        return player != null
-               && PlayerPanelState.ArePanelsAvailable
-               && (player.controlsDisabled & ~(EControlMask.Magic | EControlMask.Inventory)) == 0
-               && Conversations.runningConversation == null
-               && !MapScreen.IsMapScreenVisible();
+        if (player == null
+            || !PlayerPanelState.ArePanelsAvailable
+            || (player.controlsDisabled & ~(EControlMask.Magic | EControlMask.Inventory)) != 0
+            || Conversations.runningConversation != null
+            || MapScreen.IsMapScreenVisible())
+        {
+            return false;
+        }
+
+        RefreshRunestones();
+        return System.Array.IndexOf(hasRunestone, true) >= 0;
     }
 
     private void StartTypingRunes()
@@ -3826,6 +3850,11 @@ public class Magic : MonoBehaviour
     public void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Magic;
+
+        if (PlayerObject.HudHidden)
+        {
+            return;
+        }
 
         HandleRuneTypingGui();
 

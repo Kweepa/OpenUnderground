@@ -137,6 +137,13 @@ public static class SecretDoorSearch
             return;
         }
 
+        // With no points in Search there is no roll, as with Track.
+        int skill = Skills.GetSkill(ESkill.Search);
+        if (skill <= 0)
+        {
+            return;
+        }
+
         int level = LevelLoader.sLevelLoader.loadedLevel;
         if (level != lastPolledLevel)
         {
@@ -154,7 +161,6 @@ public static class SecretDoorSearch
         // Nearest first: it is the most useful thing to be told.
         candidates.Sort((a, b) => a.tileDistance.CompareTo(b.tileDistance));
 
-        int skill = Skills.GetSkill(ESkill.Search);
         foreach (Candidate candidate in candidates)
         {
             if (lastReportedTime.TryGetValue(candidate.objectIndex, out float reportedAt)
@@ -281,8 +287,8 @@ public static class SecretDoorSearch
     /// Harder than a look, since the timer looks for you and never tires: a look's chance at the
     /// same Search, times 1 - 0.5 e^(-0.2303 Search). The factor is one half at Search 0, 95% at
     /// 10 and 99.95% at 30, so the handicap is felt by a beginner and fades out. For the
-    /// difficulties the level designers used, 3 and 10, that is 19% and 8% a round at Search 0,
-    /// 67% and 46% at Search 10, and all but certain at 30.
+    /// difficulties the level designers used, 3 and 10, that is 67% and 46% a round at Search 10,
+    /// and all but certain at 30. At Search 0 the timer makes no roll at all (Poll).
     /// </remarks>
     internal static float ReportChance(int skill, int difficulty)
     {
