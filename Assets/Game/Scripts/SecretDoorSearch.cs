@@ -114,8 +114,8 @@ public static class SecretDoorSearch
     {
         // Not while fighting. Searching a wall is something you do with your hands free, and a
         // line about a door somewhere to the side is noise when a creature is already swinging.
-        // The caller has reset its timer by now, so the rounds skipped during a fight do not
-        // bank up and fire the moment it ends.
+        // The caller holds its timer full during a fight, so the first round after one waits a
+        // whole interval.
         if (Music.IsInCombat())
         {
             return;

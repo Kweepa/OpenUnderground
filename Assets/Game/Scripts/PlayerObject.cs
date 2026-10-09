@@ -1129,16 +1129,25 @@ public class PlayerObject : MonoBehaviour
 
         // Both this and the roll behind it run on deltaTime, so they stop by themselves during
         // conversations, cutscenes, the map and the save screen - all of which set timeScale to
-        // zero - rather than banking up rolls to fire the moment play resumes.
+        // zero - rather than banking up rolls to fire the moment play resumes. During a fight the
+        // timers are held full, so the first roll after one waits a whole interval.
         timeToNextSecretDoorCheck -= Time.deltaTime;
-        if (timeToNextSecretDoorCheck <= 0.0f)
+        if (Music.IsInCombat())
+        {
+            timeToNextSecretDoorCheck = SecretDoorSearch.checkInterval;
+        }
+        else if (timeToNextSecretDoorCheck <= 0.0f)
         {
             timeToNextSecretDoorCheck = SecretDoorSearch.checkInterval;
             SecretDoorSearch.Poll();
         }
 
         timeToNextTrapCheck -= Time.deltaTime;
-        if (timeToNextTrapCheck <= 0.0f)
+        if (Music.IsInCombat())
+        {
+            timeToNextTrapCheck = TrapSearch.checkInterval;
+        }
+        else if (timeToNextTrapCheck <= 0.0f)
         {
             timeToNextTrapCheck = TrapSearch.checkInterval;
             TrapSearch.Poll();

@@ -2,6 +2,8 @@
 
 ## Current release
 
+- After a fight, Search waits a full round before it points out hidden doors and trapped objects again.
+
 - A running spell can be dispelled, as in the original: click its icon with a panel open, or on the gamepad go down from the runes in the magic panel onto it and press A.
 
 - Casting a spell that is still running renews it instead of taking a second slot: it moves to the top of the list, keeps the longer of the two times, and its bar is full again.
