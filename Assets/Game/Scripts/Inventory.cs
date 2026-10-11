@@ -2946,15 +2946,21 @@ public class Inventory : MonoBehaviour
 
     private void TryTakeSelectionFromTradeTray()
     {
-        if ((tradeSlot & 3) >= 2 && tradeSlots[tradeSlot] != null)
+        if (IsPlayerTradeSlotIndex(tradeSlot) && tradeSlots[tradeSlot] != null)
         {
             currentArea = EInventoryArea.Stuff;
-            Add(tradeSlots[tradeSlot]);
-            tradeSlots[tradeSlot] = null;
-            tradeSlotSelected[tradeSlot] = false;
-            
-            Utils.PlayClip2d(unequip);
+            TakeFromTradeTray(tradeSlot);
         }
+    }
+
+    /// <summary>One of the player's offered items back into the pack: Y on the pad, or a right click.</summary>
+    private void TakeFromTradeTray(int slot)
+    {
+        Add(tradeSlots[slot]);
+        tradeSlots[slot] = null;
+        tradeSlotSelected[slot] = false;
+
+        Utils.PlayClip2d(unequip);
     }
 
     public void TryTakeAllFromTradeTray()
@@ -3630,7 +3636,7 @@ public class Inventory : MonoBehaviour
         Utils.PlayClip2d(unequip);
     }
 
-    private void UpdateTradeTrayMouseInteraction()
+    private void UpdateTradeTrayMouseInteraction(bool swallowPrimaryPressForFloatingPlace = false)
     {
         Mouse mouse = Mouse.current;
         if (mouse == null || Conversations.runningConversation == null)
@@ -3656,6 +3662,11 @@ public class Inventory : MonoBehaviour
             mouseTradeDotPressSlot = -1;
             mouseTradeDragThresholdCrossed = false;
 
+            // The press that has just put a carried item down in a cell: it lit the dot already,
+            // and must not reach the cell as a click, which would put it out again on release.
+            if (swallowPrimaryPressForFloatingPlace)
+                return;
+
             if (TryGetTradeSelectionDotUnderMouse(guiMouse, out int dotSlot) && tradeSlots[dotSlot] != null)
             {
                 mouseTradeDotPressSlot = dotSlot;
@@ -3663,18 +3674,24 @@ public class Inventory : MonoBehaviour
                 return;
             }
 
-            if (TryGetTradeSlotUnderMouse(guiMouse, out int cellSlot)
-                && IsPlayerTradeSlotIndex(cellSlot)
-                && tradeSlots[cellSlot] != null)
+            // A click on the item toggles its dot as a click on the dot does, on both sides: the
+            // manual says "Clicking on the item toggles the lit dot". A drag from the player's
+            // side still takes the item back.
+            if (TryGetTradeSlotUnderMouse(guiMouse, out int cellSlot) && tradeSlots[cellSlot] != null)
             {
-                mouseTradePendingSlotIdx = cellSlot;
+                mouseTradeDotPressSlot = cellSlot;
+                if (IsPlayerTradeSlotIndex(cellSlot))
+                {
+                    mouseTradePendingSlotIdx = cellSlot;
+                }
                 mouseTradeDownScreen = mouse.position.ReadValue();
             }
 
             return;
         }
 
-        if (mouseTradeDotPressSlot >= 0 && mouse.leftButton.isPressed)
+        // A cell that can be dragged finds its threshold below, where crossing it starts the drag.
+        if (mouseTradeDotPressSlot >= 0 && mouseTradePendingSlotIdx < 0 && mouse.leftButton.isPressed)
         {
             if ((mouse.position.ReadValue() - mouseTradeDownScreen).sqrMagnitude
                 >= MouseStuffDragThresholdPx * MouseStuffDragThresholdPx)
@@ -3690,6 +3707,16 @@ public class Inventory : MonoBehaviour
                 mouseTradeDragThresholdCrossed = true;
                 RunTradeTrayDragPickupFromSlot(mouseTradePendingSlotIdx);
             }
+        }
+
+        // A right click on one of the player's offered items puts it back in the pack, as a right
+        // click on an item in the pack offers it.
+        if (mouse.rightButton.wasReleasedThisFrame
+            && TryGetTradeSlotUnderMouse(guiMouse, out int takeSlot)
+            && IsPlayerTradeSlotIndex(takeSlot)
+            && tradeSlots[takeSlot] != null)
+        {
+            TakeFromTradeTray(takeSlot);
         }
 
         if (mouse.leftButton.wasReleasedThisFrame)
@@ -3824,7 +3851,7 @@ public class Inventory : MonoBehaviour
                     UpdatePaperdollMouseInteraction(invMousePx, swallowPrimaryPress);
                     UpdateStuffMouseInteraction(invMousePx, swallowPrimaryPress);
                     if (Conversations.runningConversation != null)
-                        UpdateTradeTrayMouseInteraction();
+                        UpdateTradeTrayMouseInteraction(swallowPrimaryPress);
                 }
                 else
                 {

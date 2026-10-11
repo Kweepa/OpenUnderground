@@ -162,7 +162,7 @@ public class Music : MonoBehaviour
     {
         if (fighter != null)
         {
-            fighter.lastFightTime = Time.unscaledTime;
+            fighter.lastFightTime = Time.time;
         }
 
         if (sMusic != null)
@@ -249,7 +249,7 @@ public class Music : MonoBehaviour
         {
             // A longer tail the raised weapon left is kept; a stale one from an earlier warning is not.
             sMusic.alertTime = sMusic.musicState == EMusicState.Alert ? Mathf.Max(sMusic.alertTime, creatureAlertTail) : creatureAlertTail;
-            sMusic.lastAlertHeartbeat = Time.unscaledTime;
+            sMusic.lastAlertHeartbeat = Time.time;
         }
     }
 
@@ -259,7 +259,7 @@ public class Music : MonoBehaviour
     /// </summary>
     private void LeaveFight()
     {
-        if (lastAlertHeartbeat >= 0.0f && Time.unscaledTime - lastAlertHeartbeat < 0.5f)
+        if (lastAlertHeartbeat >= 0.0f && Time.time - lastAlertHeartbeat < 0.5f)
         {
             musicState = EMusicState.Alert;
             alertTime = creatureAlertTail;
@@ -296,7 +296,7 @@ public class Music : MonoBehaviour
                 && critter.attitude == Critter.EAttitude.Hostile
                 && critter.hp > 0
                 && CritterIsAttacking(critter.state)
-                && Time.unscaledTime - critter.lastFightTime < fightMemory)
+                && Time.time - critter.lastFightTime < fightMemory)
             {
                 return true;
             }
@@ -738,8 +738,9 @@ public class Music : MonoBehaviour
 
             // When the exploring track ends, stay quiet for a while before picking a new one.
             // Wall to wall music flattens the dungeon; it is the silence that makes the next
-            // track land. Uses unscaledDeltaTime like the rest of Update, so the countdown keeps
-            // running while the game is paused.
+            // track land. Uses unscaledDeltaTime, so the countdown keeps running while the game
+            // is paused. The warning and the fight run on game time instead, below: a pause holds
+            // them, as it holds the creatures that keep them going.
             if (!musicPlayer.IsPlaying)
             {
                 if (exploringSilenceTimer == 0.0f && SilenceBetweenTracks)
@@ -770,7 +771,7 @@ public class Music : MonoBehaviour
                 alertTime = alertDuration;
             }
 
-            alertTime -= Time.unscaledDeltaTime;
+            alertTime -= Time.deltaTime;
             if (alertTime < 0.0f)
             {
                 StartExploringMusic();
@@ -787,9 +788,9 @@ public class Music : MonoBehaviour
                 combatSwitchCooldown = combatSwitchDelay;
                 StartStateMusic(musicState);
             }
-            combatSwitchCooldown -= Time.unscaledDeltaTime;
+            combatSwitchCooldown -= Time.deltaTime;
 
-            combatTime -= Time.unscaledDeltaTime;
+            combatTime -= Time.deltaTime;
             if (combatTime < 0.0f)
             {
                 LeaveFight();

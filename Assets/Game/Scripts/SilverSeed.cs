@@ -4,6 +4,7 @@ using UnityEngine;
 public class SilverSeedSaveData : UUObjectSaveData
 {
     public bool wasSleeping;
+    public bool waitingForRoom;
 }
 
 public class SilverSeed : UUObject
@@ -11,6 +12,13 @@ public class SilverSeed : UUObject
     public AudioClip saplingGrow;
 
     private bool wasSleeping;
+
+    // Settled on good ground, but the player stands where the tree would grow: it grows once he
+    // steps away, instead of inside him.
+    private bool waitingForRoom;
+
+    // How far from the player's side the trunk needs, in metres.
+    private const float treeClearance = 0.5f;
 
     public override string GetUseText()
     {
@@ -70,18 +78,39 @@ public class SilverSeed : UUObject
         Rigidbody rb = gameObject.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            if (!wasSleeping && rb.IsSleeping() && ShouldPlantSeed(rb.position))
+            bool sleeping = rb.IsSleeping();
+            if (!wasSleeping && sleeping)
             {
-                wasSleeping = true;
                 // cast down to ground
                 // TODO: check for being close to the floor (not on a bridge or another object)
+                waitingForRoom = ShouldPlantSeed(rb.position);
+            }
+            else if (!sleeping)
+            {
+                waitingForRoom = false;
+            }
+            wasSleeping = sleeping;
+
+            if (waitingForRoom && !IsPlayerInTheWay(rb.position))
+            {
+                waitingForRoom = false;
                 PlantSeed(rb.position);
             }
-            else
-            {
-                wasSleeping = rb.IsSleeping();
-            }
         }
+    }
+
+    private static bool IsPlayerInTheWay(Vector3 pos)
+    {
+        PlayerObject player = PlayerObject.Player;
+        CharacterController body = player != null ? player.cachedCharacterController : null;
+        if (body == null)
+        {
+            return false;
+        }
+
+        Vector3 offset = pos - player.transform.position;
+        float reach = body.radius + treeClearance;
+        return Mathf.Abs(offset.y) < body.height && new Vector2(offset.x, offset.z).sqrMagnitude < reach * reach;
     }
 
     protected override void PopulateSaveData(LevelObjectSaveData data)
@@ -91,6 +120,7 @@ public class SilverSeed : UUObject
         if (data is SilverSeedSaveData seedData)
         {
             seedData.wasSleeping = wasSleeping;
+            seedData.waitingForRoom = waitingForRoom;
         }
     }
 
@@ -101,6 +131,7 @@ public class SilverSeed : UUObject
         if (data is SilverSeedSaveData seedData)
         {
             wasSleeping = seedData.wasSleeping;
+            waitingForRoom = seedData.waitingForRoom;
         }
     }
 

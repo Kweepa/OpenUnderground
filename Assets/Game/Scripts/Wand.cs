@@ -242,11 +242,14 @@ public class Wand : UUObject
         if (!String.IsNullOrEmpty(enchantmentName) && enchantmentName != "(Linked)")
         {
             identifiedName += " of " + enchantmentName;
-        }
 
-        if (charges > 0)
-        {
-            identifiedName = $"{identifiedName} with {charges} full charges";
+            // Whenever it holds a spell, as in the original: "with no full charges" when it has
+            // none, and "1 full charge" without the s (UW.EXE 0x7bdbc).
+            if (!IsBrokenWand)
+            {
+                string count = charges > 0 ? charges.ToString() : "no";
+                identifiedName += $" with {count} full charge{(charges == 1 ? "" : "s")}";
+            }
         }
 
         return identifiedName;

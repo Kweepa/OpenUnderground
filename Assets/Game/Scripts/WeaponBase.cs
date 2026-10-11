@@ -814,7 +814,10 @@ public class WeaponBase : UUObject
                 quality -= damageToWeapon;
                 if (quality <= 0)
                 {
-                    Messages.Add($"Your {singularName} was destroyed.");
+                    // "were" for a name that ends in s, as for armour: the original uses one routine
+                    // for both (UW.EXE 0x79e0b).
+                    string wasSlashWere = singularName.EndsWith('s') ? "were" : "was";
+                    Messages.Add($"Your {singularName} {wasSlashWere} destroyed.");
                     Unequip();
                     Inventory.sInv.DestroyEquippedItem(this);
                 }
