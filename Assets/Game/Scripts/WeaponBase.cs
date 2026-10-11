@@ -59,6 +59,7 @@ public class WeaponBase : UUObject
     private float resetTime;
     private float postSwingTime;
     private bool wasCancelled;
+    private bool ignoreTriggerUntilRelease;
     private float lastSwingEndTime = -999f;
 
     private int enchantmentIndex;
@@ -303,6 +304,33 @@ public class WeaponBase : UUObject
         bool cancelPressed = usingKeyboardMouse ? IsCancelPressedMouseKeyboard() : IsCancelPressedGamepad();
         bool attackPressed = usingKeyboardMouse ? IsAttackPressedMouseKeyboard() : IsAttackPressedGamepad();
         bool attackHeld = usingKeyboardMouse ? IsAttackHeldMouseKeyboard() : IsAttackHeldGamepad();
+
+        // A screen that takes the controls - the map, a conversation, a dialog - has the button and
+        // the trigger to itself: on the map the right click erases a note, and it raised the weapon
+        // behind the map as well, which the music takes for trouble. A press made there is ignored
+        // until it is let go, so a right click that closes a screen does not raise the weapon either.
+        // A charge already under way when the screen opens is still held. The two panels are left
+        // to panelBlocksWeapon above.
+        bool screenTakesControls =
+            (PlayerObject.Player.controlsDisabled & ~(EControlMask.Inventory | EControlMask.Magic)) != 0;
+        if (screenTakesControls)
+        {
+            cancelPressed = false;
+            cancelHeld = false;
+            if (attackHeld && state != EState.Prepare)
+            {
+                ignoreTriggerUntilRelease = true;
+            }
+        }
+        if (!attackHeld)
+        {
+            ignoreTriggerUntilRelease = false;
+        }
+        if (ignoreTriggerUntilRelease)
+        {
+            attackPressed = false;
+            attackHeld = false;
+        }
 
         if (wasCancelled)
         {
