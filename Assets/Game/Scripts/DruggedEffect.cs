@@ -52,6 +52,15 @@ public sealed class DruggedEffectRenderer : PostProcessEffectRenderer<DruggedEff
     // This is where the magic happens
     public override void Render(PostProcessRenderContext context)
     {
+        // A build has the shader only because GraphicsSettings lists it among the Always Included
+        // Shaders: nothing else references it. Without it, pass the frame through rather than
+        // throw on every frame.
+        if (_shader == null)
+        {
+            context.command.BlitFullscreenTriangle(context.source, context.destination);
+            return;
+        }
+
         // Get a property sheet for our shader
         var sheet = context.propertySheets.Get(_shader);
 
