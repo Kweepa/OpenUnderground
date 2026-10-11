@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Eating a mushroom shows its hallucination, and drinking blurs your sight, as they were meant to: neither showed outside the Unity editor.
+
 - The silver sapling no longer grows inside you: a seed that settles at your feet waits until you step away.
 
 - An identified wand with one charge left says "with 1 full charge", and one with none "with no full charges", as in the original.

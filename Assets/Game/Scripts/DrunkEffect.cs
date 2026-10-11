@@ -49,6 +49,15 @@ public sealed class DrunkEffectRenderer : PostProcessEffectRenderer<DrunkEffect>
 
     public override void Render(PostProcessRenderContext context)
     {
+        // A build has the shader only because GraphicsSettings lists it among the Always Included
+        // Shaders: nothing else references it. Without it, pass the frame through rather than
+        // throw on every frame.
+        if (_shader == null)
+        {
+            context.command.BlitFullscreenTriangle(context.source, context.destination);
+            return;
+        }
+
         var sheet = context.propertySheets.Get(_shader);
 
         // Pass all the settings from the profile to the shader
