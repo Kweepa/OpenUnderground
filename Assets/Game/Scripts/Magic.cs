@@ -1237,7 +1237,7 @@ public class Magic : MonoBehaviour
     public static bool HasRuneBag()
     {
         return (Inventory.sInv != null && Inventory.sInv.FindObjectInInventory(EObjectType.RuneBag) != null)
-               || (Cheats.sCheats != null && !string.IsNullOrEmpty(Cheats.sCheats.giveRunestones));
+               || (Cheats.sCheats != null && Cheats.sCheats.giveRunestones);
     }
 
     private void RefreshRunestones()
@@ -1246,9 +1246,7 @@ public class Magic : MonoBehaviour
         for (int i = 0; i < 24; ++i)
         {
             hasRunestone[i] = false;
-            char rune = (char)('A' + i + (i == 23 ? 1 : 0));
-            char lowerCaseRune = (char)(rune + 32);
-            if (Cheats.sCheats.giveRunestones.Contains(rune) || Cheats.sCheats.giveRunestones.Contains(lowerCaseRune))
+            if (Cheats.sCheats.giveRunestones)
             {
                 hasRunestone[i] = true;
             }
@@ -1516,7 +1514,7 @@ public class Magic : MonoBehaviour
 
         // The full cost either way: see the note on the critical success in
         // TryCastFromSpellRunes(). The flag still picks the longer bubble.
-        PlayerData.sData.mana -= spells[i].cost;
+        PayMana(spells[i].cost);
         bubbleTime = crit ? 3.0f : 2.0f;
 
         castSpells[i] = true;
@@ -1805,6 +1803,15 @@ public class Magic : MonoBehaviour
         return doorOut != null;
     }
 
+    /// <summary>
+    /// Takes a spell's mana, never below zero. Only the Cast Without Mana cheat lets a cast through
+    /// with less than its cost, and it left the mana negative, owed back once the cheat was off.
+    /// </summary>
+    private static void PayMana(int cost)
+    {
+        PlayerData.sData.mana = Mathf.Max(0, PlayerData.sData.mana - cost);
+    }
+
     private void TryCastFromSpellRunes()
     {
         if (spellInProgress.Count <= 1)
@@ -1845,7 +1852,11 @@ public class Magic : MonoBehaviour
             }
             else if (timeBeforeCanCastAgain > 0.0f)
             {
-                Messages.Add(1, Random.Range(212, 214));
+                // Too soon after the last cast the original prints nothing, it only plays a
+                // sound (UW.EXE 0x78e2e). Here that sound is lost under the cast sound of the
+                // spell just cast, so the refusal gets a line of its own, which the original's
+                // strings do not have: its message sound is what makes it heard.
+                Messages.Add("You are not ready to cast that spell yet.");
                 Utils.PlayClip2d(castFailed);
             }
             else
@@ -1868,9 +1879,16 @@ public class Magic : MonoBehaviour
                 case Skills.ESkillTestResult.CriticalFailure:
                     Messages.Add(1, 214);
                     PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, Random.Range(1, 6), EDamageType.Damage);
+                    // A backfire starts the wait before the next cast, as a cast that works does:
+                    // in the original a critical failure goes on to the same write (UW.EXE
+                    // 0x78f67, then 0x78fad), and only a plain failure skips it (0x78f5e).
+                    timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
                     break;
                 case Skills.ESkillTestResult.Failure:
-                    Messages.Add(1, Random.Range(212, 214));
+                    // "The incantation failed." The original prints 210 + its outcome code
+                    // (UW.EXE 0x78ea5), and 212 is the failed roll; 213, "Casting was not
+                    // successful.", is a spell that went off and did nothing.
+                    Messages.Add(1, 212);
                     Utils.PlayClip2d(castFailed);
                     break;
                 case Skills.ESkillTestResult.Success:
@@ -1879,7 +1897,7 @@ public class Magic : MonoBehaviour
                         break;
                     }
 
-                    PlayerData.sData.mana -= spells[i].cost;
+                    PayMana(spells[i].cost);
                     bubbleTime = 2.0f;
                     TryCast(i);
                     castSpells[i] = true;
@@ -1897,7 +1915,7 @@ public class Magic : MonoBehaviour
                     // 0x78fd2). The power is the same for both too, at 0x78f83 - a critical
                     // success in the original buys nothing at all - so what is left here is
                     // the longer bubble, which is only feedback.
-                    PlayerData.sData.mana -= spells[i].cost;
+                    PayMana(spells[i].cost);
                     bubbleTime = 3.0f;
                     TryCast(i);
                     castSpells[i] = true;
@@ -2455,9 +2473,9 @@ public class Magic : MonoBehaviour
     public const int identifyCreatureDifficulty = 15;
 
     /// <summary>
-    /// Difficulty of the roll that tells a kind of creature is hostile, made once for each
-    /// kind named that has a hostile creature among the ones named. Much easier than naming it:
-    /// 35% at Track 1, 65% at 10, 97% at 20, always from 21.
+    /// Difficulty of the roll that tells a creature is hostile, made for each hostile creature
+    /// sensed, whether or not it is named. Much easier than naming it: 35% at Track 1, 65% at 10,
+    /// 97% at 20, always from 21.
     /// </summary>
     public const int hostileCreatureDifficulty = 5;
 
@@ -2473,14 +2491,13 @@ public class Magic : MonoBehaviour
     // cachedColliders are not.
     private readonly Collider[] detectedColliders = new Collider[128];
 
-    // The kinds of creature named in a report, by plural name, and whether any of those named is
-    // hostile; and the order they were named in.
-    private readonly Dictionary<string, bool> namedKinds = new Dictionary<string, bool>();
+    // The kinds of creature named in a report, by plural name, in the order they were named.
     private readonly List<string> namedKindOrder = new List<string>();
 
     /// <summary>
-    /// Reports the creatures around the player in one line: how many were sensed, every direction
-    /// they are in, and then what kinds of creature the Track skill could tell, and which are hostile.
+    /// Reports the creatures around the player in one line: how many were sensed, whether any is
+    /// known to be hostile, every direction they are in, and then what kinds of creature the Track
+    /// skill could tell.
     /// </summary>
     /// <param name="radius">
     /// How far to look, in tiles. The area is a square: a creature counts when its tile is less
@@ -2506,12 +2523,13 @@ public class Magic : MonoBehaviour
     /// two to four, five or more (0x3569d), and a second direction if another has more than three.
     /// Here the band is taken from all the creatures sensed and every direction is named, with the
     /// same strings: block 1, 59 to 61, and the directions 36 to 43; StringLoader shortens 61 to
-    /// "You detect many creatures ". Then, for each creature sensed, a roll against
-    /// identifyCreatureDifficulty tells what it is, and for each kind
-    /// told with a hostile creature among those, a roll against hostileCreatureDifficulty says so.
-    /// Both use the player's Track; for the spell, the higher of Track and Casting: the spell finds
-    /// the creatures, the skill reads them. The names are the plurals of block 4. Hostile means the
-    /// Hostile attitude only: an upset creature is not attacking.
+    /// "You detect many creatures ". Then each creature sensed has two rolls of its own, one
+    /// independent of the other: if it is hostile, one against hostileCreatureDifficulty, and a
+    /// single success makes the line say "hostile creatures"; and one against
+    /// identifyCreatureDifficulty, which names its kind. Both use the player's Track; for the spell,
+    /// the higher of Track and Casting: the spell finds the creatures, the skill reads them. The
+    /// names are the plurals of block 4. Hostile means the Hostile attitude only: an upset creature
+    /// is not attacking.
     /// </remarks>
     public void ReportNearbyCreatures(int radius, int skill, bool isSpell)
     {
@@ -2519,7 +2537,7 @@ public class Magic : MonoBehaviour
 
         int[] critters = { 0, 0, 0, 0, 0, 0, 0, 0 };
         int total = 0;
-        namedKinds.Clear();
+        bool hostileSensed = false;
         namedKindOrder.Clear();
         // What the creatures are: Track reads them, and for the spell Casting does as well as Track,
         // so a mage with no Track still learns something from it.
@@ -2579,19 +2597,18 @@ public class Magic : MonoBehaviour
             ++total;
             lastCreatureReportTime[critter] = Time.time;
 
-            if (!string.IsNullOrEmpty(critter.pluralName)
-                && Skills.GetResult(reading, identifyCreatureDifficulty) >= Skills.ESkillTestResult.Success)
+            // Whether it is hostile, then what it is: two rolls, neither depending on the other.
+            if (critter.attitude == Critter.EAttitude.Hostile
+                && Skills.GetResult(reading, hostileCreatureDifficulty) >= Skills.ESkillTestResult.Success)
             {
-                bool hostile = critter.attitude == Critter.EAttitude.Hostile;
-                if (namedKinds.TryGetValue(critter.pluralName, out bool anyHostile))
-                {
-                    namedKinds[critter.pluralName] = anyHostile || hostile;
-                }
-                else
-                {
-                    namedKinds.Add(critter.pluralName, hostile);
-                    namedKindOrder.Add(critter.pluralName);
-                }
+                hostileSensed = true;
+            }
+
+            if (!string.IsNullOrEmpty(critter.pluralName)
+                && Skills.GetResult(reading, identifyCreatureDifficulty) >= Skills.ESkillTestResult.Success
+                && !namedKindOrder.Contains(critter.pluralName))
+            {
+                namedKindOrder.Add(critter.pluralName);
             }
         }
 
@@ -2604,9 +2621,9 @@ public class Magic : MonoBehaviour
             return;
         }
 
-        // "You detect a few creatures to the North, to the East and to the Southwest." Each
-        // direction is the whole string from the data, and the kinds below are always plural with
-        // "(hostile)" after them, so that every piece of the line can be translated on its own.
+        // "You detect a few hostile creatures to the North, to the East and to the Southwest."
+        // Each direction is the whole string from the data, and the kinds below are always plural.
+        // "hostile" goes in before "creature" when any creature was told hostile.
         int index = 59 + (total > 1 ? 1 : 0) + (total > 4 ? 1 : 0);
         List<string> directions = new List<string>();
         for (int i = 0; i < 8; ++i)
@@ -2616,20 +2633,18 @@ public class Magic : MonoBehaviour
                 directions.Add(StringLoader.GetString(1, 36 + i));
             }
         }
-        string message = StringLoader.GetString(1, index) + JoinList(directions) + ".";
+        string detected = StringLoader.GetString(1, index);
+        if (hostileSensed)
+        {
+            detected = detected.Replace(" creature", " hostile creature");
+        }
+        string message = detected + JoinList(directions) + ".";
 
-        // "You make out signs of goblins (hostile) and mongbats." The plural reads right for one
-        // creature as well.
+        // "You make out signs of goblins and mongbats." The plural reads right for one creature
+        // as well.
         if (namedKindOrder.Count > 0)
         {
-            List<string> kinds = new List<string>();
-            foreach (string name in namedKindOrder)
-            {
-                bool hostile = namedKinds[name]
-                    && Skills.GetResult(reading, hostileCreatureDifficulty) >= Skills.ESkillTestResult.Success;
-                kinds.Add(hostile ? name + " (hostile)" : name);
-            }
-            message += " You make out signs of " + JoinList(kinds) + ".";
+            message += " You make out signs of " + JoinList(namedKindOrder) + ".";
         }
 
         Messages.Add(message);

@@ -159,6 +159,28 @@ public class CutscenePlayer : MonoBehaviour
     [Tooltip("show some debug info when playing back")]
     public bool debugShowFrames;
 
+    // Start stopped the clock and the controls, and nothing has given them back yet.
+    private bool holdsTime;
+
+    private void ReleaseTime()
+    {
+        if (holdsTime)
+        {
+            holdsTime = false;
+            Time.timeScale = 1.0f;
+            PlayerObject.DisableControls(EControlMask.Cutscene, false);
+        }
+    }
+
+    /// <summary>
+    /// A cutscene destroyed from outside, before its End event, gives back the clock and the
+    /// controls too; without this the game stayed frozen behind it.
+    /// </summary>
+    private void OnDestroy()
+    {
+        ReleaseTime();
+    }
+
     public void Start()
     {
         events = new List<CutEvent>();
@@ -176,6 +198,7 @@ public class CutscenePlayer : MonoBehaviour
 
         PlayerObject.DisableControls(EControlMask.Cutscene, true);
         Time.timeScale = 0.0f;
+        holdsTime = true;
         
         // Handle cup of wonder cutscenes
         if (sceneIndex is 13 or 14 or 15)
@@ -325,8 +348,7 @@ public class CutscenePlayer : MonoBehaviour
                 }
                 
                 Destroy(gameObject);
-                Time.timeScale = 1.0f;
-                PlayerObject.DisableControls(EControlMask.Cutscene, false);
+                ReleaseTime();
                 break;
             }
 

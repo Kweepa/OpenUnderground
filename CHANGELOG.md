@@ -2,6 +2,16 @@
 
 ## Current release
 
+- The silver sapling no longer grows inside you: a seed that settles at your feet waits until you step away.
+
+- An identified wand with one charge left says "with 1 full charge", and one with none "with no full charges", as in the original.
+
+- In a barter, clicking an item lights or clears its dot, as clicking the dot does, on your side and on the trader's, and right-clicking one of your offered items puts it back in your pack.
+
+- Pausing in the middle of a fight, or while something is coming for you, no longer switches to the exploring music.
+
+- A failed spell always says "The incantation failed.", and casting again too soon after a spell says "You are not ready to cast that spell yet."
+
 - Creatures notice you as in the original: they hear how fast you move rather than your footsteps, so flying and swimming no longer hide you and a fight draws in whatever is near, and they see you only in front of them. Once on your trail they follow you until they lose you, and one that reaches the edge of its ground runs home.
 
 - Hold Ctrl to walk slowly and quietly; with enough Sneak you can sometimes reach a creature's back unheard. A blow on a creature that has not noticed you always lands and hurts more the better you sneak, up to twice as much, and charging it makes no sound.

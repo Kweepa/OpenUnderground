@@ -1,5 +1,7 @@
 # Gameplay Controls
 
+The formatted version is online: https://github.com/Kweepa/OpenUnderground/blob/main/CONTROLS.md
+
 Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select).
 
 If you use the **Left-handed** option, Attack and Stats swap triggers on the gamepad (see notes under each section).
