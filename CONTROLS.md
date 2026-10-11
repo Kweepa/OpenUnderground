@@ -142,6 +142,7 @@ time.
 |W A S D or Arrow keys|Move|
 |Mouse (cursor locked)|Look|
 |Left Shift (hold)|Sprint (forward only; uses stamina)|
+|Ctrl (hold)|Walk slowly and quietly|
 |Space|Jump|
 
 Look speed and invert options are in Options.

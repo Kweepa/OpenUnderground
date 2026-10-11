@@ -48,6 +48,9 @@ public class LightSource : UUObject
         return DataLoader.sDataLoader.objectsData.lightSourceStats[4 + ((int)type & 3)].duration;
     }
 
+    /// <summary>How bright it is when lit, 1 to 4: candle 1, torch 2, taper 3, lantern 4 (OBJECTS.DAT).</summary>
+    public int Brightness => DataLoader.sDataLoader.objectsData.lightSourceStats[4 + ((int)type & 3)].brightness;
+
     private bool HasNakedFlame()
     {
         switch (type)

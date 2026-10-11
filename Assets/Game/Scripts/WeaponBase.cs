@@ -125,6 +125,17 @@ public class WeaponBase : UUObject
     // every load. Worth seeing - it is a deliberate touch - but not worth the warning music.
     private bool raisedOnPurpose;
 
+    /// <summary>
+    /// How loud charging this weapon makes the player, held for as long as the charge lasts. The original
+    /// makes it 10 for a melee weapon or the fist (UW.EXE 0x25706); here it is silent, so a blow from
+    /// behind can still come as a surprise and only the swing gives it away: the user's choice, 11
+    /// October 2026.
+    /// </summary>
+    protected virtual int ChargeNoise => 0;
+
+    /// <summary>How loud the swing makes the player: 15 for a melee weapon or the fist (UW.EXE 0x257fd).</summary>
+    protected virtual int SwingNoise => 15;
+
     protected virtual void ChangeState(EState newState)
     {
         state = newState;
@@ -144,6 +155,11 @@ public class WeaponBase : UUObject
             swingTime = 0.0f;
             Utils.PlayClip2d(swingSound);
             TutorialManager.NotifyAttack();
+            if (SwingNoise > 0)
+            {
+                // The swing is as loud as the player can be (UW.EXE 0x257fd).
+                PlayerObject.Player.MakeNoise(SwingNoise);
+            }
             break;
         case EState.PostSwing:
             postSwingTime = 0.0f;
@@ -357,6 +373,12 @@ public class WeaponBase : UUObject
             }
             else if (attackHeld && !panelBlocksWeapon)
             {
+                if (ChargeNoise > 0)
+                {
+                    // Charging makes noise for as long as it lasts (UW.EXE 0x25706).
+                    PlayerObject.Player.MakeNoise(ChargeNoise);
+                }
+
                 bool wasWoundUp = prepareTime > WindUpSeconds;
                 prepareTime += Time.deltaTime;
                 if (!wasWoundUp && prepareTime > WindUpSeconds)
@@ -804,6 +826,15 @@ public class WeaponBase : UUObject
         }
     }
 
+    /// <summary>
+    /// What a surprise blow multiplies the damage by, before the facing bonus: 1 + Sneak/30, so twice at
+    /// Sneak 30 or under Stealth (PlayerObject.SneakForNoise()). Ours, the user's choice of 11 October 2026.
+    /// </summary>
+    public static float SurpriseDamageScale()
+    {
+        return 1.0f + PlayerObject.SneakForNoise() / 30.0f;
+    }
+
     protected virtual bool Attack()
     {
         UUObject obj = FindObjectToDamage(3.0f, out EBodyPart aimedPart, out Vector3 aimedPoint);
@@ -819,6 +850,15 @@ public class WeaponBase : UUObject
             int flankingBonus = Utils.CalcFlankingBonus(PlayerObject.Player.transform, obj.transform);
             int rollBonus = obj is Critter ? flankingBonus : 0;
             Skills.ESkillTestResult res = Skills.GetResult(GetAttackScore() + rollBonus, obj.GetDefence());
+
+            // A surprise blow, ours, the user's choice of 11 October 2026: a hostile creature that has
+            // not noticed the player, not even heard him near, is not defending, so the blow lands, and
+            // it lands harder the better he sneaks. The original has only the facing bonus above.
+            bool surprise = obj is Critter { attitude: Critter.EAttitude.Hostile } unaware && !unaware.NoticedPlayer;
+            if (surprise && res is Skills.ESkillTestResult.CriticalFailure or Skills.ESkillTestResult.Failure)
+            {
+                res = Skills.ESkillTestResult.Success;
+            }
             switch (res)
             {
             case Skills.ESkillTestResult.CriticalFailure:
@@ -867,7 +907,12 @@ public class WeaponBase : UUObject
                     int prepTime = GetChargePercent();
                     int scaledForDamage = meleeData.MinCharge +
                                           (meleeData.MaxCharge - meleeData.MinCharge) * prepTime / 100;
-                    int damage = scaledForDamage * rolledDamage / 128 + flankingBonus;
+                    int damage = scaledForDamage * rolledDamage / 128;
+                    if (surprise)
+                    {
+                        damage = Mathf.RoundToInt(damage * SurpriseDamageScale());
+                    }
+                    damage += flankingBonus;
 
                     if (Cheats.sCheats.boostDamageFromPlayer)
                     {

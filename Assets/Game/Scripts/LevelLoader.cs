@@ -667,6 +667,11 @@ public class LevelLoader : MonoBehaviour
             {
                 obj.activeInLevel = obj.gameObject.activeSelf;
                 obj.gameObject.SetActive(false);
+
+                if (obj is Critter critter)
+                {
+                    critter.PlayerLeftLevel();
+                }
             }
             node = next;
         }

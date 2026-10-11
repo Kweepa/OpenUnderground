@@ -89,6 +89,10 @@ public class Anvil : UUObject
 
         Skills.ESkillTestResult result = Skills.GetResult(repairSkill, durability);
         int message = 0;
+
+        // Hammering on an anvil is loud: the original sets the player's noise to 15 for every repair,
+        // whatever its outcome (UW.EXE 0x749e9).
+        PlayerObject.Player.MakeNoise(15);
         switch (result)
         {
         case Skills.ESkillTestResult.CriticalFailure:

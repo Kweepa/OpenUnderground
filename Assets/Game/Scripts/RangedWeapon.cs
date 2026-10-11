@@ -82,6 +82,14 @@ public class RangedWeapon : WeaponBase
         StopSlingWhirl();
     }
 
+    // The original's launchers make no noise at all (UW.EXE 0x255ca writes it on the melee branch
+    // only). Ours, the user's choice of 10 October 2026: a whirling sling makes 10, as the original's
+    // melee charge, and every shot is as loud as a swing, made when the missile leaves (Attack()), not on
+    // a dry release.
+    protected override int ChargeNoise => type is EObjectType.Sling ? 10 : 0;
+
+    protected override int SwingNoise => 0;
+
     protected override void ChangeState(EState newState)
     {
         base.ChangeState(newState);
@@ -583,6 +591,7 @@ public class RangedWeapon : WeaponBase
                     }
                 }
                 Utils.PlayClip2d(successfulShot);
+                PlayerObject.Player.MakeNoise(15);
             }
         }
         else

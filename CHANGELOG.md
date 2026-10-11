@@ -2,6 +2,14 @@
 
 ## Current release
 
+- Creatures notice you as in the original: they hear how fast you move rather than your footsteps, so flying and swimming no longer hide you and a fight draws in whatever is near, and they see you only in front of them. Once on your trail they follow you until they lose you, and one that reaches the edge of its ground runs home.
+
+- Hold Ctrl to walk slowly and quietly; with enough Sneak you can sometimes reach a creature's back unheard. A blow on a creature that has not noticed you always lands and hurts more the better you sneak, up to twice as much, and charging it makes no sound.
+
+- Stealth makes you quieter without silencing a fight, Conceal makes you harder to see rather than unseen, and Invisibility hides you from sight but not from hearing. Your light matters too: in the dark you are seen much closer, and casting Night Vision puts your lights out, so you can see without being seen.
+
+- Creatures no longer swing at you through a closed door, and slingers no longer throw stones into the wall in front of you. The warning music starts farther away and plays for as long as something is still coming, and creatures after you when you take the stairs still know you if you come back within a minute.
+
 - The magic panel opens only when you carry a rune bag, and typing runes only starts when the bag holds a rune.
 
 - Loading a game fades in from black, and the compass, the flasks and the rune shelf fade in with it.
