@@ -27,6 +27,15 @@ public class CritterSaveData : UUObjectSaveData
     public float stateTime;
     public bool playerAlly;
     public List<Vector3> path;
+
+    // What the creature knows of the player (Critter.PerceivePlayer()): absent in an older save, so false.
+    public bool awareOfPlayer;
+    public bool alertedByPlayer;
+    public bool provokedFromRange;
+
+    // When the player left the creature's level, by PlayerData.gameTime, if he has not come back since.
+    public bool playerAway;
+    public double playerLeftAt;
     
     // Animator state
     public int animatorStateHash; // fullPathHash from AnimatorStateInfo
@@ -188,11 +197,12 @@ public class Critter : UUObject
     /// How near something has to be for noticing the player to be worth a warning, in metres.
     /// </summary>
     /// <remarks>
-    /// Three tiles. Hearing has neither occlusion nor falloff, so a creature can pick the player
-    /// up from the far end of a level and start walking; that is the acquisition working as it
-    /// should, but as music it is a warning that starts once and never has a reason to stop.
+    /// Six tiles, the user's choice of 10 October 2026: creatures notice the player from up to ten
+    /// tiles (Perception.MaxTiles), and at three the warning lasted less than a second before the
+    /// fight took over. Once started, it lasts while any creature that knows of him is coming, at any
+    /// distance.
     /// </remarks>
-    private const float alertRange = 3.0f * Tile.xzScale;
+    private const float alertRange = 6.0f * Tile.xzScale;
 
     // Static cache for string -> enum conversion (zero allocations)
     private static readonly Dictionary<string, CritterSoundType> soundTypeCache;
@@ -502,6 +512,10 @@ public class Critter : UUObject
 
     // Track whether alert sound has been played for current detection session
     private bool hasPlayedAlertForCurrentDetection;
+
+    // And whether this creature has started the warning music in it: one that noticed the player
+    // from farther than alertRange starts it when it comes within it.
+    private bool hasStartedAlertMusicForCurrentDetection;
 
     public float wanderTurnSpeed = 180.0f;
     public float approachTurnSpeed = 360.0f;
@@ -989,7 +1003,31 @@ public class Critter : UUObject
 
     private bool canOpenDoors => DataLoader.sDataLoader.comObjProps[(int)type].canOpenDoors;
 
-    private float detectionRange => Tile.xzScale * (type == EObjectType.SlasherOfVeils ? 99.0f : Mathf.Sqrt(stats.DetectionRange));
+    /// <summary>
+    /// How far from home, in tiles, a hostile creature keeps to when nothing draws it: its territory, the
+    /// high nibble of byte 0x1c, beyond which the original walks a creature on a wander leash home
+    /// (UW.EXE 0x1928f), and never less than the 3 tiles the remake's wander picks its points within
+    /// (FindWanderPoint()). The remake used to read byte 0x1c whole for this, and for a detection radius,
+    /// which the original never does: its low nibble is the courage.
+    /// </summary>
+    private int homeZone => Mathf.Max(stats.Territory, 3);
+
+    /// <summary>
+    /// How far from home, in tiles, a creature's paths may go: the remake's range, 20 tiles (15 for
+    /// Rodrick), except for a free wanderer, goal 2, which has no home in the original - no leash in a
+    /// chase (UW.EXE 0x19541 asks only of a creature whose saved goal is 4) and none at rest (0x1928f is
+    /// goals 4 and 8) - and here goes anywhere on the level. The user's choice, 11 October 2026.
+    /// </summary>
+    private int pathRange => goal == EGoal.Wander2 ? 64 : range;
+
+    // Whether the creature stands farther from home than homeZone.
+    private bool OutsideHomeZone()
+    {
+        Vector2Int ownTile = TileOf(transform.position);
+        int dx = ownTile.x - xhome;
+        int dy = ownTile.y - yhome;
+        return dx * dx + dy * dy > homeZone * homeZone;
+    }
 
     private float theftDetectionRange => Tile.xzScale * Mathf.Sqrt(stats.TheftDetectionRange);
 
@@ -2102,7 +2140,7 @@ public class Critter : UUObject
             break;
         case EState.Wander:
             wallRubTime = 0.0f;
-            if (confusionTime > 0.0f)
+            if (confusionTime > 0.0f || returningHome)
             {
                 ChangeAnimation("Run");
             }
@@ -2315,7 +2353,10 @@ public class Critter : UUObject
                 Vector3 startPos = GetProjectileLaunchPosition(true);
                 Vector3 endPos = GetTargetPos();
                 int mask = LayerMasks.EnvironmentAndCeiling;
-                if (!Physics.Raycast(startPos, endPos - startPos, out _, 10.0f, mask))
+                // The whole way to the target: a ray of 10 m stopped short of a wall or a door between
+                // 10 and 12 m, and the creature shot into it.
+                Vector3 toTarget = endPos - startPos;
+                if (!Physics.Raycast(startPos, toTarget, out _, toTarget.magnitude, mask))
                 {
                     return true;
                 }
@@ -2353,56 +2394,584 @@ public class Critter : UUObject
         return projectileType;
     }
 
-    private bool DetectPlayer()
+    // ---- How the creature perceives the player, as the original does (UW.EXE 0x1a99b and its callers)
+
+    /// <summary>
+    /// How often the creature thinks about the player: the original runs a creature's tick every four
+    /// sixteenths of a second while it moves (byte@0x14 &amp; 7 against the clock of UW.EXE 0x1c518).
+    /// </summary>
+    private const float perceptionTickSeconds = 0.25f;
+
+    private float perceptionClock = -1.0f;
+    private bool perceptionTick;
+
+    /// <summary>
+    /// The original's seen bit, bit 0 of byte@0x19: the creature knows the player is there. A sensed
+    /// or seen answer sets it and a lost one clears it (UW.EXE 0x1a99b); while it is on, an idle hostile
+    /// creature attacks at its next tick without a roll (0x19360). The original clears it when the player
+    /// leaves the level (0x70c05); here it is kept (PlayerLeftLevel()).
+    /// </summary>
+    private bool awareOfPlayer;
+
+    /// <summary>
+    /// Whether the creature has noticed the player in any way: it knows he is there (the seen bit), or it
+    /// heard him near and has turned or gone to look. A surprise blow needs neither (WeaponBase.Attack()).
+    /// </summary>
+    public bool NoticedPlayer => awareOfPlayer || alertedByPlayer || investigatingPlayer;
+
+    /// <summary>Bit 1: it heard the player but not where, and turns toward him (UW.EXE 0x19360, 0x1abca).</summary>
+    private bool alertedByPlayer;
+
+    /// <summary>
+    /// Bit 5: hit from more than a tile away by a player it cannot answer at range, so it chases with
+    /// no leash until he leaves the level (UW.EXE 0x1bc73, 0x19541).
+    /// </summary>
+    private bool provokedFromRange;
+
+    // The player's tile at the chase's last tick: the chase asks only when he has moved (UW.EXE 0x19b0d).
+    private Vector2Int chasePlayerTile = new(-1, -1);
+
+    // A chase that found no way to the player: the creature mills about and tries again one tick in
+    // eight (UW.EXE 0x18441, bit 6 of byte@0x18). The user's choice is the original's, 10 October 2026.
+    private bool chaseBlocked;
+
+    // The heading an alerted creature turns to, one octant toward the player (UW.EXE 0x1abca).
+    private float? alertTurnYaw;
+
+    // Whether a creature waiting to talk has noticed the player close enough to face him.
+    private bool facingTalker;
+
+    // Walking to the player's tile after hearing him near (WalkToPlayersTile()): holds the warning music.
+    private bool investigatingPlayer;
+
+    // Running home after a chase ended at the edge of the creature's reach (RunHome()): it takes no
+    // notice of the player until it is halfway there, runHomeHalfway metres from home.
+    private bool returningHome;
+    private float runHomeHalfway;
+
+    // The chance of SneaksPastNearHearing() at Sneak 0, 10, 20 and 30.
+    private static readonly float[] sneakPastChance = { 0.0f, 0.25f, 0.5f, 0.7f };
+
+    // The sneak roll against a near hearing (SneaksPastNearHearing()): its outcome, and until when it holds.
+    private bool sneakingPast;
+    private float sneakRollUntil;
+
+    // When the creature last knew of the player or heard him near, for OutOfHomeZoneAfterPlayer().
+    private float lastPerceivedTime;
+
+    // How long a creature left far from home stays there once it has lost the player. Ours.
+    private const float strayForgetSeconds = 20.0f;
+
+    // The growl of noticing the player plays once a detection, and not twice within this long.
+    private const float alertSoundSpacing = 10.0f;
+    private float nextAlertSoundTime;
+
+    /// <summary>Sets <see cref="perceptionTick"/> for this frame, four times a second.</summary>
+    private void AdvancePerceptionClock()
+    {
+        if (perceptionClock < 0.0f)
+        {
+            // Not every creature on the same frame.
+            perceptionClock = Random.Range(0.0f, perceptionTickSeconds);
+        }
+
+        perceptionClock -= Time.deltaTime;
+        perceptionTick = perceptionClock <= 0.0f;
+        if (perceptionTick)
+        {
+            perceptionClock = Mathf.Max(perceptionClock + perceptionTickSeconds, 0.0f);
+        }
+    }
+
+    /// <summary>
+    /// The player has left the creature's level. The original makes every creature of it forget him
+    /// (UW.EXE 0x70c05), so a creature on his heels at the stairs was caught unawares when he came
+    /// straight back. Here it keeps the seen and alerted bits, so it knows him when he returns within
+    /// <see cref="memorySeconds"/> of game time, and drops the rest, the chase with no leash among them:
+    /// the user's choice, 11 October 2026.
+    /// </summary>
+    public void PlayerLeftLevel()
+    {
+        playerAway = true;
+        playerLeftAt = PlayerData.sData.gameTime;
+        provokedFromRange = false;
+        chaseBlocked = false;
+        alertTurnYaw = null;
+        investigatingPlayer = false;
+        hasStartedAlertMusicForCurrentDetection = false;
+    }
+
+    // How long, in game time, a creature remembers a player who has left its level. Ours.
+    private const double memorySeconds = 60.0;
+
+    // Whether the player has left the creature's level and not been back since, and when he left, by
+    // PlayerData.gameTime (PlayerLeftLevel()).
+    private bool playerAway;
+    private double playerLeftAt;
+
+    // On the first frame back on its level: forgets the player if he was away too long (PlayerLeftLevel()).
+    private void ForgetIfPlayerLongGone()
+    {
+        if (!playerAway)
+        {
+            return;
+        }
+
+        playerAway = false;
+        if (PlayerData.sData.gameTime - playerLeftAt > memorySeconds)
+        {
+            ForgetPlayer();
+        }
+    }
+
+    /// <summary>The creature forgets the player.</summary>
+    public void ForgetPlayer()
+    {
+        awareOfPlayer = false;
+        alertedByPlayer = false;
+        provokedFromRange = false;
+        chaseBlocked = false;
+        alertTurnYaw = null;
+        investigatingPlayer = false;
+        hasPlayedAlertForCurrentDetection = false;
+        hasStartedAlertMusicForCurrentDetection = false;
+    }
+
+    private static Vector2Int TileOf(Vector3 position)
+    {
+        return new Vector2Int(Tile.GetTileX(position.x), Tile.GetTileY(position.z));
+    }
+
+    /// <summary>
+    /// What the creature makes of the player now, UW.EXE 0x1a99b on whole tiles with the changes listed
+    /// in <see cref="Perception"/>. A sight sets the seen bit and a loss clears it, as there.
+    /// </summary>
+    private Perception.EResult PerceivePlayer()
     {
         if (PlayerData.sData.dead)
+        {
+            return Perception.EResult.Lost;
+        }
+
+        // Kweepa's, kept: a blow just taken, the Slasher of Veils, and Tyball once he has talked.
+        if (damagedTimer > 0.0f
+            || LevelLoader.sLevelLoader.loadedLevel == 9
+            || (whoami == EWhoAmI.Tyball && talkedTo != 0))
+        {
+            awareOfPlayer = true;
+            return Perception.EResult.Sensed;
+        }
+
+        PlayerObject player = PlayerObject.Player;
+        Vector2Int playerTile = TileOf(player.transform.position);
+        Vector2Int ownTile = TileOf(transform.position);
+        int dx = playerTile.x - ownTile.x;
+        int dy = playerTile.y - ownTile.y;
+        if (Mathf.Abs(dx) > Perception.MaxTiles || Mathf.Abs(dy) > Perception.MaxTiles)
+        {
+            // The original does not think at all this far from the player: nothing changes.
+            return Perception.EResult.Lost;
+        }
+
+        int d2 = dx * dx + dy * dy;
+        Perception.EResult heard = Perception.Hear(player.NoiseLevel, stats.Hearing, d2);
+        if (heard == Perception.EResult.Near)
+        {
+            lastPerceivedTime = Time.time;
+        }
+        if (heard == Perception.EResult.Sensed)
+        {
+            awareOfPlayer = true;
+            return Perception.EResult.Sensed;
+        }
+
+        if (Perception.WithinSight(player.Visibility, stats.Sight, d2)
+            && Perception.InFront(dx, dy, Perception.CoarseHeading(transform.eulerAngles.y))
+            && SeesPlayerFromEyes())
+        {
+            awareOfPlayer = true;
+            return Perception.EResult.Sensed;
+        }
+
+        if (heard == Perception.EResult.Near)
+        {
+            return Perception.EResult.Near;
+        }
+
+        awareOfPlayer = false;
+        // Lost: the next notice is a new one, with its growl and its warning; one still walking to
+        // where it heard him keeps the warning it started.
+        hasPlayedAlertForCurrentDetection = false;
+        if (!investigatingPlayer)
+        {
+            hasStartedAlertMusicForCurrentDetection = false;
+        }
+        return Perception.EResult.Lost;
+    }
+
+    /// <summary>
+    /// The line of sight, from the top of the creature to the player's eye. The original's goes eye to
+    /// eye over the tiles' walls and floors (UW.EXE 0x17671); this one stops at the level's geometry,
+    /// closed doors included, which the original's does not: the user's choice, 10 October 2026.
+    /// </summary>
+    private bool SeesPlayerFromEyes()
+    {
+        Vector3 eye = transform.TransformPoint(cachedCharacterController.center)
+                      + 0.4f * cachedCharacterController.height * Vector3.up;
+        Vector3 playerEye = PlayerObject.Player.mainCamera!.transform.position;
+        Vector3 ray = playerEye - eye;
+        return !Physics.Raycast(eye, ray, ray.magnitude, LayerMasks.EnvironmentAndCeiling);
+    }
+
+    /// <summary>
+    /// An idle hostile creature's look for the player, at a tick (UW.EXE 0x19360): with the seen bit it
+    /// attacks; the alerted bit turns it an octant toward him, kept with a chance of (n + 1) in 16; and
+    /// with a chance of n in 16 it perceives - sensed or seen starts the attack, near alerts it and half
+    /// the time sends it to his tile. n is critterStats byte 0x1f >> 4.
+    /// </summary>
+    private bool IdleNoticesPlayer()
+    {
+        if (returningHome)
         {
             return false;
         }
 
-        if (PlayerObject.Player.noise > 0.0f)
+        if (awareOfPlayer)
         {
             return true;
         }
 
-        if (damagedTimer > 0.0f)
+        if (!perceptionTick)
         {
-            return true;
+            return false;
         }
 
-        if (!Magic.sMagic.IsSpellActive(Magic.ESpell.Conceal) && !Magic.sMagic.IsSpellActive(Magic.ESpell.Invisibility))
+        int alertness = stats.Alertness;
+        if (alertedByPlayer)
         {
-            // check we're looking towards the player
-            Vector3 playerPos = PlayerObject.Player.transform.position;
-            Vector3 dir = (playerPos - transform.position).normalized;
-            float dot = Vector3.Dot(dir, transform.forward);
-            if (dot > 0.0f)
+            if (Random.Range(0, 16) > alertness)
             {
-                float distance = (playerPos - transform.position).magnitude;
-                // check line of sight
-                if (!Physics.Raycast(transform.position, dir, distance, LayerMasks.EnvironmentAndCeiling))
-                {
-                    return true;
-                }
+                alertedByPlayer = false;
+            }
+            else
+            {
+                TurnAlertTowardPlayer();
             }
         }
 
-        if (whoami == EWhoAmI.Tyball && talkedTo != 0)
+        if (Random.Range(0, 16) >= alertness)
         {
-            // keep attacking until the player gets out of the detection range
-            return true;
+            return false;
         }
 
-        // Slasher can always see the player
-        if (LevelLoader.sLevelLoader.loadedLevel == 9)
+        switch (PerceivePlayer())
         {
+        case Perception.EResult.Sensed:
+            awareOfPlayer = true;
             return true;
+        case Perception.EResult.Near:
+            if (SneaksPastNearHearing())
+            {
+                break;
+            }
+
+            alertedByPlayer = true;
+            // The growl that says it has noticed something, once (Kweepa's sound, given to the near
+            // answer too at the user's request of 10 October 2026).
+            PlayNoticeSound();
+            if (Random.Range(0, 2) == 0)
+            {
+                WalkToPlayersTile();
+            }
+            break;
         }
 
         return false;
     }
 
-    private bool CheckIdleToCombat(float distanceToPlayer)
+    /// <summary>
+    /// Whether an idle creature lets a near hearing pass, the player's Sneak against it: ours, the user's
+    /// choice of 11 October 2026, since by the original's rule alone a quiet player was turned on from
+    /// several tiles at Sneak 20. The chance is 1 in 4 at Sneak 10, 1 in 2 at 20 and 7 in 10 at 30,
+    /// straight lines between them and from none at 0 (sneakPastChance). Rolled at the first near hearing
+    /// and held for 2 to 3 seconds, then rolled again at the next, so staying close is heard sooner or
+    /// later. Sensing or seeing him is not rolled against, nor is a chase.
+    /// </summary>
+    private bool SneaksPastNearHearing()
+    {
+        if (Time.time >= sneakRollUntil)
+        {
+            float step = Mathf.Clamp(PlayerObject.SneakForNoise(), 0, 30) / 10.0f;
+            int below = Mathf.Min((int)step, 2);
+            float chance = Mathf.Lerp(sneakPastChance[below], sneakPastChance[below + 1], step - below);
+            sneakingPast = Random.value < chance;
+            sneakRollUntil = Time.time + Random.Range(2.0f, 3.0f);
+        }
+
+        return sneakingPast;
+    }
+
+    /// <summary>
+    /// The alert sound when the creature first notices the player, by hearing him near or by sensing or
+    /// seeing him: once until a perception loses him again, and never twice within alertSoundSpacing.
+    /// </summary>
+    private void PlayNoticeSound()
+    {
+        if (attitude != EAttitude.Hostile || hasPlayedAlertForCurrentDetection || Time.time < nextAlertSoundTime)
+        {
+            return;
+        }
+
+        PlayAlertSound();
+        nextAlertSoundTime = Time.time + alertSoundSpacing;
+    }
+
+    /// <summary>Turns the alerted creature one octant toward the player (UW.EXE 0x1abca).</summary>
+    private void TurnAlertTowardPlayer()
+    {
+        Vector3 toPlayer = PlayerObject.Player.transform.position - transform.position;
+        int toward = Perception.CoarseHeading(Mathf.Atan2(toPlayer.x, toPlayer.z) * Mathf.Rad2Deg);
+        int heading = Perception.CoarseHeading(transform.eulerAngles.y);
+        int rel = (toward - heading + 8) % 8;
+        if (rel != 0)
+        {
+            alertTurnYaw = transform.eulerAngles.y + (rel <= 4 ? 45.0f : -45.0f);
+        }
+    }
+
+    /// <summary>A creature that heard the player walks to his tile to see (UW.EXE 0x19360, 0x18441).</summary>
+    private void WalkToPlayersTile()
+    {
+        Tile tile = LevelLoader.GetTile(PlayerObject.Player.transform.position);
+        if (tile == null)
+        {
+            return;
+        }
+
+        // Into a path of its own: called from the Wander state, an empty one would leave it walking none.
+        GetPath(out List<Vector3> toTile, transform.position, AdjustWanderPoint(tile), mayCrossLava: false);
+        if (toTile.Count > 0)
+        {
+            path = toTile;
+            SetState(EState.TurnToWander);
+            investigatingPlayer = true;
+        }
+    }
+
+    /// <summary>
+    /// Whether a chase is given up at this tick: beyond its leash (UW.EXE 0x19541, with the user's
+    /// limit), or, when the player has moved to another tile, one time in eight on a perception that
+    /// loses him, or half the time on one that only hears him (0x19b0d). In melee it never asks.
+    /// </summary>
+    private bool ChaseGivesUp()
+    {
+        if (!perceptionTick || attackTarget != null || !awareOfPlayer)
+        {
+            return false;
+        }
+
+        // At its leash it goes home, unless it can shoot the player from there.
+        if (LeashBreaks() && !CanDoProjectileAttack(0.0f))
+        {
+            RunHome();
+            return true;
+        }
+
+        if (GetDistanceToTarget() < meleeAttackRange + meleeAttackHysteresis)
+        {
+            return false;
+        }
+
+        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
+        bool moved = playerTile != chasePlayerTile;
+        chasePlayerTile = playerTile;
+        if (!moved || Random.Range(0, 8) != 0)
+        {
+            return false;
+        }
+
+        switch (PerceivePlayer())
+        {
+        case Perception.EResult.Lost:
+            // Also when he is out of reach of any perception, which does not clear the bit by itself.
+            awareOfPlayer = false;
+            alertedByPlayer = false;
+            hasPlayedAlertForCurrentDetection = false;
+            hasStartedAlertMusicForCurrentDetection = false;
+            SetState(EState.Idle);
+            return true;
+        case Perception.EResult.Near:
+            if (Random.Range(0, 2) == 0)
+            {
+                awareOfPlayer = false;
+                alertedByPlayer = true;
+                SetState(EState.Idle);
+                return true;
+            }
+            break;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The leash of the chase. The original drops it more than 2 tiles from the player when the creature
+    /// is farther from home than twice its territory, 4 to 16 tiles by type, for a creature that was
+    /// wandering on its leash when it started (goals 4 and 8) and was not provoked from range (UW.EXE
+    /// 0x19541). The limit here is the original's plus 10 tiles, held to 20, the remake's old reach of
+    /// every chase: the user's choice, 10 October 2026, since the original's alone made creatures give
+    /// up much sooner than players are used to.
+    /// </summary>
+    private bool LeashBreaks()
+    {
+        if ((goal != EGoal.Wander4 && goal != EGoal.Wander8) || provokedFromRange)
+        {
+            return false;
+        }
+
+        Vector3 toPlayer = PlayerObject.Player.transform.position - transform.position;
+        toPlayer.y = 0.0f;
+        if (toPlayer.magnitude <= 2.0f * Tile.xzScale)
+        {
+            return false;
+        }
+
+        Vector2Int ownTile = TileOf(transform.position);
+        int dx = ownTile.x - xhome;
+        int dy = ownTile.y - yhome;
+        int limit = Mathf.Min(2 * stats.Territory + 10, 20);
+        return dx * dx + dy * dy > limit * limit;
+    }
+
+    /// <summary>
+    /// Whether a hostile creature is out of its home zone at rest: a chase lost or a look that found
+    /// nobody left it there. The original walks a creature on a wander leash home at once from beyond its
+    /// territory (UW.EXE 0x1928f). Here, the user's choice of 11 October 2026, it stays where it is while
+    /// it still hears the player, and once it has heard nothing of him for strayForgetSeconds it runs
+    /// home (RunHome()). The Slasher of Veils keeps to no zone.
+    /// </summary>
+    private bool OutOfHomeZoneAfterPlayer()
+    {
+        return attitude == EAttitude.Hostile && !playerAlly && !awareOfPlayer && confusionTime <= 0.0f
+               && goal != EGoal.AwaitConversation && type != EObjectType.SlasherOfVeils && OutsideHomeZone();
+    }
+
+    /// <summary>Whether the player is within this many tiles on the ground.</summary>
+    private bool PlayerWithinTiles(float tiles)
+    {
+        Vector3 toPlayer = PlayerObject.Player.transform.position - transform.position;
+        toPlayer.y = 0.0f;
+        return toPlayer.magnitude < tiles * Tile.xzScale;
+    }
+
+    /// <summary>How far the creature is from the centre of its home tile, on the ground, in metres.</summary>
+    private float HomeDistance()
+    {
+        Vector3 toHome = LevelLoader.GetTile(xhome, yhome)?.GetCenter() - transform.position ?? Vector3.zero;
+        toHome.y = 0.0f;
+        return toHome.magnitude;
+    }
+
+    /// <summary>Whether the creature stands at the edge of <see cref="range"/>, the farthest from home GetTilePath() goes.</summary>
+    private bool AtRangeEdge()
+    {
+        Vector2Int ownTile = TileOf(transform.position);
+        int dx = ownTile.x - xhome;
+        int dy = ownTile.y - yhome;
+        return dx * dx + dy * dy >= (pathRange - 1) * (pathRange - 1);
+    }
+
+    /// <summary>
+    /// The chase has ended at the edge of the creature's reach - its leash (UW.EXE 0x19541, which sends
+    /// it home with 0x1928f) or the range its paths keep to: it forgets the player, turns and runs home,
+    /// and takes no notice of him, nor of his blows, until it is halfway there; then it walks the rest
+    /// and perceives him as any creature does. Only when it cannot shoot him from where it stands.
+    /// Running and deaf on the way are ours, the user's choice of 10 October 2026: walking, or milling at
+    /// the edge, it was an easy mark for missiles, and it turned on every one; the walk from halfway is
+    /// the user's of 11 October.
+    /// </summary>
+    private void RunHome()
+    {
+        // Resumed after an interruption, the run keeps the halfway mark it had.
+        if (!returningHome)
+        {
+            runHomeHalfway = 0.5f * HomeDistance();
+        }
+
+        ForgetPlayer();
+        returningHome = false;
+        Tile home = LevelLoader.GetTile(xhome, yhome);
+        if (home != null && TileOf(transform.position) != new Vector2Int(xhome, yhome))
+        {
+            GetPath(out List<Vector3> toHome, transform.position, AdjustWanderPoint(home), mayCrossLava: false);
+            if (toHome.Count > 0)
+            {
+                path = toHome;
+                returningHome = true;
+                SetState(EState.TurnToWander);
+                return;
+            }
+        }
+
+        SetState(EState.Idle);
+    }
+
+    /// <summary>
+    /// Whether a path that does not reach the player ends within a melee reach of him. The original's
+    /// failed search mills about (UW.EXE 0x18441); one that can strike from the end of its way comes
+    /// and strikes instead, ours, the user's choice of 11 October 2026: lurkers milled about in the
+    /// water while the player stood on the shore beside them.
+    /// </summary>
+    private bool PathEndsWithinReach()
+    {
+        Vector3 toTarget = GetTargetFootPos() - path[^1];
+        toTarget.y = 0.0f;
+        return toTarget.magnitude < meleeAttackRange;
+    }
+
+    /// <summary>
+    /// Whether a path that does not reach the player stops at the edge of <see cref="range"/>: then it is
+    /// the range, and not a wall, that keeps the creature from him.
+    /// </summary>
+    private bool PathEndsAtRangeEdge()
+    {
+        if (path == null || path.Count == 0)
+        {
+            return false;
+        }
+
+        Vector2Int end = TileOf(path[^1]);
+        int dx = end.x - xhome;
+        int dy = end.y - yhome;
+        return dx * dx + dy * dy >= (pathRange - 1) * (pathRange - 1);
+    }
+
+    /// <summary>
+    /// Whether a creature waiting to talk starts the conversation at this tick (UW.EXE 0x1a5e7): unless
+    /// it has lost the player, it faces him within 2.5 tiles, and talks within 1.5. The original also
+    /// wants the player to face it; the user dropped that, 10 October 2026.
+    /// </summary>
+    private bool WaitingTalkerStarts()
+    {
+        Vector3 toPlayer = PlayerObject.Player.transform.position - transform.position;
+        toPlayer.y = 0.0f;
+        float tiles = toPlayer.magnitude / Tile.xzScale;
+        if (tiles >= 2.5f)
+        {
+            facingTalker = false;
+            return false;
+        }
+
+        if (!perceptionTick)
+        {
+            return false;
+        }
+
+        facingTalker = PerceivePlayer() != Perception.EResult.Lost;
+        return facingTalker && tiles < 1.5f;
+    }
+
+    private bool CheckIdleToCombat()
     {
         if (confusionTime > 0.0f)
         {
@@ -2418,9 +2987,10 @@ public class Critter : UUObject
         {
             if (theftDetectedTimer > 0.0f)
             {
+                awareOfPlayer = true;
                 return true;
             }
-            return distanceToPlayer < detectionRange && DetectPlayer();
+            return IdleNoticesPlayer();
         }
 
         return true;
@@ -2575,6 +3145,11 @@ public class Critter : UUObject
         }
 
         base.Update();
+        ForgetIfPlayerLongGone();
+        if (awareOfPlayer)
+        {
+            lastPerceivedTime = Time.time;
+        }
 
         // Update cached current tile
         cachedCurrentTile = LevelLoader.GetTile(transform.position);
@@ -2603,20 +3178,40 @@ public class Critter : UUObject
 
         distanceToPlayer = Mathf.Sqrt(distanceToPlayer);
 
-        // Still on its way, and near enough to matter: keep the warning music alive. These four
+        // Still on its way: keep the warning music alive. These four
         // states are a creature that has the player and is closing on him without having swung
         // yet, which is exactly what that music is for; the moment it swings, InCombat takes
         // over. Refreshed every frame rather than started, so the warning ends a breath after
         // the last one gives up or is outrun, instead of running on a timer of its own.
         // Below the sqrt on purpose: above it the distance is still squared, and the same
         // threshold written twice in two units is a bug waiting for someone in a hurry.
+        if (investigatingPlayer && state is not (EState.TurnToWander or EState.Wander))
+        {
+            investigatingPlayer = false;
+        }
+
+        // A creature that heard the player near and turns or walks to see counts too, the user's
+        // choice of 10 October 2026: it has not noticed him, but it is coming.
         if (attitude == EAttitude.Hostile
             && attackTarget == null
-            && distanceToPlayer <= alertRange
-            && state is EState.TurnToApproach or EState.Approach
-                or EState.CombatIdle or EState.ProjectileIdle)
+            && ((awareOfPlayer
+                 && state is EState.TurnToApproach or EState.Approach
+                     or EState.CombatIdle or EState.ProjectileIdle)
+                || (!awareOfPlayer && (alertedByPlayer || investigatingPlayer))))
         {
-            Music.AlertHeartbeat();
+            // Creatures notice the player from farther than alertRange, by ear or by eye, so one that
+            // noticed him out there starts the warning when it comes within it, once; and any that
+            // knows of him and is coming keeps it going wherever it is, and brings it back when a
+            // fight ends (Music.LeaveFight()).
+            if (!hasStartedAlertMusicForCurrentDetection && distanceToPlayer <= alertRange)
+            {
+                Music.Alert();
+                hasStartedAlertMusicForCurrentDetection = true;
+            }
+            else
+            {
+                Music.AlertHeartbeat();
+            }
         }
 
         if (IsGolemWithShieldOfValor() && hp < 5)
@@ -2699,6 +3294,42 @@ public class Critter : UUObject
             {
                 theftDetectedTimer -= Time.deltaTime;
             }
+
+            AdvancePerceptionClock();
+
+            // A creature milling about after a failed search tries again one tick in eight, whatever
+            // it is doing then (UW.EXE 0x18441): asked only while idle, the wander between almost
+            // never left it the chance.
+            if (chaseBlocked && perceptionTick && Random.Range(0, 8) == 0)
+            {
+                chaseBlocked = false;
+                if (state is EState.Wander or EState.TurnToWander)
+                {
+                    SetState(EState.Idle);
+                }
+            }
+
+            // Halfway home it walks the rest, and perceives the player again.
+            if (returningHome && HomeDistance() <= runHomeHalfway)
+            {
+                returningHome = false;
+                if (state == EState.Wander && confusionTime <= 0.0f)
+                {
+                    ChangeAnimation("Walk");
+                }
+            }
+
+            // Running home, it turns on a player who comes within two tiles and can be reached: the
+            // user's choice of 11 October 2026, so the run is a way out of a fight at range, not a free
+            // pass to close in on it.
+            if (returningHome && perceptionTick && PlayerWithinTiles(2.0f)
+                && GetPath(out List<Vector3> toPlayer, transform.position, GetTargetFootPos(), mayCrossLava: false))
+            {
+                returningHome = false;
+                awareOfPlayer = true;
+                path = toPlayer;
+                SetState(EState.TurnToApproach);
+            }
         }
 
         if (paralyzeTime > 0.0f)
@@ -2765,17 +3396,32 @@ public class Critter : UUObject
                     // just idle
                     AdvanceAnim(0.8f);
                 }
-                else if (goal == EGoal.AwaitConversation && distanceToPlayer < 4.0f && DetectPlayer())
+                else if (goal == EGoal.AwaitConversation && WaitingTalkerStarts())
                 {
                     // start a conversation
                     TryInteract(null, null, EAction.Use);
                 }
-                else if ((attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5) && CheckIdleToCombat(distanceToPlayer))
+                else if (returningHome)
+                {
+                    // Interrupted on the way home: on again.
+                    RunHome();
+                }
+                else if ((attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5) && CheckIdleToCombat()
+                         && attackTarget == null && chaseBlocked)
+                {
+                    // No way to the player: mill about until the retry in Update() (UW.EXE 0x18441).
+                    GetPath(out path, transform.position, AdjustWanderPoint(FindWanderPoint()), mayCrossLava: false);
+                    if (path.Count > 0)
+                    {
+                        SetState(EState.TurnToWander);
+                    }
+                }
+                else if ((attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5) && CheckIdleToCombat())
                 {
                     // Play alert sound if this is the first time detecting the player while hostile in this detection session
                     if (attackTarget == null && attitude == EAttitude.Hostile && !hasPlayedAlertForCurrentDetection)
                     {
-                        PlayAlertSound();
+                        PlayNoticeSound();
 
                         // And the warning music with it, if the thing that noticed is close
                         // enough to be a threat. Noticing the player is not the same as
@@ -2787,14 +3433,45 @@ public class Critter : UUObject
                         if (distanceToPlayer <= alertRange)
                         {
                             Music.Alert();
+                            hasStartedAlertMusicForCurrentDetection = true;
                         }
                     }
 
-                    GetPath(out path, transform.position, GetTargetFootPos(), mayCrossLava: Time.time >= lavaCrossingBarredUntil);
-                    // A path is never shorter than the straight line CheckIdleToCombat() already
-                    // checked, and GetTilePath() keeps every path within range tiles of home, so a
-                    // third leash on the path length only rejects reachable targets.
-                    if (path.Count > 0)
+                    bool reaches = GetPath(out path, transform.position, GetTargetFootPos(), mayCrossLava: Time.time >= lavaCrossingBarredUntil);
+                    // GetTilePath() keeps every path within range tiles of home, so a leash on the path
+                    // length would only reject reachable targets. A path that does not reach the player
+                    // is the original's failed search: the creature gives up and mills about (UW.EXE
+                    // 0x18441, 0x19b0d), unless it can shoot him from where it is.
+                    if (!reaches && attackTarget == null && !CanDoProjectileAttack(0.0f))
+                    {
+                        if (AtRangeEdge())
+                        {
+                            // As far from home as any path of this creature may go, and the player still
+                            // out of reach and out of a shot: the remake's own leash, and the chase ends.
+                            RunHome();
+                        }
+                        else if (PathEndsAtRangeEdge() && path.Count > 1)
+                        {
+                            // The range, not a wall, stands between them: it comes as far as it may.
+                            SetState(EState.TurnToApproach);
+                        }
+                        else if (path.Count > 0 && PathEndsWithinReach())
+                        {
+                            // It cannot stand where he stands, but can strike him from where its way
+                            // ends: a lurker at the water's edge with the player on the shore.
+                            SetState(EState.TurnToApproach);
+                        }
+                        else if (path.Count == 0 && GetDistanceToTarget() < meleeAttackRange + meleeAttackHysteresis
+                                 && IsViewToTargetClear())
+                        {
+                            SetState(EState.CombatIdle);
+                        }
+                        else
+                        {
+                            chaseBlocked = true;
+                        }
+                    }
+                    else if (path.Count > 0)
                     {
                         SetState(EState.TurnToApproach);
                     }
@@ -2805,7 +3482,24 @@ public class Critter : UUObject
                 }
                 else if (AdvanceAnim(0.8f) || confusionTime > 0.0f) // removed check for upset (want to see fidgets)
                 {
-                    if (goal != EGoal.Stand7 && goal != EGoal.Stand0 && goal != EGoal.Stand11 && goal != EGoal.Stand12 && goal != EGoal.AwaitConversation)
+                    // A free wanderer has no home to go back to: where it rests out of its zone, after a
+                    // chase or a look, becomes its home, and it wanders there.
+                    if (goal == EGoal.Wander2 && OutsideHomeZone())
+                    {
+                        Vector2Int here = TileOf(transform.position);
+                        xhome = here.x;
+                        yhome = here.y;
+                    }
+
+                    if (OutOfHomeZoneAfterPlayer())
+                    {
+                        // Out of its zone: it waits while it still hears the player, then runs home.
+                        if (Time.time - lastPerceivedTime >= strayForgetSeconds)
+                        {
+                            RunHome();
+                        }
+                    }
+                    else if (goal != EGoal.Stand7 && goal != EGoal.Stand0 && goal != EGoal.Stand11 && goal != EGoal.Stand12 && goal != EGoal.AwaitConversation)
                     {
                         // try a wander
                         Tile target = FindWanderPoint();
@@ -2813,7 +3507,7 @@ public class Critter : UUObject
 
                         // A wanderer keeps out of lava, as the original's stops at its edge.
                         GetPath(out path, transform.position, targetCenter, mayCrossLava: false);
-                        if (path.Count > 0 && path.Count < detectionRange / Tile.xzScale)
+                        if (path.Count > 0)
                         {
                             //path[path.Count - 1] += new Vector3( Random.Range( -1.0f, 1.0f ), 0.0f, Random.Range( -1.0f, 1.0f ) );
                             SetState(EState.TurnToWander);
@@ -2838,11 +3532,21 @@ public class Critter : UUObject
                     }
                 }
 
-                // Reset alert flag when hostile critter loses sight of player in Idle/Fidget state
-                if (attitude == EAttitude.Hostile && !DetectPlayer())
+                // An alerted creature turning toward what it heard, or a waiting one toward the player.
+                if (facingTalker)
                 {
-                    hasPlayedAlertForCurrentDetection = false;
+                    TurnTo(PlayerObject.Player.transform.position, wanderTurnSpeed, 5.0f);
                 }
+                else if (alertTurnYaw.HasValue)
+                {
+                    Quaternion facing = Quaternion.Euler(0.0f, alertTurnYaw.Value, 0.0f);
+                    transform.rotation = Quaternion.RotateTowards(transform.rotation, facing, wanderTurnSpeed * Time.deltaTime);
+                    if (Quaternion.Angle(transform.rotation, facing) < 1.0f)
+                    {
+                        alertTurnYaw = null;
+                    }
+                }
+
 
                 break;
             case EState.TurnToWander:
@@ -2856,18 +3560,14 @@ public class Critter : UUObject
                 TryCloseDoorIfTrapped();
                 // Interrupt wander if hostile and can see player (confused critters keep wandering erratically).
                 // Player allies without a target yet should keep wandering instead of snapping to Idle.
-                if (attitude == EAttitude.Hostile && DetectPlayer() && confusionTime <= 0.0f
-                    && !(playerAlly && attackTarget == null))
+                // A creature milling about because it found no way to the player keeps wandering.
+                if (attitude == EAttitude.Hostile && confusionTime <= 0.0f && !chaseBlocked && !returningHome
+                    && !(playerAlly && attackTarget == null) && IdleNoticesPlayer())
                 {
                     SetState(EState.Idle);
                     break;
                 }
 
-                // Reset alert flag when hostile critter loses sight of player in Wander state
-                if (attitude == EAttitude.Hostile && !DetectPlayer())
-                {
-                    hasPlayedAlertForCurrentDetection = false;
-                }
 
                 // Interrupt wander if theft was detected
                 if (theftDetectedTimer > 0.0f && confusionTime <= 0.0f)
@@ -2876,11 +3576,15 @@ public class Critter : UUObject
                     break;
                 }
 
-                AdvanceAnim(confusionTime > 0.0f ? 0.5f : 0.3f);
-                TurnTo(GetLookahead(0.5f), wanderTurnSpeed, 20.0f);
-                if (MoveAlongPath(confusionTime > 0.0f ? confusedSpeed : walkSpeed, 0.5f * cachedCharacterController.radius)
+                AdvanceAnim(confusionTime > 0.0f || returningHome ? 0.5f : 0.3f);
+                TurnTo(GetLookahead(0.5f), returningHome ? approachTurnSpeed : wanderTurnSpeed, 20.0f);
+                if (MoveAlongPath(returningHome ? runSpeed : confusionTime > 0.0f ? confusedSpeed : walkSpeed,
+                        0.5f * cachedCharacterController.radius)
                     || wallRubTime > 1.0f)
                 {
+                    // Home, or as near as the way allows: it may notice the player again.
+                    returningHome = false;
+
                     if (cachedAnimator != null
                         && cachedAnimator.HasState(0, Animator.StringToHash("Fidget"))
                         && Random.value < 0.5f)
@@ -2924,6 +3628,11 @@ public class Critter : UUObject
                 }
                 break;
             case EState.TurnToApproach:
+                // A chase that gives up, on its leash or when it loses the player (UW.EXE 0x19541, 0x19b0d).
+                if (ChaseGivesUp())
+                {
+                    break;
+                }
                 AdvanceAnim(0.5f);
                 if (TurnTo(GetLookahead(0.5f), approachTurnSpeed, 30.0f))
                 {
@@ -2932,6 +3641,11 @@ public class Critter : UUObject
                 break;
             case EState.Approach:
                 {
+                // A chase that gives up, on its leash or when it loses the player (UW.EXE 0x19541, 0x19b0d).
+                if (ChaseGivesUp())
+                {
+                    break;
+                }
                 TryCloseDoorIfTrapped();
                 AdvanceAnim(0.5f);
                 TurnTo(GetLookahead(0.5f), approachTurnSpeed, 30.0f);
@@ -2960,6 +3674,11 @@ public class Critter : UUObject
                 }
                 break;
             case EState.CombatIdle:
+                // A chase that gives up, on its leash or when it loses the player (UW.EXE 0x19541, 0x19b0d).
+                if (ChaseGivesUp())
+                {
+                    break;
+                }
                 TryCloseDoorIfTrapped();
                 UpdateFlyerCombatHeight();
                 if (UpdateCombatStep())
@@ -3033,6 +3752,11 @@ public class Critter : UUObject
                 break;
 
             case EState.ProjectileIdle:
+                // A chase that gives up, on its leash or when it loses the player (UW.EXE 0x19541, 0x19b0d).
+                if (ChaseGivesUp())
+                {
+                    break;
+                }
                 TurnTo(PlayerObject.Player.transform.position, projectileTurnSpeed, 30.0f);
 
                 stateTime -= Time.deltaTime;
@@ -3253,14 +3977,16 @@ public class Critter : UUObject
             return;
         }
 
-        if (attackTarget == null && !DetectPlayer())
+        if (attackTarget == null && !awareOfPlayer)
         {
             SetState(EState.Idle);
         }
         else
         {
             float distanceToTarget = GetDistanceToTarget();
-            if (distanceToTarget < meleeAttackRange + meleeAttackHysteresis)
+            // Not through a wall or a closed door: near enough is not enough, it has to reach. With
+            // creatures that hear the player through both, one behind a door swung at it.
+            if (distanceToTarget < meleeAttackRange + meleeAttackHysteresis && IsViewToTargetClear())
             {
                 SetState(EState.Attack);
             }
@@ -3453,7 +4179,7 @@ public class Critter : UUObject
 
                 openSet.Remove(cur);
                 cur.closedTag = sTag;
-                List<Tile> neighbs = GetValidNeighbours(cur, home, range, null);
+                List<Tile> neighbs = GetValidNeighbours(cur, home, pathRange, null);
                 foreach (Tile t in neighbs)
                 {
                     if (t.closedTag != sTag && t != lavaTarget)
@@ -3500,7 +4226,8 @@ public class Critter : UUObject
         return found;
     }
 
-    private void GetPath(out List<Vector3> vecPath, Vector3 start, Vector3 end, bool mayCrossLava = true)
+    /// <returns>Whether the path reaches the end's tile; when it does not, it leads to the nearest tile.</returns>
+    private bool GetPath(out List<Vector3> vecPath, Vector3 start, Vector3 end, bool mayCrossLava = true)
     {
         Tile source = LevelLoader.GetTile(Tile.GetTileX(start.x), Tile.GetTileY(start.z));
         Tile target = LevelLoader.GetTile(Tile.GetTileX(end.x), Tile.GetTileY(end.z));
@@ -3593,6 +4320,8 @@ public class Critter : UUObject
                 Debug.DrawLine(vecPath[i], vecPath[i + 1], Color.cyan, 5.0f);
             }
         }
+
+        return found;
     }
 
     /// <summary>How far above the floor a flyer's body passes over a tile's edge: a quarter of a metre, ours.</summary>
@@ -4002,7 +4731,7 @@ public class Critter : UUObject
             var next = new List<Tile>();
             foreach (Tile step in frontier)
             {
-                foreach (Tile t in GetValidNeighbours(step, home, range, null))
+                foreach (Tile t in GetValidNeighbours(step, home, pathRange, null))
                 {
                     if (seen.Add(t))
                     {
@@ -4456,8 +5185,25 @@ public class Critter : UUObject
             }
         }
 
+        // A blow tells where the player is (the seen bit, UW.EXE 0x1bc38), and one from more than a
+        // tile away that this creature cannot answer at range makes it chase with no leash (0x1bc73).
+        // On its way home after a chase at the edge of its reach it does not turn (RunHome()).
+        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
+        Vector2Int ownTile = TileOf(transform.position);
+        int fromX = playerTile.x - ownTile.x;
+        int fromY = playerTile.y - ownTile.y;
+        if (!returningHome)
+        {
+            awareOfPlayer = true;
+            chaseBlocked = false;
+            if (fromX * fromX + fromY * fromY > 2 && GetProjectileType() == 0)
+            {
+                provokedFromRange = true;
+            }
+        }
+
         bool flinching = false;
-        if (result == Skills.ESkillTestResult.CriticalSuccess && hp > 0)
+        if (result == Skills.ESkillTestResult.CriticalSuccess && hp > 0 && !returningHome)
         {
             if (cachedAnimator != null && cachedAnimator.HasState(0, Animator.StringToHash("Flinch")))
             {
@@ -4466,7 +5212,7 @@ public class Critter : UUObject
             }
         }
 
-        if (!flinching && state is EState.Wander or EState.TurnToWander or EState.Approach or EState.TurnToApproach)
+        if (!flinching && !returningHome && state is EState.Wander or EState.TurnToWander or EState.Approach or EState.TurnToApproach)
         {
             SetState(EState.Idle);
         }
@@ -5532,6 +6278,11 @@ public class Critter : UUObject
             critterData.stateTime = stateTime;
             critterData.playerAlly = playerAlly;
             critterData.path = path != null ? new List<Vector3>(path) : null;
+            critterData.awareOfPlayer = awareOfPlayer;
+            critterData.alertedByPlayer = alertedByPlayer;
+            critterData.provokedFromRange = provokedFromRange;
+            critterData.playerAway = playerAway;
+            critterData.playerLeftAt = playerLeftAt;
 
             // Save animator state - when in transition save target state so we don't persist the source (e.g. Idle during Idle->Walk)
             if (cachedAnimator != null)
@@ -5623,6 +6374,11 @@ public class Critter : UUObject
             stateTime = critterData.stateTime;
             playerAlly = critterData.playerAlly;
             path = critterData.path != null ? new List<Vector3>(critterData.path) : null;
+            awareOfPlayer = critterData.awareOfPlayer;
+            alertedByPlayer = critterData.alertedByPlayer;
+            provokedFromRange = critterData.provokedFromRange;
+            playerAway = critterData.playerAway;
+            playerLeftAt = critterData.playerLeftAt;
 
             // Store animator state for restoration in PostLoadInitialize
             savedAnimatorStateHash = critterData.animatorStateHash;

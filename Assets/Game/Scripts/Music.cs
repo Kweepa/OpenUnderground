@@ -68,15 +68,25 @@ public class Music : MonoBehaviour
 
     /// <summary>Seconds the warning music keeps playing after the last thing that called for it.</summary>
     /// <remarks>
-    /// Only the tail: the countdown is refreshed every frame the weapon is up and every frame a
-    /// hostile creature is still coming, so this is how long the music takes to notice that the
-    /// reason has gone. Settled by ear at six seconds, timed against the trace: long enough that
-    /// the warning reads as letting go rather than as a cut, short enough not to outstay the
-    /// danger.
+    /// Only the tail: the countdown is refreshed every frame the weapon is up, so this is how long
+    /// the music takes to notice that the reason has gone. Settled by ear at six seconds, timed
+    /// against the trace: long enough that the warning reads as letting go rather than as a cut,
+    /// short enough not to outstay the danger. A creature's tail is creatureAlertTail.
     /// </remarks>
     private const float alertDuration = 6.0f;
 
+    /// <summary>
+    /// The same tail when the reason was a creature rather than the raised weapon: two seconds, the
+    /// user's choice of 10 October 2026, since six outstayed a chase that had already ended.
+    /// </summary>
+    private const float creatureAlertTail = 2.0f;
+
     private float alertTime;
+
+    // When a creature last said it was still coming (AlertHeartbeat()): a fight that ends while one
+    // is goes back to the warning, not to the corridors.
+    private float lastAlertHeartbeat = -1.0f;
+
     private static Music sMusic;
     private float stateTime;
     private MusicPlayer musicPlayer;
@@ -208,7 +218,8 @@ public class Music : MonoBehaviour
             return;
         }
 
-        sMusic.alertTime = alertDuration;
+        // A longer tail the raised weapon left is kept; a stale one from an earlier warning is not.
+        sMusic.alertTime = sMusic.musicState == EMusicState.Alert ? Mathf.Max(sMusic.alertTime, creatureAlertTail) : creatureAlertTail;
 
         switch (sMusic.musicState)
         {
@@ -236,8 +247,27 @@ public class Music : MonoBehaviour
     {
         if (sMusic != null)
         {
-            sMusic.alertTime = alertDuration;
+            // A longer tail the raised weapon left is kept; a stale one from an earlier warning is not.
+            sMusic.alertTime = sMusic.musicState == EMusicState.Alert ? Mathf.Max(sMusic.alertTime, creatureAlertTail) : creatureAlertTail;
+            sMusic.lastAlertHeartbeat = Time.unscaledTime;
         }
+    }
+
+    /// <summary>
+    /// The music after a fight or its fanfare: the warning while a creature is still coming, else the
+    /// corridors.
+    /// </summary>
+    private void LeaveFight()
+    {
+        if (lastAlertHeartbeat >= 0.0f && Time.unscaledTime - lastAlertHeartbeat < 0.5f)
+        {
+            musicState = EMusicState.Alert;
+            alertTime = creatureAlertTail;
+            StartStateMusic(EMusicState.Alert);
+            return;
+        }
+
+        StartExploringMusic();
     }
 
     /// <summary>
@@ -762,7 +792,7 @@ public class Music : MonoBehaviour
             combatTime -= Time.unscaledDeltaTime;
             if (combatTime < 0.0f)
             {
-                StartExploringMusic();
+                LeaveFight();
             }
             break;
             
@@ -790,7 +820,7 @@ public class Music : MonoBehaviour
                 }
                 else
                 {
-                    StartExploringMusic();
+                    LeaveFight();
                 }
             }
             break;

@@ -128,7 +128,12 @@ a flyer of category 1. Anything new that asks how a creature moves should ask 0A
 player the game writes his Defense skill plus half the skill of the weapon in his hand into
 this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
 13h 	9 	Probability[3] 	Probabilities 	Each has the form (uint16 value, uint8 percent). What this means is unknown.
-1Ch 	12 	 ?? 	 ?? 	 ??
+1Ch 	1 	uint8 	TerritoryAndCourage 	High nibble the territory in tiles, low nibble the courage (UW.EXE 0x19541, 0x1c033).
+1Dh 	1 	uint8 	 ?? 	The creature's noise (low nibble) and visibility (high nibble) as a target of another creature's
+perception; for the player the game rewrites them every frame (UW.EXE 0x31458).
+1Eh 	1 	uint8 	 ?? 	Hearing (low nibble) and sight (high nibble), for perceiving a target (UW.EXE 0x1a99b).
+1Fh 	1 	uint8 	 ?? 	High nibble: the chance in 16 of trying to perceive at an idle tick (UW.EXE 0x19360).
+20h 	8 	 ?? 	 ?? 	 ??
 28h 	2 	uint16 	Experience: 	Experience provided when killed.
 2Ah 	5 	 ?? 	 ?? 	 ?? list of spells. Looks like 3 values?
 2Dh     Some sort of value (magic users related)
@@ -159,11 +164,30 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
         public int[] AttackDamage; // the damage value of the chosen attack.
         public int[] AttackProbability; // Probability of which attack/animation to execute
 
-        public byte DetectionRange;
+        // Byte 1Ch is two nibbles and the original never reads it whole: the high one is the
+        // creature's territory in tiles, 2 to 8, and the low one its courage (UW.EXE 0x1928f, 0x19541,
+        // 0x1c033, 0x1c0ba). It used to be read whole, as a detection radius and as the reach of a
+        // wander; nothing reads it whole now, and the courage is not used yet.
+        public byte TerritoryAndCourage;
         public byte unk1d;
         public byte unk1e;
         public byte TheftDetectionRange;
         public byte unk1f;
+
+        /// <summary>The territory in tiles, the high nibble of byte 1Ch (UW.EXE 0x1928f, 0x19541).</summary>
+        public int Territory => TerritoryAndCourage >> 4;
+
+        /// <summary>How well the creature hears, 0 to 15: the low nibble of byte 1Eh (UW.EXE 0x1a99b).</summary>
+        public int Hearing => unk1e & 15;
+
+        /// <summary>How well the creature sees, 0 to 15: the high nibble of byte 1Eh (UW.EXE 0x1a99b).</summary>
+        public int Sight => unk1e >> 4;
+
+        /// <summary>
+        /// The chance in 16 that an idle creature tries to perceive the player at a tick: the high nibble
+        /// of byte 1Fh (UW.EXE 0x19360).
+        /// </summary>
+        public int Alertness => unk1f >> 4;
 
         // The four loot slots at 0x20-0x25, which the original rolls in UW.EXE 0x83821 and 0x83942.
         public List<LootSlot> Loot;
@@ -294,7 +318,7 @@ this byte of his own row (UW.EXE 0x7e535 and 0x7e5f8); armour is not part of it.
                 critterStats[i].AttackProbability[j] = stream.GetByte();
             }
 
-            critterStats[i].DetectionRange = stream.GetByte();
+            critterStats[i].TerritoryAndCourage = stream.GetByte();
             critterStats[i].unk1d = stream.GetByte();
             critterStats[i].unk1e = stream.GetByte();
             critterStats[i].TheftDetectionRange = (byte)(critterStats[i].unk1e >> 4);

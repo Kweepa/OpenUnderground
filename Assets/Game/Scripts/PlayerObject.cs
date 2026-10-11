@@ -364,7 +364,188 @@ public class PlayerObject : MonoBehaviour
     private bool touchingWater;
     private bool touchingLava;
 
-    public float noise;
+    /// <summary>
+    /// How loud the player is, 0 to 15, as creatures hear him (Perception, Critter.PerceivePlayer()).
+    /// </summary>
+    /// <remarks>
+    /// The original keeps it in the low nibble of byte 0x1d of the player's critterStats row and sets
+    /// it every frame from how fast he moves, not from his footsteps (UW.EXE 0x31458): the base is
+    /// 13 - Sneak/3, the Sneak being 30 under Stealth here (SneakForNoise()); standing still
+    /// makes 0, moving makes the base plus 10 * speed / top speed - 5; and anything but plain ground -
+    /// water, lava, levitating or flying - adds 4, as do a blow just taken and drink. It rises at once and falls a step at a time. A melee
+    /// swing makes 15 (0x255ca) and the anvil 15 (0x748c4): see MakeNoise(). The original's melee charge
+    /// makes 10 and its launchers nothing; here the charge is silent and a whirling sling makes 10 and
+    /// every shot 15, ours.
+    /// The top speed here is the walking speed, the user's choice, and the ordinary walk counts as the
+    /// original's run on the keyboard, 28/32 of the top (0x30d9a): +3, and a sprint more.
+    /// </remarks>
+    public int NoiseLevel { get; private set; }
+
+    /// <summary>
+    /// How visible the player is, 0 to 15: 15 - Sneak/5, less 5 under Conceal and 0 under
+    /// Invisibility (UW.EXE 0x7dea4, 0x7e31d). The original gives light no part in it; here the light the
+    /// player carries or casts moves it, a torch leaving it as the original has it (PlayerLightLevel()):
+    /// the user's choice, 11 October 2026.
+    /// </summary>
+    public int Visibility { get; private set; }
+
+    /// <summary>
+    /// How long one step of the noise's fall lasts. The original takes eight frames for it (UW.EXE
+    /// 0x31458), and the original floppy game, captured at the speed of its day, draws 20 to 21 frames
+    /// a second, so 0.38 to 0.40 s; DOSBox at full speed draws 70, 0.11 s.
+    /// </summary>
+    private const float noiseFallStep = 0.4f;
+
+    private float noiseFallTime;
+
+    // The speed the movement asked for this frame, as a share of the walking speed, for the noise.
+    private float noiseSpeedFraction;
+
+    // How long the noise of a blow just taken lasts: the original keeps 5 frames per hit point
+    // (0x3172a(0x20, 5 * damage), from 0x24eca), here at the same 20 frames a second as noiseFallStep.
+    private float blowNoiseTime;
+
+    /// <summary>
+    /// Makes the player at least this loud now: the original's swing (15) and repair at the anvil (15),
+    /// and our sling whirl (10) and shot (15). The noise then falls from there as it
+    /// does from moving.
+    /// </summary>
+    public void MakeNoise(int level)
+    {
+        if (level > NoiseLevel)
+        {
+            NoiseLevel = Mathf.Min(level, 15);
+            noiseFallTime = noiseFallStep;
+        }
+    }
+
+    /// <summary>
+    /// The noise and the visibility for this frame (UW.EXE 0x31458), after the movement has set
+    /// <see cref="noiseSpeedFraction"/>.
+    /// </summary>
+    private void UpdateNoise(bool flying)
+    {
+        int sneak = Skills.GetSkill(ESkill.Sneak);
+        int noiseBase = 13 - SneakForNoise() / 3;
+        int n = 0;
+        if (noiseSpeedFraction > 0.01f)
+        {
+            n = noiseBase + Mathf.FloorToInt(10.0f * noiseSpeedFraction * 28.0f / 32.0f) - 5;
+        }
+
+        if (blowNoiseTime > 0.0f)
+        {
+            blowNoiseTime -= Time.deltaTime;
+        }
+
+        if (isInWater || touchingLava || flying || blowNoiseTime > 0.0f || PlayerData.sData.drunkenness > 0)
+        {
+            n += 4;
+        }
+
+        n = Mathf.Clamp(n, 0, 15);
+        if (n >= NoiseLevel)
+        {
+            NoiseLevel = n;
+            noiseFallTime = noiseFallStep;
+        }
+        else
+        {
+            noiseFallTime -= Time.deltaTime;
+            if (noiseFallTime <= 0.0f)
+            {
+                --NoiseLevel;
+                noiseFallTime += noiseFallStep;
+            }
+        }
+
+        int visibility = Mathf.Clamp(15 - sneak / 5 + lightVisibility[PlayerLightLevel()], 0, 15);
+        if (Magic.sMagic.IsSpellActive(Magic.ESpell.Invisibility))
+        {
+            visibility = 0;
+        }
+        else if (Magic.sMagic.IsSpellActive(Magic.ESpell.Conceal))
+        {
+            visibility = Mathf.Max(0, visibility - 5);
+        }
+        Visibility = visibility;
+    }
+
+    // The change to the visibility by the player's light level: none -6, candle -3, torch 0, taper and
+    // the Light spell +1, lantern +2, Daylight +3. Ours.
+    private static readonly int[] lightVisibility = { -6, -3, 0, 1, 2, 2, 3, 3 };
+
+    /// <summary>
+    /// The brightest light the player gives off, 0 to 6, on the original's scale: a lit light source he
+    /// holds, 1 to 4, the Light spell 3 and Daylight 6. Night Vision lights his eyes, not him, and does
+    /// not count.
+    /// </summary>
+    private static int PlayerLightLevel()
+    {
+        int level = 0;
+        if (Inventory.sInv == null)
+        {
+            return 2;
+        }
+
+        if (Inventory.sInv.invSlotContents[(int)EInvSlot.LeftShoulder] is LightSource left && left.IsLit())
+        {
+            level = Mathf.Max(level, left.Brightness);
+        }
+        if (Inventory.sInv.invSlotContents[(int)EInvSlot.RightShoulder] is LightSource right && right.IsLit())
+        {
+            level = Mathf.Max(level, right.Brightness);
+        }
+        foreach (LightSource light in Inventory.sInv.litLights)
+        {
+            level = Mathf.Max(level, light.Brightness);
+        }
+
+        if (Magic.sMagic.IsSpellActive(Magic.ESpell.Daylight))
+        {
+            level = Mathf.Max(level, 6);
+        }
+        else if (Magic.sMagic.IsSpellActive(Magic.ESpell.Light))
+        {
+            level = Mathf.Max(level, 3);
+        }
+
+        return Mathf.Clamp(level, 0, lightVisibility.Length - 1);
+    }
+
+    /// <summary>
+    /// The Sneak the noise, Critter.SneaksPastNearHearing() and the surprise blow go by: the skill, or 30
+    /// under Stealth. The original's Stealth takes the noise base to 0 (UW.EXE 0x7e31d), quieter than any
+    /// Sneak reaches; here it is a Sneak of 30, so it gives the roll and not silence: the user's choice,
+    /// 11 October 2026.
+    /// </summary>
+    public static int SneakForNoise()
+    {
+        int sneak = Skills.GetSkill(ESkill.Sneak);
+        return Magic.sMagic != null && Magic.sMagic.IsSpellActive(Magic.ESpell.Stealth) ? Mathf.Max(sneak, stealthSneak) : sneak;
+    }
+
+    private const int stealthSneak = 30;
+
+    /// <summary>
+    /// The slow walk, with Ctrl held on the keyboard: the original's S key, 12/32 of the top speed against
+    /// the 28/32 of its W (UW.EXE 0x30d9a), so every direction at 12/28 of its speed and never more than
+    /// that of the walking speed of the ground or the water. Forward the noise's speed term is -2, as there,
+    /// sideways -3 and back -4. Fix 327; Ctrl is the user's choice, 11 October 2026.
+    /// </summary>
+    private void LimitToSlowWalk(float moveSpeed)
+    {
+        cachedMoveDirection *= slowWalkFraction;
+        float limit = slowWalkFraction * (isInWater ? 0.5f * groundSpeed : groundSpeed);
+        float asked = cachedMoveDirection.magnitude * moveSpeed;
+        if (asked > limit)
+        {
+            cachedMoveDirection *= limit / asked;
+        }
+    }
+
+    // floor(10 * f * 28 / 32) - 5 is -2 at f = 12/28 (UpdateNoise()).
+    private const float slowWalkFraction = 12.0f / 28.0f;
 
     private void PlayFootstep(float volume)
     {
@@ -406,14 +587,9 @@ public class PlayerObject : MonoBehaviour
             lastFootstep = i;
 
             bool isStealthy = Magic.sMagic.IsSpellActive(Magic.ESpell.Stealth) || Magic.sMagic.IsSpellActive(Magic.ESpell.Invisibility);
-            Skills.ESkillTestResult result = Skills.GetResult(Skills.GetSkill(ESkill.Sneak), 10);
-            
-            Utils.PlayClip(steps[i], transform.position - Vector3.up, isStealthy ? 0.5f * volume : volume);
 
-            if (!isStealthy && result < Skills.ESkillTestResult.Success)
-            {
-                noise = Mathf.Max(noise, volume);
-            }
+            // The step only sounds: what creatures hear is NoiseLevel, made from the speed.
+            Utils.PlayClip(steps[i], transform.position - Vector3.up, isStealthy ? 0.5f * volume : volume);
         }
 
         if (touchingWater && Magic.sMagic.IsSpellActive(Magic.ESpell.WaterWalk))
@@ -742,8 +918,10 @@ public class PlayerObject : MonoBehaviour
         bool stickPressedGamepad = GameInput.CurrentGamepad?.leftStickButton.isPressed ?? false;
         bool shiftPressedKeyboard = GameInput.CurrentKeyboard?.leftShiftKey.isPressed ?? false;
         bool sprintModifierHeld = usingKeyboardMove ? shiftPressedKeyboard : stickPressedGamepad;
+        bool slowWalk = usingKeyboardMove && (GameInput.CurrentKeyboard?.ctrlKey.isPressed ?? false);
 
         bool wantsSprint = sprintModifierHeld
+                          && !slowWalk
                           && moveControl.y > sprintForwardThreshold
                           && stamina > 0f
                           && cachedCharacterController.isGrounded
@@ -779,10 +957,20 @@ public class PlayerObject : MonoBehaviour
             // left/right at 75%, backward at 50% of forward speed
             cachedMoveDirection = 0.75f * Utils.DeadZone(moveControl.x) * transform.right +
                                   (moveControl.y > 0.0f ? 1.0f : 0.5f) * Utils.DeadZone(moveControl.y) * transform.forward;
+
+            if (slowWalk)
+            {
+                LimitToSlowWalk(moveSpeed);
+            }
             
             UpdateJumpIndicator(moveControl, moveSpeed);
         }
         
+        // The speed asked for, against the walking speed of the ground or the water: what the noise is
+        // made from, like the original's DS:0x2794 against DS:0x2496.
+        Vector3 horizontal = new Vector3(cachedMoveDirection.x, 0.0f, cachedMoveDirection.z);
+        noiseSpeedFraction = horizontal.magnitude * moveSpeed / (isInWater ? 0.5f * groundSpeed : groundSpeed);
+
         float stepOffset = cachedCharacterController.stepOffset;
         Vector3 walk = KeepOutOfCreatures(cachedMoveDirection * (moveSpeed * Time.deltaTime), out float stepLimit);
         cachedCharacterController.stepOffset = Mathf.Min(stepOffset, stepLimit);
@@ -895,7 +1083,7 @@ public class PlayerObject : MonoBehaviour
                 // makes all day. Auto jump keeps its own trigger, and no longer needs the key:
                 // running at the edge of a gap fires the jump by itself.
                 if (IsJumpPressedSeparated()
-                    || (PlayerInput.AutoJump && ShouldAutoJump(moveControl, moveSpeed)))
+                    || (PlayerInput.AutoJump && !slowWalk && ShouldAutoJump(moveControl, moveSpeed)))
                 {
                     jumped = true;
                 }
@@ -1084,6 +1272,10 @@ public class PlayerObject : MonoBehaviour
         cachedCharacterController.Move(flightVelocity * (groundSpeed * Time.deltaTime));
 
         cachedMoveDirection = flightVelocity;
+
+        // Against the top of the flight, which Levitate cuts to a fifth.
+        Vector3 horizontal = new Vector3(flightVelocity.x, 0.0f, flightVelocity.z);
+        noiseSpeedFraction = horizontal.magnitude / (Magic.sMagic.IsSpellActive(Magic.ESpell.Fly) ? 1.0f : 0.2f);
     }
     
     private Vector3 CalculateLeapUpVelocity(Vector3 startPoint, Vector3 targetPoint, float maxApex)
@@ -1142,8 +1334,6 @@ public class PlayerObject : MonoBehaviour
         
         // Establish which device is currently driving controls (used to keep gamepad vs kb/m siloed).
         GameInput.RefreshLastActiveDevice();
-
-        noise = Mathf.MoveTowards(noise, 0.0f, Time.deltaTime);
 
         if (PlayerData.sData.dead)
         {
@@ -1308,6 +1498,8 @@ public class PlayerObject : MonoBehaviour
             {
                 NormalMovement();
             }
+
+            UpdateNoise(flying && remainingCarryWeight >= 0);
 
             GameObject cam = gameObject.transform.GetChild(0).gameObject;
 
@@ -1721,6 +1913,9 @@ public class PlayerObject : MonoBehaviour
             if (shake)
             {
                 Rumble(0.1f, 0.2f, 0.3f);
+
+                // A blow makes the player louder for a while (UW.EXE 0x24eca).
+                blowNoiseTime = Mathf.Max(blowNoiseTime, 0.25f * damage);
             }
 
             if (grunt)
@@ -1804,7 +1999,10 @@ public class PlayerObject : MonoBehaviour
         timeToNextWaterDamage = 0.0f;
         timeToNextLavaDamage = 0.0f;
         poisonClock.Reset();
-        noise = 0.0f;
+        NoiseLevel = 0;
+        noiseFallTime = 0.0f;
+        noiseSpeedFraction = 0.0f;
+        blowNoiseTime = 0.0f;
     }
 
     public void TeleportTo(Vector3 pos, Quaternion rot)

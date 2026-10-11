@@ -2005,6 +2005,48 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Casting Night Vision puts out the player's lights: the light sources he holds or is trying in the
+    /// inventory, and the Light and Daylight spells running, so the spell is a way to go dark and be
+    /// seen less (PlayerObject.Visibility). A light worn as an enchantment stays. Ours, the user's choice
+    /// of 11 October 2026; the original leaves the lights alone.
+    /// </summary>
+    private void PutOutLightsForNightVision()
+    {
+        bool putOut = false;
+        for (int j = activeSpells.Count - 1; j >= 0; --j)
+        {
+            if ((ESpell)activeSpells[j].spell is ESpell.Light or ESpell.Daylight)
+            {
+                RemoveSpell(j);
+                putOut = true;
+            }
+        }
+
+        if (Inventory.sInv != null)
+        {
+            foreach (EInvSlot slot in new[] { EInvSlot.LeftShoulder, EInvSlot.RightShoulder })
+            {
+                if (Inventory.sInv.invSlotContents[(int)slot] is LightSource light && light.IsLit())
+                {
+                    light.SetLit(false);
+                    putOut = true;
+                }
+            }
+
+            for (int j = Inventory.sInv.litLights.Count - 1; j >= 0; --j)
+            {
+                Inventory.sInv.litLights[j].SetLit(false);
+                putOut = true;
+            }
+        }
+
+        if (putOut)
+        {
+            Messages.Add("Your lights go out.");
+        }
+    }
+
     public bool TryCast(int i, bool anonymous = false)
     {
         // level / char level
@@ -2028,6 +2070,10 @@ public class Magic : MonoBehaviour
                 activeSpells.Remove(running);
                 activeSpells.Add(running);
                 PlayCastSound(i);
+                if (i == (int)ESpell.NightVision)
+                {
+                    PutOutLightsForNightVision();
+                }
                 return true;
             }
 
@@ -2093,6 +2139,8 @@ public class Magic : MonoBehaviour
                         colorGrading.enabled.Override(true);
                     }
                 }
+
+                PutOutLightsForNightVision();
             }
             else if (spells[activeSpell.spell].runes == "OPW") // roaming sight
             {
