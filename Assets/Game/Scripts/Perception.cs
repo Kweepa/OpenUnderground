@@ -38,6 +38,16 @@ public static class Perception
     public const int MaxTiles = 10;
 
     /// <summary>
+    /// Whether a creature dx, dy tiles from the player thinks at all: the original's do not when
+    /// d² > 100 on whole tiles (UW.EXE 0x1b138), a circle of ten tiles. Its line of sight, ten steps
+    /// along the major axis, reaches no farther, so this bounds the sight too.
+    /// </summary>
+    public static bool WithinThinkingRange(int dx, int dy)
+    {
+        return dx * dx + dy * dy <= MaxTiles * MaxTiles;
+    }
+
+    /// <summary>
     /// The octant of a tile delta, 0 to 7: 0 is +y, the remake's +z, and the numbers go clockwise as
     /// seen from above, +x being 2. The boundaries are the lines y = 2x, x = 2y and their mirrors, so
     /// the four axis octants are 53.1 degrees wide and the four diagonal ones 36.9 (UW.EXE 0x18302). A

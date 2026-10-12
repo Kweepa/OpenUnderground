@@ -236,6 +236,7 @@ public class Projectile : UUObject
                 critter.TryDamage(damage, Skills.ESkillTestResult.Success, mask);
                 if (playersMissile)
                 {
+                    critter.StruckByPlayer();
                     PlayerObject.Player.SetLastEngagedInCombat(critter);
                 }
             }
@@ -372,6 +373,10 @@ public class Projectile : UUObject
                         // it gets there (0x25988), so a creature's armour soaks an arrow too.
                         damage = critter.AbsorbWithArmour(damage, transform.position.y);
                         critter.TryDamage(damage, Skills.ESkillTestResult.Success, mask);
+                        if (projectileOwner == PlayerObject.Player.gameObject)
+                        {
+                            critter.StruckByPlayer();
+                        }
                         PlayerObject.Player.SetLastEngagedInCombat(critter);
                     }
                     else if (projectileOwner == PlayerObject.Player.gameObject)

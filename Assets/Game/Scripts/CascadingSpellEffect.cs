@@ -262,6 +262,10 @@ public class CascadingSpellEffect : LevelObject
                 {
                     hitList.Add(critter);
                     critter.TryDamage(Random.Range(minDamage, maxDamage), Skills.ESkillTestResult.Success, DamageMask);
+                    if (owner == PlayerObject.Player)
+                    {
+                        critter.StruckByPlayer();
+                    }
                 }
             }
         }

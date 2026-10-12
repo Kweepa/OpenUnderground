@@ -487,6 +487,24 @@ public class Critter : UUObject
     // in the original too (0x8418f).
     public bool lootAlreadyMade;
 
+    // Bit 7 of critterData[2], byte 0x0a of the original's record: a creature with it set neither
+    // raises the pack alarm when struck nor answers one (UW.EXE 0x1c383, 0x1ba43). Nothing in UW.EXE
+    // sets it, and the creature initializer 0x7010e clears it on a creature made from nothing, so it
+    // is level data: 149 of the 595 creatures a player can reach have it, 122 of them hostile from the
+    // start, spread over every type and every level but the last. Read and kept, but obeyed only
+    // while honourDeafToPackAlarm is on.
+    public bool deafToPackAlarm;
+
+    // Off: every creature takes part in the pack alarm, the user's choice of 12 October 2026. What the
+    // designers meant by the bit is not known, and as data it looks arbitrary - two goblins of one camp
+    // can differ by it - so it is not obeyed until a reason turns up. Turn it on to have the original's
+    // rule whole: a marked creature then sounds no alarm when struck, and stays put, neither turned
+    // hostile nor told where the player is, when its kin are.
+    private const bool honourDeafToPackAlarm = false;
+
+    // Whether this creature is out of the pack alarm both ways (see deafToPackAlarm).
+    private bool OutOfPackAlarm => honourDeafToPackAlarm && deafToPackAlarm;
+
     public float walkSpeed = 1.0f;
     public float confusedSpeed = 2.0f;
     public float runSpeed = 3.0f;
@@ -556,12 +574,18 @@ public class Critter : UUObject
         return critterData != null && (critterData[6] & (1 << 4)) != 0;
     }
 
+    /// <summary>Bit 7 of critterData[2]: see <see cref="deafToPackAlarm"/>.</summary>
+    private static bool IsDeafToPackAlarmInData(byte[] critterData)
+    {
+        return critterData != null && (critterData[2] & 0x80) != 0;
+    }
+
     /// <summary>
-    /// Reads the two markers, <see cref="elite"/> and <see cref="lootAlreadyMade"/>, back from the
-    /// level rather than trusting the save. They are static data, and a save written before a
-    /// marker existed answers false for every creature already on a level the player had visited -
-    /// which would leave it dead for anyone carrying on an old game. Creatures with no level of
-    /// origin, summoned ones, keep what they were given.
+    /// Reads the three markers, <see cref="elite"/>, <see cref="lootAlreadyMade"/> and
+    /// <see cref="deafToPackAlarm"/>, back from the level rather than trusting the save. They are
+    /// static data, and a save written before a marker existed answers false for every creature
+    /// already on a level the player had visited - which would leave it dead for anyone carrying on
+    /// an old game. Creatures with no level of origin, summoned ones, keep what they were given.
     /// </summary>
     private void RefreshMarkersFromLevel()
     {
@@ -575,6 +599,7 @@ public class Critter : UUObject
         {
             elite = IsEliteInData(fromLevel);
             lootAlreadyMade = IsLootMadeInData(fromLevel);
+            deafToPackAlarm = IsDeafToPackAlarmInData(fromLevel);
         }
     }
 
@@ -601,6 +626,7 @@ public class Critter : UUObject
             whoami = (EWhoAmI)critterData[18];
             elite = IsEliteInData(critterData);
             lootAlreadyMade = IsLootMadeInData(critterData);
+            deafToPackAlarm = IsDeafToPackAlarmInData(critterData);
 
             movementType = GetMovementTypeFromData();
         }
@@ -2157,7 +2183,6 @@ public class Critter : UUObject
             ChangeAnimation("CombatIdle");
             combatStepTime = 0.0f;
             combatStepDecisionTime = 0.0f;
-            NotifyRaceOfAttack();
             PlayerObject.Player.RegisterEncounteredCritter(type, levelIndex, objectIndex, originalHp);
             break;
         case EState.CombatTurn:
@@ -2567,7 +2592,7 @@ public class Critter : UUObject
         Vector2Int ownTile = TileOf(transform.position);
         int dx = playerTile.x - ownTile.x;
         int dy = playerTile.y - ownTile.y;
-        if (Mathf.Abs(dx) > Perception.MaxTiles || Mathf.Abs(dy) > Perception.MaxTiles)
+        if (!Perception.WithinThinkingRange(dx, dy))
         {
             // The original does not think at all this far from the player: nothing changes.
             return Perception.EResult.Lost;
@@ -3296,6 +3321,7 @@ public class Critter : UUObject
             }
 
             AdvancePerceptionClock();
+            HearPackAlarm();
 
             // A creature milling about after a failed search tries again one tick in eight, whatever
             // it is doing then (UW.EXE 0x18441): asked only while idle, the wander between almost
@@ -5106,26 +5132,108 @@ public class Critter : UUObject
         return hp > 0;
     }
 
-    private void NotifyRaceOfAttack()
+    // The pack alarm (UW.EXE 0x1c2d2, 0x1b8fa): the last creature the player struck, the attitude that
+    // left it in, its race, its tile and level, and when, by PlayerData.gameTime. A level of -1 is no
+    // alarm.
+    private static Critter alarmStruck;
+    private static EAttitude alarmAttitude;
+    private static int alarmRace;
+    private static Vector2Int alarmTile;
+    private static int alarmLevel = -1;
+    private static double alarmTime;
+
+    // How long the alarm is heard: 0x200 units of the clock, 2 seconds of game time (UW.EXE 0x1ba71).
+    private const double packAlarmSeconds = 2.0;
+
+    /// <summary>
+    /// Forgets the pack alarm. Called on entering a level, as the original does (UW.EXE 0x71713), and
+    /// before a save is loaded: kept across a load, an alarm sounded later in the game it replaced would
+    /// come back once the loaded game's clock reached it, and turn creatures on a player who did nothing.
+    /// </summary>
+    public static void ClearPackAlarm()
     {
-        // max distance is < 4 tiles
+        alarmLevel = -1;
+        alarmStruck = null;
+    }
 
-        int numOverlaps = Physics.OverlapSphereNonAlloc(transform.position, 4.0f * xzScale,
-            sphereOverlapCache, 1 << LayerMask.NameToLayer("Characters"));
-
-        for (int i = 0; i < numOverlaps; ++i)
+    /// <summary>
+    /// The player has struck this creature, with a blow, a missile or a spell, or swung at it and missed:
+    /// for two seconds those of its race around it answer (HearPackAlarm()), at the attitude the attack
+    /// left it in. The original records the fight when the attacker is the player and the blow lands
+    /// (UW.EXE 0x1c2d2); whether its spells count as his is not determined. Called after TryDamage().
+    /// </summary>
+    public void StruckByPlayer()
+    {
+        if (OutOfPackAlarm)
         {
-            Collider col = sphereOverlapCache[i];
-            if (col is CharacterController)
-            {
-                Critter critter = col.transform.root.GetComponent<Critter>();
-
-                if (critter.race == race && critter != this)
-                {
-                    critter.attitude = (EAttitude)Mathf.Max(0, (int)(critter.attitude - 1));
-                }
-            }
+            return;
         }
+
+        alarmStruck = this;
+        alarmAttitude = attitude;
+        alarmRace = race;
+        alarmTile = TileOf(transform.position);
+        alarmLevel = LevelLoader.sLevelLoader.loadedLevel;
+        alarmTime = PlayerData.sData.gameTime;
+    }
+
+    /// <summary>
+    /// The pack alarm, at a perception tick (UW.EXE 0x1b8fa): within two seconds of the player striking
+    /// a creature of its race, a creature nearer that one's tile than its alarm radius, in Manhattan
+    /// tiles, turns hostile and knows where he is, so it comes for him. The radius is the low nibble of
+    /// critterStats byte 0x1e, the hearing: 4 for a rotworm, 9 for a goblin, 14 for a cave bat. When the
+    /// attack or the taunt left the one struck short of hostile (TakeOffence(), Taunted()), those it
+    /// reaches only come down to its attitude: the user's rule, 12 October 2026.
+    /// </summary>
+    private void HearPackAlarm()
+    {
+        if (!perceptionTick || alarmLevel != LevelLoader.sLevelLoader.loadedLevel
+            || ReferenceEquals(alarmStruck, this) || race != alarmRace)
+        {
+            return;
+        }
+
+        double since = PlayerData.sData.gameTime - alarmTime;
+        if (since < 0.0 || since > packAlarmSeconds)
+        {
+            return;
+        }
+
+        // Bit 1 of byte 0x0a of its row: no reactions at all, the wisp's. A player ally answers through
+        // PlayerObject.SetLastEngagedInCombat(), and one on its way home takes no notice of the player.
+        if ((stats.Passive & 2) != 0 || OutOfPackAlarm || playerAlly || returningHome)
+        {
+            return;
+        }
+
+        Vector2Int ownTile = TileOf(transform.position);
+        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
+        if (!Perception.WithinThinkingRange(playerTile.x - ownTile.x, playerTile.y - ownTile.y))
+        {
+            return;
+        }
+
+        if (Mathf.Abs(ownTile.x - alarmTile.x) + Mathf.Abs(ownTile.y - alarmTile.y) >= stats.Hearing)
+        {
+            return;
+        }
+
+        // Short of hostile, those it reaches come down to the struck one's attitude and never go up: a
+        // mellow creature upset leaves its hostile kin hostile, a friendly one made mellow its upset kin
+        // upset. The user's rule, 12 October 2026.
+        if (alarmAttitude != EAttitude.Hostile)
+        {
+            if (attitude > alarmAttitude)
+            {
+                attitude = alarmAttitude;
+            }
+            return;
+        }
+
+        // Hostile at once with the seen bit. The original also sends it to the fight's tile with goal
+        // 5, whose chase then heads for the player's own tile; here the seen bit starts that chase.
+        attitude = EAttitude.Hostile;
+        awareOfPlayer = true;
     }
 
     // Where the player's blow about to be spent landed, for the blood; see MarkNextBlow().
@@ -5174,16 +5282,7 @@ public class Critter : UUObject
         nextBlowSplat = null;
         nextBlowTint = null;
 
-        // make more hostile
-        if (attitude > 0)
-        {
-            --attitude;
-
-            if (attitude == EAttitude.Hostile)
-            {
-                PlayAlertSound();
-            }
-        }
+        TakeOffence(damage);
 
         // A blow tells where the player is (the seen bit, UW.EXE 0x1bc38), and one from more than a
         // tile away that this creature cannot answer at range makes it chase with no leash (0x1bc73).
@@ -5225,7 +5324,6 @@ public class Critter : UUObject
             {
                 Music.InCombat(this);
             }
-            NotifyRaceOfAttack();
 
             // maybe flee
             if (result == Skills.ESkillTestResult.CriticalSuccess
@@ -5257,7 +5355,13 @@ public class Critter : UUObject
         damagedTimer += 5.0f;
     }
 
-    public void ReactToMissedAttack()
+    /// <summary>
+    /// A swing at the creature that did it no harm, a miss or a blow its armour took whole. Facing the
+    /// player, it notices; and when the swing gives offence it is taken as a scratch (TakeOffence())
+    /// and sounds the pack alarm at the attitude it leaves. WeaponBase.Attack() decides which misses
+    /// give offence; a harmless blow has given its own in TryDamage().
+    /// </summary>
+    public void ReactToMissedAttack(bool offends)
     {
         // Check if facing player
         Vector3 playerPos = PlayerObject.Player.transform.position;
@@ -5266,17 +5370,116 @@ public class Critter : UUObject
 
         if (dot > 0.0f) // Facing player
         {
-            // Make more hostile
-            if (attitude > 0)
+            if (offends)
             {
-                --attitude;
+                TakeOffence(0);
                 if (attitude == EAttitude.Hostile)
                 {
-                    PlayAlertSound();
                     Music.InCombat(this);
                 }
+                StruckByPlayer();
             }
             damagedTimer += 2.0f; // Shorter than actual damage
+        }
+    }
+
+    // How near, in front of the player, a charged swing at nothing taunts a creature: two tiles, and
+    // within 45 degrees of where he looks. The cache is for TauntInFront().
+    private const float tauntTiles = 2.0f;
+    private const float tauntHalfAngle = 45.0f;
+    private static readonly Collider[] tauntOverlapCache = new Collider[16];
+
+    /// <summary>
+    /// A charged swing at nothing, the cursor at least red, taunts every creature in front of the
+    /// player within two tiles that he can see and that faces him (Taunted()). Ours, the user's rule of
+    /// 12 October 2026: the original has no such thing.
+    /// </summary>
+    public static void TauntInFront()
+    {
+        PlayerObject player = PlayerObject.Player;
+        Vector3 eye = player.mainCamera!.transform.position;
+        Vector3 look = player.mainCamera.transform.forward;
+        look.y = 0.0f;
+        if (look.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+        look.Normalize();
+
+        float reach = tauntTiles * Tile.xzScale;
+        float minDot = Mathf.Cos(tauntHalfAngle * Mathf.Deg2Rad);
+        int count = Physics.OverlapSphereNonAlloc(player.transform.position, reach, tauntOverlapCache,
+            1 << LayerMask.NameToLayer("Characters"));
+        for (int i = 0; i < count; i++)
+        {
+            if (tauntOverlapCache[i] is not CharacterController cc)
+            {
+                continue;
+            }
+
+            Critter critter = cc.transform.root.GetComponent<Critter>();
+            if (critter == null)
+            {
+                continue;
+            }
+
+            Vector3 apart = critter.transform.position - player.transform.position;
+            apart.y = 0.0f;
+            if (apart.magnitude > reach || apart.sqrMagnitude < 0.0001f
+                || Vector3.Dot(look, apart.normalized) < minDot
+                || Vector3.Dot(critter.transform.forward, -apart.normalized) <= 0.0f)
+            {
+                continue;
+            }
+
+            Vector3 centre = cc.transform.TransformPoint(cc.center);
+            Vector3 ray = centre - eye;
+            if (Physics.Raycast(eye, ray, ray.magnitude, LayerMasks.EnvironmentAndCeiling))
+            {
+                continue;
+            }
+
+            critter.Taunted();
+        }
+    }
+
+    /// <summary>
+    /// The creature has seen the player swing at it with nothing to hit: one step down in attitude, so
+    /// that taunting it long enough makes it hostile, and the pack alarm at the attitude it is left in,
+    /// so its kin around it go the same way. A hostile creature has nothing left to lose.
+    /// </summary>
+    private void Taunted()
+    {
+        if (attitude == EAttitude.Hostile || hp <= 0 || playerAlly)
+        {
+            return;
+        }
+
+        --attitude;
+        if (attitude == EAttitude.Hostile)
+        {
+            PlayAlertSound();
+        }
+        StruckByPlayer();
+    }
+
+    /// <summary>
+    /// Kweepa's two steps, so that a stray swing does not turn a whole camp: a scratch, under a fifth
+    /// of the creature's full hit points, upsets it, and a second scratch on an upset creature or a
+    /// real blow makes it hostile. The user's rule, 12 October 2026; the original makes it hostile at
+    /// the first blow, in the retaliation of UW.EXE 0x1b8fa.
+    /// </summary>
+    private void TakeOffence(int damage)
+    {
+        if (attitude == EAttitude.Hostile)
+        {
+            return;
+        }
+
+        attitude = damage * 5 < originalHp && attitude > EAttitude.Upset ? EAttitude.Upset : EAttitude.Hostile;
+        if (attitude == EAttitude.Hostile)
+        {
+            PlayAlertSound();
         }
     }
 

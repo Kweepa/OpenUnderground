@@ -2768,6 +2768,7 @@ public class Magic : MonoBehaviour
                     && critter.attitude == Critter.EAttitude.Hostile && critter.type != EObjectType.SlasherOfVeils)
                 {
                     critter.TryDamage(5, Skills.ESkillTestResult.Success);
+                    critter.StruckByPlayer();
                     critter.CreateFear();
                 }
             }
@@ -3027,6 +3028,7 @@ public class Magic : MonoBehaviour
             target.MarkNextSplat(EParticleType.PoisonSplat, PoisonSplatTint);
             target.TryDamage(Utils.DiceRoll(PoisonDieFaces, PoisonDice), Skills.ESkillTestResult.Success,
                 Resistance.Poison | Resistance.Magic);
+            target.StruckByPlayer();
             PlayerObject.Player.SetLastEngagedInCombat(target);
         }
     }
@@ -3125,6 +3127,7 @@ public class Magic : MonoBehaviour
                 if (critter != null && critter.IsDamageable() && (critter.resistances & Resistance.Undead) != 0)
                 {
                     critter.TryDamage(SmiteUndeadDamage, Skills.ESkillTestResult.Success, Resistance.Magic);
+                    critter.StruckByPlayer();
                 }
             }
         }

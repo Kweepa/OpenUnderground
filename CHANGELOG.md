@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Striking a creature alerts the others of its kind around it, as in the original: they react at once, some creatures from as far as 9 tiles away. A mere scratch or a charged swing that misses only upsets the creature and its kin, so a stray swing does not turn a whole camp; strike again and they turn on you. Swinging at the air in front of a creature taunts it, and enough of it will start a fight.
+
 - Right-clicking on the map only erases the note under the pointer: it no longer raises your weapon behind the map and starts the warning music.
 
 - Eating a mushroom shows its hallucination, and drinking blurs your sight, as they were meant to: neither showed outside the Unity editor.
