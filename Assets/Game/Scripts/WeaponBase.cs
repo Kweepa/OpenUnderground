@@ -916,7 +916,12 @@ public class WeaponBase : UUObject
             case Skills.ESkillTestResult.Failure:
                 if (obj is Critter critterMiss)
                 {
-                    critterMiss.ReactToMissedAttack();
+                    // A miss gives offence only when it was meant: charged, the cursor at least red, and
+                    // within two tiles of the creature. A click that only lifts the weapon swings it too, and
+                    // turned a friendly camp. The user's rule, 12 October 2026.
+                    Vector3 apart = critterMiss.transform.position - PlayerObject.Player.transform.position;
+                    apart.y = 0.0f;
+                    critterMiss.ReactToMissedAttack(offends: GetChargePercent() > 0 && apart.magnitude <= 2.0f * Tile.xzScale);
                 }
                 break;
             case Skills.ESkillTestResult.Success:
@@ -969,12 +974,13 @@ public class WeaponBase : UUObject
                 
                     if (critter != null)
                     {
+                        critter.StruckByPlayer();
                         PlayerObject.Player.SetLastEngagedInCombat(critter);
                         
                         // If attack succeeded but did zero damage, ensure enemy reacts if facing player
                         if (damage == 0)
                         {
-                            critter.ReactToMissedAttack();
+                            critter.ReactToMissedAttack(offends: false);
                         }
                     }
                 }
@@ -994,6 +1000,12 @@ public class WeaponBase : UUObject
         }
         else
         {
+            // A charged swing at nothing taunts the creatures in front.
+            if (GetChargePercent() > 0)
+            {
+                Critter.TauntInFront();
+            }
+
             // Check for wall hit when no damageable object is found
             Vector3 cameraPos = PlayerObject.Player.mainCamera.transform.position;
             Vector3 forward = PlayerObject.Player.mainCamera.transform.forward;

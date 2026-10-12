@@ -570,6 +570,9 @@ public class LevelLoader : MonoBehaviour
 
     public void LoadLevel(int level)
     {
+        // Entering a level forgets the pack alarm (UW.EXE 0x71713).
+        Critter.ClearPackAlarm();
+
         // Check if level was already loaded before calling LoadLevelGeometry
         bool wasAlreadyLoaded = (levels[level] != null);
 
@@ -610,6 +613,8 @@ public class LevelLoader : MonoBehaviour
     /// </summary>
     public void PrepareForSaveLoad()
     {
+        Critter.ClearPackAlarm();
+
         for (int i = 0; i < levels.Length; i++)
         {
             if (levels[i] == null)
