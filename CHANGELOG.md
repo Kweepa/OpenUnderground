@@ -2,6 +2,10 @@
 
 ## Current release
 
+- Creatures run from a fight as in the original, by their courage and their wounds: mages and goblins break and flee, skeletons and golems fight on unless one blow takes half their life, and one you shoot from afar charges you instead. A creature that has fled keeps away from you, fights back when cornered, and calms down once it can no longer see or hear you.
+
+- A creature that a light blow only upset no longer starts a fight after flinching from it.
+
 - Striking a creature alerts the others of its kind around it, as in the original: they react at once, some creatures from as far as 9 tiles away. A mere scratch or a charged swing that misses only upsets the creature and its kin, so a stray swing does not turn a whole camp; strike again and they turn on you. Swinging at the air in front of a creature taunts it, and enough of it will start a fight.
 
 - Right-clicking on the map only erases the note under the pointer: it no longer raises your weapon behind the map and starts the warning music.

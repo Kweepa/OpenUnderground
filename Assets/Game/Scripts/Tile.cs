@@ -15,6 +15,12 @@ public class Tile
    public int x;
    public int y;
 
+   /// <summary>
+   /// Bit 14 of the tile's word, the low bit of doorFrob: magic is forbidden here (UW.EXE 0x343a4). Only
+   /// the creatures read it so far, for whether one can answer a blow from afar (Critter.Retaliate()).
+   /// </summary>
+   public bool NoMagic => (doorFrob & 1) != 0;
+
    // for path finding, so transient
    public float g; // known cost to tile
    public float h; // heuristic to goal
