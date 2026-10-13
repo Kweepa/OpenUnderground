@@ -3417,6 +3417,10 @@ public class Critter : UUObject
             case EState.Idle:
             case EState.Fidget:
                 TryCloseDoorIfTrapped();
+                // CheckIdleToCombat() is a perception roll on a tick, so it is asked once a frame and the
+                // answer kept for the branch after: asked twice, a creature that failed to notice the
+                // player rolled again, and noticed him up to twice as often (UW.EXE 0x19360).
+                bool toCombat = false;
                 if (isTwilightZone)
                 {
                     // just idle
@@ -3432,7 +3436,7 @@ public class Critter : UUObject
                     // Interrupted on the way home: on again.
                     RunHome();
                 }
-                else if ((attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5) && CheckIdleToCombat()
+                else if ((attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5) && (toCombat = CheckIdleToCombat())
                          && attackTarget == null && chaseBlocked)
                 {
                     // No way to the player: mill about until the retry in Update() (UW.EXE 0x18441).
@@ -3442,7 +3446,7 @@ public class Critter : UUObject
                         SetState(EState.TurnToWander);
                     }
                 }
-                else if ((attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5) && CheckIdleToCombat())
+                else if (toCombat)
                 {
                     // Play alert sound if this is the first time detecting the player while hostile in this detection session
                     if (attackTarget == null && attitude == EAttitude.Hostile && !hasPlayedAlertForCurrentDetection)
