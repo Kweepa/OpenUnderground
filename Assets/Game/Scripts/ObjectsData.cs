@@ -113,7 +113,7 @@ Mask 0xF0 is the remains; Nothing = 0x00, RotwormCorpse = 0x20, Rubble = 0x40, W
 Its bits are how the original decides how a creature moves: bit 7 flies and bit 6 swims, each on a movement record
 of its own, and anything else walks (UW.EXE 0x1b270-0x1b2b0). Bit 5 lets a walker jump a tile in the path search
 (0x16196).
-0Bh 	1 	uint8 	WalkSpeed 	The speed a creature wanders at (UW.EXE 0x18cb1) and chases at from afar (0x1a0aa).
+0Bh 	1 	uint8 	WalkSpeed 	The speed a creature wanders at (UW.EXE 0x18cb1) and flees at from afar (0x1a0aa).
 0Ch 	1 	uint8 	MovementSpeed 	Speed of movement; 0 is immobile, maxes out at 12 for vampire bat.
 0Dh 	2 	 ?? 	 ?? 	 ??
 0Fh 	1 	uint8 	PoisonDamage 	Amount of poison damage this is capable of on attack.
@@ -136,7 +136,8 @@ perception; for the player the game rewrites them every frame (UW.EXE 0x31458).
 20h 	8 	 ?? 	 ?? 	 ??
 28h 	2 	uint16 	Experience: 	Experience provided when killed.
 2Ah 	5 	 ?? 	 ?? 	 ?? list of spells. Looks like 3 values?
-2Dh     Some sort of value (magic users related)
+2Dh     Bit 0: the creature can answer at range, so a blow from afar does not provoke it and it takes the morale
+roll even there (UW.EXE 0x1b8fa); bits 1-7: its chance of a spell (0x19ca2, 0x19d4f).
 2Fh 	1 	uint8 	 ?? 	Always 73.
 */
         public int[] Armour; // per body part, see EBodyPart
@@ -167,7 +168,7 @@ perception; for the player the game rewrites them every frame (UW.EXE 0x31458).
         // Byte 1Ch is two nibbles and the original never reads it whole: the high one is the
         // creature's territory in tiles, 2 to 8, and the low one its courage (UW.EXE 0x1928f, 0x19541,
         // 0x1c033, 0x1c0ba). It used to be read whole, as a detection radius and as the reach of a
-        // wander; nothing reads it whole now, and the courage is not used yet.
+        // wander; nothing reads it whole now. The courage decides when a creature flees (Morale).
         public byte TerritoryAndCourage;
         public byte unk1d;
         public byte unk1e;
@@ -176,6 +177,16 @@ perception; for the player the game rewrites them every frame (UW.EXE 0x31458).
 
         /// <summary>The territory in tiles, the high nibble of byte 1Ch (UW.EXE 0x1928f, 0x19541).</summary>
         public int Territory => TerritoryAndCourage >> 4;
+
+        /// <summary>The courage, 0 to 15, the low nibble of byte 1Ch (UW.EXE 0x1c033, 0x1a0aa).</summary>
+        public int Courage => TerritoryAndCourage & 15;
+
+        /// <summary>
+        /// Bit 0 of byte 2Dh: the creature can answer a blow from afar, so it is not provoked by one and
+        /// takes the morale roll even then, unless it stands where magic is forbidden (UW.EXE 0x1b8fa).
+        /// The mages, the acid slug, the imp, the gazer, the fire elemental and Tyball have it.
+        /// </summary>
+        public bool AnswersAtRange => (unk2D & 1) != 0;
 
         /// <summary>How well the creature hears, 0 to 15: the low nibble of byte 1Eh (UW.EXE 0x1a99b).</summary>
         public int Hearing => unk1e & 15;

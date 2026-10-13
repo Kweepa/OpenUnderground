@@ -33,6 +33,10 @@ public class CritterSaveData : UUObjectSaveData
     public bool alertedByPlayer;
     public bool provokedFromRange;
 
+    // The flight (Critter.Retaliate()): absent in an older save, so a creature that has never fled.
+    public bool afraid;
+    public bool cornered;
+
     // When the player left the creature's level, by PlayerData.gameTime, if he has not come back since.
     public bool playerAway;
     public double playerLeftAt;
@@ -1042,9 +1046,10 @@ public class Critter : UUObject
     /// How far from home, in tiles, a creature's paths may go: the remake's range, 20 tiles (15 for
     /// Rodrick), except for a free wanderer, goal 2, which has no home in the original - no leash in a
     /// chase (UW.EXE 0x19541 asks only of a creature whose saved goal is 4) and none at rest (0x1928f is
-    /// goals 4 and 8) - and here goes anywhere on the level. The user's choice, 11 October 2026.
+    /// goals 4 and 8) - and here goes anywhere on the level. The user's choice, 11 October 2026. A
+    /// fleeing creature's paths go anywhere too, so that the range does not corner it (RunAway()).
     /// </summary>
-    private int pathRange => goal == EGoal.Wander2 ? 64 : range;
+    private int pathRange => goal == EGoal.Wander2 || fleePathing ? 64 : range;
 
     // Whether the creature stands farther from home than homeZone.
     private bool OutsideHomeZone()
@@ -1323,7 +1328,9 @@ public class Critter : UUObject
                         wallRubTime += Time.deltaTime;
                     }
 
-                    if (state is EState.Wander or EState.Approach or EState.Flee)
+                    // A fleeing one does not stop: it would go idle beside the player it runs from, and notice
+                    // him there at once (mod 48). Stuck, it picks another way (RunAway()).
+                    if (state is EState.Wander or EState.Approach)
                     {
                         // if walking into someone, stop so we don't look ridiculous running on the spot
                         if (Vector3.Dot(bToA, transform.forward) > 0.0f)
@@ -2453,6 +2460,33 @@ public class Critter : UUObject
     /// </summary>
     private bool provokedFromRange;
 
+    /// <summary>
+    /// The creature has fled from the player and runs again whenever it notices him (FleesOnNotice()).
+    /// Ours: the original's flight never ends (UW.EXE 0x1a0aa). Nothing clears it but a blow it answers
+    /// by fighting (Retaliate()); the healing of fix 126, when it comes, should clear it too.
+    /// </summary>
+    private bool afraid;
+
+    /// <summary>Bit 4: cornered, a fighter that no blow makes run again until the player leaves the level (Corner()).</summary>
+    private bool cornered;
+
+    // The damage taken since the creature last answered one of the player's blows, and the frame of the
+    // last of it (UW.EXE 0x1c2d2, byte@0x11): StruckByPlayer() answers only a blow that landed.
+    private int pendingDamage;
+    private int lastDamageFrame = -1;
+
+    // A fleeing creature that has lost the player, and where it was then (UpdateFlight()).
+    private bool fleeLostPlayer;
+    private Vector3 fleeLostAt;
+
+    // Seeking a flight's path, which may go anywhere on the level (pathRange).
+    private bool fleePathing;
+
+    // The backing off of a flight, next to the player (the Flee state): negative while it may still
+    // start, the seconds left while it lasts, 0 once it is spent. Once a flight (RunAway()).
+    private float backOffLeft = -1.0f;
+    private const float BackOffSeconds = 1.5f;
+
     // The player's tile at the chase's last tick: the chase asks only when he has moved (UW.EXE 0x19b0d).
     private Vector2Int chasePlayerTile = new(-1, -1);
 
@@ -2513,13 +2547,15 @@ public class Critter : UUObject
     /// (UW.EXE 0x70c05), so a creature on his heels at the stairs was caught unawares when he came
     /// straight back. Here it keeps the seen and alerted bits, so it knows him when he returns within
     /// <see cref="memorySeconds"/> of game time, and drops the rest, the chase with no leash among them:
-    /// the user's choice, 11 October 2026.
+    /// the user's choice, 11 October 2026. A cornered creature is no longer one (0x70c9f), and an afraid
+    /// one stays afraid, as the original's flight outlives the level (0x70c05 leaves the goal alone).
     /// </summary>
     public void PlayerLeftLevel()
     {
         playerAway = true;
         playerLeftAt = PlayerData.sData.gameTime;
         provokedFromRange = false;
+        cornered = false;
         chaseBlocked = false;
         alertTurnYaw = null;
         investigatingPlayer = false;
@@ -2571,7 +2607,8 @@ public class Critter : UUObject
     /// What the creature makes of the player now, UW.EXE 0x1a99b on whole tiles with the changes listed
     /// in <see cref="Perception"/>. A sight sets the seen bit and a loss clears it, as there.
     /// </summary>
-    private Perception.EResult PerceivePlayer()
+    /// <param name="assumeFacing">Sees as though it faced the player: a fleeing creature's test (UpdateFlight()).</param>
+    private Perception.EResult PerceivePlayer(bool assumeFacing = false)
     {
         if (PlayerData.sData.dead)
         {
@@ -2611,7 +2648,7 @@ public class Critter : UUObject
         }
 
         if (Perception.WithinSight(player.Visibility, stats.Sight, d2)
-            && Perception.InFront(dx, dy, Perception.CoarseHeading(transform.eulerAngles.y))
+            && (assumeFacing || Perception.InFront(dx, dy, Perception.CoarseHeading(transform.eulerAngles.y)))
             && SeesPlayerFromEyes())
         {
             awareOfPlayer = true;
@@ -2704,7 +2741,8 @@ public class Critter : UUObject
             // The growl that says it has noticed something, once (Kweepa's sound, given to the near
             // answer too at the user's request of 10 October 2026).
             PlayNoticeSound();
-            if (Random.Range(0, 2) == 0)
+            // An afraid creature does not come to see what it heard (FleesOnNotice()).
+            if (Random.Range(0, 2) == 0 && !afraid)
             {
                 WalkToPlayersTile();
             }
@@ -3356,6 +3394,22 @@ public class Critter : UUObject
                 path = toPlayer;
                 SetState(EState.TurnToApproach);
             }
+
+            // A flight, and a cornered creature that the player has stepped back from: it runs once he
+            // is more than two tiles off, unless it can shoot him (UW.EXE 0x19f76).
+            if (perceptionTick && paralyzeTime <= 0.0f)
+            {
+                if (state is EState.TurnToFlee or EState.Flee)
+                {
+                    UpdateFlight();
+                }
+                else if (cornered && attitude == EAttitude.Hostile && attackTarget == null
+                         && state is EState.TurnToApproach or EState.Approach or EState.CombatIdle
+                         && !PlayerWithinTiles(2.0f) && !CanDoProjectileAttack(0.0f))
+                {
+                    RunAway();
+                }
+            }
         }
 
         if (paralyzeTime > 0.0f)
@@ -3448,6 +3502,12 @@ public class Critter : UUObject
                 }
                 else if (toCombat)
                 {
+                    // It has fled from the player: it runs again, or a cornered one holds its ground.
+                    if ((afraid || cornered) && attitude == EAttitude.Hostile && attackTarget == null && FleesOnNotice())
+                    {
+                        break;
+                    }
+
                     // Play alert sound if this is the first time detecting the player while hostile in this detection session
                     if (attackTarget == null && attitude == EAttitude.Hostile && !hasPlayedAlertForCurrentDetection)
                     {
@@ -3830,7 +3890,8 @@ public class Critter : UUObject
 
             case EState.TurnToFlee:
                 AdvanceAnim(0.3f);
-                if (TurnTo(GetLookahead(0.5f), fleeTurnTurnSpeed, 20.0f))
+                // Next to the player it does not turn away first: it backs off facing him (the Flee state).
+                if ((backOffLeft < 0.0f && PlayerAdjacent()) || TurnTo(GetLookahead(0.5f), fleeTurnTurnSpeed, 20.0f))
                 {
                     SetState(EState.Flee);
                 }
@@ -3838,20 +3899,62 @@ public class Critter : UUObject
             case EState.Flee:
                 TryCloseDoorIfTrapped();
                 AdvanceAnim(0.2f);
-                TurnTo(GetLookahead(0.5f), fleeTurnSpeed, 20.0f);
-                if (MoveAlongPath(fleeSpeed, 0.3f))
+                if (path == null || path.Count == 0)
                 {
-                    SetState(EState.Idle);
+                    RunAway();
+                    break;
                 }
-                if (wallRubTime > 1.0f)
+
+                // Next to the player it backs off facing him at half its walk (UW.EXE 0x1a1b1), once a
+                // flight and for 1.5 s at most, then turns and runs: the original backs off for as long as
+                // he stays next to it, which left it an easy mark. The user's choice of 13 October 2026.
+                if (backOffLeft < 0.0f && PlayerAdjacent())
                 {
-                    SetState(EState.Idle);
+                    backOffLeft = BackOffSeconds;
+                }
+
+                bool arrived;
+                if (backOffLeft > 0.0f)
+                {
+                    backOffLeft = Mathf.Max(0.0f, backOffLeft - Time.deltaTime);
+                    TurnTo(PlayerObject.Player.transform.position, fleeTurnSpeed, 20.0f);
+                    ChangeAnimation("Walk");
+                    arrived = MoveAlongPath(BackOffSpeed, 0.3f);
+                }
+                else
+                {
+                    TurnTo(GetLookahead(0.5f), fleeTurnSpeed, 20.0f);
+                    ChangeAnimation("Run");
+                    arrived = MoveAlongPath(fleeSpeed, 0.3f);
+                }
+
+                // There, or stuck against a wall: it runs on from where it is, or is cornered.
+                if (arrived || wallRubTime > 1.0f)
+                {
+                    RunAway();
                 }
                 break;
             case EState.Flinch:
                 if (hp > 0 && actionDone)
                 {
-                    SetState(EState.CombatIdle);
+                    // A blow it answered by running (Retaliate()) caught it in the flinch.
+                    if (afraid && !cornered && attackTarget == null && attitude == EAttitude.Hostile)
+                    {
+                        RunAway();
+                        if (state == EState.Flinch)
+                        {
+                            SetState(EState.Idle);
+                        }
+                    }
+                    else if (attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5 || attackTarget != null)
+                    {
+                        SetState(EState.CombatIdle);
+                    }
+                    else
+                    {
+                        // A blow that only upset it does not start a fight (TakeOffence()).
+                        SetState(EState.Idle);
+                    }
                 }
                 break;
             case EState.Die:
@@ -4109,6 +4212,13 @@ public class Critter : UUObject
         return target.GetCenter();
     }
 
+    /// <summary>The end of the best of three ways away from the player, the one that ends farthest from him.</summary>
+    /// <remarks>
+    /// A way out that passes the player - a tile within a tile and a half of him and nearer him than
+    /// where the creature starts - is no way out: in a dead end with the player at its mouth the creature
+    /// is cornered (RunAway()), as the original's is, which has no path and is stopped by the walls
+    /// (UW.EXE 0x1a0aa). The user's rule of 13 October 2026.
+    /// </remarks>
     private Tile FindFleePoint()
     {
         // try calculating a flee to 3 points and see which is furthest from the player
@@ -4122,7 +4232,7 @@ public class Critter : UUObject
 
         Tile fleeTile = LevelLoader.GetClosestTile(transform.position + 12.0f * playerToMe);
         GetTilePath(out List<Tile> fleeTiles, source, fleeTile);
-        if (fleeTiles.Count > 1)
+        if (fleeTiles.Count > 1 && !PassesByPlayer(fleeTiles))
         {
             Tile lastTile = fleeTiles[^1];
             bestTile = lastTile;
@@ -4131,7 +4241,7 @@ public class Critter : UUObject
 
         fleeTile = LevelLoader.GetClosestTile(transform.position + 10.0f * playerToMe + 8.0f * left);
         GetTilePath(out fleeTiles, source, fleeTile);
-        if (fleeTiles.Count > 1)
+        if (fleeTiles.Count > 1 && !PassesByPlayer(fleeTiles))
         {
             Tile lastTile = fleeTiles[^1];
             float dist = (lastTile.GetCenter() - PlayerObject.Player.transform.position).magnitude;
@@ -4144,7 +4254,7 @@ public class Critter : UUObject
 
         fleeTile = LevelLoader.GetClosestTile(transform.position + 10.0f * playerToMe - 8.0f * left);
         GetTilePath(out fleeTiles, source, fleeTile);
-        if (fleeTiles.Count > 1)
+        if (fleeTiles.Count > 1 && !PassesByPlayer(fleeTiles))
         {
             Tile lastTile = fleeTiles[^1];
             float dist = (lastTile.GetCenter() - PlayerObject.Player.transform.position).magnitude;
@@ -4156,6 +4266,30 @@ public class Critter : UUObject
 
         return bestTile;
     }
+
+    /// <summary>Whether a flight's tiles pass the player: see FindFleePoint().</summary>
+    private static bool PassesByPlayer(List<Tile> tiles)
+    {
+        Vector3 player = PlayerObject.Player.transform.position;
+        player.y = 0.0f;
+        Vector3 start = tiles[0].GetCenter();
+        start.y = 0.0f;
+        float startDistance = (start - player).magnitude;
+        for (int i = 1; i < tiles.Count; ++i)
+        {
+            Vector3 centre = tiles[i].GetCenter();
+            centre.y = 0.0f;
+            float distance = (centre - player).magnitude;
+            if (distance < PassByTiles * Tile.xzScale && distance < startDistance)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private const float PassByTiles = 1.5f;
 
     private static ulong sTag;
 
@@ -5168,6 +5302,12 @@ public class Critter : UUObject
     /// </summary>
     public void StruckByPlayer()
     {
+        // A blow that landed is answered: a miss or a taunt took nothing this frame.
+        if (lastDamageFrame == Time.frameCount)
+        {
+            Retaliate();
+        }
+
         if (OutOfPackAlarm)
         {
             return;
@@ -5288,21 +5428,17 @@ public class Critter : UUObject
 
         TakeOffence(damage);
 
-        // A blow tells where the player is (the seen bit, UW.EXE 0x1bc38), and one from more than a
-        // tile away that this creature cannot answer at range makes it chase with no leash (0x1bc73).
-        // On its way home after a chase at the edge of its reach it does not turn (RunHome()).
-        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
-        Vector2Int ownTile = TileOf(transform.position);
-        int fromX = playerTile.x - ownTile.x;
-        int fromY = playerTile.y - ownTile.y;
+        // What the blow took counts toward the answer to the next of the player's (Retaliate()),
+        // whatever did the harm, as in the original (UW.EXE 0x1c2d2 adds to byte@0x11).
+        pendingDamage += damage;
+        lastDamageFrame = Time.frameCount;
+
+        // A blow tells where the player is (the seen bit, UW.EXE 0x1bc38). On its way home after a
+        // chase at the edge of its reach it does not turn (RunHome()).
         if (!returningHome)
         {
             awareOfPlayer = true;
             chaseBlocked = false;
-            if (fromX * fromX + fromY * fromY > 2 && GetProjectileType() == 0)
-            {
-                provokedFromRange = true;
-            }
         }
 
         bool flinching = false;
@@ -5327,15 +5463,6 @@ public class Critter : UUObject
             if (hp > 0)
             {
                 Music.InCombat(this);
-            }
-
-            // maybe flee
-            if (result == Skills.ESkillTestResult.CriticalSuccess
-                && hp < originalHp / 3.0f
-                && PlayerData.sData.charLevel >= critterLevel
-                && Random.value < 0.5f)
-            {
-                CreateFear();
             }
         }
 
@@ -5487,26 +5614,278 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>The Cause Fear spell and the tremor: the creature runs, whatever its courage (UW.EXE 0x34d2f gives goal 6).</summary>
     public void CreateFear()
     {
+        StartFlight();
+    }
+
+    /// <summary>
+    /// The answer to a blow of the player's that landed, as the original's decider gives it when its
+    /// last attacker is set (UW.EXE 0x1b8fa, 0x1bb47-0x1bd3e). From more than a tile away a creature
+    /// that cannot answer at range, or stands where magic is forbidden, is provoked: it chases with no
+    /// leash and never runs again while the player stays on the level. Otherwise a provoked creature
+    /// fights, a cornered one fights (goal 9), and any other takes the morale roll (Morale.Flees(),
+    /// 0x1c033) on the damage taken since it last answered: it runs, or it fights. Only a creature the
+    /// blow left hostile rolls, the user's rule of 13 October 2026: a light blow that only upsets it
+    /// (TakeOffence()) is no fight yet; but any hit from afar provokes, as the original's makes it
+    /// hostile first. One with no reactions at all, bit 1 of its row's byte 0x0a,
+    /// the wisp's, skips it as in the original (0x1ba02).
+    /// </summary>
+    private void Retaliate()
+    {
+        int damage = pendingDamage;
+        pendingDamage = 0;
+        if (hp <= 0 || returningHome || playerAlly || (stats.Passive & 2) != 0)
+        {
+            return;
+        }
+
+        // Provoked by any hit from afar, before the hostility and the damage are asked: the original
+        // makes the creature hostile at once, so a first light hit from a distance, which here only
+        // upsets it (TakeOffence()), must not leave it free to run once a later blow angers it.
+        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
+        Vector2Int ownTile = TileOf(transform.position);
+        int dx = playerTile.x - ownTile.x;
+        int dy = playerTile.y - ownTile.y;
+        Tile here = LevelLoader.GetTile(ownTile.x, ownTile.y);
+        if (dx * dx + dy * dy > 2 && (!stats.AnswersAtRange || (here != null && here.NoMagic)))
+        {
+            provokedFromRange = true;
+        }
+
+        if (damage <= 0 || attitude != EAttitude.Hostile)
+        {
+            return;
+        }
+
+        if (provokedFromRange || cornered)
+        {
+            Fight();
+        }
+        else if (Morale.Flees(stats.AvgHit, hp, stats.Courage, damage, Random.Range(0, Morale.RollRange)))
+        {
+            StartFlight();
+        }
+        else
+        {
+            Fight();
+        }
+    }
+
+    /// <summary>The creature stops running, if it was, and fights: the original's goal 5 or 9.</summary>
+    private void Fight()
+    {
+        afraid = false;
+        if (state is EState.TurnToFlee or EState.Flee)
+        {
+            SetState(EState.Idle);
+        }
+    }
+
+    /// <summary>
+    /// The creature runs from the player, and stays afraid of him once it calms down: whenever it
+    /// notices him again it runs again, with no roll (FleesOnNotice()), the user's choice of 13 October
+    /// 2026. In the original a flight is a goal, 6, that nothing but a blow, a corner or the target's
+    /// death ends (UW.EXE 0x1a0aa). A creature in the middle of a flinch runs when it ends.
+    /// </summary>
+    private void StartFlight()
+    {
+        afraid = true;
+        fleeLostPlayer = false;
+        if (state != EState.Flinch)
+        {
+            RunAway();
+        }
+    }
+
+    /// <summary>
+    /// Picks a place away from the player and runs there: the farthest of FindFleePoint()'s three, by a
+    /// path that may go anywhere on the level, not only within the creature's range of home. When there
+    /// is no way to get farther from him and he is within three tiles, the creature is cornered, as the
+    /// original's is when it is blocked that close (UW.EXE 0x1a0aa); farther off it waits and tries
+    /// again at its next perception tick.
+    /// </summary>
+    private void RunAway()
+    {
+        Vector3 player = PlayerObject.Player.transform.position;
+        Vector3 fromPlayer = transform.position - player;
+        fromPlayer.y = 0.0f;
+
+        fleePathing = true;
         Tile fleeTile = FindFleePoint();
+        List<Vector3> away = null;
         if (fleeTile != null)
         {
-            SetState(EState.TurnToFlee);
-            Vector3 targetCenter = fleeTile.GetCenter();
-            if (movementType == EMovementType.Flying)
+            Vector3 toEnd = fleeTile.GetCenter() - player;
+            toEnd.y = 0.0f;
+            if (toEnd.magnitude > fromPlayer.magnitude)
             {
-                targetCenter.y += 1.5f;
-            }
+                Vector3 targetCenter = fleeTile.GetCenter();
+                if (movementType == EMovementType.Flying)
+                {
+                    targetCenter.y += 1.5f;
+                }
 
-            GetPath(out path, transform.position, targetCenter);
-            if (path.Count > 0)
+                GetPath(out away, transform.position, targetCenter);
+            }
+        }
+        fleePathing = false;
+
+        if (away != null && away.Count > 0)
+        {
+            path = away;
+            wallRubTime = 0.0f;
+            if (state is not (EState.TurnToFlee or EState.Flee))
             {
-                //path[path.Count - 1] += new Vector3( Random.Range( -1.0f, 1.0f ), 0.0f, Random.Range( -1.0f, 1.0f ) );
+                // A new flight: it may back off once (the Flee state).
+                backOffLeft = -1.0f;
+            }
+            if (state != EState.Flee)
+            {
                 SetState(EState.TurnToFlee);
             }
         }
+        else if (PlayerWithinTiles(3.0f))
+        {
+            Corner();
+        }
+        else if (state is EState.TurnToFlee or EState.Flee)
+        {
+            SetState(EState.Idle);
+        }
     }
+
+    /// <summary>
+    /// Cornered: bit 4 of byte@0x19, goal 9 (UW.EXE 0x1a0aa, 0x19f76). Until the player leaves the
+    /// level the creature fights when he comes within a tile and a half, holds its ground facing him
+    /// within two, and runs when he is farther (FleesOnNotice()); a blow no longer makes it roll.
+    /// </summary>
+    private void Corner()
+    {
+        cornered = true;
+        if (state is EState.TurnToFlee or EState.Flee)
+        {
+            SetState(EState.Idle);
+        }
+    }
+
+    /// <summary>
+    /// What a creature that has fled does on noticing the player, in place of coming for him. A
+    /// cornered one fights within a tile and a half, or when it can shoot him, holds its ground facing
+    /// him within two tiles and runs when he is farther; an afraid one runs. The run starts on a
+    /// perception tick, so the paths are not sought on every frame.
+    /// </summary>
+    /// <returns>Whether it does not come for him.</returns>
+    private bool FleesOnNotice()
+    {
+        if (cornered)
+        {
+            if (PlayerWithinTiles(1.5f) || CanDoProjectileAttack(0.0f))
+            {
+                return false;
+            }
+
+            if (PlayerWithinTiles(2.0f))
+            {
+                TurnTo(PlayerObject.Player.transform.position, combatTurnSpeed, 5.0f);
+                return true;
+            }
+        }
+
+        if (perceptionTick)
+        {
+            RunAway();
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// A fleeing creature, at each perception tick. Next to the player, one with a courage of 8 or more
+    /// turns to fight one tick in 256, as the original's does (UW.EXE 0x1a167). Otherwise it calms
+    /// down once it could no longer perceive him were it facing him - mod 170's perception whole, his
+    /// noise, Sneak, light and line of sight with it - and has run two tiles more: the user's rule of
+    /// 13 October 2026, where the original's flight never ends. The two tiles show the fear, and keep a
+    /// creature with poor senses from stopping at once. Calm, it walks back to its home, and a free
+    /// wanderer stays where it is (CalmDown()).
+    /// </summary>
+    private void UpdateFlight()
+    {
+        if (PlayerAdjacent() && stats.Courage >= 8 && Random.Range(0, 256) == 0)
+        {
+            Corner();
+            return;
+        }
+
+        if (PerceivePlayer(assumeFacing: true) != Perception.EResult.Lost)
+        {
+            fleeLostPlayer = false;
+            return;
+        }
+
+        if (!fleeLostPlayer)
+        {
+            fleeLostPlayer = true;
+            fleeLostAt = transform.position;
+            return;
+        }
+
+        Vector3 run = transform.position - fleeLostAt;
+        run.y = 0.0f;
+        if (run.magnitude >= CalmDownTiles * Tile.xzScale)
+        {
+            CalmDown();
+        }
+    }
+
+    // How far a fleeing creature runs on after it has lost the player: the user's rule of 13 October 2026.
+    private const float CalmDownTiles = 2.0f;
+
+    /// <summary>The flight ends: the creature walks home, or a free wanderer (goal 2) stays where it is.</summary>
+    private void CalmDown()
+    {
+        fleeLostPlayer = false;
+
+        // It has lost the player: beyond the ten tiles of thinking range a loss does not clear the seen
+        // bit (PerceivePlayer()), and an afraid creature that still knew of him would run at once again.
+        awareOfPlayer = false;
+        alertedByPlayer = false;
+        hasPlayedAlertForCurrentDetection = false;
+        Tile home = LevelLoader.GetTile(xhome, yhome);
+        if (goal != EGoal.Wander2 && home != null && TileOf(transform.position) != new Vector2Int(xhome, yhome))
+        {
+            GetPath(out List<Vector3> toHome, transform.position, AdjustWanderPoint(home), mayCrossLava: false);
+            if (toHome.Count > 0)
+            {
+                path = toHome;
+                SetState(EState.TurnToWander);
+                return;
+            }
+        }
+
+        SetState(EState.Idle);
+    }
+
+    /// <summary>
+    /// Whether the player is on the creature's tile or one of the eight around it, within 1.5 m of its
+    /// height: the original's test for a target in contact (UW.EXE 0x1a13d, d² <= 3 on whole tiles and
+    /// a height within 16).
+    /// </summary>
+    private bool PlayerAdjacent()
+    {
+        Vector3 player = PlayerObject.Player.transform.position;
+        Vector2Int playerTile = TileOf(player);
+        Vector2Int ownTile = TileOf(transform.position);
+        return Mathf.Abs(playerTile.x - ownTile.x) <= 1 && Mathf.Abs(playerTile.y - ownTile.y) <= 1
+            && Mathf.Abs(player.y - transform.position.y) < 2.0f * Tile.yScale;
+    }
+
+    /// <summary>
+    /// The speed a fleeing creature backs off at when the player is next to it, facing him: half its
+    /// walk in the original's units, <c>(critterStats byte 0x0b + 1) / 2</c> (UW.EXE 0x1a237), made a
+    /// speed as the combat step makes its own (TryStartCombatStep()).
+    /// </summary>
+    private float BackOffSpeed => (stats.WalkSpeed + 1) / 2 * walkSpeed / 4.0f;
 
     /// <summary>
     /// Whether the creature bleeds, by the splats its stats row gives it: blood or a pool of it,
@@ -6488,6 +6867,8 @@ public class Critter : UUObject
             critterData.awareOfPlayer = awareOfPlayer;
             critterData.alertedByPlayer = alertedByPlayer;
             critterData.provokedFromRange = provokedFromRange;
+            critterData.afraid = afraid;
+            critterData.cornered = cornered;
             critterData.playerAway = playerAway;
             critterData.playerLeftAt = playerLeftAt;
 
@@ -6584,6 +6965,8 @@ public class Critter : UUObject
             awareOfPlayer = critterData.awareOfPlayer;
             alertedByPlayer = critterData.alertedByPlayer;
             provokedFromRange = critterData.provokedFromRange;
+            afraid = critterData.afraid;
+            cornered = critterData.cornered;
             playerAway = critterData.playerAway;
             playerLeftAt = critterData.playerLeftAt;
 
