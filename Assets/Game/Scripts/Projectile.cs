@@ -162,7 +162,11 @@ public class Projectile : UUObject
             eff.transform.localScale = new Vector3(hitEffectScale, hitEffectScale, hitEffectScale);
         }
 
-        if (result < Skills.ESkillTestResult.Success)
+        if (type == EObjectType.Knife)
+        {
+            DropKnife();
+        }
+        else if (result < Skills.ESkillTestResult.Success)
         {
             Utils.DestroyItem(this);
         }
@@ -184,6 +188,64 @@ public class Projectile : UUObject
     /// point of contact reaches as far every way.
     /// </summary>
     private const float BurstRadius = 2.2f;
+
+    /// <summary>Where a missile is born: 7/8 of a tile ahead of its launcher's centre (UW.EXE 0x282b1).</summary>
+    private const float BirthDistance = 7.0f / 8.0f * Tile.xzScale;
+
+    private static readonly RaycastHit[] roomCache = new RaycastHit[16];
+
+    /// <summary>
+    /// Whether a missile has room to leave its launcher. In the original every missile - a spell's,
+    /// a bow's, a thrown one, a creature's - is born 7/8 of a tile ahead of its launcher's centre,
+    /// and is not launched at all when its box there meets a wall, the floor or a body (UW.EXE
+    /// 0x282b1, which all five launches of 0x27ef1 go through). Nothing else keeps a caster out of
+    /// its own blast: the blast spares nobody, and no contact routine reads who launched the
+    /// missile. Here the missile leaves from the hand, so the whole way out to that point has to be
+    /// clear, and for a fireball or a lightning bolt far enough that the launcher is outside the
+    /// burst's reach.
+    /// </summary>
+    public static bool HasRoomToLaunch(EObjectType missileType, GameObject launcher, float launcherRadius,
+        Vector3 start, Vector3 direction)
+    {
+        Vector3 heading = direction;
+        heading.y = 0.0f;
+        if (heading.sqrMagnitude < 1e-6f)
+        {
+            heading = launcher.transform.forward;
+            heading.y = 0.0f;
+        }
+        heading.Normalize();
+
+        // The original's point ahead is on the level of the launch: the aim up or down only sets
+        // the missile's flight.
+        float distance = BirthDistance;
+        if (missileType is EObjectType.Arrow or EObjectType.CrossbowBolt or EObjectType.SlingStone)
+        {
+            // Ours, the user's choice of 14 October 2026: half the way for a bow's, a crossbow's
+            // or a sling's missile, which cannot hurt its launcher, so that a creature in melee
+            // can still be shot.
+            distance /= 2.0f;
+        }
+        else if (missileType is EObjectType.Fireball or EObjectType.LightningBolt)
+        {
+            distance = Mathf.Max(distance, launcherRadius + BurstRadius + 0.1f);
+        }
+
+        int layers = LayerMasks.EnvironmentAndCeiling
+                     | (1 << LayerMask.NameToLayer("Characters")) | (1 << LayerMask.NameToLayer("Player"));
+        int count = Physics.SphereCastNonAlloc(start, 0.1f, heading, roomCache, distance, layers,
+            QueryTriggerInteraction.Ignore);
+        Transform own = launcher.transform.root;
+        for (int i = 0; i < count; ++i)
+        {
+            if (roomCache[i].collider.transform.root != own)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// A fireball or a lightning bolt bursts where it stops, whatever stopped it - a wall, the floor,
@@ -262,9 +324,70 @@ public class Projectile : UUObject
         return transform.position;
     }
 
+    /// <summary>When a spent knife disappears: 0 while it flies.</summary>
+    private float knifeVanishAt;
+
+    /// <summary>
+    /// A mage's knife that has struck, or met anything, falls to the floor and disappears a moment
+    /// later. Ours, the user's choice of 14 October 2026: it has no gravity in flight, and bounced
+    /// slowly off what it met and floated there.
+    /// </summary>
+    private void DropKnife()
+    {
+        doDamage = false;
+        if (knifeVanishAt > 0.0f)
+        {
+            return;
+        }
+        knifeVanishAt = Time.time + KnifeVanishSeconds;
+        Rigidbody rb = transform.root.GetComponentInChildren<Rigidbody>();
+        if (rb != null)
+        {
+            rb.linearVelocity *= Random.Range(-0.1f, 0.0f);
+            rb.useGravity = true;
+        }
+    }
+
+    private const float KnifeVanishSeconds = 1.5f;
+
+    /// <summary>
+    /// The knife is a rigid body, and a contact that the physics step resolved before Update()
+    /// looked - against the player's capsule, say - bounced it back unseen: it now strikes or drops.
+    /// </summary>
+    public override void OnCollisionEnter(Collision collision)
+    {
+        base.OnCollisionEnter(collision);
+        if (type != EObjectType.Knife || !doDamage || this == null)
+        {
+            return;
+        }
+
+        Transform root = collision.collider.transform.root;
+        if (root.gameObject != projectileOwner
+            && (root.GetComponent<PlayerObject>() != null || root.GetComponent<Critter>() != null))
+        {
+            HitSomething(root);
+        }
+        else
+        {
+            DropKnife();
+        }
+    }
+
     public override void Update()
     {
         base.Update();
+
+        if (type == EObjectType.Knife && !doDamage)
+        {
+            // Also a spent knife from a save.
+            DropKnife();
+            if (Time.time >= knifeVanishAt)
+            {
+                Utils.DestroyItem(this);
+                return;
+            }
+        }
 
         // Check for collisions using overlap detection
         if (doDamage && oldPos != Vector3.zero)

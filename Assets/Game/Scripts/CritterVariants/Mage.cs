@@ -93,17 +93,28 @@ namespace Game.Scripts.CritterVariants
 
         protected override string[] GetAttackCandidateStates()
         {
-            if (type == EObjectType.Tyball && movementType == EMovementType.Flying)
+            if (type == EObjectType.Tyball)
             {
-                return new[] { "Cast_Fly", "Throw_Knife_Fly" };
+                return movementType == EMovementType.Flying
+                    ? new[] { "Cast_Fly", "Throw_Knife_Fly" }
+                    : new[] { "Cast1", "Cast2", "Throw_Knife" };
             }
-            else if (type is EObjectType.MageB or EObjectType.MageF)
+            // In the melee band a mage throws its knife, or strikes with its staff; it casts from
+            // farther off (GetCastStates()).
+            else if (HasStaff)
             {
-                return new[] { "Cast", "Thrust" };
+                return new[] { "Thrust" };
             }
 
-            return new[] { "Cast1", "Cast2", "Throw_Knife" };
+            return new[] { "Throw_Knife" };
         }
+
+        protected override string[] GetCastStates()
+        {
+            return HasStaff ? new[] { "Cast" } : base.GetCastStates();
+        }
+
+        private bool HasStaff => type is EObjectType.MageB or EObjectType.MageF;
 
         protected override void ChangeAnimation(string animationName)
         {
@@ -249,6 +260,14 @@ namespace Game.Scripts.CritterVariants
 
         protected override void LaunchProjectile()
         {
+            // The staff's thrust is a blow: its clip calls the projectile event and has no type of
+            // its own, so it threw the last spell again.
+            if (HasStaff && state == EState.Attack)
+            {
+                TryDamageTarget();
+                return;
+            }
+
             // On level 4, mages sometimes spawn monsters instead of launching projectiles
             if (LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel == 4)
             {

@@ -526,6 +526,23 @@ public class RangedWeapon : WeaponBase
         return false;
     }
 
+    /// <summary>Where the missile leaves from: beside the eye, toward the weapon hand.</summary>
+    private Vector3 GetShotStart()
+    {
+        Vector3 horizontalOffset = PlayerData.sData.leftHanded 
+            ? -PlayerObject.Player.transform.right 
+            : PlayerObject.Player.transform.right;
+        return PlayerObject.Player.transform.position + spawnSide * horizontalOffset + spawnOffset * Vector3.up + spawnForward * PlayerObject.Player.mainCamera.transform.forward;
+    }
+
+    /// <summary>Whether the shot has room to leave the player (Projectile.HasRoomToLaunch()).</summary>
+    private bool HasRoomToShoot(EObjectType ammoType)
+    {
+        return Projectile.HasRoomToLaunch(ammoType, PlayerObject.Player.gameObject,
+            PlayerObject.Player.cachedCharacterController.radius, GetShotStart(),
+            PlayerObject.Player.mainCamera.transform.forward);
+    }
+
     protected override bool Attack()
     {
         // check we still have ammo
@@ -533,7 +550,14 @@ public class RangedWeapon : WeaponBase
         bool useGravity = type is EObjectType.Sling;
 
         UUObject ammo = Inventory.sInv.FindObjectInInventory(ammoType);
-        if (ammo != null)
+        if (ammo != null && !HasRoomToShoot(ammoType))
+        {
+            // "You need more space to fire that weapon." The original's missile is born 7/8 of a
+            // tile ahead, and with no room there the shot is not made (UW.EXE 0x282b1, 0x2799c).
+            // The ammunition stays in the pack, and no sound: a bow's failed shot is its shot.
+            Messages.Add(1, 254);
+        }
+        else if (ammo != null)
         {
             // peel one off and shoot it
             if (ammo.quantity > 1)
@@ -550,10 +574,7 @@ public class RangedWeapon : WeaponBase
                 Inventory.sInv.RemoveItemFromInventory(ammo);
             }
             
-            Vector3 horizontalOffset = PlayerData.sData.leftHanded 
-                ? -PlayerObject.Player.transform.right 
-                : PlayerObject.Player.transform.right;
-            Vector3 start = PlayerObject.Player.transform.position + spawnSide * horizontalOffset + spawnOffset * Vector3.up + spawnForward * PlayerObject.Player.mainCamera.transform.forward;
+            Vector3 start = GetShotStart();
             Vector3 dir = PlayerObject.Player.mainCamera.transform.forward;
             Projectile proj = ammo as Projectile;
             if (proj != null)
