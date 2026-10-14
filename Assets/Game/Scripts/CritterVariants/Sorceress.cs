@@ -177,7 +177,8 @@ namespace Game.Scripts.CritterVariants
 
         protected override string[] GetAttackCandidateStates()
         {
-            return new[] { "Cast1", "Cast2", "Throw_Knife" };
+            // In the melee band she throws her knife; she casts from farther off (GetCastStates()).
+            return new[] { "Throw_Knife" };
         }
     }
 }

@@ -13,6 +13,25 @@ namespace Game.Scripts.CritterVariants
 
         private bool effectsActive;
 
+        // Tyball keeps his own way of fighting.
+        protected override bool CastsFromRange => type != EObjectType.Tyball;
+
+        /// <summary>The states that cast a spell, from afar; GetAttackCandidateStates() has those for the melee band.</summary>
+        protected virtual string[] GetCastStates()
+        {
+            return new[] { "Cast1", "Cast2" };
+        }
+
+        protected override void ChangeAnimation(string animationName)
+        {
+            if (animationName == "ProjectileAttack" && CastsFromRange)
+            {
+                string[] castStates = GetCastStates();
+                animationName = castStates[Random.Range(0, castStates.Length)];
+            }
+            base.ChangeAnimation(animationName);
+        }
+
         private void EffectsEvent(int active)
         {
             if (electricEffect != null)
@@ -104,7 +123,7 @@ namespace Game.Scripts.CritterVariants
                 break;
             }
 
-            if (spell != Magic.ESpell.Curse)
+            if (spell != Magic.ESpell.Curse && HasRoomToLaunch(GetProjectileType()))
             {
                 Utils.PlayClipOccluded(Magic.sMagic.castSpellSound[(int)spell], transform.position);
             }

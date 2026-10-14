@@ -1175,9 +1175,20 @@ public class Critter : UUObject
     /// <summary>Whether this creature takes the step and its target is closer than the original's 7/8 of a tile.</summary>
     private bool IsCrowdedInCombat()
     {
-        return StepsInCombat()
-            && cachedCharacterController != null && cachedCharacterController.enabled
-            && GetDistanceToTarget() < 0.7f * meleeAttackRange;
+        if (!StepsInCombat() || cachedCharacterController == null || !cachedCharacterController.enabled)
+        {
+            return false;
+        }
+
+        float distance = GetDistanceToTarget();
+        if (CastsFromRange)
+        {
+            // A caster starts backing away within CasterBackOffStart and goes on until it is
+            // CasterBackOffEnd away again.
+            keepingAway = distance < (keepingAway ? CasterBackOffEnd : CasterBackOffStart);
+            return keepingAway;
+        }
+        return distance < 0.7f * meleeAttackRange;
     }
 
     /// <summary>
@@ -1211,6 +1222,27 @@ public class Critter : UUObject
         }
         toTarget.Normalize();
 
+        if (CastsFromRange)
+        {
+            // A caster backs straight away at its walk, a third of its run, or aside when its back
+            // is to a wall or a drop. Ours.
+            Vector3 side = Quaternion.AngleAxis(Random.Range(0, 2) == 0 ? 90.0f : -90.0f, Vector3.up) * toTarget;
+            Vector3 away = IsCombatStepSafe(-toTarget) ? -toTarget
+                : IsCombatStepSafe(side) ? side
+                : IsCombatStepSafe(-side) ? -side
+                : Vector3.zero;
+            if (away == Vector3.zero)
+            {
+                return false;
+            }
+
+            combatStepDirection = away;
+            combatStepSpeed = walkSpeed;
+            combatStepTime = CombatStepPeriod;
+            ChangeAnimation("Walk");
+            return true;
+        }
+
         bool aside = Random.Range(0, 4) == 0;
         Vector3 direction = aside
             ? Quaternion.AngleAxis(Random.Range(0, 2) == 0 ? 90.0f : -90.0f, Vector3.up) * toTarget
@@ -1234,6 +1266,12 @@ public class Critter : UUObject
     private void MoveCombatStep()
     {
         TurnTo(GetTargetFootPos(), combatTurnSpeed, 30.0f);
+        Vector3 toTarget = GetTargetFootPos() - transform.position;
+        toTarget.y = 0.0f;
+        if (Vector3.Dot(combatStepDirection, toTarget.normalized) < -0.5f)
+        {
+            PlayWalkBackward();
+        }
         Vector3 motion = combatStepDirection * (combatStepSpeed * Time.deltaTime);
         if (movementType != EMovementType.Flying)
         {
@@ -1241,6 +1279,35 @@ public class Critter : UUObject
         }
         motion = ApplyOverlapAvoidance(motion, updateWallRubTime: false);
         cachedCharacterController.Move(motion);
+    }
+
+    private float walkBackwardTime;
+
+    /// <summary>
+    /// Plays the walk backwards, for a creature that backs away facing its target. Ours: no
+    /// creature has a clip for it. The animator is held still and the walk's time is run down by
+    /// hand; Update() sets the animator's speed back to 1 every frame, so it resumes by itself as
+    /// soon as the creature stops backing.
+    /// </summary>
+    private void PlayWalkBackward()
+    {
+        if (cachedAnimator == null)
+        {
+            return;
+        }
+        int walk = Animator.StringToHash("Walk");
+        if (!cachedAnimator.HasState(0, walk))
+        {
+            ChangeAnimation("Walk");
+            return;
+        }
+
+        AnimatorStateInfo info = cachedAnimator.GetCurrentAnimatorStateInfo(0);
+        float length = info.shortNameHash == walk && info.length > 0.01f && !float.IsInfinity(info.length) ? info.length : 1.0f;
+        walkBackwardTime = Mathf.Repeat(walkBackwardTime - Time.deltaTime / length, 1.0f);
+        cachedAnimator.Play(walk, 0, walkBackwardTime);
+        cachedAnimator.speed = 0.0f;
+        currentAnimation = "Walk";
     }
 
     /// <summary>
@@ -2215,7 +2282,7 @@ public class Critter : UUObject
             mLungeTime = 0.0f; // Reset lunge timer - will be set by animation event
             mLungeDirection = Vector3.zero;
             mLungeDestination = Vector3.zero;
-            if (cachedAnimator != null && movementType != EMovementType.Swimming && !AttackHasLungeEvent())
+            if (cachedAnimator != null && movementType != EMovementType.Swimming && !CastsFromRange && !AttackHasLungeEvent())
             {
                 // The ghosts' and the fire elemental's attacks have no lunge of their own, so they
                 // struck from wherever they stood, up to meleeAttackRange away; this lunges as the
@@ -2360,6 +2427,29 @@ public class Critter : UUObject
         return PlayerObject.Player.mainCamera!.transform.position + 1.5f * Vector3.down;
     }
 
+    /// <summary>
+    /// A mage or a sorceress, which casts from afar and keeps its distance. In the original a caster
+    /// never starts a spell within 1.25 tiles of its target: there it fights hand to hand
+    /// (UW.EXE 0x19541, 0x197af), and beyond it casts while it sees and faces the target
+    /// (0x19d4f, 0x1add3). Here it throws its knife or strikes with its staff in that band, and
+    /// backs away at its walk (CasterBackOffStart), so that a player who closes in is still under
+    /// fire for a while and can reach it: the user's choice of 14 October 2026.
+    /// </summary>
+    protected virtual bool CastsFromRange => false;
+
+    /// <summary>Within this of its target a creature fights hand to hand and shoots nothing (UW.EXE 0x19541).</summary>
+    private float MeleeBand => CastsFromRange ? 1.25f * Tile.xzScale : meleeAttackRange + meleeAttackHysteresis;
+
+    /// <summary>
+    /// A caster backs away from a target closer than the first, fighting on, until it is as far as
+    /// the second, a little within the 12 m it can cast from. Ours, the user's choice of 14
+    /// October 2026: the original's caster only stops coming closer at four tiles (UW.EXE 0x19b0d).
+    /// </summary>
+    private const float CasterBackOffStart = 9.0f;
+    private const float CasterBackOffEnd = 11.5f;
+
+    private bool keepingAway;
+
     private bool CanDoProjectileAttack(float distanceOffset)
     {
         // some creatures are projectile only?
@@ -2376,6 +2466,7 @@ public class Critter : UUObject
             hasProjectileWeapon = true;
             break;
         }
+        hasProjectileWeapon |= CastsFromRange;
 
         if (hasProjectileWeapon)
         {
@@ -3847,21 +3938,22 @@ public class Critter : UUObject
                 {
                     break;
                 }
+                // A caster backs away while it waits to cast again.
+                if (CastsFromRange && UpdateCombatStep())
+                {
+                    stateTime -= Time.deltaTime;
+                    if (stateTime < 0.0f)
+                    {
+                        EndProjectileIdle();
+                    }
+                    break;
+                }
                 TurnTo(PlayerObject.Player.transform.position, projectileTurnSpeed, 30.0f);
 
                 stateTime -= Time.deltaTime;
                 if (AdvanceAnim(0.3f) && stateTime < 0.0f)
                 {
-                    // add some hysteresis
-                    if (CanDoProjectileAttack(-2.0f))
-                    {
-                        SetState(EState.ProjectileAttack);
-                    }
-                    else
-                    {
-                        // idle will get us closer
-                        SetState(EState.Idle);
-                    }
+                    EndProjectileIdle();
                 }
                 break;
             case EState.ProjectileAttack:
@@ -3918,7 +4010,7 @@ public class Critter : UUObject
                 {
                     backOffLeft = Mathf.Max(0.0f, backOffLeft - Time.deltaTime);
                     TurnTo(PlayerObject.Player.transform.position, fleeTurnSpeed, 20.0f);
-                    ChangeAnimation("Walk");
+                    PlayWalkBackward();
                     arrived = MoveAlongPath(BackOffSpeed, 0.3f);
                 }
                 else
@@ -4102,6 +4194,29 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// The end of the wait before a shot. Within the melee band the creature fights hand to hand
+    /// instead: the original never starts a missile there, and the shot used to leave at whatever
+    /// distance the target had come to meanwhile (UW.EXE 0x19541).
+    /// </summary>
+    private void EndProjectileIdle()
+    {
+        if (GetDistanceToTarget() < MeleeBand && IsViewToTargetClear())
+        {
+            CheckTransitionToAttack();
+        }
+        // add some hysteresis
+        else if (CanDoProjectileAttack(-2.0f))
+        {
+            SetState(EState.ProjectileAttack);
+        }
+        else
+        {
+            // idle will get us closer
+            SetState(EState.Idle);
+        }
+    }
+
     private void CheckTransitionToAttack()
     {
         if (playerAlly && attackTarget == null)
@@ -4119,7 +4234,7 @@ public class Critter : UUObject
             float distanceToTarget = GetDistanceToTarget();
             // Not through a wall or a closed door: near enough is not enough, it has to reach. With
             // creatures that hear the player through both, one behind a door swung at it.
-            if (distanceToTarget < meleeAttackRange + meleeAttackHysteresis && IsViewToTargetClear())
+            if (distanceToTarget < MeleeBand && IsViewToTargetClear())
             {
                 SetState(EState.Attack);
             }
@@ -4135,10 +4250,27 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// Whether the creature's missile has room to leave it (Projectile.HasRoomToLaunch()). The
+    /// knife a mage throws in the melee band stands for the original's blow there, so it is not
+    /// held back.
+    /// </summary>
+    protected bool HasRoomToLaunch(EObjectType projectileType)
+    {
+        if (projectileType == EObjectType.Knife)
+        {
+            return true;
+        }
+
+        Vector3 startPos = GetProjectileLaunchPosition(false);
+        Vector3 endPos = PlayerObject.Player.mainCamera!.transform.position + 0.5f * Vector3.down;
+        return Projectile.HasRoomToLaunch(projectileType, gameObject, cachedCharacterController.radius, startPos, endPos - startPos);
+    }
+
     protected virtual void LaunchProjectile()
     {
         EObjectType projectileType = GetProjectileType();
-        if (projectileType != 0)
+        if (projectileType != 0 && HasRoomToLaunch(projectileType))
         {
             UUObject proj = LevelLoader.CreateObjectOfType(projectileType);
             proj.PostLoadInitialize();
@@ -4172,6 +4304,14 @@ public class Critter : UUObject
                     Debug.DrawLine(startPos, endPos, Color.green, 5.0f);
                 }
                 proj.gameObject.transform.forward = rb.linearVelocity.normalized;
+            }
+
+            // A missile leaving from the hands starts inside the creature's own body, and bounced
+            // off it.
+            Collider missileCollider = proj.gameObject.GetComponentInChildren<Collider>();
+            if (missileCollider != null && cachedCharacterController != null)
+            {
+                Physics.IgnoreCollision(missileCollider, cachedCharacterController);
             }
 
             Projectile projectile = proj as Projectile;
@@ -6111,7 +6251,7 @@ public class Critter : UUObject
         return Mathf.Max(0, damage - GetArmourByBodyPart(bodyPart));
     }
 
-    void TryDamageTarget()
+    protected void TryDamageTarget()
     {
         if (GetDistanceToTarget() > meleeAttackRange + meleeAttackHysteresis)
         {

@@ -1512,6 +1512,12 @@ public class Magic : MonoBehaviour
             return;
         }
 
+        if (MissileHasNoRoom(i, worldAimDirection))
+        {
+            suppressWorldMousePrimaryUntilReleased = true;
+            return;
+        }
+
         // The full cost either way: see the note on the critical success in
         // TryCastFromSpellRunes(). The flag still picks the longer bubble.
         PayMana(spells[i].cost);
@@ -1892,7 +1898,7 @@ public class Magic : MonoBehaviour
                     Utils.PlayClip2d(castFailed);
                     break;
                 case Skills.ESkillTestResult.Success:
-                    if (TryBeginMousePrimedSpellAfterRuneSuccess(i, false))
+                    if (TryBeginMousePrimedSpellAfterRuneSuccess(i, false) || MissileHasNoRoom(i, null))
                     {
                         break;
                     }
@@ -1903,7 +1909,7 @@ public class Magic : MonoBehaviour
                     castSpells[i] = true;
                     break;
                 case Skills.ESkillTestResult.CriticalSuccess:
-                    if (TryBeginMousePrimedSpellAfterRuneSuccess(i, true))
+                    if (TryBeginMousePrimedSpellAfterRuneSuccess(i, true) || MissileHasNoRoom(i, null))
                     {
                         break;
                     }
@@ -2233,16 +2239,16 @@ public class Magic : MonoBehaviour
             CastCreateFood();
             break;
         case "OJ":
-            CastProjectile(EObjectType.MagicMissile, mouseWorldAimDirOpt);
+            success = CastProjectile(EObjectType.MagicMissile, mouseWorldAimDirOpt);
             break;
         case "OG":
-            CastProjectile(EObjectType.LightningBolt, mouseWorldAimDirOpt);
+            success = CastProjectile(EObjectType.LightningBolt, mouseWorldAimDirOpt);
             break;
         case "PF":
-            CastProjectile(EObjectType.Fireball, mouseWorldAimDirOpt);
+            success = CastProjectile(EObjectType.Fireball, mouseWorldAimDirOpt);
             break;
         case "ZZZ":
-            CastProjectile(EObjectType.Acid, mouseWorldAimDirOpt);
+            success = CastProjectile(EObjectType.Acid, mouseWorldAimDirOpt);
             break;
         case "QC":
             CastCreateFear();
@@ -2393,12 +2399,85 @@ public class Magic : MonoBehaviour
         ParticleSpawner.SpawnParticle(EParticleType.MagicCreateFood, start);
     }
 
-    void CastProjectile(EObjectType type, Vector3? aimDirFromCameraOpt = null)
+    /// <summary>The missile a spell launches, or 0 for a spell that launches none.</summary>
+    private static EObjectType GetSpellMissile(string runes)
+    {
+        return runes switch
+        {
+            "OJ" => EObjectType.MagicMissile,
+            "OG" => EObjectType.LightningBolt,
+            "PF" => EObjectType.Fireball,
+            "ZZZ" => EObjectType.Acid,
+            _ => 0,
+        };
+    }
+
+    /// <summary>
+    /// Whether spell i is a missile with no room to leave the player (Projectile.HasRoomToLaunch()).
+    /// The original then says so and takes no mana (UW.EXE 0x3488e), so this is asked before the
+    /// mana is paid.
+    /// </summary>
+    private bool MissileHasNoRoom(int i, Vector3? aimDirFromCameraOpt)
+    {
+        EObjectType missile = GetSpellMissile(spells[i].runes);
+        if (missile == 0)
+        {
+            return false;
+        }
+
+        GetMissileLaunch(aimDirFromCameraOpt, out Vector3 start, out Vector3 dir);
+        if (Projectile.HasRoomToLaunch(missile, PlayerObject.Player.gameObject,
+                PlayerObject.Player.cachedCharacterController.radius, start, dir))
+        {
+            return false;
+        }
+
+        // "There is not enough room to release that spell."
+        Messages.Add(1, 255);
+        return true;
+    }
+
+    /// <summary>
+    /// Launches a missile spell, unless it has no room to leave the player: then it says so and
+    /// returns false (UW.EXE 0x3488e), and a wand keeps its charge.
+    /// </summary>
+    bool CastProjectile(EObjectType type, Vector3? aimDirFromCameraOpt = null)
+    {
+        GetMissileLaunch(aimDirFromCameraOpt, out Vector3 start, out Vector3 dir);
+        if (!Projectile.HasRoomToLaunch(type, PlayerObject.Player.gameObject,
+                PlayerObject.Player.cachedCharacterController.radius, start, dir))
+        {
+            // "There is not enough room to release that spell."
+            Messages.Add(1, 255);
+            return false;
+        }
+
+        Projectile proj = LevelLoader.CreateObjectOfType(type) as Projectile;
+        if (proj != null)
+        {
+            // Initialize name properties so projectile has proper name
+            proj.PostLoadInitialize();
+            proj.projectileOwner = PlayerObject.Player.gameObject;
+            proj.gameObject.transform.SetPositionAndRotation(start, Quaternion.LookRotation(dir, Vector3.up));
+            LevelLoader.AddToWorld(proj);
+            Rigidbody rb = proj.gameObject.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                // set velocity
+                rb.linearVelocity = 10.0f * dir;
+            }
+            proj.doDamage = true;
+        }
+        return true;
+    }
+
+    /// <summary>Where a missile spell leaves the player from, and which way it goes.</summary>
+    private static void GetMissileLaunch(Vector3? aimDirFromCameraOpt, out Vector3 start, out Vector3 dir)
     {
         // aim the projectile at whatever is being looked at
         int layerMask = LayerMasks.EnvironmentAndCeiling | (1 << LayerMask.NameToLayer("Characters"));
-        Vector3 start = PlayerObject.Player.mainCamera.transform.position;
-        Vector3 dir = aimDirFromCameraOpt ?? PlayerObject.Player.mainCamera.transform.forward;
+        start = PlayerObject.Player.mainCamera.transform.position;
+        dir = aimDirFromCameraOpt ?? PlayerObject.Player.mainCamera.transform.forward;
         if (dir.sqrMagnitude < 1e-8f)
         {
             dir = PlayerObject.Player.mainCamera.transform.forward;
@@ -2417,23 +2496,6 @@ public class Magic : MonoBehaviour
         }
         start = PlayerObject.Player.transform.position + 0.6f * Vector3.up;
         dir = (target - start).normalized;
-        
-        Projectile proj = LevelLoader.CreateObjectOfType(type) as Projectile;
-        if (proj != null)
-        {
-            // Initialize name properties so projectile has proper name
-            proj.PostLoadInitialize();
-            proj.projectileOwner = PlayerObject.Player.gameObject;
-            proj.gameObject.transform.SetPositionAndRotation(start, Quaternion.LookRotation(dir, Vector3.up));
-            LevelLoader.AddToWorld(proj);
-            Rigidbody rb = proj.gameObject.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                // set velocity
-                rb.linearVelocity = 10.0f * dir;
-            }
-            proj.doDamage = true;
-        }
     }
 
     void CastCreateFear()

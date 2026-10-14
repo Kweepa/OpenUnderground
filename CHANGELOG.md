@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Mages cast from afar and no longer die of their own fireballs: they keep their distance, back away slowly when you close in, and up close throw a knife or strike with the staff instead. Creatures that back away from you now walk backwards. As in the original, a spell, an arrow or a sling stone with no room to leave its caster is not released: you get "There is not enough room to release that spell." and keep your mana, or "You need more space to fire that weapon."
+
 - Creatures run from a fight as in the original, by their courage and their wounds: mages and goblins break and flee, skeletons and golems fight on unless one blow takes half their life, and one you shoot from afar charges you instead. A creature that has fled keeps away from you, fights back when cornered, and calms down once it can no longer see or hear you.
 
 - A creature that a light blow only upset no longer starts a fight after flinching from it.
