@@ -59,6 +59,12 @@ time.
 |-|-|
 |Right stick click (R3), hold|Quicksave (five are kept, the sixth replaces the oldest)|
 
+### Sleeping
+
+|Control|Action|
+|-|-|
+|D-pad left, hold|Sleep, on a bedroll if there is one in your pack|
+
 ### Inventory
 
 |Control|Action|
@@ -177,6 +183,12 @@ Look speed and invert options are in Options.
 |-|-|
 |F5|Quicksave (five are kept, the sixth replaces the oldest)|
 |Mouse wheel|Scroll the save and load lists|
+
+### Sleeping
+
+|Control|Action|
+|-|-|
+|F10|Sleep, on a bedroll if there is one in your pack|
 
 ### Inventory
 

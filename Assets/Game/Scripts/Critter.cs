@@ -2689,6 +2689,145 @@ public class Critter : UUObject
         hasStartedAlertMusicForCurrentDetection = false;
     }
 
+    /// <summary>
+    /// Whether a creature stops the player from lying down: one within two tiles that knows he is there
+    /// and hunts him (UW.EXE 0x711e1 over the 5x5 tiles around him, 0x7116e). The original asks for goal
+    /// 4, 5 or 9 with the seen bit; the remake has no goal machine, and a hostile creature with the seen
+    /// bit is the one that would be on those goals.
+    /// </summary>
+    public static bool HuntsPlayerNear()
+    {
+        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
+        foreach (Critter c in FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            Vector2Int tile = TileOf(c.transform.position);
+            if (Mathf.Abs(tile.x - playerTile.x) <= 2 && Mathf.Abs(tile.y - playerTile.y) <= 2
+                && c.hp > 0 && c.awareOfPlayer && c.attitude == EAttitude.Hostile && !c.playerAlly)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The ambush on a sleeping player (UW.EXE 0x71670, 0x7120c): the creatures within eight tiles of
+    /// him, walked as the original walks them, x outer and y inner, and the first that accepts comes and
+    /// wakes him. Whether one did.
+    /// </summary>
+    public static bool AmbushSleeper()
+    {
+        Vector2Int playerTile = TileOf(PlayerObject.Player.transform.position);
+        var near = new List<Critter>();
+        foreach (Critter c in FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            Vector2Int tile = TileOf(c.transform.position);
+            if (Mathf.Abs(tile.x - playerTile.x) <= 8 && Mathf.Abs(tile.y - playerTile.y) <= 8)
+            {
+                near.Add(c);
+            }
+        }
+
+        near.Sort((a, b) =>
+        {
+            Vector2Int ta = TileOf(a.transform.position);
+            Vector2Int tb = TileOf(b.transform.position);
+            return ta.x != tb.x ? ta.x.CompareTo(tb.x) : ta.y.CompareTo(tb.y);
+        });
+
+        foreach (Critter c in near)
+        {
+            if (c.TryAmbush(playerTile))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// One creature's answer to the ambush (UW.EXE 0x7120c): a hostile creature, on a coin toss, within
+    /// √3 territories of the player and with a way to him, is put two steps short of his tile, knowing
+    /// where he is. The original's way may cost nothing at all, no drop and no jump; here it is the
+    /// creature's own path, kept off lava. The original also sets off the wards on that way, but with
+    /// no one to hurt they do nothing (0x846ec).
+    /// </summary>
+    private bool TryAmbush(Vector2Int playerTile)
+    {
+        if (hp <= 0 || state is EState.Die or EState.Dead or EState.Cleanup
+            || attitude != EAttitude.Hostile || playerAlly || cachedCharacterController == null)
+        {
+            return false;
+        }
+
+        if (Random.Range(0, 2) == 0)
+        {
+            return false;
+        }
+
+        Vector2Int ownTile = TileOf(transform.position);
+        int dx = ownTile.x - playerTile.x;
+        int dy = ownTile.y - playerTile.y;
+        int territory = stats.Territory;
+        if (3 * territory * territory < dx * dx + dy * dy)
+        {
+            return false;
+        }
+
+        Tile source = LevelLoader.GetTile(ownTile.x, ownTile.y);
+        Tile target = LevelLoader.GetTile(playerTile.x, playerTile.y);
+        if (source == null || target == null
+            || !GetTilePath(out List<Tile> tiles, source, target, mayCrossLava: false))
+        {
+            return false;
+        }
+
+        // tiles[0] is its own tile and the last the player's: one already next to him is not taken.
+        int n = tiles.Count - 1;
+        if (n < 2)
+        {
+            return false;
+        }
+
+        Tile spot = tiles[n - 2];
+        if (spot != source)
+        {
+            CharacterController cc = cachedCharacterController;
+            Vector3 pos = spot.GetCenter();
+            pos.y = spot.GetFloorY(pos.x, pos.z) - cc.center.y + 0.5f * cc.height;
+            if (!FitsAt(pos))
+            {
+                return false;
+            }
+
+            cc.enabled = false;
+            transform.position = pos;
+            cc.enabled = true;
+            FitFlightHeight();
+        }
+
+        returningHome = false;
+        chaseBlocked = false;
+        awareOfPlayer = true;
+        SetState(EState.Idle);
+        return true;
+    }
+
+    // Whether the creature's body fits with its transform at pos (UW.EXE 0x29498 for the ambush).
+    private bool FitsAt(Vector3 pos)
+    {
+        CharacterController cc = cachedCharacterController;
+        float radius = cc.radius;
+        Vector3 centre = pos + cc.center;
+        Vector3 axis = Vector3.up * Mathf.Max(0.5f * cc.height - radius, 0.0f);
+        // A little off the floor, so that standing on it is not an overlap.
+        Vector3 lift = Vector3.up * 0.05f;
+        int mask = LayerMasks.EnvironmentOnly | (1 << LayerMask.NameToLayer("Characters"));
+        return !Physics.CheckCapsule(centre - axis + lift, centre + axis + lift, 0.9f * radius, mask, QueryTriggerInteraction.Ignore);
+    }
+
     private static Vector2Int TileOf(Vector3 position)
     {
         return new Vector2Int(Tile.GetTileX(position.x), Tile.GetTileY(position.z));

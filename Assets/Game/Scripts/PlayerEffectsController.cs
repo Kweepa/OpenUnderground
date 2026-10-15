@@ -183,9 +183,10 @@ public class PlayerEffectsController : MonoBehaviour
     }
 
     /// <summary>
-    /// Mushroom trip state is not serialized; clear runtime state and post-process after loading a save.
+    /// Ends the mushroom trip: after loading a save, since its state is not serialized, and at every
+    /// sleep, which clears the original's hallucination counter (UW.EXE 0x8205d).
     /// </summary>
-    public void ResetMushroomTripAfterLoad()
+    public void EndMushroomTrip()
     {
         currentDruggedState = DruggedState.Inactive;
         druggedStateTimer = 0f;

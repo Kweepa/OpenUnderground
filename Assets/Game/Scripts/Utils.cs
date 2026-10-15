@@ -1151,6 +1151,11 @@ public class Utils
         }
     }
     
+    /// <summary>
+    /// Whether the player can sleep off a drink here and live: Kweepa's rule, kept by the user's choice
+    /// of 17 October 2026. Passing out in a fight, with a hostile creature within four tiles, on lava
+    /// or in the Ethereal Void kills. The original has no such rule.
+    /// </summary>
     public static bool SafeToSleepOffDrink()
     {
         if (Music.GetMusicState() == EMusicState.Combat)
@@ -1186,49 +1191,32 @@ public class Utils
         return true;
     }
 
+    /// <summary>
+    /// Whether the player can lie down to sleep here (UW.EXE 0x81f8f): not in water or on lava, not in
+    /// the air, not on level 9, the Ethereal Void (message 20); and not with a hostile creature that
+    /// knows he is there within two tiles (message 14, Critter.HuntsPlayerNear()).
+    /// </summary>
     public static bool CanSleepHere(bool notify = false)
     {
-        if (Music.GetMusicState() == EMusicState.Combat)
+        PlayerObject player = PlayerObject.Player;
+        if (LevelLoader.sLevelLoader.loadedLevel == 9
+            || !player.cachedCharacterController.isGrounded
+            || player.isInWater
+            || player.TouchingLava)
         {
             if (notify)
             {
-                Messages.Add(1, 14);
+                Messages.Add(1, 20); // you can't go to sleep here
             }
 
             return false;
         }
 
-        // check for enemies nearby (within 4 tiles)
-        int count = Physics.OverlapSphereNonAlloc(PlayerObject.Player.mainCamera.transform.position, 4.0f * Tile.xzScale,
-                     cachedColliders, 1 << LayerMask.NameToLayer("Characters"));
-        for (int i = 0; i < count; i++)
-        {
-            Collider col = cachedColliders[i];
-            if (col is CharacterController)
-            {
-                Critter critter = col.transform.root.gameObject.GetComponent<Critter>();
-                if (critter != null && critter.attitude == Critter.EAttitude.Hostile && critter.hp > 0)
-                {
-                    if (notify)
-                    {
-                        Messages.Add(1, 14); // there are hostile creatures nearby
-                    }
-
-                    Array.Clear(cachedColliders, 0, count);
-                    return false;
-                }
-            }
-        }
-        Array.Clear(cachedColliders, 0, count);
-        
-        // check for trying to sleep in water, on lava, in the air, in the ethereal void, etc
-        if (LevelLoader.sLevelLoader.loadedLevel == 9
-            || !PlayerObject.Player.cachedCharacterController.isGrounded
-            || LevelLoader.GetClosestTile(PlayerObject.Player.transform.position).GetFloorTerrain() >= ETerrainType.Water)
+        if (Critter.HuntsPlayerNear())
         {
             if (notify)
             {
-                Messages.Add(1, 20); // you can't go to sleep here
+                Messages.Add(1, 14); // there are hostile creatures nearby
             }
 
             return false;

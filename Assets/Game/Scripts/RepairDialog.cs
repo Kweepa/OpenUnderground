@@ -412,12 +412,13 @@ public class RepairDialog : MonoBehaviour
         }
         else
         {
-            // Keep the original gamepad hint placement + click rects.
+            // The hints sit 10 higher than they did: at 25 off the foot, the labels touched the frame.
             int k = 20;
-            Rect bRect = new Rect(r.x + 50, r.y + r.height - 25 - k, k, k);
-            Rect bLabelRect = new Rect(r.x + 50 + k + 5, r.y + r.height - 25 - k, 150, k);
-            Rect aRect = new Rect(r.x + r.width - 170, r.y + r.height - 25 - k, k, k);
-            Rect aLabelRect = new Rect(r.x + r.width - 170 + k + 5, r.y + r.height - 25 - k, 150, k);
+            float footY = r.y + r.height - 35;
+            Rect bRect = new Rect(r.x + 50, footY - k, k, k);
+            Rect bLabelRect = new Rect(r.x + 50 + k + 5, footY - k, 150, k);
+            Rect aRect = new Rect(r.x + r.width - 170, footY - k, k, k);
+            Rect aLabelRect = new Rect(r.x + r.width - 170 + k + 5, footY - k, 150, k);
 
             if (bButton != null)
             {
@@ -432,8 +433,8 @@ public class RepairDialog : MonoBehaviour
             GUI.Label(aLabelRect, confirmLabel, repairDialogStyle);
 
             int kk = 20;
-            Rect cancelRect = new Rect(r.x + 50, r.y + r.height - 25 - kk, 200, kk + 8);
-            Rect confirmRect = new Rect(r.x + r.width - 220, r.y + r.height - 25 - kk, 200, kk + 8);
+            Rect cancelRect = new Rect(r.x + 50, footY - kk, 200, kk + 8);
+            Rect confirmRect = new Rect(r.x + r.width - 220, footY - kk, 200, kk + 8);
             if (GuiInput.TryConsumeClickInRect(cancelRect))
             {
                 CancelRepair();
