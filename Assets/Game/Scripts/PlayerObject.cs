@@ -1899,12 +1899,7 @@ public class PlayerObject : MonoBehaviour
             // the world tick calls the death of the player as soon as they are 0 (0x26565).
             if (PlayerData.sData.hp <= 0)
             {
-                PlayerData.sData.hp = 0;
-                PlayerData.sData.dead = true;
-                Music.Dead();
-
-                bool allowSaplingRebirth = PlayerData.sData.saplingPlanted && LevelLoader.sLevelLoader.loadedLevel != 9;
-                StartCoroutine(allowSaplingRebirth ? PlayRebirthCutscene() : PlayDeathCutscene());
+                Die();
             }
 
             DamageFlash flash = mainCamera.GetComponentInChildren<DamageFlash>();
@@ -1942,6 +1937,53 @@ public class PlayerObject : MonoBehaviour
                 GetComponentInChildren<ScreenShake>().Shake();
             }
         }
+    }
+
+    /// <summary>
+    /// A spell that backfires: <paramref name="dice"/>d8 taken straight off the hit points, with
+    /// no armour, resistance or easy mode. That is the original's damage effect 9 (UW.EXE
+    /// 0x34813), with two changes: the original never takes the hit points below 3 and does
+    /// nothing at 3 or less, while here a backfire can kill; and it has no grunt, which is kept
+    /// here as for any blow.
+    /// </summary>
+    public void DamageFromBackfire(int dice)
+    {
+        if (PlayerData.sData.dead || Cheats.sCheats.invincible)
+        {
+            return;
+        }
+
+        int damage = 0;
+        for (int i = 0; i < dice; ++i)
+        {
+            damage += Random.Range(1, 9);
+        }
+
+        PlayerData.sData.hp -= damage;
+        if (PlayerData.sData.hp <= 0)
+        {
+            Die();
+        }
+
+        DamageFlash flash = mainCamera.GetComponentInChildren<DamageFlash>();
+        if (flash != null)
+        {
+            flash.Flash(damage / 4.0f, EDamageType.Damage);
+        }
+
+        Rumble(0.1f, 0.2f, 0.3f);
+        PlayDamageGrunt(Math.Min(0.75f + damage / 8.0f, 1.0f));
+        GetComponentInChildren<ScreenShake>().Shake();
+    }
+
+    private void Die()
+    {
+        PlayerData.sData.hp = 0;
+        PlayerData.sData.dead = true;
+        Music.Dead();
+
+        bool allowSaplingRebirth = PlayerData.sData.saplingPlanted && LevelLoader.sLevelLoader.loadedLevel != 9;
+        StartCoroutine(allowSaplingRebirth ? PlayRebirthCutscene() : PlayDeathCutscene());
     }
 
     public void RestoreHealth(int health)

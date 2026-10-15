@@ -1883,12 +1883,16 @@ public class Magic : MonoBehaviour
                 switch (result)
                 {
                 case Skills.ESkillTestResult.CriticalFailure:
+                    // "The spell backfires." In the original a backfire is still a cast: it goes on
+                    // to the wait before the next cast and to the full mana (UW.EXE 0x78f67, then
+                    // 0x78fad and 0x78fd2), and casts effect 9 on the caster with circle / 2 as
+                    // its power (0x78f71). Effect 9 is circle / 2 d8 off the hit points (0x34813).
+                    // Only a plain failure skips all of this (0x78f5e).
                     Messages.Add(1, 214);
-                    PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, Random.Range(1, 6), EDamageType.Damage);
-                    // A backfire starts the wait before the next cast, as a cast that works does:
-                    // in the original a critical failure goes on to the same write (UW.EXE
-                    // 0x78f67, then 0x78fad), and only a plain failure skips it (0x78f5e).
+                    PayMana(spells[i].cost);
                     timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
+                    PlayerObject.Player.DamageFromBackfire(spells[i].circle / 2);
+                    PlayCastSound(i);
                     break;
                 case Skills.ESkillTestResult.Failure:
                     // "The incantation failed." The original prints 210 + its outcome code
