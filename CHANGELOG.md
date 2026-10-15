@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A spell that backfires costs its mana, as in the original, and hurts more the higher its circle, up to 4d8 on the eighth: enough to kill a weak caster.
+
 - Sleeping heals as in the original, and restores your mana too: well fed on a bedroll you wake with about two thirds of both back, otherwise about a third, and starving with nothing. A creature hunting nearby may come and wake you after a few hours ("Your sleep is interrupted!"), and on waking a line tells you how long you slept and how rested and hungry you are.
 
 - F10, or holding left on the D-pad, lies down to sleep anywhere, as in the original: a bedroll anywhere in your pack makes it a better night. The game asks before you sleep, and a hostile creature only keeps you awake when it is hunting you within two tiles.
