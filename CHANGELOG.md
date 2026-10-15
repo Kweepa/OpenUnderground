@@ -2,6 +2,14 @@
 
 ## Current release
 
+- Sleeping heals as in the original, and restores your mana too: well fed on a bedroll you wake with about two thirds of both back, otherwise about a third, and starving with nothing. A creature hunting nearby may come and wake you after a few hours ("Your sleep is interrupted!"), and on waking a line tells you how long you slept and how rested and hungry you are.
+
+- F10, or holding left on the D-pad, lies down to sleep anywhere, as in the original: a bedroll anywhere in your pack makes it a better night. The game asks before you sleep, and a hostile creature only keeps you awake when it is hunting you within two tiles.
+
+- Passing out from drink is a real night's sleep, with its healing and its risks, and passing out in water hurts, as in the original. Passing out with a hostile creature nearby is still death.
+
+- While you sleep, three open doors in ten swing shut, near ones as well, and a mushroom's visions end, as in the original.
+
 - Mages cast from afar and no longer die of their own fireballs: they keep their distance, back away slowly when you close in, and up close throw a knife or strike with the staff instead. Creatures that back away from you now walk backwards. As in the original, a spell, an arrow or a sling stone with no room to leave its caster is not released: you get "There is not enough room to release that spell." and keep your mana, or "You need more space to fire that weapon."
 
 - Creatures run from a fight as in the original, by their courage and their wounds: mages and goblins break and flee, skeletons and golems fight on unless one blow takes half their life, and one you shoot from afar charges you instead. A creature that has fled keeps away from you, fights back when cornered, and calms down once it can no longer see or hear you.

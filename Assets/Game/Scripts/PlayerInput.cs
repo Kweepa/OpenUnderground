@@ -187,6 +187,23 @@ public static class PlayerInput
         return GameInput.CurrentGamepad?.rightStickButton.isPressed ?? false;
     }
 
+    /// <summary>Keyboard F10 — sleep, the original's key for it (UW.EXE 0x82345).</summary>
+    public static bool SleepKeyPressed()
+    {
+        return GameInput.CurrentKeyboard?.f10Key.wasPressedThisFrame ?? false;
+    }
+
+    /// <summary>Gamepad D-pad left held down — sleep, which wants a hold.</summary>
+    /// <remarks>
+    /// During play the d-pad's left and right are the only inputs nothing else reads; up and down
+    /// scroll the message log. It answers to a hold, as the quicksave does, because sleeping is not
+    /// something to do by accident. The caller times the hold; this only says whether it is down.
+    /// </remarks>
+    public static bool SleepButtonHeld()
+    {
+        return GameInput.CurrentGamepad?.dpad.left.isPressed ?? false;
+    }
+
     /// <summary>Gamepad Y — use (mouse uses LMB hold / drag). Keyboard has no use binding.</summary>
     public static bool InteractUsePressed()
     {

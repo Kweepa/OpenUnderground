@@ -98,15 +98,6 @@ public abstract class Lockable : UUObject
         return true;
     }
 
-    /// <summary>Clears the locked flag without unlock audio or chain reactions.</summary>
-    public void ClearLockedFlag()
-    {
-        if (Locked(out UUObject lockObj))
-        {
-            lockObj.flags &= ~(1 << 0);
-        }
-    }
-    
     public override void TryInteract(UUObject originator, UUObject sender, EAction action)
     {
         bool isLocked = Locked(out UUObject lockObj);

@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections;
 
 public class Food : UUObject
 {
@@ -135,7 +134,8 @@ public class Food : UUObject
             switch (result)
             {
             case Skills.ESkillTestResult.CriticalFailure:
-                PlayerObject.Player.StartCoroutine(SleepItOff());
+                Messages.Add(1, 241);
+                PlayerObject.Player.StartCoroutine(Sleeping.Collapse());
                 break;
             case Skills.ESkillTestResult.Failure:
                 // screenshake
@@ -213,49 +213,6 @@ public class Food : UUObject
 
             return action;
         }
-    }
-
-    private IEnumerator SleepItOff()
-    {
-        PlayerObject.DisableControls(EControlMask.Resting, true);
-        
-        Messages.Add(1, 241);
-        
-        PlayerObject.Player.fadeIn = false;
-
-        while (PlayerObject.Player.fade < 1.0f)
-        {
-            PlayerObject.Player.fade += Time.unscaledDeltaTime;
-            yield return null;
-        }
-        PlayerObject.Player.fade = 1.0f;
-        
-        PlayerData.sData.gameTime += 8 * 60 * 60; // 8 hours
-        PlayerData.sData.drunkenness = 0;
-        PlayerData.sData.passedOutDrunk = true;
-
-        yield return new WaitForSeconds(1.0f);
-
-        if (!Utils.SafeToSleepOffDrink() && !Cheats.sCheats.invincible)
-        {
-            // go into the death routine
-            PlayerObject.DisableControls(EControlMask.Resting, false);
-            PlayerObject.Player.Damage(Skills.ESkillTestResult.Success, PlayerData.sData.hp + 1, EDamageType.Direct);
-            yield break;
-        }
-        
-        Messages.Add(1, 243);
-        
-        Door.CloseRandomDoors();
-
-        while (PlayerObject.Player.fade > 0.0f)
-        {
-            PlayerObject.Player.fade -= Time.unscaledDeltaTime;
-            yield return null;
-        }
-        PlayerObject.Player.fade = 0.0f;
-
-        PlayerObject.DisableControls(EControlMask.Resting, false);
     }
 
     protected override int GetQualityOffset()

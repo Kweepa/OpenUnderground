@@ -364,6 +364,9 @@ public class PlayerObject : MonoBehaviour
     private bool touchingWater;
     private bool touchingLava;
 
+    /// <summary>Whether the player stands in lava, whatever protects him from it (Utils.CanSleepHere()).</summary>
+    public bool TouchingLava => touchingLava;
+
     /// <summary>
     /// How loud the player is, 0 to 15, as creatures hear him (Perception, Critter.PerceivePlayer()).
     /// </summary>

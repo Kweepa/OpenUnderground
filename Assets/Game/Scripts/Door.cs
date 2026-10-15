@@ -774,18 +774,19 @@ public class Door : Lockable
         arialCutscene = null;
     }
 
-    public static void CloseRandomDoors()
+    /// <summary>
+    /// Closes some of the open doors while the player sleeps (UW.EXE 0x850c4, called by the sleep with 0):
+    /// each one with a chance of 3 in 10, at any distance, except those on a tile with bit 15 set, the high
+    /// bit of doorFrob, which the original leaves as the player left them.
+    /// </summary>
+    public static void CloseDoorsInSleep()
     {
         foreach (Door d in FindObjectsByType<Door>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
             if (d.isOpen
-                && !LevelLoader.GetLevel().pvs.IsVisible(d.initialTile)
-                && Random.value < 0.1)
+                && (d.initialTile == null || (d.initialTile.doorFrob & 2) == 0)
+                && Random.Range(0, 10) < 3)
             {
-                if (d.type != EObjectType.Portcullis)
-                {
-                    d.ClearLockedFlag();
-                }
                 d.opening = false;
             }
         }

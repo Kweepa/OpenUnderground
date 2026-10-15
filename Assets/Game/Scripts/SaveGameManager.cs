@@ -795,7 +795,7 @@ public class SaveGameManager : MonoBehaviour
             // Create lava lights for the loaded level
             LevelLoader.sLevelLoader.CreateLavaLights();
 
-            PlayerObject.Player?.GetComponent<PlayerEffectsController>()?.ResetMushroomTripAfterLoad();
+            PlayerObject.Player?.GetComponent<PlayerEffectsController>()?.EndMushroomTrip();
             PlayerObject.Player?.StartAfterLoad();
             
             ++gamesLoaded;

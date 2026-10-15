@@ -11,6 +11,10 @@ public class PlayerPanelInput : MonoBehaviour
     private const float WalkDismissDuration = 3f;
     private float continuousWalkDismissTime;
 
+    private const float SleepHoldSeconds = 0.85f;
+    private float sleepHoldTime;
+    private bool sleepDoneThisHold;
+
     private static PlayerPanelInput sInstance;
 
     private void Awake()
@@ -147,9 +151,44 @@ public class PlayerPanelInput : MonoBehaviour
             ToggleStatsPanel();
         }
 
+        UpdateSleepInput();
+
         TryDismissPanelsFromContinuousWalk();
 
         GameplayCursorPolicy.Apply(PlayerObject.Player);
+    }
+
+    /// <summary>
+    /// The sleep input: F10 at once, with a panel open as well as closed, and the gamepad's d-pad held
+    /// left for <see cref="SleepHoldSeconds"/>, only while nothing else has the controls - the panels
+    /// read the d-pad for their cursors. Once per hold, as the quicksave.
+    /// </summary>
+    private void UpdateSleepInput()
+    {
+        const EControlMask sleepKeyFree = EControlMask.Magic | EControlMask.Inventory;
+        if ((PlayerObject.Player.controlsDisabled & ~sleepKeyFree) == 0 && PlayerInput.SleepKeyPressed())
+        {
+            Sleeping.TryFromKey();
+        }
+
+        if (!PlayerObject.Player.controlsActive || !PlayerInput.SleepButtonHeld())
+        {
+            sleepHoldTime = 0.0f;
+            sleepDoneThisHold = false;
+            return;
+        }
+
+        if (sleepDoneThisHold)
+        {
+            return;
+        }
+
+        sleepHoldTime += Time.unscaledDeltaTime;
+        if (sleepHoldTime >= SleepHoldSeconds)
+        {
+            sleepDoneThisHold = true;
+            Sleeping.TryFromKey();
+        }
     }
 
     private static void ToggleMagic()
