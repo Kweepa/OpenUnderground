@@ -11,6 +11,13 @@ public class TrapTextClip
     public int tileY;
 }
 
+[System.Serializable]
+public class TrapSaveData : UUObjectSaveData
+{
+    // Absent in an older save, so a trap that has made nothing yet.
+    public int creatureCopiesMade;
+}
+
 public class Trap : UUObject
 {
     public TrapTextClip[] textClips;
@@ -18,6 +25,9 @@ public class Trap : UUObject
     public AudioClip movingPlatformSound;
     
     private readonly Collider[] cachedColliders = new Collider[16];
+
+    // How many creatures this trap has made when the player set it off (CountCreatureCopy).
+    private int creatureCopiesMade;
     
     public override void TryInteract(UUObject originator, UUObject sender, EAction action)
     {
@@ -182,6 +192,7 @@ public class Trap : UUObject
                 {
                     UUObject newObject = Instantiate(templateObject);
                     newObject.name = templateObject.name;
+                    newObject.originalLevel = 0; // a copy: the template's slot stays the template's
                     newObject.gameObject.SetActive(true);
 
                     Tile t = LevelLoader.GetTile(2, 7); // this is a spot behind the player (unless they use telekinesis)
@@ -189,6 +200,7 @@ public class Trap : UUObject
                     newObject.y = 3;
                     newObject.WorldInitialize(t, t.x, t.y);
                     newObject.PostLoadInitialize();
+                    CountCreatureCopy(newObject);
                 }
             }
             break;
@@ -210,7 +222,7 @@ public class Trap : UUObject
             }
             break;
         case EObjectType.CreateObjectTrap:
-            DoCreateObjectTrap(sender);
+            CountCreatureCopy(DoCreateObjectTrap(sender));
             doChain = false;
             break;
         case EObjectType.DoorTrap:
@@ -607,6 +619,78 @@ public class Trap : UUObject
         return initialTile;
     }
 
+    /// <summary>
+    /// Counts a creature this trap has just made because the player set it off, and marks it as a
+    /// repeat from the second one on.
+    /// </summary>
+    /// <remarks>
+    /// Ours, not the original's, which pays experience for every kill, a trap's copies included
+    /// (UW.EXE 0x25b35): a trap the player can set off again and again was a well of experience and
+    /// loot, and the level 3 skeleton behind the three buttons is the case. The mark is only a fact
+    /// about the creature; whether it costs the reward is the player's option,
+    /// PlayerInput.RewardOnlyFirstTrapCopy, read when the reward would come (Critter.WithholdsReward).
+    /// Only the triggers reach this, and every trigger is the player's doing: the repopulation calls
+    /// DoCreateObjectTrap() directly, so the creatures the dungeon brings back by itself are never
+    /// counted.
+    /// </remarks>
+    private void CountCreatureCopy(UUObject made)
+    {
+        if (made is Critter critter)
+        {
+            ++creatureCopiesMade;
+            critter.repeatTrapCopy = creatureCopiesMade > 1;
+        }
+    }
+
+    protected override void PopulateSaveData(LevelObjectSaveData data)
+    {
+        base.PopulateSaveData(data);
+
+        if (data is TrapSaveData trapData)
+        {
+            trapData.creatureCopiesMade = creatureCopiesMade;
+        }
+    }
+
+    protected override void RestoreFromSaveData(LevelObjectSaveData data)
+    {
+        base.RestoreFromSaveData(data);
+
+        if (data is TrapSaveData trapData)
+        {
+            creatureCopiesMade = trapData.creatureCopiesMade;
+        }
+    }
+
+    // The same record UUObject.SaveToData() writes, with the count.
+    public override ObjectSaveData SaveToData()
+    {
+        TrapSaveData data = new TrapSaveData();
+        PopulateSaveData(data);
+
+        return new ObjectSaveData
+        {
+            objectName = name,
+            objectTypeName = GetType().Name,
+            objectType = (int)type,
+            objectIndex = objectIndex,
+            level = levelIndex,
+            originalLevel = originalLevel,
+            jsonData = JsonUtility.ToJson(data)
+        };
+    }
+
+    public override void LoadFromData(ObjectSaveData objData)
+    {
+        if (objData == null || string.IsNullOrEmpty(objData.jsonData))
+        {
+            return;
+        }
+
+        TrapSaveData data = JsonUtility.FromJson<TrapSaveData>(objData.jsonData);
+        RestoreFromSaveData(data);
+    }
+
     public UUObject DoCreateObjectTrap(UUObject sender)
     {
         // spawns an object from a template
@@ -620,6 +704,11 @@ public class Trap : UUObject
                 {
                     UUObject newObject = Instantiate(templateObject);
                     newObject.name = templateObject.name;
+                    // A copy is made at run time, like a shelf or a summoned creature. Keeping the
+                    // template's level let a save put the copy in the template's slot of objects[],
+                    // and once that copy died the trap found nothing to copy: the level 3 skeleton
+                    // stopped coming after a reload. The index stays, for the logs.
+                    newObject.originalLevel = 0;
                     newObject.gameObject.SetActive(true);
 
                     if (newObject is Critter spawnedFromTemplate)
