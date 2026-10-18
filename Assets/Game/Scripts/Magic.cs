@@ -143,13 +143,30 @@ public class Magic : MonoBehaviour
     private const float RuneShelfWidth
         = 2 * RuneShelfEdgeX + MaxRunesOnShelf * RuneOnShelfWidth + (MaxRunesOnShelf - 1) * RuneShelfGapPixels;
 
-    // The row at the bottom left: the mana flask, the rune shelf beside it, then the worn spells as
-    // tall as the shelf; the timed spells stack above the shelf. The row is 16 pixels of the shelf at
-    // 3.6, rounded, and stands as far from the bottom edge as the panels from the top.
+    // The row at the bottom left: the mana flask, the rune shelf beside it, then the worn spells
+    // and the stamina gauge under them; the timed spells stack above the shelf. The row is 16
+    // pixels of the shelf at 3.6, rounded, and stands as far from the bottom edge as the panels from
+    // the top.
     private const float FlaskWidth = 3 * 24;
     private const float HudRowX = PlayerPanelState.PanelMargin + FlaskWidth + 10;
     private const int HudRowHeight = 58;
     private const float HudRowFromBottom = PlayerPanelState.PanelMargin + HudRowHeight;
+
+    // The time left on a timed spell and the stamina are drawn the same way, as gauges: a white
+    // line 5 tall over a dark track as long as a full one, so the part spent shows, both on a black
+    // line one pixel tall for contrast on a bright floor. A timed spell's is 150 long at full time.
+    private const int GaugeHeight = 5;
+    private const int GaugeShadow = 1;
+    private const float SpellGaugeWidth = 150;
+    private static readonly Color GaugeTrackColor = new(0.25f, 0.25f, 0.25f, 0.8f);
+
+    // The stamina gauge runs under the worn spells, standing on the bottom of the row. The white is
+    // as long as the seconds of sprint left, the track as the seconds of a full bar, and at Acrobat
+    // 30 a full bar is three times a timed spell's at full time. The worn spells shrink to keep four
+    // pixels above it, their top still the shelf's.
+    private const int StaminaGaugeGap = 4;
+    private const float StaminaGaugeFullWidth = 3 * SpellGaugeWidth;
+    private const int WornIconHeight = HudRowHeight - StaminaGaugeGap - GaugeHeight - GaugeShadow;
 
     /// <summary>Top of the bottom row, for whatever has to keep clear of it: the messages.</summary>
     public static float HudRowTop => Screen.height - HudRowFromBottom;
@@ -4000,6 +4017,34 @@ public class Magic : MonoBehaviour
         DrawTex(slotX + (height - width) / 2, y, width, height, tex);
     }
 
+    /// <summary>
+    /// A gauge with its top at x, y: a white line left long, over a dark track full long, both on
+    /// a black line. See GaugeHeight.
+    /// </summary>
+    private void DrawGauge(float x, float y, float full, float left)
+    {
+        left = Mathf.Min(left, full);
+        Color previousGuiColor = GUI.color;
+        GUI.color = Color.black;
+        DrawTex(x, y + GaugeHeight, full, GaugeShadow, Texture2D.whiteTexture);
+        GUI.color = GaugeTrackColor;
+        DrawTex(x + left, y, full - left, GaugeHeight, Texture2D.whiteTexture);
+        GUI.color = previousGuiColor;
+        if (left > 0)
+        {
+            DrawTex(x, y, left, GaugeHeight, Texture2D.whiteTexture);
+        }
+    }
+
+    /// <summary>The stamina gauge, from x and standing on bottom. See StaminaGaugeFullWidth.</summary>
+    private void DrawStaminaGauge(float x, float bottom)
+    {
+        float pixelsPerSecond = StaminaGaugeFullWidth / PlayerObject.MaxSprintSeconds;
+        float full = Mathf.Round(pixelsPerSecond * Mathf.Min(PlayerObject.Player.SprintSecondsFull, PlayerObject.MaxSprintSeconds));
+        float left = Mathf.Round(pixelsPerSecond * PlayerObject.Player.SprintSecondsLeft);
+        DrawGauge(x, bottom - GaugeShadow - GaugeHeight, full, left);
+    }
+
     public void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Magic;
@@ -4028,7 +4073,8 @@ public class Magic : MonoBehaviour
             DrawIcon(HudRowX, y, 64, tex);
             GUI.Label(new Rect(HudRowX + 68, y + 20, 100, 20), spell.name, style);
             float fullTime = activeSpells[i].fullTime > 0 ? activeSpells[i].fullTime : spell.duration;
-            DrawTex(HudRowX + 68, y + 50, 150 * Mathf.Min(activeSpells[i].time / fullTime, 1), 5, Texture2D.whiteTexture);
+            DrawGauge(HudRowX + 68, y + 50, SpellGaugeWidth,
+                Mathf.Round(SpellGaugeWidth * Mathf.Min(activeSpells[i].time / fullTime, 1)));
 
             if (i == activeSpellCursor && tex != null)
             {
@@ -4057,11 +4103,15 @@ public class Magic : MonoBehaviour
         {
             // The worn icons sat 64 apart, which left 21 pixels between two 48 tall icons once they
             // were drawn their own width; half of that gap is enough, and it stays as they grow.
-            const float wornIconWidth = HudRowHeight * 16f / 18;
+            const float wornIconWidth = WornIconHeight * 16f / 18;
             const float wornIconGap = (64 - 48f * 16 / 18) / 2;
             const float wornIconStep = wornIconWidth + wornIconGap;
             // after the rune shelf, with the gap there is between two icons
-            float psx = HudRowX + RuneShelfWidth + (wornIconStep - wornIconWidth) - (HudRowHeight - wornIconWidth) / 2;
+            float wornLeft = HudRowX + RuneShelfWidth + wornIconGap;
+            float psx = wornLeft - (WornIconHeight - wornIconWidth) / 2;
+
+            DrawStaminaGauge(Mathf.Round(wornLeft), Screen.height - PlayerPanelState.PanelMargin);
+
             // Only the stronger of the two protections counts (GetResistances()), so only it is shown.
             bool greaterProtectionShown = IsSpellKnownActive(ESpell.GreaterMagicProtection);
             foreach (SPermanentSpell spell in permanentSpells)
@@ -4072,7 +4122,7 @@ public class Magic : MonoBehaviour
                     int icon = spells[(int)spell.spell].icon;
                     if (icon >= 0)
                     {
-                        DrawIcon(psx, Screen.height - HudRowFromBottom, HudRowHeight, SpellIcons.Get(icon));
+                        DrawIcon(psx, Screen.height - HudRowFromBottom, WornIconHeight, SpellIcons.Get(icon));
                         psx += wornIconStep;
                     }
                 }
@@ -4082,7 +4132,7 @@ public class Magic : MonoBehaviour
             // the lava, so they are not among the permanent spells. Nothing to identify on them.
             if (Inventory.sInv != null && Inventory.sInv.Wearing(EObjectType.DragonskinBoots))
             {
-                DrawIcon(psx, Screen.height - HudRowFromBottom, HudRowHeight, SpellIcons.Get(SpellIcons.LavaResistance));
+                DrawIcon(psx, Screen.height - HudRowFromBottom, WornIconHeight, SpellIcons.Get(SpellIcons.LavaResistance));
             }
         }
 

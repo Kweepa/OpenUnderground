@@ -854,10 +854,24 @@ public class PlayerObject : MonoBehaviour
     /// </remarks>
     private float SprintDrainTime()
     {
-        return staminaDrainTime * (0.8f + 3.2f * Skills.GetSkill(ESkill.Acrobat) / 30.0f);
+        return SprintDrainTime(Skills.GetSkill(ESkill.Acrobat));
     }
 
-    /// <inheritdoc cref="SprintDrainTime"/>
+    private static float SprintDrainTime(int acrobat)
+    {
+        return staminaDrainTime * (0.8f + 3.2f * acrobat / 30.0f);
+    }
+
+    /// <summary>Seconds of sprint a full stamina bar holds, for the gauge: it grows with Acrobat.</summary>
+    public float SprintSecondsFull => SprintDrainTime();
+
+    /// <summary>Seconds of sprint left in the stamina bar, for the gauge.</summary>
+    public float SprintSecondsLeft => stamina * SprintDrainTime();
+
+    /// <summary>Seconds of sprint a full bar holds at Acrobat 30, the longest the gauge gets.</summary>
+    public static float MaxSprintSeconds => SprintDrainTime(30);
+
+    /// <inheritdoc cref="SprintDrainTime()"/>
     private float SprintRecoverTime()
     {
         // Cannot reach zero: that would need Acrobat 60 and the cap is 30. Floored anyway.
