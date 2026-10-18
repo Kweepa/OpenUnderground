@@ -166,6 +166,8 @@ public static class GameInput
         !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.eKey.wasPressedThisFrame ?? false);
     public static bool RKeyPressedThisFrame() =>
         !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.rKey.wasPressedThisFrame ?? false);
+    public static bool FKeyPressedThisFrame() =>
+        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.fKey.wasPressedThisFrame ?? false);
 
     public static bool ShoulderLeftPressedThisFrame() => CurrentGamepad?.leftShoulder.wasPressedThisFrame ?? false;
     public static bool ShoulderRightPressedThisFrame() => CurrentGamepad?.rightShoulder.wasPressedThisFrame ?? false;

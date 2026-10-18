@@ -852,7 +852,8 @@ public class TutorialManager : MonoBehaviour
             if (mouseUi)
             {
                 return "Click the left mouse button to examine things. "
-                       + "Move (WASD) close enough that an item name turns yellow, then hold or drag the left mouse button to pick it up.";
+                       + "Move (WASD) close enough that an item name turns yellow, then hold or drag the left mouse button to pick it up, "
+                       + "or press F to put it straight into your pack.";
             }
 
             return "Press X to examine things. "
@@ -914,7 +915,7 @@ public class TutorialManager : MonoBehaviour
         case ETutorialStep.Interactable:
             if (mouseUi)
             {
-                return "Hold the left mouse button to use switches, doors, and other interactables when you are close enough.";
+                return "Hold the left mouse button, or press F, to use switches, doors, and other interactables when you are close enough.";
             }
 
             return "Press Y to use switches, doors, and other interactables when you are close enough.";

@@ -810,9 +810,10 @@ public class UUObject : LevelObject
                     
                     // Remove from level.objects[] array recursively (handles containers and their contents)
                     RemoveFromLevelObjectsRecursive();
-                    if (GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+                    TutorialManager.NotifyPickup();
+                    if (Interaction.sInt != null && Interaction.sInt.KeyboardUse)
                     {
-                        TutorialManager.NotifyPickup();
+                        Inventory.sInv.ShowPanelOn(this);
                     }
 
                     // A pick-up does not hand the object's list a use: that is what a use is for.
@@ -838,7 +839,8 @@ public class UUObject : LevelObject
     }
 
     /// <param name="worldDragToHandOnly">From right-hold/drag pickup: hold in cursor only; do not merge or add to inventory until placed.</param>
-    public void PickUpSome(int howMany, bool worldDragToHandOnly)
+    /// <param name="showInInventory">From the F key: open the inventory on what was put in the pack.</param>
+    public void PickUpSome(int howMany, bool worldDragToHandOnly, bool showInInventory = false)
     {
         if (howMany == 0)
             return;
@@ -869,6 +871,7 @@ public class UUObject : LevelObject
             return;
         }
 
+        UUObject picked = this;
         if (howMany == quantity)
         {
             gameObject.SetActive(false);
@@ -884,6 +887,12 @@ public class UUObject : LevelObject
             obj.PostLoadInitialize();
             Inventory.Add(obj);
             quantity -= howMany;
+            picked = obj;
+        }
+
+        if (showInInventory)
+        {
+            Inventory.sInv.ShowPanelOn(picked);
         }
 
         TutorialManager.NotifyPickup();

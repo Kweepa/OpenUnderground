@@ -2,6 +2,8 @@
 
 ## Current release
 
+- F uses what you point at, like Y on the pad: a door or a lever works at once, and an item goes straight into your pack instead of onto the cursor, with the inventory opening on it. With an item already on the cursor, F puts it in your pack.
+
 - The number beside the paperdoll now says what it is: point at it, or move onto it with the d-pad, and the top of the panel reads "carry weight left". On the d-pad the two hands now name their numbers too, as they did under the pointer.
 
 - A white line under the worn spells shows the stamina left for sprinting. It gets longer as Acrobat grows, shortens while you sprint and fills back up when you stop. The worn spell icons are a little smaller to make room for it. This line and those of the timed spells have a dark track behind them for the part used up.
