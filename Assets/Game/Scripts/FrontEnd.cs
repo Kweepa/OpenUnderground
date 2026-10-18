@@ -27,15 +27,13 @@ public class FrontEnd : MonoBehaviour
     public AudioClip makeSelection;
     public AudioClip backSelection;
     
-    [Header("Music")]
-    [Tooltip("XMI music file to play on the title screen (e.g., UW01.XMI)")]
-    public string titleMusicTrack = "UW01.XMI";
-
     public GUIStyle style;
 
     public Texture2D[] achievementsButton;
     /// <summary>Title-menu Quit art: [0]=Lit (unselected), [1]=Unlit (selected), same order as achievementsButton.</summary>
     public Texture2D[] quitButton;
+    /// <summary>Title-menu Setup art, in the same order.</summary>
+    public Texture2D[] setupButton;
     public Texture2D achievementsBackground;
     public GUIStyle achievementHeaderStyle;
     
@@ -74,10 +72,12 @@ public class FrontEnd : MonoBehaviour
         PortCredits,
         CreateCharacter,
         Achievements,
+        Setup,
         Done
     }
 
     private EState state = EState.Initialize;
+    private SetupScreen setupScreen;
     private CutscenePlayer cutscene;
     private CreateCharacter creator;
     private int menuIndex;
@@ -110,6 +110,11 @@ public class FrontEnd : MonoBehaviour
 
     [System.NonSerialized] private Texture2D[] dropShadows;
     [System.NonSerialized] private Texture2D[] buttons;
+    // The first and the last-plus-one rows of each slot's letters, counted from the top of its image.
+    [System.NonSerialized] private int[] glyphTop;
+    [System.NonSerialized] private int[] glyphBottom;
+    // The row just under the line the small letters stand on, counted from the top of the image.
+    [System.NonSerialized] private int[] baselineRow;
 
     // The load list is whatever is on disk, newest first, so it has no fixed length and it scrolls.
     // loadScroll is the first row drawn.
@@ -125,30 +130,68 @@ public class FrontEnd : MonoBehaviour
     private const float OpeningScreenCropTop = 27f;
     private const float OpeningScreenVirtualHeight = 200f;
 
+    // Texture slots in the order the menu shows them. Setup is slot 6 so that the slots of the
+    // entries before it keep their numbers; without saves Journey Onward is not shown.
+    private static readonly int[] slotsWithSaves = { 0, 1, 2, 3, SetupSlot, JourneyOnwardSlot, QuitSlot };
+    private static readonly int[] slotsWithoutSaves = { 0, 1, 2, 3, SetupSlot, QuitSlot };
+
     private int MenuItemCount()
     {
-        return hasSaves ? 6 : 5;
+        return hasSaves ? slotsWithSaves.Length : slotsWithoutSaves.Length;
     }
 
     /// <summary>
-    /// Maps visible menu index to fixed texture slot (0–5). Without saves, index 4 is Quit (slot 5).
+    /// Maps visible menu index to fixed texture slot (0–6).
     /// </summary>
     private int MenuItemToSlot(int menuItemIndex)
     {
-        if (hasSaves)
-        {
-            return menuItemIndex;
-        }
-        if (menuItemIndex < 4)
-        {
-            return menuItemIndex;
-        }
-        return 5;
+        return hasSaves ? slotsWithSaves[menuItemIndex] : slotsWithoutSaves[menuItemIndex];
     }
 
-    // Texture slots of the two entries the menu opens on.
+    /// <summary>The middle of a menu entry's image on the 200-line screen.</summary>
+    /// <remarks>
+    /// The entries' baselines - the line the small letters stand on - are spread evenly between the
+    /// first entry and the last, so a Setup image of any height lays out by itself. Measured on the
+    /// letters and not on the images, whose empty margins differ: the original's are 18 to 23 rows
+    /// high, Kweepa's 24. The places are always the seven of the menu with saves: without them
+    /// Journey Onward is missing, Quit moves up into its place and the last place stays empty.
+    /// </remarks>
+    private float MenuRowY(int menuItemIndex)
+    {
+        int count = slotsWithSaves.Length;
+        int first = slotsWithSaves[0];
+        int last = slotsWithSaves[count - 1];
+        float firstBaseline = MenuFirstLettersTop + (baselineRow[first] - glyphTop[first]) * MenuItemScale;
+        float lastBaseline = MenuLastLettersBottom - (glyphBottom[last] - baselineRow[last]) * MenuItemScale;
+        float baseline = Mathf.Lerp(firstBaseline, lastBaseline, menuItemIndex / (float)(count - 1))
+            - PlaceRaise[menuItemIndex];
+
+        int slot = MenuItemToSlot(menuItemIndex);
+        return baseline + (buttons[2 * slot].height / 2f - baselineRow[slot]) * MenuItemScale;
+    }
+
+    // The entries are drawn at nine tenths of their size, so that seven fit with room between them.
+    private const float MenuItemScale = 0.9f;
+
+    // How far each of the seven places is raised above the even spacing, in lines of the 200-line
+    // screen, chosen with the user on 25 October 2026: Journey Onward's descenders came within a line
+    // of Quit's letters, so its place goes up two lines, which doubles that gap, and Setup's one, to
+    // stay as clear of Journey Onward as before.
+    private static readonly float[] PlaceRaise = { 0f, 0f, 0f, 0f, 1.0f, 2.05f, 0f };
+
+    // Where the letters of the first entry start and those of the last end, chosen with the user on
+    // 20 October 2026. The first: the title's letters end on row 61 of the opening screen, which is
+    // line 40.5; Introduction's started 14.5 lines below that, and now half as far. The last: Quit's
+    // letters ended 6 lines above the bottom, and now a third less.
+    private const float MenuFirstLettersTop = 47.7f;
+    private const float MenuLastLettersBottom = 196f;
+
+    // Texture slots of the two entries the menu opens on, and of the last two.
     private const int CreateCharacterSlot = 1;
     private const int JourneyOnwardSlot = 4;
+    private const int QuitSlot = 5;
+    private const int SetupSlot = 6;
+    private const int SlotCount = 7;
 
     /// <summary>The visible menu index of a texture slot, or -1 when that entry is not shown.</summary>
     /// <remarks>
@@ -223,18 +266,23 @@ public class FrontEnd : MonoBehaviour
             return achievementsButton[variant];
         case 4:
             return DataLoader.sDataLoader.opbtnTex[6 + variant];
-        default:
+        case 5:
             return quitButton[variant];
+        default:
+            return setupButton[variant];
         }
     }
 
     private void CreateDropShadows()
     {
         // Reallocate each time: Unity may deserialize older smaller array sizes onto the MonoBehaviour.
-        buttons = new Texture2D[12];
-        dropShadows = new Texture2D[6];
+        buttons = new Texture2D[2 * SlotCount];
+        dropShadows = new Texture2D[SlotCount];
+        glyphTop = new int[SlotCount];
+        glyphBottom = new int[SlotCount];
+        baselineRow = new int[SlotCount];
 
-        for (int i = 0; i < 12; ++i)
+        for (int i = 0; i < 2 * SlotCount; ++i)
         {
             Texture2D a = GetMenuItemTexture(i);
             Texture2D b = new Texture2D(a.width, a.height);
@@ -264,6 +312,11 @@ public class FrontEnd : MonoBehaviour
                     dPix[p] = Color.black;
                 }
             }
+
+            if ((i & 1) == 0)
+            {
+                MeasureLetters(bPix, a.width, a.height, out glyphTop[i / 2], out glyphBottom[i / 2], out baselineRow[i / 2]);
+            }
             b.SetPixels(bPix);
             b.wrapMode = TextureWrapMode.Clamp;
             b.filterMode = FilterMode.Point;
@@ -281,6 +334,53 @@ public class FrontEnd : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Where an image's letters are, the pixels kept above, in rows counted from the top: the first,
+    /// the one after the last, and the one after the baseline.
+    /// </summary>
+    /// <remarks>
+    /// The baseline is where most columns of letters end: the small letters, and the capitals, stand
+    /// on it, and only a few strokes - the tail of a y or a J - go below.
+    /// </remarks>
+    private static void MeasureLetters(Color[] pixels, int width, int height, out int top, out int bottom, out int baseline)
+    {
+        top = height;
+        bottom = 0;
+        int[] columnsEnding = new int[height + 1];
+        for (int x = 0; x < width; ++x)
+        {
+            int lowest = -1;
+            for (int row = 0; row < height; ++row)
+            {
+                // GetPixels() gives the bottom row first.
+                if (pixels[(height - 1 - row) * width + x].a > 0f)
+                {
+                    top = Mathf.Min(top, row);
+                    lowest = row;
+                }
+            }
+            if (lowest >= 0)
+            {
+                bottom = Mathf.Max(bottom, lowest + 1);
+                ++columnsEnding[lowest + 1];
+            }
+        }
+        if (bottom <= top)
+        {
+            top = 0;
+            bottom = height;
+        }
+
+        baseline = bottom;
+        for (int row = 0; row <= height; ++row)
+        {
+            if (columnsEnding[row] > columnsEnding[baseline])
+            {
+                baseline = row;
+            }
+        }
+    }
+
     public void Update()
     {
         if (state != EState.Done)
@@ -317,11 +417,8 @@ public class FrontEnd : MonoBehaviour
             // Check if saves exist (lightweight check, no unzipping)
             CheckSavesExist();
             
-            // Start title music
-            if (MusicPlayer.Instance != null && !string.IsNullOrEmpty(titleMusicTrack) && MusicPlayer.Instance.currentTrack.ToLower() != titleMusicTrack.ToLower())
-            {
-                MusicPlayer.Instance.SwitchTrack(titleMusicTrack, true);
-            }
+            // Start title music, unless one of the title tracks is already playing
+            StartTitleMusic();
             FadeIn();
             SelectFirstMenuItem();
             state = EState.Menu;
@@ -392,6 +489,40 @@ public class FrontEnd : MonoBehaviour
             else if (Keyboard.current?.tKey.wasPressedThisFrame ?? false)
                 ToggleRevealAchievements();
             break;
+        case EState.Setup:
+            setupScreen.Update();
+            if (setupScreen.Closed)
+            {
+                if (backSelection != null)
+                    Utils.PlayClip2d(backSelection);
+                setupScreen = null;
+                state = EState.Menu;
+                StartTitleMusic();
+            }
+            break;
+        }
+    }
+
+    /// <summary>
+    /// Plays one of the title tracks, looping, unless one of them is playing already: coming back
+    /// from the Setup screen or from a game does not start it over.
+    /// </summary>
+    private static void StartTitleMusic()
+    {
+        MusicPlayer player = MusicPlayer.Instance;
+        if (player == null || (player.IsPlaying && MusicConfig.Contains(EMusicSituation.Title, player.currentTrack)))
+        {
+            return;
+        }
+
+        string title = MusicConfig.Pick(EMusicSituation.Title);
+        if (title != null)
+        {
+            player.SwitchTrack(title, true);
+        }
+        else
+        {
+            player.StopMusic();
         }
     }
 
@@ -657,7 +788,7 @@ public class FrontEnd : MonoBehaviour
         {
             Utils.PlayClip2d(makeSelection);
         }
-        switch (menuIndex)
+        switch (MenuItemToSlot(menuIndex))
         {
         case 0:
             state = EState.Introduction;
@@ -689,18 +820,15 @@ public class FrontEnd : MonoBehaviour
             state = EState.Achievements;
             revealAchievements = false;
             break;
-        case 4:
-            if (hasSaves)
-            {
-                OpenLoadMenu();
-            }
-            else
-            {
-                QuitApplication();
-            }
+        case JourneyOnwardSlot:
+            OpenLoadMenu();
             break;
-        case 5:
+        case QuitSlot:
             QuitApplication();
+            break;
+        case SetupSlot:
+            setupScreen = new SetupScreen(this);
+            state = EState.Setup;
             break;
         }
     }
@@ -719,7 +847,9 @@ public class FrontEnd : MonoBehaviour
         // Use the un-juiced rect for stable hover hit-testing.
         int slot = MenuItemToSlot(i);
         Texture t = buttons[2 * slot];
-        return new Rect(160 * xs - (t.width / 2f) * xs, buttonY[i] * ys - (t.height / 2f) * ys, t.width * xs, t.height * ys);
+        float w = t.width * xs * MenuItemScale;
+        float h = t.height * ys * MenuItemScale;
+        return new Rect(160 * xs - w / 2f, MenuRowY(i) * ys - h / 2f, w, h);
     }
 
     private void SetMenuIndex(int newIndex)
@@ -1060,7 +1190,6 @@ public class FrontEnd : MonoBehaviour
         Destroy(gameObject);
     }
     
-    private static int[] buttonY = { 64, 87, 111, 135, 158, 181 };
 
     private Color selectColor = new Color32(255, 213, 64, 255);
     private Color unselectColor = new Color32(187, 123, 1, 255);
@@ -1106,14 +1235,16 @@ public class FrontEnd : MonoBehaviour
                     for (int i = 0; i < numItems; ++i)
                     {
                         int slot = MenuItemToSlot(i);
-                        float xjs = menuIndex == i ? juiceScale * xs : xs;
-                        float yjs = menuIndex == i ? juiceScale * ys : ys;
+                        float xjs = (menuIndex == i ? juiceScale * xs : xs) * MenuItemScale;
+                        float yjs = (menuIndex == i ? juiceScale * ys : ys) * MenuItemScale;
                         Texture t = dropShadows[slot];
-                        Rect r = new Rect(160 * xs - (t.width / 2 - 1) * xjs, buttonY[i] * ys - (t.height / 2 - 3) * yjs, t.width * xjs, t.height * yjs);
+                        // Half the height as a float, as MenuRowY() takes it: with t.height / 2 an image of odd
+                        // height - three of the original's - stood half a row low, off the even baselines.
+                        Rect r = new Rect(160 * xs - (t.width / 2 - 1) * xjs, MenuRowY(i) * ys - (t.height / 2f - 3) * yjs, t.width * xjs, t.height * yjs);
                         GUI.DrawTexture(r, t, ScaleMode.StretchToFill, true);
 
                         t = buttons[2 * slot + (menuIndex == i ? 1 : 0)];
-                        r = new Rect(160 * xs - t.width / 2 * xjs, buttonY[i] * ys - t.height / 2 * yjs, t.width * xjs, t.height * yjs);
+                        r = new Rect(160 * xs - t.width / 2 * xjs, MenuRowY(i) * ys - t.height / 2f * yjs, t.width * xjs, t.height * yjs);
                         GUI.DrawTexture(r, t, ScaleMode.StretchToFill, true);
                     }
                     
@@ -1209,6 +1340,9 @@ public class FrontEnd : MonoBehaviour
 
                 GuiInput.TryConsumeClickInPanel(frontEndRect);
             }
+            break;
+        case EState.Setup:
+            setupScreen?.OnGUI();
             break;
         case EState.Achievements:
             foreach (Achievements ach in GameObject.FindObjectsByType<Achievements>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))

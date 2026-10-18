@@ -55,10 +55,13 @@ public class Logos : MonoBehaviour
             StringLoader.LoadStrings();
             originLogo = GraphicsLoader.ReadBYT("../Data/pres1.byt", 5);
             
-            // Start title music
-            if (MusicPlayer.Instance != null)
+            // Start title music. The first read of music.txt is here, which writes it with the
+            // original's tracks if it is not there yet: right after the game's files were found.
+            MusicConfig.EnsureLoaded();
+            string titleTrack = MusicConfig.Pick(EMusicSituation.Title);
+            if (MusicPlayer.Instance != null && titleTrack != null)
             {
-                MusicPlayer.Instance.SwitchTrack("UW01.XMI", true);
+                MusicPlayer.Instance.SwitchTrack(titleTrack, true);
             }
             
             FadeIn();

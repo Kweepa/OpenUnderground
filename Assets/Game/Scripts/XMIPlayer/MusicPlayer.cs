@@ -1,6 +1,10 @@
 using UnityEngine;
+using UnityEngine.Networking;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System;
 
 public enum ESampleRate
@@ -51,7 +55,24 @@ public class MusicPlayer : MonoBehaviour
     private MeltySynth.Synthesizer synthesizer;
     private XMISequencer sequencer;
     private ConcurrentQueue<MusicCommand> commandQueue;
-    
+
+    // A synthesizer built with another soundfont, waiting for the audio thread to take it up between
+    // two buffers, so that the track carries on through the change instead of starting over.
+    private MeltySynth.Synthesizer pendingSynthesizer;
+
+    // What has been sent to the synthesizer on each channel, kept so that a new one can be put in
+    // the same state: the controllers in the order they were last set (data entry only means
+    // something after the parameter it follows), the program, the pitch bend, the channel pressure
+    // and the notes held. Written and read on the audio thread only.
+    private readonly int[,] controllerValues = new int[16, 128];
+    private readonly List<int>[] controllerOrder = NewControllerOrder();
+    private readonly int[] programs = NewChannelArray();
+    private readonly int[] pitchBends = NewChannelArray();
+    private readonly int[] channelPressures = NewChannelArray();
+    private readonly int[,] heldNotes = new int[16, 128];
+    // Set by StopMusic() on the main thread: the held notes are forgotten on the next buffer.
+    private volatile bool forgetHeldNotes;
+
     // Resampling state
     private double resamplePosition = 0.0; // Use double for precision, continuous (doesn't wrap)
     private int unityOutputSampleRate; // Cached from Awake() - AudioSettings can't be accessed from audio thread
@@ -68,6 +89,17 @@ public class MusicPlayer : MonoBehaviour
     // --- Track Management ---
     public string currentTrack = "";
     private string soundFolderPath;
+
+    // --- Recorded music: mp3, ogg and wav, the player's own tracks ---
+    // Played by Unity's decoder on an AudioSource of their own. Not this object's: its
+    // OnAudioFilterRead() writes the synthesizer over whatever its source plays.
+    private AudioSource clipSource;
+    private AudioClip clip;
+    // True from the request to the first sample, so that a track still loading counts as playing and
+    // Music does not take it for one that has ended.
+    private bool clipLoading;
+    // Bumped by every switch and stop: a load that finishes after it belongs to a track nobody wants.
+    private int clipRequest;
     
     void Awake()
     {
@@ -94,6 +126,12 @@ public class MusicPlayer : MonoBehaviour
         // --- 2. Initialize Synthesizer (from bundled StreamingAssets) ---
         InitializeSynthesizer();
         
+        clipSource = new GameObject("RecordedMusic").AddComponent<AudioSource>();
+        clipSource.transform.SetParent(transform, false);
+        clipSource.playOnAwake = false;
+        clipSource.spatialBlend = 0.0f;
+        clipSource.outputAudioMixerGroup = GetComponent<AudioSource>().outputAudioMixerGroup;
+
         // --- 3. Set up sound folder path ---
         try
         {
@@ -117,6 +155,12 @@ public class MusicPlayer : MonoBehaviour
         if (velocityCurveAmount != lastBuiltVelocityCurveAmount)
         {
             RebuildVelocityRemap();
+        }
+
+        // The synthesizer applies these two on the audio thread; a recorded track has its source.
+        if (clipSource != null)
+        {
+            clipSource.volume = masterVolumeScale * duckMultiplier;
         }
     }
 
@@ -179,7 +223,7 @@ public class MusicPlayer : MonoBehaviour
         // 3. Load MeltySynth with performance-optimized settings
         var settings = new MeltySynth.SynthesizerSettings((int)xmiSampleRate);
         settings.MaximumPolyphony = maximumPolyphony;  // Limit voices to prevent CPU overload
-        synthesizer = new MeltySynth.Synthesizer(fullPath, settings); 
+        var created = new MeltySynth.Synthesizer(fullPath, settings); 
         
         if (commandQueue == null)
         {
@@ -191,34 +235,120 @@ public class MusicPlayer : MonoBehaviour
         for (int i = 0; i < 16; i++)
         {
             // MIDI Controller Change: (channel, 0xB0, controller 7 (volume), value 127)
-            synthesizer.ProcessMidiMessage(i, 0xB0, 7, 127);
+            created.ProcessMidiMessage(i, 0xB0, 7, 127);
+        }
+
+        // With a track playing, the audio thread takes the new synthesizer up itself, after putting it
+        // in the old one's state. Without one there is nothing to carry over.
+        if (synthesizer != null && sequencer != null && sequencer.IsLoaded)
+        {
+            Interlocked.Exchange(ref pendingSynthesizer, created);
+        }
+        else
+        {
+            synthesizer = created;
+        }
+    }
+
+    private static List<int>[] NewControllerOrder()
+    {
+        var order = new List<int>[16];
+        for (int i = 0; i < order.Length; ++i)
+        {
+            order[i] = new List<int>();
+        }
+        return order;
+    }
+
+    private static int[] NewChannelArray()
+    {
+        int[] values = new int[16];
+        for (int i = 0; i < values.Length; ++i)
+        {
+            values[i] = -1;
+        }
+        return values;
+    }
+
+    // --- Channel state, on the audio thread ---
+
+    private void RecordController(int channel, int controller, int value)
+    {
+        if (controller >= 120)
+        {
+            // The channel mode messages. Reset All Controllers clears what the channel had, and All
+            // Sound Off and All Notes Off - which the sequencer sends when a track loops - the notes.
+            if (controller == 121)
+            {
+                controllerOrder[channel].Clear();
+            }
+            else if (controller == 120 || controller == 123)
+            {
+                for (int note = 0; note < 128; ++note)
+                {
+                    heldNotes[channel, note] = 0;
+                }
+            }
+            return;
+        }
+
+        controllerValues[channel, controller] = value;
+        controllerOrder[channel].Remove(controller);
+        controllerOrder[channel].Add(controller);
+    }
+
+    /// <summary>
+    /// Puts the synthesizer just taken up in the state the old one was left in, so that the track
+    /// carries on with the same instruments, levels and notes, only through another soundfont. The
+    /// notes held start again, which is a new attack and not silence until the next note.
+    /// </summary>
+    private void ReplayChannelState()
+    {
+        for (int channel = 0; channel < 16; ++channel)
+        {
+            foreach (int controller in controllerOrder[channel])
+            {
+                synthesizer.ProcessMidiMessage(channel, 0xB0, controller, controllerValues[channel, controller]);
+            }
+            if (programs[channel] >= 0)
+            {
+                synthesizer.ProcessMidiMessage(channel, 0xC0, programs[channel], 0);
+            }
+            if (pitchBends[channel] >= 0)
+            {
+                synthesizer.ProcessMidiMessage(channel, 0xE0, pitchBends[channel] & 0x7F, (pitchBends[channel] >> 7) & 0x7F);
+            }
+            if (channelPressures[channel] >= 0)
+            {
+                synthesizer.ProcessMidiMessage(channel, 0xD0, channelPressures[channel], 0);
+            }
+            for (int note = 0; note < 128; ++note)
+            {
+                if (heldNotes[channel, note] > 0)
+                {
+                    synthesizer.NoteOn(channel, note, heldNotes[channel, note]);
+                }
+            }
         }
     }
     
     /// <summary>
-    /// Reload the synthesizer with a new sound font and restart the current track.
+    /// Reload the synthesizer with a new sound font. The track playing carries on from where it is.
     /// </summary>
+    /// <remarks>
+    /// It used to stop the track and start it again from the beginning, unlooped, so that a change of
+    /// soundfont in the options also cut the title music's loop. Now the new synthesizer is handed to
+    /// the audio thread, which sets it up like the old one and goes on with the same sequencer.
+    /// </remarks>
     public void ReloadSynthesizerWithSoundFont(string newSoundFontFileName, float musicVolume)
     {
         if (newSoundFontFileName != soundFontFileName)
         {
-            // Remember current track
-            string trackToRestart = currentTrack;
-        
-            // Stop current playback
-            StopMusic();
-        
             // Update sound font filename
             soundFontFileName = newSoundFontFileName;
         
             // Reload synthesizer
             InitializeSynthesizer();
-        
-            // Restart the track if one was playing
-            if (!string.IsNullOrEmpty(trackToRestart))
-            {
-                SwitchTrack(trackToRestart);
-            }
         
             Debug.Log($"Synthesizer reloaded with sound font: {soundFontFileName}");
         }
@@ -236,7 +366,12 @@ public class MusicPlayer : MonoBehaviour
     /// <summary>
     /// Switch to a different music track. Stops current track and starts new one immediately.
     /// </summary>
-    /// <param name="fileName">XMI filename (e.g., "UW01.XMI")</param>
+    /// <remarks>
+    /// An XMI plays through the synthesizer at once. Any other file - mp3, ogg, wav - is loaded by
+    /// Unity's decoder in the background and starts when it is ready, a few hundred milliseconds for a
+    /// long track; IsPlaying is true meanwhile.
+    /// </remarks>
+    /// <param name="fileName">A file of the sound folder (e.g., "UW01.XMI"), or a full path</param>
     /// <param name="loop">Whether to loop the track when it ends (default: false)</param>
     public void SwitchTrack(string fileName, bool loop = false)
     {
@@ -261,6 +396,14 @@ public class MusicPlayer : MonoBehaviour
         }
         
         // Load and start new track
+        if (!Path.GetExtension(fullPath).Equals(".xmi", StringComparison.OrdinalIgnoreCase))
+        {
+            currentTrack = fileName;
+            clipLoading = true;
+            StartCoroutine(LoadClip(fullPath, loop, ++clipRequest));
+            return;
+        }
+
         LoadSong(fullPath, loop);
         currentTrack = fileName;
         
@@ -282,6 +425,10 @@ public class MusicPlayer : MonoBehaviour
         {
             sequencer.Loop = false;
         }
+        if (clipSource != null)
+        {
+            clipSource.loop = false;
+        }
     }
 
     /// <summary>
@@ -291,6 +438,19 @@ public class MusicPlayer : MonoBehaviour
     {
         // Clear sequencer (IsLoaded is checked in OnAudioFilterRead)
         sequencer = null;
+
+        ++clipRequest;
+        clipLoading = false;
+        if (clipSource != null)
+        {
+            clipSource.Stop();
+            clipSource.clip = null;
+        }
+        if (clip != null)
+        {
+            Destroy(clip);
+            clip = null;
+        }
         
         // Reset all MIDI channels - stop all notes
         if (synthesizer != null)
@@ -303,6 +463,7 @@ public class MusicPlayer : MonoBehaviour
                 synthesizer.ProcessMidiMessage(channel, 0xB0, 120, 0);
             }
         }
+        forgetHeldNotes = true;
         
         currentTrack = "";
     }
@@ -312,7 +473,7 @@ public class MusicPlayer : MonoBehaviour
     /// </summary>
     public bool IsPlaying
     {
-        get { return sequencer != null && sequencer.IsLoaded; }
+        get { return (sequencer != null && sequencer.IsLoaded) || clipLoading || (clipSource != null && clipSource.isPlaying); }
     }
 
     /// <summary>
@@ -320,7 +481,14 @@ public class MusicPlayer : MonoBehaviour
     /// </summary>
     public double CurrentTime
     {
-        get { return sequencer != null ? sequencer.CurrentTime : 0.0; }
+        get
+        {
+            if (sequencer != null)
+            {
+                return sequencer.CurrentTime;
+            }
+            return clipSource != null && clipSource.clip != null ? clipSource.time : 0.0;
+        }
     }
 
     public int ActiveVoiceCount => synthesizer != null ? synthesizer.ActiveVoiceCount : 0;
@@ -330,6 +498,85 @@ public class MusicPlayer : MonoBehaviour
     public int DroppedNoteOns => droppedNoteOns;
     public float VelocityCurveAmount => velocityCurveAmount;
     
+    /// <summary>
+    /// Loads a recorded track with Unity's decoder and plays it, unless another switch or a stop has
+    /// come in the meantime.
+    /// </summary>
+    /// <remarks>
+    /// Tried on the Windows player and under Proton for mp3, ogg and wav (mod 900's probe, October
+    /// 2026): every way of asking - streamed, compressed - decodes the whole track into memory, a few
+    /// tens of megabytes for a few minutes of music, so only the track that plays is kept.
+    /// </remarks>
+    private IEnumerator LoadClip(string fullPath, bool loop, int request)
+    {
+        using UnityWebRequest web = UnityWebRequestMultimedia.GetAudioClip(FileUri(fullPath), AudioTypeOf(fullPath));
+        yield return web.SendWebRequest();
+        if (request != clipRequest)
+        {
+            yield break;
+        }
+
+        clipLoading = false;
+        AudioClip loaded = null;
+        if (web.result == UnityWebRequest.Result.Success)
+        {
+            try
+            {
+                loaded = DownloadHandlerAudioClip.GetContent(web);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Cannot decode {fullPath}: {e.Message}");
+            }
+        }
+        else
+        {
+            Debug.LogError($"Cannot load {fullPath}: {web.error}");
+        }
+
+        if (loaded == null || loaded.length <= 0.0f)
+        {
+            currentTrack = "";
+            yield break;
+        }
+
+        clip = loaded;
+        clipSource.clip = clip;
+        clipSource.loop = loop;
+        clipSource.volume = masterVolumeScale * duckMultiplier;
+        clipSource.Play();
+    }
+
+    public static AudioType AudioTypeOf(string path)
+    {
+        switch (Path.GetExtension(path).ToLowerInvariant())
+        {
+        case ".mp3": return AudioType.MPEG;
+        case ".ogg": return AudioType.OGGVORBIS;
+        case ".wav": return AudioType.WAV;
+        default: return AudioType.UNKNOWN;
+        }
+    }
+
+    /// <summary>
+    /// A file:// URI with every part of the path escaped, so spaces, accents and '#' in a name
+    /// survive; new Uri(path) does not agree with itself across runtimes on '#'.
+    /// </summary>
+    public static string FileUri(string path)
+    {
+        string[] parts = path.Replace('\\', '/').Split('/');
+        for (int i = 0; i < parts.Length; ++i)
+        {
+            bool drive = i == 0 && parts[i].Length == 2 && parts[i][1] == ':';
+            if (!drive)
+            {
+                parts[i] = Uri.EscapeDataString(parts[i]);
+            }
+        }
+        string joined = string.Join("/", parts);
+        return joined.StartsWith("/") ? "file://" + joined : "file:///" + joined;
+    }
+
     // This function takes the *full absolute path*
     private void LoadSong(string fullPath, bool loop = false)
     {
@@ -352,6 +599,7 @@ public class MusicPlayer : MonoBehaviour
         if (velocity <= 0)
         {
             synthesizer.NoteOff(channel, note);
+            heldNotes[channel, note] = 0;
             return;
         }
 
@@ -374,6 +622,7 @@ public class MusicPlayer : MonoBehaviour
 
         int remappedVelocity = velocityRemap[Mathf.Clamp(velocity, 0, 127)];
         synthesizer.NoteOn(channel, note, remappedVelocity);
+        heldNotes[channel, note] = remappedVelocity;
 
         active = synthesizer.ActiveVoiceCount;
         if (active > peakActiveVoices)
@@ -386,6 +635,21 @@ public class MusicPlayer : MonoBehaviour
     // Runs on the dedicated, real-time Audio Thread
     void OnAudioFilterRead(float[] data, int channels)
     {
+        if (forgetHeldNotes)
+        {
+            forgetHeldNotes = false;
+            Array.Clear(heldNotes, 0, heldNotes.Length);
+        }
+
+        // A soundfont changed while a track was playing: take the new synthesizer up here, between
+        // two buffers, where nothing else is using the old one.
+        MeltySynth.Synthesizer replacement = Interlocked.Exchange(ref pendingSynthesizer, null);
+        if (replacement != null)
+        {
+            synthesizer = replacement;
+            ReplayChannelState();
+        }
+
         if (synthesizer == null) return;
         
         if (channels != 2) return;
@@ -422,14 +686,17 @@ public class MusicPlayer : MonoBehaviour
                 break;
             case MusicCommandType.NoteOff:
                 synthesizer.NoteOff(cmd.Channel, cmd.Note);
+                heldNotes[cmd.Channel, cmd.Note] = 0;
                 break;
             case MusicCommandType.ProgramChange:
                 // MIDI Program Change: (channel, 0xC0, program, 0)
                 synthesizer.ProcessMidiMessage(cmd.Channel, 0xC0, cmd.Program, 0);
+                programs[cmd.Channel] = cmd.Program;
                 break;
             case MusicCommandType.ControllerChange:
                 // MIDI Controller Change: (channel, 0xB0, controller, value)
                 synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, cmd.Controller, cmd.Value);
+                RecordController(cmd.Channel, cmd.Controller, cmd.Value);
                 break;
             case MusicCommandType.PolyphonicAftertouch:
                 // MIDI Polyphonic Key Pressure: (channel, 0xA0, note, value)
@@ -440,10 +707,12 @@ public class MusicPlayer : MonoBehaviour
                 int pitchLSB = cmd.Value & 0x7F;
                 int pitchMSB = (cmd.Value >> 7) & 0x7F;
                 synthesizer.ProcessMidiMessage(cmd.Channel, 0xE0, pitchLSB, pitchMSB);
+                pitchBends[cmd.Channel] = cmd.Value & 0x3FFF;
                 break;
             case MusicCommandType.ChannelAftertouch:
                 // MIDI Channel Pressure: (channel, 0xD0, value, 0)
                 synthesizer.ProcessMidiMessage(cmd.Channel, 0xD0, cmd.Value, 0);
+                channelPressures[cmd.Channel] = cmd.Value;
                 break;
             }
         }
