@@ -336,6 +336,40 @@ public class Inventory : MonoBehaviour
         return false;
     }
 
+    private const string CarryWeightLegend = "carry weight left";
+
+    // The grey circle the carry weight number is drawn in: panel pixels 62-74 across and 50-59
+    // down, scaled 3 and 3.6 as the panel is.
+    private static Rect CarryWeightRect(float panelLeft)
+    {
+        return new Rect(panelLeft + 186, PanelTop + 180, 39, 36);
+    }
+
+    // Four numbers is more than anyone should have to hold in their head, so a hand under the
+    // pointer or the pad cursor says what its pair is. The name of a held item goes to the top of
+    // the panel when the paperdoll is pointed at or selected, which leaves this box free.
+    private void DrawHandLegend(int handSlot, float invPosition)
+    {
+        bool weaponHand = handSlot == (int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand);
+        Utils.DropShadowText(weaponHand ? "attack / max damage" : "defence / armour",
+            Screen.width - invPosition + ix, iy + 250, 240, 20, descriptionStyle);
+    }
+
+    // The cursor on the carry weight is the size of a slot's, centred on the circle.
+    private static Rect CarryWeightCursorRect(float panelLeft)
+    {
+        Rect r = CarryWeightRect(panelLeft);
+        return new Rect(r.center.x - 24, r.center.y - 29, 48, 58);
+    }
+
+    // At the top of the panel, where the name of a paperdoll item goes.
+    private void DrawCarryWeightLegend(float invPosition)
+    {
+        descriptionStyle.alignment = TextAnchor.LowerLeft;
+        Utils.DropShadowText(CarryWeightLegend, Screen.width - invPosition + ix, PanelTop - 20, 240, 40, descriptionStyle);
+        descriptionStyle.alignment = TextAnchor.UpperLeft;
+    }
+
     private static Rect PaperdollSlotHitRect(float panelLeft, int slotIndex)
     {
         float x = panelLeft + 3 * invSlots[slotIndex].cx;
@@ -2160,7 +2194,10 @@ public class Inventory : MonoBehaviour
     {
         Stuff,
         Paperdoll,
-        Trading
+        Trading,
+        // The carry weight number. It can be selected so that the pad can show what it means, as
+        // the pointer does; nothing is done with it.
+        CarryWeight
     }
 
     private EInventoryArea currentArea;
@@ -2333,7 +2370,16 @@ public class Inventory : MonoBehaviour
         else if (ShouldInventoryMoveRepeat(ref invMoveNextFireRight, InvMoveRightHeld(), InvMoveRightPressedThisFrame()) && invSlots[equipSlot].goRight != -1)
         {
             Utils.PlayClip2d(moveCursor);
-            equipSlot = invSlots[equipSlot].goRight;
+            // The carry weight sits just right of the left ring, and is reached from it both
+            // ways, right and down.
+            if (equipSlot == (int)EInvSlot.LeftFinger)
+            {
+                currentArea = EInventoryArea.CarryWeight;
+            }
+            else
+            {
+                equipSlot = invSlots[equipSlot].goRight;
+            }
         }
         else if (ShouldInventoryMoveRepeat(ref invMoveNextFireUp, InvMoveUpHeld(), InvMoveUpPressedThisFrame()) && invSlots[equipSlot].goUp != -1)
         {
@@ -2342,7 +2388,12 @@ public class Inventory : MonoBehaviour
         }
         else if (ShouldInventoryMoveRepeat(ref invMoveNextFireDown, InvMoveDownHeld(), InvMoveDownPressedThisFrame()))
         {
-            if (invSlots[equipSlot].goDown != -1)
+            if (equipSlot == (int)EInvSlot.LeftFinger)
+            {
+                Utils.PlayClip2d(moveCursor);
+                currentArea = EInventoryArea.CarryWeight;
+            }
+            else if (invSlots[equipSlot].goDown != -1)
             {
                 Utils.PlayClip2d(moveCursor);
                 equipSlot = invSlots[equipSlot].goDown;
@@ -2360,6 +2411,28 @@ public class Inventory : MonoBehaviour
         else if ((Gamepad.current?.aButton.wasReleasedThisFrame ?? false) && aPressedTime < 0.2f)
         {
             RunPaperdollShortPrimaryReleaseAtSlot(equipSlot);
+        }
+    }
+
+    /// <summary>The carry weight is selected only to show its legend: the buttons do nothing here.</summary>
+    private void UpdateCarryWeight()
+    {
+        int slot = -1;
+        if (ShouldInventoryMoveRepeat(ref invMoveNextFireLeft, InvMoveLeftHeld(), InvMoveLeftPressedThisFrame())
+            || ShouldInventoryMoveRepeat(ref invMoveNextFireUp, InvMoveUpHeld(), InvMoveUpPressedThisFrame()))
+        {
+            slot = (int)EInvSlot.LeftFinger;
+        }
+        else if (ShouldInventoryMoveRepeat(ref invMoveNextFireDown, InvMoveDownHeld(), InvMoveDownPressedThisFrame()))
+        {
+            slot = (int)EInvSlot.Feet;
+        }
+
+        if (slot >= 0)
+        {
+            Utils.PlayClip2d(moveCursor);
+            currentArea = EInventoryArea.Paperdoll;
+            equipSlot = slot;
         }
     }
 
@@ -3814,6 +3887,9 @@ public class Inventory : MonoBehaviour
                     break;
                 case EInventoryArea.Trading:
                     UpdateTrading();
+                    break;
+                case EInventoryArea.CarryWeight:
+                    UpdateCarryWeight();
                     break;
                 }
 
@@ -5383,6 +5459,11 @@ public class Inventory : MonoBehaviour
                             GUI.DrawTexture(new Rect(px, py, 48, 58), cursor);
                         }
                     }
+                    else if (CarryWeightRect(panelLeftForCursor).Contains(guiMouse))
+                    {
+                        // the frame that goes with the legend the hover shows
+                        GUI.DrawTexture(CarryWeightCursorRect(panelLeftForCursor), cursor);
+                    }
                     else if (mouseCursorCarriedPortable != null
                              && inventoryInsertCursor != null
                              && TryGetStuffListInsertPreviewCenter(guiMouse, panelLeftForCursor, out Vector2 insertCtr))
@@ -5417,6 +5498,9 @@ public class Inventory : MonoBehaviour
                             new Rect(Screen.width - invPosition + 3 * invSlots[equipSlot].cx + 72,
                                 PanelTop + 3.6f * invSlots[equipSlot].cy, 48, 58), cursor);
                     }
+                    break;
+                case EInventoryArea.CarryWeight:
+                    GUI.DrawTexture(CarryWeightCursorRect(Screen.width - invPosition), cursor);
                     break;
                 case EInventoryArea.Stuff:
                     if (index != -1)
@@ -5463,6 +5547,7 @@ public class Inventory : MonoBehaviour
             // A hand under the pointer, whether or not it holds anything: the ratings under it are
             // there either way, and an empty hand still fights with the fist.
             int hoverHandSlot = -1;
+            bool hoverCarryWeight = false;
 
             Vector2 guiMouseDesc = Mouse.current != null
                 ? GuiInput.ScreenToGuiMouse(Mouse.current.position.ReadValue())
@@ -5497,6 +5582,10 @@ public class Inventory : MonoBehaviour
                             hoverPaperdollSlot = pdSlot;
                         }
                     }
+                    else if (CarryWeightRect(panelLeftDesc).Contains(guiMouseDesc))
+                    {
+                        hoverCarryWeight = true;
+                    }
                     else if (TryGetStuffGridCellListIndex(guiMouseDesc, panelLeftDesc, out int cellIdx)
                              && cellIdx >= 0 && cellIdx < itemsToDisplay.Count)
                     {
@@ -5529,15 +5618,15 @@ public class Inventory : MonoBehaviour
                     }
                 }
 
-                // Four numbers is more than anyone should have to hold in their head, so hovering a
-                // hand says what its pair is. The name of a held item goes to the top of the panel
-                // when the pointer is on the paperdoll, which leaves this box free.
                 if (hoverHandSlot >= 0)
                 {
-                    bool weaponHand = hoverHandSlot
-                        == (int)(PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand);
-                    Utils.DropShadowText(weaponHand ? "attack / max damage" : "defence / armour",
-                        Screen.width - invPosition + ix, iy + 250, 240, 20, descriptionStyle);
+                    DrawHandLegend(hoverHandSlot, invPosition);
+                }
+
+                // Nothing else on the panel says what this number is.
+                if (hoverCarryWeight)
+                {
+                    DrawCarryWeightLegend(invPosition);
                 }
             }
 
@@ -5701,6 +5790,13 @@ public class Inventory : MonoBehaviour
                 }
                 break;
             case EInventoryArea.Paperdoll:
+                // the pad's hand legend, empty hand included, as the pointer's
+                if (!mouseInventoryUi
+                    && (equipSlot == (int)EInvSlot.LeftHand || equipSlot == (int)EInvSlot.RightHand))
+                {
+                    DrawHandLegend(equipSlot, invPosition);
+                }
+
                 // name the item
                 if (!mouseInventoryUi && invSlotContents[equipSlot] != null)
                 {
@@ -5779,6 +5875,13 @@ public class Inventory : MonoBehaviour
                 }
                 break;
             
+            case EInventoryArea.CarryWeight:
+                if (!mouseInventoryUi)
+                {
+                    DrawCarryWeightLegend(invPosition);
+                }
+                break;
+
             case EInventoryArea.Trading:
                 // name the highlighted item
                 if (tradeSlots[tradeSlot] != null)

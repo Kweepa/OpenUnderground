@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The number beside the paperdoll now says what it is: point at it, or move onto it with the d-pad, and the top of the panel reads "carry weight left". On the d-pad the two hands now name their numbers too, as they did under the pointer.
+
 - A white line under the worn spells shows the stamina left for sprinting. It gets longer as Acrobat grows, shortens while you sprint and fills back up when you stop. The worn spell icons are a little smaller to make room for it. This line and those of the timed spells have a dark track behind them for the part used up.
 
 - The Rune of Warding hurts the enemy that sets it off, more with a higher Casting skill, as in the original, though a creature it kills gives no experience. Only hostile creatures set it off, the warning says where the creature is, you can lay more than one, and with a wall too close in front of you there is no room for it.
