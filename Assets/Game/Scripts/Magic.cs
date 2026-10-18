@@ -2265,7 +2265,7 @@ public class Magic : MonoBehaviour
             CastCurePoison();
             break;
         case "IJ":
-            CastRuneOfWarding();
+            success = CastRuneOfWarding();
             break;
         case "VPY":
             CastTremor();
@@ -2744,26 +2744,46 @@ public class Magic : MonoBehaviour
         }
     }
 
-    void CastRuneOfWarding()
-    {
-        UUObject rune = Instantiate(runeOfWarding);
-        if (rune != null)
-        {
-            // find a spot in front of the player to place the rune
-            int environmentLayerMask = LayerMasks.EnvironmentAndCeiling;
+    /// <summary>
+    /// The nearest a Rune of Warding is placed in front of the player, in metres. With a wall closer
+    /// than that plus a metre, there is no room for it.
+    /// </summary>
+    private const float MinRuneDistance = 1.0f;
 
-            Vector3 startPos = PlayerObject.Player.transform.position;
-            Vector3 forward = PlayerObject.Player.transform.forward;
-            Vector3 runePos = startPos + 2.0f * forward;
-            if (Physics.Raycast(startPos, forward, out RaycastHit wallHit, 3.0f, environmentLayerMask))
-            {
-                runePos = startPos + (wallHit.distance - 1.0f) * forward;
-            }
-            
-            rune.transform.SetPositionAndRotation(runePos, PlayerObject.Player.transform.rotation);
-            LevelLoader.AddToWorld(rune);
-            Messages.Add(1, 276); // placed
+    /// <returns>False when there is no room for the rune, so that the cast does not sound like a success.</returns>
+    bool CastRuneOfWarding()
+    {
+        // find a spot in front of the player to place the rune: 2 m ahead, or a metre short of a
+        // wall closer than 3 m
+        int environmentLayerMask = LayerMasks.EnvironmentAndCeiling;
+
+        Vector3 startPos = PlayerObject.Player.transform.position;
+        Vector3 forward = PlayerObject.Player.transform.forward;
+        float distance = 2.0f;
+        if (Physics.Raycast(startPos, forward, out RaycastHit wallHit, 3.0f, environmentLayerMask))
+        {
+            distance = wallHit.distance - 1.0f;
         }
+
+        // Ours: the original tests nothing about the spot and drops the rune inside a wall in front
+        // of the caster (UW.EXE 0x351e5, 0x84c0a). Here it is not placed, with the message the
+        // original gives when it cannot make the rune at all.
+        if (distance < MinRuneDistance)
+        {
+            Messages.Add(1, 277); // no room
+            return false;
+        }
+
+        UUObject rune = Instantiate(runeOfWarding);
+        if (rune == null)
+        {
+            return false;
+        }
+
+        rune.transform.SetPositionAndRotation(startPos + distance * forward, PlayerObject.Player.transform.rotation);
+        LevelLoader.AddToWorld(rune);
+        Messages.Add(1, 276); // placed
+        return true;
     }
 
     public void CastTremor()
