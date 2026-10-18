@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The Rune of Warding hurts the enemy that sets it off, more with a higher Casting skill, as in the original, though a creature it kills gives no experience. Only hostile creatures set it off, the warning says where the creature is, you can lay more than one, and with a wall too close in front of you there is no room for it.
+
 - A creature that a trap makes again every time you set it off, like the skeleton behind the three buttons on level 3, gives experience and loot only the first time. The creatures the dungeon brings back by itself are worth fighting as before.
 
 - When the title cutscene ends, the menu starts on Journey Onward with the pointer on it, or on Create Character when there are no saves yet. The click or A that skips the two logos also skips the title cutscene.

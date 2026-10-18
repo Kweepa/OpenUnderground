@@ -26,6 +26,9 @@ public class CritterSaveData : UUObjectSaveData
     // A trap's second or later creature (Trap.CountCreatureCopy()): absent in an older save, so false.
     public bool repeatTrapCopy;
 
+    // Killed by a blow with no attacker (TryDamageWithoutAttacker()): absent in an older save, so false.
+    public bool killedWithoutAttacker;
+
     public int movementType;
     public int state;
     public float stateTime;
@@ -503,6 +506,9 @@ public class Critter : UUObject
     // neither its own nor the template's inventory. The option is read when each reward would come,
     // so the loot follows it at the creature's first run and the experience at its death.
     private bool WithholdsReward => repeatTrapCopy && PlayerInput.RewardOnlyFirstTrapCopy;
+
+    // Killed by a blow nobody struck, the Rune of Warding's: its death pays no experience.
+    private bool killedWithoutAttacker;
 
     // Bit 7 of critterData[2], byte 0x0a of the original's record: a creature with it set neither
     // raises the pack alarm when struck nor answers one (UW.EXE 0x1c383, 0x1ba43). Nothing in UW.EXE
@@ -2159,7 +2165,7 @@ public class Critter : UUObject
 
             // TODO: reduce based on relative level of player and enemy
             // also maybe reduce based on max abyss level reached...?
-            if (!WithholdsReward)
+            if (!WithholdsReward && !killedWithoutAttacker)
             {
                 PlayerObject.AddXP(10 * stats.Exp);
             }
@@ -5704,6 +5710,24 @@ public class Critter : UUObject
         nextBlowTint = tint;
     }
 
+    /// <summary>
+    /// A blow that nobody struck, the Rune of Warding's: the same as any other, but a creature it
+    /// kills pays no experience.
+    /// </summary>
+    /// <remarks>
+    /// In the original the ward trap's damage goes through the damage gate with no attacker
+    /// (UW.EXE 0x847aa -> 0x73e22 -> 0x25f0a), so the attacker's index is 0 and a kill pays no
+    /// experience (0x1c376-0x1c3d8).
+    /// </remarks>
+    public void TryDamageWithoutAttacker(int damage, int mask)
+    {
+        TryDamage(damage, Skills.ESkillTestResult.Success, mask);
+        if (hp <= 0)
+        {
+            killedWithoutAttacker = true;
+        }
+    }
+
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
     {
         // Easy mode: increase damage done to enemies by 3/2
@@ -7162,6 +7186,7 @@ public class Critter : UUObject
             critterData.elite = elite;
             critterData.lootAlreadyMade = lootAlreadyMade;
             critterData.repeatTrapCopy = repeatTrapCopy;
+            critterData.killedWithoutAttacker = killedWithoutAttacker;
             critterData.movementType = (int)movementType;
             critterData.state = (int)state;
             critterData.stateTime = stateTime;
@@ -7255,6 +7280,7 @@ public class Critter : UUObject
             elite = critterData.elite;
             lootAlreadyMade = critterData.lootAlreadyMade;
             repeatTrapCopy = critterData.repeatTrapCopy;
+            killedWithoutAttacker = critterData.killedWithoutAttacker;
             RefreshMarkersFromLevel();
             movementType = (EMovementType)critterData.movementType;
             if (movementType == EMovementType.TwilightZone)
