@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A white line under the worn spells shows the stamina left for sprinting. It gets longer as Acrobat grows, shortens while you sprint and fills back up when you stop. The worn spell icons are a little smaller to make room for it. This line and those of the timed spells have a dark track behind them for the part used up.
+
 - The Rune of Warding hurts the enemy that sets it off, more with a higher Casting skill, as in the original, though a creature it kills gives no experience. Only hostile creatures set it off, the warning says where the creature is, you can lay more than one, and with a wall too close in front of you there is no room for it.
 
 - A creature that a trap makes again every time you set it off, like the skeleton behind the three buttons on level 3, gives experience and loot only the first time. The creatures the dungeon brings back by itself are worth fighting as before.
