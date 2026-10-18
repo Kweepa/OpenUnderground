@@ -33,6 +33,11 @@ public class Interaction : MonoBehaviour
 
     public bool MouseLeftHoldPortablePickupUse => mouseLeftHoldPortablePickupUse;
 
+    /// <summary>True while <see cref="DoUse"/> runs from the F key: a portable put in the pack opens the inventory on it.</summary>
+    private bool keyboardUse;
+
+    public bool KeyboardUse => keyboardUse;
+
     private readonly Collider[] cachedColliders = new Collider[8];
 
     /// <summary>Set in <see cref="OnGUI"/> when the cursor is free and the pointer is over modal UI.</summary>
@@ -196,6 +201,11 @@ public class Interaction : MonoBehaviour
             return;
         }
 
+        if (GameInput.FKeyPressedThisFrame())
+        {
+            UseFromKeyboard();
+        }
+
         // Inventory/magic open: suppress gamepad world look/use (X/Y); mouse/kb may world-interact when nothing is on the cursor.
         if (PlayerPanelState.IsEffectivelyExploringInventory)
         {
@@ -346,6 +356,42 @@ public class Interaction : MonoBehaviour
         if (mouseLookFromLeftRelease)
         {
             DoLook(hasMaterialHit, objectHit);
+        }
+    }
+
+    /// <summary>
+    /// The F key: a use, the same as Y on the pad, so a portable goes straight into the pack instead of onto the
+    /// cursor, and the inventory opens on it. With an item already on the cursor, F puts that one into the pack.
+    /// </summary>
+    private void UseFromKeyboard()
+    {
+        // Only the two panels may be open: no use in a conversation, a dialog or on the map.
+        const EControlMask panels = EControlMask.Inventory | EControlMask.Magic;
+        if ((PlayerObject.Player.controlsDisabled & ~panels) != 0)
+        {
+            return;
+        }
+
+        // A left press in progress is a pick-up onto the cursor or a throw being charged: it keeps the item.
+        if (GameInput.CurrentMouse != null && GameInput.CurrentMouse.leftButton.isPressed)
+        {
+            return;
+        }
+
+        if (Inventory.sInv != null && Inventory.sInv.mouseCursorCarriedPortable != null)
+        {
+            Inventory.sInv.TryStowMouseCursorCarriedPortable();
+            return;
+        }
+
+        keyboardUse = true;
+        try
+        {
+            DoUse();
+        }
+        finally
+        {
+            keyboardUse = false;
         }
     }
 

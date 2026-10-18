@@ -1502,6 +1502,32 @@ public class Inventory : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Opens the inventory on an item just put in the pack by the F key, as a mouse pick-up opens it with the item on
+    /// the cursor. An item that merged into a stack is not in the list itself, and the selection then stays.
+    /// </summary>
+    public void ShowPanelOn(UUObject obj)
+    {
+        if (!PlayerPanelState.ArePanelsAvailable)
+        {
+            return;
+        }
+
+        StatsPanel.sStatsPanel?.Hide();
+        if (PlayerPanelState.ActivePanel != EPlayerPanel.Inventory)
+        {
+            PlayerPanelState.SetPanel(EPlayerPanel.Inventory, fromUserToggle: false);
+        }
+
+        int listIndex = GetCurrentListInternal().IndexOf(obj);
+        if (listIndex >= 0)
+        {
+            currentArea = EInventoryArea.Stuff;
+            index = listIndex;
+            viewIndex = Mathf.Max(0, index - 12) & ~3;
+        }
+    }
+
     public void BeginWorldPickupFromGround(UUObject obj)
     {
         if (!PlayerPanelState.ArePanelsAvailable)

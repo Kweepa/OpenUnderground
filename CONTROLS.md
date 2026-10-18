@@ -163,6 +163,7 @@ Look speed and invert options are in Options.
 |-|-|
 |Left click (short)|Examine / look at what is under the crosshair or free cursor|
 |Left click (hold or drag)|Use or pick up (when the name turns yellow)|
+|F|Use, or pick up straight into your pack (when the name turns yellow); with an item on the cursor, put it in your pack|
 |Right mouse (hold, then release)|Charge attack, then swing|
 |X|Cancel a weapon charge|
 
@@ -197,6 +198,7 @@ Look speed and invert options are in Options.
 |Left click|Look / use (short click); drag to pick up; place a carried item|
 |Left click (hold outside the panel while carrying)|Charge a throw|
 |Right click|Secondary use (equip, eat, unequip, and similar); store into a container when carrying|
+|F, while carrying|Put the carried item in your pack|
 |Scroll wheel|Scroll the stuff list when the pointer is over the grid|
 |Arrow keys|Move selection|
 

@@ -161,11 +161,10 @@ public static class PlayerInput
                || (GameInput.CurrentKeyboard?.bKey.isPressed ?? false);
     }
 
-    /// <summary>Gamepad X or keyboard F — look (mouse: short LMB release / F).</summary>
+    /// <summary>Gamepad X — look (mouse: short LMB release).</summary>
     public static bool InteractLookPressed()
     {
-        return (GameInput.CurrentGamepad?.xButton.wasPressedThisFrame ?? false)
-               || (GameInput.CurrentKeyboard?.fKey.wasPressedThisFrame ?? false);
+        return GameInput.CurrentGamepad?.xButton.wasPressedThisFrame ?? false;
     }
 
     /// <summary>Keyboard F5 — write a quicksave, at once.</summary>
@@ -212,7 +211,7 @@ public static class PlayerInput
         return GameInput.CurrentGamepad?.dpad.left.isPressed ?? false;
     }
 
-    /// <summary>Gamepad Y — use (mouse uses LMB hold / drag). Keyboard has no use binding.</summary>
+    /// <summary>Gamepad Y — use (mouse uses LMB hold / drag; keyboard F, see <see cref="Interaction"/>).</summary>
     public static bool InteractUsePressed()
     {
         return GameInput.CurrentGamepad?.yButton.wasPressedThisFrame ?? false;

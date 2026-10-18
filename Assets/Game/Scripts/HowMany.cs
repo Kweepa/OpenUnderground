@@ -52,6 +52,9 @@ public class HowMany : MonoBehaviour
     /// <summary>Set when Pickup dialog opened from right-hold/drag on world object; <see cref="UUObject.PickUpSome"/> uses hand-only path.</summary>
     public bool pickupFromWorldDragIntent;
 
+    /// <summary>Set when the Pickup dialog opened from the F key: the inventory opens on what is picked up.</summary>
+    private bool pickupShowsInventory;
+
     public static HowMany sHowMany;
 
     public static void AskHowMany(EHowManyReason reason, UUObject obj)
@@ -68,6 +71,10 @@ public class HowMany : MonoBehaviour
             && Interaction.sInt != null
             && (Interaction.sInt.HasWorldPickupIntentForPickup()
                 || Interaction.sInt.MouseLeftHoldPortablePickupUse);
+        sHowMany.pickupShowsInventory =
+            reason == EHowManyReason.Pickup
+            && Interaction.sInt != null
+            && Interaction.sInt.KeyboardUse;
         Utils.PlayClip2d(sHowMany.dialogOn);
     }
 
@@ -125,8 +132,9 @@ public class HowMany : MonoBehaviour
             howManyItem = null;
             break;
         case EHowManyReason.Pickup:
-            howManyItem.PickUpSome(howMany, pickupFromWorldDragIntent);
+            howManyItem.PickUpSome(howMany, pickupFromWorldDragIntent, pickupShowsInventory);
             pickupFromWorldDragIntent = false;
+            pickupShowsInventory = false;
             howManyItem = null;
             if (Interaction.sInt != null)
                 Interaction.sInt.ClearWorldPickupIntentFlags();
@@ -148,6 +156,7 @@ public class HowMany : MonoBehaviour
             Inventory.sInv.pendingTradeTrayDragSlot = -1;
 
         pickupFromWorldDragIntent = false;
+        pickupShowsInventory = false;
         howManyItem = null;
         quantityRepeatDirection = 0;
         cachedHasArrowRects = false;
