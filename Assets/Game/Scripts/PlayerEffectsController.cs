@@ -96,6 +96,13 @@ public class PlayerEffectsController : MonoBehaviour
             return;
         }
 
+        // Set every frame rather than once, so that a trip put back by RestoreTrip() shows even
+        // when the effect was not yet found at that moment.
+        if (currentDruggedState != DruggedState.Digesting)
+        {
+            druggedEffect.enabled.value = true;
+        }
+
         druggedStateTimer += Time.deltaTime;
 
         switch (currentDruggedState)
@@ -122,6 +129,7 @@ public class PlayerEffectsController : MonoBehaviour
                 break;
 
             case DruggedState.Holding:
+                druggedEffect.masterIntensity.value = 1f;
                 float holdDuration = druggedDuration - druggedFadeInTime;
                 if (druggedStateTimer >= holdDuration)
                 {
@@ -183,8 +191,67 @@ public class PlayerEffectsController : MonoBehaviour
     }
 
     /// <summary>
-    /// Ends the mushroom trip: after loading a save, since its state is not serialized, and at every
-    /// sleep, which clears the original's hallucination counter (UW.EXE 0x8205d).
+    /// Starts the trip with no digestion, for the Hallucination enchantment of a potion or a
+    /// scroll. The original sets its counter to 3 world ticks, 42 to 63 seconds (UW.EXE 0x34619,
+    /// 0x2ad4d); the fade in, the full trip and the fade out here come to about 50.
+    /// </summary>
+    public void StartHallucination()
+    {
+        if (druggedEffect == null)
+        {
+            Debug.LogWarning("Drugged effect is not assigned on the Post-Process Profile.");
+            return;
+        }
+
+        switch (currentDruggedState)
+        {
+            case DruggedState.FadingIn:
+                // Already on its way to full intensity.
+                break;
+
+            case DruggedState.Holding:
+                // At full intensity: the counter goes back to 3, so the trip starts over.
+                druggedStateTimer = 0f;
+                break;
+
+            case DruggedState.FadingOut:
+                // Fade back in from where the effect is now.
+                currentDruggedState = DruggedState.FadingIn;
+                druggedStateTimer = druggedEffect.masterIntensity.value * druggedFadeInTime;
+                break;
+
+            default:
+                // Inactive, or a mushroom still digesting: the effect starts now.
+                druggedEffect.enabled.value = true;
+                currentDruggedState = DruggedState.FadingIn;
+                druggedStateTimer = 0f;
+                break;
+        }
+    }
+
+    /// <summary>The trip's stage, 0 for none, and the seconds spent in it: what a save keeps.</summary>
+    public int TripStage => (int)currentDruggedState;
+    public float TripTimer => druggedStateTimer;
+
+    /// <summary>
+    /// Puts back the trip a save was written with, at the same stage and second, so that it ends
+    /// when it would have. The original saves its hallucination counter in PLAYER.DAT and shows the
+    /// effect again after a load (UW.EXE 0x788a9, at 0x7899b). Stage 0, which a save without a trip
+    /// or an older save gives, ends the one running.
+    /// </summary>
+    public void RestoreTrip(int stage, float timer)
+    {
+        EndMushroomTrip();
+        if (stage > (int)DruggedState.Inactive && stage <= (int)DruggedState.FadingOut)
+        {
+            currentDruggedState = (DruggedState)stage;
+            druggedStateTimer = timer;
+        }
+    }
+
+    /// <summary>
+    /// Ends the mushroom trip at every sleep, which clears the original's hallucination counter
+    /// (UW.EXE 0x8205d), and before a load puts back the one saved.
     /// </summary>
     public void EndMushroomTrip()
     {

@@ -795,7 +795,7 @@ public class SaveGameManager : MonoBehaviour
             // Create lava lights for the loaded level
             LevelLoader.sLevelLoader.CreateLavaLights();
 
-            PlayerObject.Player?.GetComponent<PlayerEffectsController>()?.EndMushroomTrip();
+            PlayerObject.Player?.GetComponent<PlayerEffectsController>()?.RestoreTrip(saveData.playerData.tripStage, saveData.playerData.tripTimer);
             PlayerObject.Player?.StartAfterLoad();
             
             ++gamesLoaded;
@@ -1147,6 +1147,9 @@ public class SaveGameManager : MonoBehaviour
         data.hunger = playerData.hunger;
         data.fatigue = playerData.fatigue;
         data.drunkenness = playerData.drunkenness;
+        PlayerEffectsController effects = PlayerObject.Player?.GetComponent<PlayerEffectsController>();
+        data.tripStage = effects != null ? effects.TripStage : 0;
+        data.tripTimer = effects != null ? effects.TripTimer : 0f;
         
         // Skills
         data.skill = new int[playerData.skill.Length];

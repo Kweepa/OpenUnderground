@@ -1593,6 +1593,16 @@ public class UUObject : LevelObject
                 return true;
             }
 
+            if (enchantmentNumber == Magic.StringIndexHallucination)
+            {
+                // Kind 13 parameter 5, carried by five red potions, a green one and a scroll: the
+                // message, then the original's hallucination counter at 3 (UW.EXE 0x34619), which
+                // the remake shows as the mushroom's trip, started at once.
+                Messages.Add(1, 228); // "Your vision distorts and you feel light headed."
+                PlayerObject.Player.GetComponent<PlayerEffectsController>()?.StartHallucination();
+                return true;
+            }
+
             if (enchantmentNumber == Magic.StringIndexRestoreMana)
             {
                 Magic.sMagic.RestoreMana(PlayerData.sData.maxMana);
