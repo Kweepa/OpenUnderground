@@ -57,6 +57,14 @@ public static class PlayerInput
     /// </summary>
     public static bool PartialResistances => PlayerPrefs.GetInt("Options_PartialResistances", 1) == 1;
 
+    /// <summary>
+    /// Whether a creature that a trap makes again, from its second copy on, dies with no experience
+    /// and no loot. Only traps the player sets off count, through a button, a lever or a step; the
+    /// creatures the dungeon brings back by itself are worth fighting as before. Off, every copy
+    /// pays, which is what the original does. On unless the player turns it off.
+    /// </summary>
+    public static bool RewardOnlyFirstTrapCopy => PlayerPrefs.GetInt("Options_RewardOnlyFirstTrapCopy", 1) == 1;
+
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     public static Vector2 ReadMoveVector()
     {

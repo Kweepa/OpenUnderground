@@ -22,6 +22,10 @@ public class CritterSaveData : UUObjectSaveData
     public int whoami;
     public bool elite;
     public bool lootAlreadyMade;
+
+    // A trap's second or later creature (Trap.CountCreatureCopy()): absent in an older save, so false.
+    public bool repeatTrapCopy;
+
     public int movementType;
     public int state;
     public float stateTime;
@@ -490,6 +494,15 @@ public class Critter : UUObject
     // that Instantiate() carries it into a create-object trap's copy, which copies the whole record
     // in the original too (0x8418f).
     public bool lootAlreadyMade;
+
+    // Ours: the second or later creature a trap has made because the player set it off
+    // (Trap.CountCreatureCopy()). Nothing in the original tells such a creature apart.
+    public bool repeatTrapCopy;
+
+    // Whether this creature gives the player nothing when it dies: no experience, and no loot,
+    // neither its own nor the template's inventory. The option is read when each reward would come,
+    // so the loot follows it at the creature's first run and the experience at its death.
+    private bool WithholdsReward => repeatTrapCopy && PlayerInput.RewardOnlyFirstTrapCopy;
 
     // Bit 7 of critterData[2], byte 0x0a of the original's record: a creature with it set neither
     // raises the pack alarm when struck nor answers one (UW.EXE 0x1c383, 0x1ba43). Nothing in UW.EXE
@@ -2146,7 +2159,10 @@ public class Critter : UUObject
 
             // TODO: reduce based on relative level of player and enemy
             // also maybe reduce based on max abyss level reached...?
-            PlayerObject.AddXP(10 * stats.Exp);
+            if (!WithholdsReward)
+            {
+                PlayerObject.AddXP(10 * stats.Exp);
+            }
         }
 
         if (whoami == EWhoAmI.Gazer)
@@ -6533,6 +6549,13 @@ public class Critter : UUObject
     // player can tell apart. Nothing is made if the level data says it already was.
     private void SpawnLoot()
     {
+        if (WithholdsReward)
+        {
+            // the link is the template's own inventory, which this creature must not carry off
+            link = 0;
+            return;
+        }
+
         List<UUObject> placed = new List<UUObject>();
         if (link != 0)
         {
@@ -7138,6 +7161,7 @@ public class Critter : UUObject
             critterData.whoami = (int)whoami;
             critterData.elite = elite;
             critterData.lootAlreadyMade = lootAlreadyMade;
+            critterData.repeatTrapCopy = repeatTrapCopy;
             critterData.movementType = (int)movementType;
             critterData.state = (int)state;
             critterData.stateTime = stateTime;
@@ -7230,6 +7254,7 @@ public class Critter : UUObject
             whoami = (EWhoAmI)critterData.whoami;
             elite = critterData.elite;
             lootAlreadyMade = critterData.lootAlreadyMade;
+            repeatTrapCopy = critterData.repeatTrapCopy;
             RefreshMarkersFromLevel();
             movementType = (EMovementType)critterData.movementType;
             if (movementType == EMovementType.TwilightZone)

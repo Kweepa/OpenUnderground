@@ -1791,12 +1791,34 @@ public class SaveGameManager : MonoBehaviour
         return uu.originalLevel == levelBeingLoaded;
     }
     
+    /// <summary>
+    /// Whether this object may take its slot in objects[]: false when another object of the same
+    /// load already has it. The loser becomes a runtime object, so the next save writes it as one.
+    /// </summary>
+    private static bool ClaimLevelObjectSlot(HashSet<int> slotsTaken, UUObject uu)
+    {
+        if (slotsTaken.Add(uu.objectIndex))
+        {
+            return true;
+        }
+
+        uu.originalLevel = 0;
+        return false;
+    }
+
     private void LoadWorldObjects(SaveGameData saveData)
     {
         Level[] levels = LevelLoader.sLevelLoader.levels;
         if (saveData.worldObjectsByLevel != null && saveData.worldObjectsByLevel.Length > 0)
         {
             int maxLevel = Mathf.Min(saveData.worldObjectsByLevel.Length, levels.Length);
+            // The slots of objects[] already given in this load. A slot holds one object, and the
+            // inactive objects come first: an object out of the world is in that list only because
+            // it owns its slot. So a later claim on a taken slot is a copy that kept its template's
+            // level and index - a trap's creature or object, in a save written before Trap
+            // cleared originalLevel on its copies - and it stays a runtime object instead of
+            // taking the template's place, which left the trap with nothing to copy.
+            HashSet<int> slotsTaken = new HashSet<int>();
             for (int levelIndex = 0; levelIndex < maxLevel; levelIndex++)
             {
                 Level level = levels[levelIndex];
@@ -1805,6 +1827,7 @@ public class SaveGameManager : MonoBehaviour
                 LevelWorldSaveData levelData = saveData.worldObjectsByLevel[levelIndex];
                 if (levelData == null)
                     continue;
+                slotsTaken.Clear();
                 
                 // Restore inactive objects first (in objects[] but not in worldObj)
                 if (levelData.inactiveObjects != null)
@@ -1816,7 +1839,8 @@ public class SaveGameManager : MonoBehaviour
                         {
                             LevelObject levelObj = CreateObjectFromSaveData(objData);
                             if (levelObj != null && levelObj.gameObject != null
-                                && levelObj is UUObject uuObj && ShouldPlaceObjectInLevelObjectsArray(uuObj, levelIndex))
+                                && levelObj is UUObject uuObj && ShouldPlaceObjectInLevelObjectsArray(uuObj, levelIndex)
+                                && ClaimLevelObjectSlot(slotsTaken, uuObj))
                             {
                                 uuObj.levelIndex = levelIndex;
                                 LevelLoader.AssignLevelObjectSlot(levelIndex, uuObj.objectIndex, uuObj);
@@ -1840,7 +1864,8 @@ public class SaveGameManager : MonoBehaviour
                             LevelObject levelObj = CreateObjectFromSaveData(objData);
                             if (levelObj != null && levelObj.gameObject != null)
                             {
-                                if (levelObj is UUObject uuObj && ShouldPlaceObjectInLevelObjectsArray(uuObj, levelIndex))
+                                if (levelObj is UUObject uuObj && ShouldPlaceObjectInLevelObjectsArray(uuObj, levelIndex)
+                                    && ClaimLevelObjectSlot(slotsTaken, uuObj))
                                 {
                                     uuObj.levelIndex = levelIndex;
                                     LevelLoader.AssignLevelObjectSlot(levelIndex, uuObj.objectIndex, uuObj);
