@@ -44,18 +44,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0277eb3aca8b4807877c81a5e64a1e6c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stateMusicTracks:
-  - uw03.xmi
-  - uw04.xmi
-  - uw02.xmi
-  - uw04.xmi
-  - uw06.xmi
-  - uw07.xmi
-  - uw11.xmi
-  - uw11.xmi
-  - uw12.xmi
-  - uw15.xmi
-  - uw05.xmi
-  - uw10.xmi
-  - uw15.xmi
-  - uw15.xmi

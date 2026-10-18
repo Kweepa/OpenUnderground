@@ -2,6 +2,10 @@
 
 ## Current release
 
+- Setup, a new entry on the title menu, lets you choose the music for each moment of the game, from exploring and combat to the map and the title screen: the original tracks, your own MP3, OGG or WAV files, or both, one picked at random when there are several; each can be listened to there, through any of the soundfonts, and switched off without removing it. The choice is kept in a music.txt you can also edit by hand, and the sequel's ambient tracks, if you had added them, are already in it.
+
+- Changing the soundfont, in the options or on the Setup screen, no longer starts the music over: the track carries on from where it was, with the new instruments, and the title music keeps looping.
+
 - In the Introduction a left click or A goes on to the next scene and Escape or Start goes back to the menu; in the Acknowledgements a left click anywhere turns to the next page, a right click to the previous one, and Escape goes back. Both screens now show their keys. Escape also ends a dream and the two story scenes of level 7.
 
 - A mage no longer casts a fireball or a lightning bolt through the creature standing in front of it, which killed its companion in the blast.

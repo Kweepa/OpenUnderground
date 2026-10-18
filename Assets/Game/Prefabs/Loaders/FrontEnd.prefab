@@ -72,7 +72,6 @@ MonoBehaviour:
   moveSelection: {fileID: 8300000, guid: a88270b24a9026049881300617bc5df3, type: 3}
   makeSelection: {fileID: 8300000, guid: 71c08b128ff975647a8eab647e29722c, type: 3}
   backSelection: {fileID: 8300000, guid: 774e45ccf82aaab46aa4537dcaed8a52, type: 3}
-  titleMusicTrack: UW01.XMI
   style:
     m_Name: 
     m_Normal:
@@ -146,6 +145,9 @@ MonoBehaviour:
   quitButton:
   - {fileID: 2800000, guid: 133311ebb104470ead40fa871b048c93, type: 3}
   - {fileID: 2800000, guid: 2152a54a059648a7aea7cd698ac8b4d2, type: 3}
+  setupButton:
+  - {fileID: 2800000, guid: 6c6302fa0ccf4d60b1f731b865b90234, type: 3}
+  - {fileID: 2800000, guid: a339d6e8dc70487dbd204a35b3a39114, type: 3}
   achievementsBackground: {fileID: 2800000, guid: 3b869e3985cc2d144a7022a28c4eaad1,
     type: 3}
   achievementHeaderStyle:

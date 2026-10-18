@@ -18,8 +18,8 @@ public enum EMusicState
     Death,
     Map,
 
-    // In coda, non in mezzo: stateMusicTracks e' indicizzato da questo enum e il prefab lo
-    // serializza per posizione, quindi un valore nuovo inserito prima sposterebbe ogni traccia.
+    // At the end, not in the middle: the prefab used to store a track per value by position, and
+    // the order is kept. Which tracks each one plays is now MusicConfig's, through SituationOf().
     Winning,
     Alert,
     Sleep,
@@ -28,9 +28,6 @@ public enum EMusicState
     
 public class Music : MonoBehaviour
 {
-    [EnumNamedArray(typeof(EMusicState))]
-    public string[] stateMusicTracks = new string[System.Enum.GetValues(typeof(EMusicState)).Length];
-
     [Tooltip("Show track name, time, and voice stats on screen")]
     public bool showMusicDebugHUD = false;
 
@@ -39,9 +36,6 @@ public class Music : MonoBehaviour
 
     [Tooltip("The one silence after the title track has played out, in seconds. Its own number, and a shorter one: nothing has been heard in the dungeon yet at that point. Capped by the player's maximum.")]
     public float openingSilence = 10.0f;
-
-    [Tooltip("Subfolder of the sound folder scanned for extra ambient tracks, e.g. music ripped from UW2. Leave empty to disable.")]
-    public string extraExploringTracksFolder = "UW2";
 
 
     private EMusicState musicState = EMusicState.ExploringA;
@@ -90,7 +84,9 @@ public class Music : MonoBehaviour
     private static Music sMusic;
     private float stateTime;
     private MusicPlayer musicPlayer;
+    // The full path of the track this component last started, as MusicConfig resolves it.
     private string currentPlayingTrack = "";
+    private bool deathMusicStarted;
     
     // Track state before entering map screen
     private static EMusicState stateBeforeMap;
@@ -109,10 +105,9 @@ public class Music : MonoBehaviour
     // True from the moment the title track is left playing until the first ambient track is due.
     private bool openingSilencePending;
     
-    // Ambient tracks found in extraExploringTracksFolder, as paths relative to the sound folder.
-    // null = never scanned, empty = scanned and nothing found, so the disk is hit once per session.
-    private string[] extraExploringTracks;
-    
+    /// <summary>Seconds before trying again when no ambient track can be played.</summary>
+    private const float noTrackRetry = 10.0f;
+
     private readonly Collider[] cachedColliders = new Collider[32];
     
     void Awake()
@@ -357,7 +352,7 @@ public class Music : MonoBehaviour
             // track, none is a level up, and the nearest is the kill itself, which asks for the
             // one this remake plays on a victory. So with no track named here, say nothing at
             // all rather than cutting the music for a second of silence.
-            if (string.IsNullOrEmpty(sMusic.stateMusicTracks[(int)EMusicState.LevelUp]))
+            if (MusicConfig.PlayablePaths(EMusicSituation.LevelUp).Count == 0)
             {
                 return;
             }
@@ -418,6 +413,7 @@ public class Music : MonoBehaviour
     public static void Dead()
     {
         sMusic.musicState = EMusicState.Death;
+        sMusic.deathMusicStarted = false;
     }
 
     /// <summary>
@@ -519,77 +515,45 @@ public class Music : MonoBehaviour
             return;
         }
 
-        // Randomly pick one of the exploring states
-        EMusicState[] exploringStates = new EMusicState[] 
-        { 
-            EMusicState.ExploringA, 
-            EMusicState.ExploringB, 
-            EMusicState.ExploringC, 
-            EMusicState.ExploringD 
-        };
-
-        // Extra ambient tracks widen the pool without replacing anything: with no extra folder
-        // present this array is empty and the draw is exactly the vanilla one. Every track,
-        // built in or extra, carries the same weight.
-        string[] extraTracks = GetExtraExploringTracks();
-        int pick = Random.Range(0, exploringStates.Length + extraTracks.Length);
-        if (pick >= exploringStates.Length && musicPlayer != null)
+        // Every ambient track carries the same weight: the original draws one of its three at random
+        // (UW.EXE 0x20545), and the player's own join the same draw.
+        List<string> pool = GetAmbientTracks();
+        musicState = EMusicState.ExploringA;
+        if (musicPlayer == null)
         {
-            string track = extraTracks[pick - exploringStates.Length];
-            musicPlayer.SwitchTrack(track, false);
-            if (musicPlayer.IsPlaying)
-            {
-                // The extra tracks have no EMusicState of their own, so ExploringA stands in and
-                // Update() carries on treating us as exploring.
-                musicState = EMusicState.ExploringA;
-                currentPlayingTrack = track;
-                return;
-            }
-            // File unreadable or deleted since the scan: fall through to a scene track in the
-            // same frame, so the player never hears a gap.
+            return;
+        }
+        if (pool.Count == 0)
+        {
+            // Nothing to play: silence, and a look again in a while rather than on every frame.
+            musicPlayer.StopMusic();
+            currentPlayingTrack = "";
+            exploringSilenceTimer = noTrackRetry;
+            return;
         }
 
-        musicState = exploringStates[Random.Range(0, exploringStates.Length)];
-        StartStateMusic(musicState);
+        PlayTrack(pool[Random.Range(0, pool.Count)], false);
     }
 
     /// <summary>
-    /// Extra ambient tracks available right now: the contents of the extra folder, filtered to the
-    /// arrangement that matches the selected soundfont, plus the map track when the map is set to
-    /// keep the music playing. The folder itself is scanned only once per session.
+    /// The ambient tracks that can play now: the player's Atmosphere list, plus the map's tracks when
+    /// the map is set to keep the music playing.
     /// </summary>
-    private string[] GetExtraExploringTracks()
+    private List<string> GetAmbientTracks()
     {
-        extraExploringTracks ??= ScanExtraExploringTracks();
-
-        // UW2 ships two arrangements of each track: UWA* for AdLib, UWR* for Roland MT-32. Pick
-        // the set that matches the soundfont selected in the options menu, so switching soundfont
-        // switches the pool immediately with no stale cache. Files matching neither prefix are
-        // always eligible, so any other music dropped in the folder just works.
-        string prefix = PlayerPrefs.GetString("Options_SoundFont", "Soundfonts/MT32.sf2")
-            .ToUpperInvariant().Contains("OPL") ? "UWA" : "UWR";
-        string rejectedPrefix = prefix == "UWA" ? "UWR" : "UWA";
-
-        List<string> pool = new();
-        foreach (string track in extraExploringTracks)
+        List<string> pool = MusicConfig.PlayablePaths(EMusicSituation.Atmosphere);
+        foreach (string mapTrack in GetSpareMapTracks())
         {
-            if (!Path.GetFileName(track).ToUpperInvariant().StartsWith(rejectedPrefix))
+            if (!pool.Exists(path => MusicConfig.SamePath(path, mapTrack)))
             {
-                pool.Add(track);
+                pool.Add(mapTrack);
             }
         }
-
-        string mapTrack = GetSpareMapTrack();
-        if (!string.IsNullOrEmpty(mapTrack))
-        {
-            pool.Add(mapTrack);
-        }
-
-        return pool.ToArray();
+        return pool;
     }
 
     /// <summary>
-    /// The map track, when opening the map no longer plays it and nothing else does either.
+    /// The map's tracks, when opening the map no longer plays them.
     /// </summary>
     /// <remarks>
     /// With the map keeping the music playing, the track the map used to start is the one piece of
@@ -597,65 +561,44 @@ public class Music : MonoBehaviour
     /// ambient rotation, where it is one more track and carries the same weight as every other.
     /// Tied to the option rather than added outright, because with the option off it is still the
     /// map's own track and hearing it while walking would give the map away.
-    /// The file is checked here for the same reason ShouldLeaveMusicAloneOnMap checks it: the
-    /// names come from the scene and the files come from the player's own copy of the original
-    /// game, so a name in the list is not a track on disk.
     /// </remarks>
-    private string GetSpareMapTrack()
+    private static List<string> GetSpareMapTracks()
     {
-        if (!PlayerInput.KeepMusicOnMap)
-        {
-            return null;
-        }
+        return PlayerInput.KeepMusicOnMap ? MusicConfig.PlayablePaths(EMusicSituation.Map) : new List<string>();
+    }
 
-        string mapTrack = stateMusicTracks[(int)EMusicState.Map];
-        if (string.IsNullOrEmpty(mapTrack))
+    /// <summary>The list a state plays from: the four exploring states share the Atmosphere one.</summary>
+    private static EMusicSituation SituationOf(EMusicState state)
+    {
+        switch (state)
         {
-            return null;
-        }
-
-        try
-        {
-            return File.Exists(Path.Combine(GameDataPath.GetSoundPath(), mapTrack)) ? mapTrack : null;
-        }
-        catch (Exception)
-        {
-            return null;
+        case EMusicState.Combat: return EMusicSituation.Combat;
+        case EMusicState.Injured: return EMusicSituation.Injured;
+        case EMusicState.Winning: return EMusicSituation.Winning;
+        case EMusicState.Alert: return EMusicSituation.Alert;
+        case EMusicState.Victory: return EMusicSituation.Victory;
+        case EMusicState.LevelUp: return EMusicSituation.LevelUp;
+        case EMusicState.Death: return EMusicSituation.Death;
+        case EMusicState.Map: return EMusicSituation.Map;
+        case EMusicState.Sleep: return EMusicSituation.Sleep;
+        case EMusicState.Conversation: return EMusicSituation.Conversation;
+        default: return EMusicSituation.Atmosphere;
         }
     }
 
-    private string[] ScanExtraExploringTracks()
+    /// <summary>Starts a track by its full path, from the beginning even when it is the one that has just ended.</summary>
+    private void PlayTrack(string path, bool loop)
     {
-        if (string.IsNullOrEmpty(extraExploringTracksFolder))
+        // MusicPlayer.SwitchTrack() does nothing for the track it last started, which after it has
+        // played out is still its current one.
+        if (MusicConfig.SamePath(musicPlayer.currentTrack, path))
         {
-            return Array.Empty<string>();
+            musicPlayer.StopMusic();
         }
-
-        try
-        {
-            string folder = Path.Combine(GameDataPath.GetSoundPath(), extraExploringTracksFolder);
-            if (!Directory.Exists(folder))
-            {
-                return Array.Empty<string>();
-            }
-
-            string[] files = Directory.GetFiles(folder, "*.xmi");
-            string[] tracks = new string[files.Length];
-            for (int i = 0; i < files.Length; ++i)
-            {
-                // MusicPlayer.SwitchTrack resolves the name against the sound folder, so a
-                // relative path naming the subfolder is all it needs.
-                tracks[i] = Path.Combine(extraExploringTracksFolder, Path.GetFileName(files[i]));
-            }
-            return tracks;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"Could not scan '{extraExploringTracksFolder}' for extra ambient tracks: {e.Message}");
-            return Array.Empty<string>();
-        }
+        musicPlayer.SwitchTrack(path, loop);
+        currentPlayingTrack = path;
     }
-    
+
     /// <summary>
     /// Public method to resume exploring music (used by cutscenes)
     /// </summary>
@@ -671,23 +614,26 @@ public class Music : MonoBehaviour
     {
         if (musicPlayer == null) return;
         
-        string trackFileName = stateMusicTracks[(int)state];
-        if (string.IsNullOrEmpty(trackFileName))
+        // One of the state's tracks at random, held until the state is entered again. The one playing
+        // is kept when the state's list has it too, so moving between two states that share a track -
+        // the three of the map, sleep and conversation, say - does not start it over.
+        string keep = musicPlayer.IsPlaying ? currentPlayingTrack : null;
+        string path = MusicConfig.Pick(SituationOf(state), keep);
+        if (path == null)
         {
             musicPlayer.StopMusic();
             currentPlayingTrack = "";
             return;
         }
         
-        if (trackFileName != currentPlayingTrack)
+        if (!musicPlayer.IsPlaying || !MusicConfig.SamePath(path, currentPlayingTrack))
         {
             // The whole combat band loops, not just the middle of it: the three tracks take turns
             // for as long as the fight lasts, so any of them can be the one that is playing.
             bool loop = state is EMusicState.Map or EMusicState.Combat
                 or EMusicState.Injured or EMusicState.Winning or EMusicState.Alert
                 or EMusicState.Sleep or EMusicState.Conversation;
-            musicPlayer.SwitchTrack(trackFileName, loop);
-            currentPlayingTrack = trackFileName;
+            PlayTrack(path, loop);
         }
     }
 
@@ -698,7 +644,7 @@ public class Music : MonoBehaviour
             return;
         }
 
-        string track = string.IsNullOrEmpty(currentPlayingTrack) ? "(none)" : currentPlayingTrack;
+        string track = string.IsNullOrEmpty(currentPlayingTrack) ? "(none)" : Path.GetFileName(currentPlayingTrack);
         double t = musicPlayer.CurrentTime;
         int minutes = (int)(t / 60.0);
         int seconds = (int)(t % 60.0);
@@ -836,10 +782,10 @@ public class Music : MonoBehaviour
             break;
             
         case EMusicState.Death:
-            // Play death music
-            string deathTrack = stateMusicTracks[(int)EMusicState.Death];
-            if (currentPlayingTrack != deathTrack)
+            // Play death music, once: it is picked when the state is entered, not on every frame.
+            if (!deathMusicStarted)
             {
+                deathMusicStarted = true;
                 StartStateMusic(EMusicState.Death);
             }
             
@@ -876,8 +822,8 @@ public class Music : MonoBehaviour
     /// track configured but absent from the player's data files, MusicPlayer.SwitchTrack stops
     /// the current track first and only then fails its File.Exists check, which is worse: Music
     /// still records the track as playing, so the state is a lie as well as silent. The second
-    /// case is real rather than theoretical, because the track names come from the scene and the
-    /// files come from whichever copy of the original game the player owns.
+    /// case is real rather than theoretical, because the track names come from music.txt and the
+    /// files come from the player's disk.
     /// Either way the map is silent and closing it restarts a random exploring track.
     /// EnterMapScreen and ExitMapScreen must take this early return together, or the way out
     /// reads a stateBeforeMap the way in never wrote.
@@ -894,21 +840,9 @@ public class Music : MonoBehaviour
             return true;
         }
 
-        string mapTrack = sMusic.stateMusicTracks[(int)EMusicState.Map];
-        if (string.IsNullOrEmpty(mapTrack))
-        {
-            return true;
-        }
-
-        try
-        {
-            // Same folder MusicPlayer resolves track names against.
-            return !File.Exists(Path.Combine(GameDataPath.GetSoundPath(), mapTrack));
-        }
-        catch (Exception)
-        {
-            return true;
-        }
+        // The map's list may be empty, and its files may be missing: the names come from music.txt
+        // and the files from the player's disk.
+        return MusicConfig.PlayablePaths(EMusicSituation.Map).Count == 0;
     }
 
     public static void EnterMapScreen()
