@@ -56,13 +56,18 @@ public static class Enchantment
     /// holds none: below 512 it is a stack size, as in a save written before the debris recorded
     /// its roll. The inverse of <see cref="PotionSpecialFor"/> for every number the loot can roll.
     /// </summary>
+    /// <remarks>
+    /// Decoded with bit 11 set, as UW.EXE 0x38b5c does: every enchanted potion in the level data
+    /// has it, and a potion the debris makes is read as one. So 512-575 are spells, and the six
+    /// potions at 581 are kind 13 parameter 5, Hallucination - not 256 + 5, Leap.
+    /// </remarks>
     public static int PotionNumberFrom(int special)
     {
         if (special == PoisonResistancePotionSpecial)
         {
             return Magic.StringIndexPoisonResistance;
         }
-        return special >= FirstEnchantedSpecial ? FirstSpellName + (special & 0x3f) : None;
+        return special >= FirstEnchantedSpecial ? NameIndexOf(special, true) : None;
     }
 
     /// <summary>The effect kind, or -1 when the number is not one of the item enchantments.</summary>

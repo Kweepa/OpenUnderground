@@ -93,6 +93,10 @@ public class PlayerSaveData
     public int hunger;
     public int fatigue;
     public int drunkenness;
+    // The mushroom's trip, which the original saves as its hallucination counter: the stage it is
+    // at and the seconds spent in that stage. 0 is no trip, and an older save reads as that.
+    public int tripStage;
+    public float tripTimer;
     
     // Skills
     public int[] skill;

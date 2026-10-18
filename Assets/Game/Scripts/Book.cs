@@ -29,7 +29,8 @@ public class Book : UUObject
     {
         if (!isLinked && isEnchanted)
         {
-            SetEnchantment(256 + (special & 0x3f));
+            // Every enchanted scroll in the level data has bit 11 set (UW.EXE 0x38b5c).
+            SetEnchantment(Enchantment.NameIndexOf(special, true));
         }
     }
 

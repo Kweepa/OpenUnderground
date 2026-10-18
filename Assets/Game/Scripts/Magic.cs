@@ -353,6 +353,7 @@ public class Magic : MonoBehaviour
     public const int StringIndexRegeneration = 190;
     public const int StringIndexManaRegeneration = 191;
     public const int StringIndexTheFrog = 211;
+    public const int StringIndexHallucination = 213;
     public const int StringIndexManaBoost = 307;
     public const int StringIndexRestoreMana = 308;
 

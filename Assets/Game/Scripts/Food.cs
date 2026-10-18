@@ -17,12 +17,22 @@ public class Food : UUObject
         PlayerData.sData.hunger = Mathf.Max(0, PlayerData.sData.hunger - foodValue);
         Utils.PlayClip2d(eat);
 
-        if (isEnchanted)
+        CastEnchantmentOnEating();
+
+        return EEquipAction.Consume;
+    }
+
+    /// <summary>
+    /// What is eaten or drunk fires its enchantment only when bit 11 is set (UW.EXE 0x384e4, at
+    /// 0x3850b). The ale on level 1 has it; the enchanted loaf on level 8 does not, so it is named
+    /// Cure Poison and eating it does nothing more than any loaf.
+    /// </summary>
+    private void CastEnchantmentOnEating()
+    {
+        if (isEnchanted && Enchantment.HasBit11(this))
         {
             Magic.sMagic.TryCastEnchantment(enchantmentNumber, anonymous: true);
         }
-
-        return EEquipAction.Consume;
     }
 
     protected EEquipAction EatSolidWithMessage(int messageId, int foodValue)
@@ -107,10 +117,7 @@ public class Food : UUObject
 
             Utils.PlayClip2d(eat);
 
-            if (isEnchanted)
-            {
-                Magic.sMagic.TryCastEnchantment(enchantmentNumber, true);
-            }
+            CastEnchantmentOnEating();
 
             switch (type)
             {

@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Six potions and a scroll that worked as Leap are Hallucination, as in the original: "Your vision distorts and you feel light headed.", and the world swims for about a minute, like a mushroom's but at once; a save now keeps either running. The enchanted loaf of bread no longer cures poison, which in the original it never did.
+
 - A spell that backfires costs its mana, as in the original, and hurts more the higher its circle, up to 4d8 on the eighth: enough to kill a weak caster.
 
 - Sleeping heals as in the original, and restores your mana too: well fed on a bedroll you wake with about two thirds of both back, otherwise about a third, and starving with nothing. A creature hunting nearby may come and wake you after a few hours ("Your sleep is interrupted!"), and on waking a line tells you how long you slept and how rested and hungry you are.
