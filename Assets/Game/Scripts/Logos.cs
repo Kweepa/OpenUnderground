@@ -96,6 +96,24 @@ public class Logos : MonoBehaviour
 
             break;
         case EState.Title:
+            // The two logos above end on a left click or A. This one is a cutscene, and
+            // CutscenePlayer offers no skip - only a 10x fast forward while you hold the right
+            // button, and only after the first half second - so the same click that got you past
+            // the logos does nothing here and the startup stops feeling responsive halfway
+            // through. Accept the same gesture, and leave the fast forward where it is.
+            // Only the title cutscene: this is handled here rather than in CutscenePlayer so that
+            // the intro, the credits, the endings and the death scenes are untouched.
+            if (cutscene != null
+                && ((GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
+                    || (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)))
+            {
+                // CutscenePlayer.OnDestroy() gives back the clock and the controls. Cleared as well
+                // as destroyed, because Destroy is deferred to the end of the frame and the test
+                // below runs first.
+                Destroy(cutscene.gameObject);
+                cutscene = null;
+            }
+
             if (cutscene == null)
             {
                 SceneManager.LoadScene("World");

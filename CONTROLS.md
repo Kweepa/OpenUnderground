@@ -265,7 +265,10 @@ Look speed and invert options are in Options.
 |Control|Action|
 |-|-|
 |Left click|Advance|
-|Right click (hold)|Skip|
+|Right click (hold)|Fast forward, ten times speed|
+
+The title screen that follows the two startup logos also ends on a left click or A, like the logos
+themselves. Other cutscenes have no outright skip, only the fast forward.
 
 
 

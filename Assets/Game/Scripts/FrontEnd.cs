@@ -138,6 +138,67 @@ public class FrontEnd : MonoBehaviour
         return 5;
     }
 
+    // Texture slots of the two entries the menu opens on.
+    private const int CreateCharacterSlot = 1;
+    private const int JourneyOnwardSlot = 4;
+
+    /// <summary>The visible menu index of a texture slot, or -1 when that entry is not shown.</summary>
+    /// <remarks>
+    /// Searched rather than fixed, because the entries move up and down with what is shown:
+    /// without saves Journey Onward is gone and Quit takes its place.
+    /// </remarks>
+    private int MenuIndexOfSlot(int slot)
+    {
+        int numItems = MenuItemCount();
+        for (int i = 0; i < numItems; ++i)
+        {
+            if (MenuItemToSlot(i) == slot)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Selects Journey Onward when there are saves, otherwise Create Character, and puts the pointer
+    /// on it.
+    /// </summary>
+    /// <remarks>
+    /// Those are the entries a player wants when the title cutscene ends. Left on Introduction, a
+    /// player clicking through the title screen lands in the intro cutscene. The menu order stays
+    /// the original's.
+    /// </remarks>
+    private void SelectFirstMenuItem()
+    {
+        int index = MenuIndexOfSlot(JourneyOnwardSlot);
+        if (index < 0)
+        {
+            index = MenuIndexOfSlot(CreateCharacterSlot);
+        }
+        if (index < 0)
+        {
+            return;
+        }
+
+        menuIndex = index;
+        Rect item = GetMenuItemRectGui(index, Screen.width / 320.0f, Screen.height / 200.0f);
+        WarpMouseToGui(item.center);
+    }
+
+    /// <summary>Moves the pointer to a point in GUI space, when there is a mouse.</summary>
+    private static void WarpMouseToGui(Vector2 guiPoint)
+    {
+        Mouse mouse = Mouse.current;
+        if (mouse == null)
+        {
+            return;
+        }
+
+        // GUI space counts down from the top, the mouse counts up from the bottom.
+        mouse.WarpCursorPosition(new Vector2(guiPoint.x, UnityEngine.Device.Screen.height - guiPoint.y));
+    }
+
     private Texture2D GetMenuItemTexture(int i)
     {
         int item = i / 2;
@@ -254,6 +315,7 @@ public class FrontEnd : MonoBehaviour
                 MusicPlayer.Instance.SwitchTrack(titleMusicTrack, true);
             }
             FadeIn();
+            SelectFirstMenuItem();
             state = EState.Menu;
             break;
         case EState.Menu:
@@ -385,17 +447,7 @@ public class FrontEnd : MonoBehaviour
             return;
         }
 
-        Mouse mouse = Mouse.current;
-        if (mouse == null)
-        {
-            return;
-        }
-
-        Rect row = GetLoadSlotRectGui(0);
-        // GUI space counts down from the top, the mouse counts up from the bottom.
-        float guiY = row.y + row.height * 0.5f;
-        mouse.WarpCursorPosition(new Vector2(row.x + row.width * 0.5f,
-            UnityEngine.Device.Screen.height - guiY));
+        WarpMouseToGui(GetLoadSlotRectGui(0).center);
     }
 
     /// <summary>Moves the load list selection, keeping it inside the window that is drawn.</summary>

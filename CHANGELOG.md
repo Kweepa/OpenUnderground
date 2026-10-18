@@ -2,6 +2,8 @@
 
 ## Current release
 
+- When the title cutscene ends, the menu starts on Journey Onward with the pointer on it, or on Create Character when there are no saves yet. The click or A that skips the two logos also skips the title cutscene.
+
 - Six potions and a scroll that worked as Leap are Hallucination, as in the original: "Your vision distorts and you feel light headed.", and the world swims for about a minute, like a mushroom's but at once; a save now keeps either running. The enchanted loaf of bread no longer cures poison, which in the original it never did.
 
 - A spell that backfires costs its mana, as in the original, and hurts more the higher its circle, up to 4d8 on the eighth: enough to kill a weak caster.
