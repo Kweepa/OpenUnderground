@@ -574,6 +574,16 @@ public partial class Conversation
         int maxInstructions = 32768;
         while (--maxInstructions > 0 && !yield && Conversations.gambits.Count == 0 && !babl_get_input)
         {
+            // A pc outside the code ends the conversation. Sseetharee's "Why not?" calls -1 (slot 15,
+            // pc 1411): the original then fetches the word before the code, the segment of the heap
+            // block's pointer to itself (UW.EXE 0x672f1), far above the last opcode, and stops cleanly
+            // (0x68a70). Here code[-1] threw on every frame and the conversation never ended.
+            if (ip < 0 || ip >= code.Length)
+            {
+                Debug.LogWarningFormat("Conversation {0}: pc {1} outside the code. Ending.", conversationIndex, ip);
+                EndConversation();
+                break;
+            }
             AddToDisassembly();
             EOp op = (EOp)code[ip++];
             if (ip >= code.Length && op != EOp.Ret) // ret
@@ -786,9 +796,10 @@ public partial class Conversation
                 Push(-Pop());
                 break;
             default:
-                Debug.LogErrorFormat("Error in conversation code ip={0}, tok={1}. Exiting...", ip - 1, op);
-                exit = true;
-                yield = true;
+                // An opcode out of range ends the conversation the normal way, as the original does
+                // (UW.EXE 0x68a70): variables written back, trade tray returned (slot 6, pc 1902).
+                Debug.LogWarningFormat("Conversation {0}: bad opcode {1} at pc {2}. Ending.", conversationIndex, (int)op, ip - 1);
+                EndConversation();
                 break;
             }
         }
