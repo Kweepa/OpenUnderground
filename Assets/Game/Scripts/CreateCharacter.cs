@@ -158,6 +158,12 @@ public class CreateCharacter : MonoBehaviour
         }
     }
 
+    // What a skill point is worth at creation, as the original has it (UW.EXE 0x8141f, read
+    // whole; its only caller applies the picks). A skill not raised yet gets 3 + attribute / 9
+    // and three rolls; one already raised gets 1 + attribute / 13 and two. On top go 0 to
+    // rolls - 1 at random and one GetResult(attribute, 20) per roll, counted -1 to 2, so a
+    // raised skill with a low attribute can even lose a point. The total stops at 30.
+    // With an attribute of 20 the first point averages 7.4 and the second 3.4.
     private void IncreaseSkill(byte skill)
     {
         int curValue = PlayerData.sData.skill[skill];
@@ -176,9 +182,18 @@ public class CreateCharacter : MonoBehaviour
             governingStatValue = PlayerData.sData.dexterity;
             break;
         }
-        int statBasedBonus = Math.Max(0, governingStatValue - curValue) / 5;
+        bool firstPoint = curValue == 0;
+        int rolls = firstPoint ? 3 : 2;
+        int value = curValue + (firstPoint ? 3 + governingStatValue / 9 : 1 + governingStatValue / 13);
+        value += UnityEngine.Random.Range(0, rolls);
+        for (int i = 0; i < rolls; ++i)
+        {
+            // The enum runs from CriticalFailure to CriticalSuccess, 0 to 3; the original adds
+            // its own result, -1 to 2.
+            value += (int)Skills.GetResult(governingStatValue, 20) - 1;
+        }
 
-        PlayerData.sData.skill[skill] += Math.Min(UnityEngine.Random.Range(1, 13) + statBasedBonus, 12);
+        PlayerData.sData.skill[skill] = Math.Min(value, 30);
     }
 
     private void RollStats()
@@ -191,28 +206,37 @@ public class CreateCharacter : MonoBehaviour
 
         Utils.PlayClip2d(diceRoll);
 
-        // roll up a random character
+        // Roll up a random character. The class's points go out in chunks of 1 to 4, each on one
+        // of the three attributes picked at random, and a chunk that would take an attribute
+        // past 30 stops there, the rest staying to be handed out (UW.EXE 0x6cdb2, at 0x6ce18).
+        // The means are those of one point at a time, but the spread is wider: an attribute
+        // can stay at the class minimum, or reach 30.
         int pointsRemaining = data.pointsRemaining;
-        while (pointsRemaining-- > 0)
+        while (pointsRemaining > 0)
         {
-            int r = UnityEngine.Random.Range(0, 3);
-            switch (r)
+            int chunk = Math.Min(UnityEngine.Random.Range(1, 5), pointsRemaining);
+            switch (UnityEngine.Random.Range(0, 3))
             {
             case 0:
-                ++PlayerData.sData.strength;
+                chunk = Math.Min(chunk, 30 - PlayerData.sData.strength);
+                PlayerData.sData.strength += chunk;
                 break;
             case 1:
-                ++PlayerData.sData.intellect;
+                chunk = Math.Min(chunk, 30 - PlayerData.sData.dexterity);
+                PlayerData.sData.dexterity += chunk;
                 break;
             case 2:
-                ++PlayerData.sData.dexterity;
+                chunk = Math.Min(chunk, 30 - PlayerData.sData.intellect);
+                PlayerData.sData.intellect += chunk;
                 break;
             }
+            pointsRemaining -= chunk;
         }
         PlayerData.sData.vitality = PlayerObject.GetMaxHitPoints();
-        // A new character starts 6 to 11 hit points short of the maximum, as in the original
-        // (UW.EXE 0x6ca5c-0x6ca76: the maximum, less 6, less rand() % 6).
-        PlayerData.sData.hp = PlayerData.sData.vitality - 6 - UnityEngine.Random.Range(0, 6);
+        // A new character starts with full hit points. The original's reset writes the maximum
+        // less 6 to 11 (UW.EXE 0x6ca5c), but that runs before this screen, and the class screen
+        // then sets them to the maximum it has just worked out (0x6ce6b-0x6ce83).
+        PlayerData.sData.hp = PlayerData.sData.vitality;
 
         for (int i = 0; i < PlayerData.sData.skill.Length; ++i)
         {

@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Creating a character rolls as the original does: the first point on a skill is worth about twice the second - a Fighter who takes Attack twice ends near 13 instead of 18 - no skill starts above 30, and the attributes spread wider, one sometimes staying at the class minimum. A new character also starts with full hit points.
+
 - The game no longer freezes when you answer "Why not?" to the lizardman Sseetharee on level 3. The conversation ends there, as in the original.
 
 - F uses what you point at, like Y on the pad: a door or a lever works at once, and an item goes straight into your pack instead of onto the cursor, with the inventory opening on it. With an item already on the cursor, F puts it in your pack.
@@ -129,8 +131,6 @@
 - The Open spell works as in the original: it opens the one door or chest you aim at, within reach, and a hard lock can resist it. Locks the original keeps for their own key no longer give way to it, nor to a lockpick, so the spell no longer lets you skip a part of the game.
 
 - A toadstool now makes you ill, as its message says and as in the original.
-
-- A new character starts a little hurt, 6 to 11 hit points short of the maximum, as in the original.
 
 - Eating a mushroom gives three points of mana.
 
