@@ -2,6 +2,8 @@
 
 ## Current release
 
+- In the Introduction a left click or A goes on to the next scene and Escape or Start goes back to the menu; in the Acknowledgements a left click anywhere turns to the next page, a right click to the previous one, and Escape goes back. Both screens now show their keys. Escape also ends a dream and the two story scenes of level 7.
+
 - A mage no longer casts a fireball or a lightning bolt through the creature standing in front of it, which killed its companion in the blast.
 
 - An acid slug's spit now flies in an arc and falls, as in the original, carrying four tiles at most. A mage's thrown knife flies in an arc too, faster and flatter.
