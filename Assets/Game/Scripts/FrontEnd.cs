@@ -41,12 +41,20 @@ public class FrontEnd : MonoBehaviour
     
     public Texture2D bButton;
     public Texture2D yButton;
+    // The other two face buttons, for hints.
+    public Texture2D aButton;
+    public Texture2D xButton;
     public GUIStyle buttonLabelStyle;
 
     [Header("Keyboard icons (Achievements)")]
     public Texture2D blankKeyTexture;
     public Texture2D escapeKeyTexture;
     public GUIStyle keyLetterStyle;
+
+    [Header("Hints of the introduction and the acknowledgements")]
+    public Texture2D leftMouseButtonTexture;
+    public Texture2D rightMouseButtonTexture;
+    public Texture2D dPadLeftRightTexture;
     
     public Texture2D savePanelBackground;
     public GUIStyle savePanelText;
@@ -330,6 +338,10 @@ public class FrontEnd : MonoBehaviour
             UpdateLoadMenu();
             break;
         case EState.Introduction:
+            if (cutscene != null)
+            {
+                UpdateIntroductionKeys();
+            }
             if (cutscene == null)
             {
                 state = EState.Menu;
@@ -381,6 +393,127 @@ public class FrontEnd : MonoBehaviour
                 ToggleRevealAchievements();
             break;
         }
+    }
+
+    /// <summary>
+    /// The introduction's own keys, besides the fast forward the cutscene has: a left click or A goes
+    /// on to the next scene, Escape or Start goes back to the menu.
+    /// </summary>
+    /// <remarks>
+    /// Here and not in CutscenePlayer, as the title cutscene's skip is in Logos, so that the dreams,
+    /// the endings and the deaths are untouched. Where the cutscene waits for a press, the press is its
+    /// own: it lets the cutscene go on, and does not skip a scene as well.
+    /// </remarks>
+    private void UpdateIntroductionKeys()
+    {
+        GameInput.RefreshLastActiveDevice();
+        if (GameInput.EscapePressedThisFrame() || (GameInput.CurrentGamepad?.startButton.wasPressedThisFrame ?? false))
+        {
+            if (backSelection != null)
+                Utils.PlayClip2d(backSelection);
+            // CutscenePlayer.OnDestroy() gives back the clock. Cleared as well, because Destroy waits for
+            // the end of the frame.
+            Destroy(cutscene.gameObject);
+            cutscene = null;
+            return;
+        }
+
+        bool next = (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)
+            || (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false);
+        if (next && !cutscene.WaitingForPress)
+        {
+            cutscene.SkipToNextScene();
+        }
+
+        if (next || PointerMoved())
+        {
+            hintsShownAt = Time.unscaledTime;
+        }
+    }
+
+    private Vector2 lastPointer;
+
+    private bool PointerMoved()
+    {
+        Mouse mouse = GameInput.CurrentMouse;
+        if (mouse == null)
+        {
+            return false;
+        }
+        Vector2 now = mouse.position.ReadValue();
+        bool moved = (now - lastPointer).sqrMagnitude > 4f;
+        lastPointer = now;
+        return moved;
+    }
+
+    // When the introduction's hints were last asked for: they show for HintsSeconds after that, so
+    // they do not sit over the pictures for the whole of it.
+    private float hintsShownAt;
+    private const float HintsSeconds = 4f;
+
+    /// <summary>
+    /// The hints of the introduction and of the acknowledgements, drawn as the achievements page draws
+    /// its own: the introduction's at the top, where the subtitles are not, fading out a few seconds
+    /// after the last press or move of the pointer; the acknowledgements' at the bottom, for good.
+    /// </summary>
+    private void DrawScreenHints(bool introduction)
+    {
+        bool pad = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
+        Hint[] hints;
+        if (introduction)
+        {
+            hints = pad
+                ? new[]
+                {
+                    new Hint("next scene", HintKey.Of(aButton)),
+                    new Hint("fast forward", HintKey.Of(bButton)),
+                    new Hint("back", HintKey.PadButton("Start")),
+                }
+                : new[]
+                {
+                    new Hint("next scene", HintKey.Of(leftMouseButtonTexture)),
+                    new Hint("fast forward", HintKey.Of(rightMouseButtonTexture)),
+                    new Hint("back", HintKey.Of(escapeKeyTexture)),
+                };
+        }
+        else
+        {
+            hints = pad
+                ? new[]
+                {
+                    new Hint("pages", HintKey.Of(dPadLeftRightTexture)),
+                    new Hint("back", HintKey.Of(bButton)),
+                }
+                : new[]
+                {
+                    new Hint("next page", HintKey.Of(leftMouseButtonTexture)),
+                    new Hint("previous page", HintKey.Of(rightMouseButtonTexture)),
+                    new Hint("back", HintKey.Of(escapeKeyTexture)),
+                };
+        }
+
+        float alpha = 1f;
+        if (introduction)
+        {
+            alpha = Mathf.Clamp01(HintsSeconds + 1f - (Time.unscaledTime - hintsShownAt));
+            if (alpha <= 0f)
+            {
+                return;
+            }
+        }
+
+        float scale = UiScale();
+        float height = 48f * scale;
+        Rect row = introduction
+            ? new Rect(0, 12f * scale, Screen.width, height)
+            : new Rect(0, Screen.height - 50f * scale - height / 2 + 12f * scale, Screen.width, height);
+
+        Color previous = GUI.color;
+        GUI.color = new Color(0f, 0f, 0f, 0.5f * alpha);
+        GUI.DrawTexture(new Rect(0, row.y, Screen.width, row.height), Texture2D.whiteTexture);
+        GUI.color = new Color(1f, 1f, 1f, alpha);
+        HintBar.Draw(row, scale, buttonLabelStyle, keyLetterStyle, blankKeyTexture, hints);
+        GUI.color = previous;
     }
 
     private void BackFromAchievements()
@@ -529,6 +662,7 @@ public class FrontEnd : MonoBehaviour
         case 0:
             state = EState.Introduction;
             cutscene = Instantiate(introCutscene);
+            hintsShownAt = Time.unscaledTime;
             if (MusicPlayer.Instance != null)
                 MusicPlayer.Instance.SetMusicDuckMultiplier(0.5f);
             break;
@@ -1113,6 +1247,15 @@ public class FrontEnd : MonoBehaviour
                 }
                 break;
             }
+            break;
+        case EState.Introduction:
+            if (cutscene != null)
+            {
+                DrawScreenHints(true);
+            }
+            break;
+        case EState.PortCredits:
+            DrawScreenHints(false);
             break;
         }
         Utils.DrawFade(fadeAlpha);

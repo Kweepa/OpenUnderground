@@ -217,6 +217,8 @@ MonoBehaviour:
     m_StretchHeight: 0
   bButton: {fileID: 2800000, guid: 30ef8c8f932fbcc4c99ee7b9b89dffc8, type: 3}
   yButton: {fileID: 2800000, guid: 2e7b03614c7fb7347ae582cfe6aea9dc, type: 3}
+  aButton: {fileID: 2800000, guid: b6511337e45c0fb41bcd61af323b2ce9, type: 3}
+  xButton: {fileID: 2800000, guid: fc5689391c16d3542969bd5aa2fc51cf, type: 3}
   buttonLabelStyle:
     m_Name: 
     m_Normal:
@@ -286,6 +288,9 @@ MonoBehaviour:
     m_StretchHeight: 0
   blankKeyTexture: {fileID: 2800000, guid: d64732d1ed1e44c428f198609dffc69c, type: 3}
   escapeKeyTexture: {fileID: 2800000, guid: ab70255189063294da9344b595a1bf48, type: 3}
+  leftMouseButtonTexture: {fileID: 2800000, guid: 56aa71cf12da0e7428d12efac92c85d5, type: 3}
+  rightMouseButtonTexture: {fileID: 2800000, guid: c7063c7e6dd950744ac6ca7c0855a957, type: 3}
+  dPadLeftRightTexture: {fileID: 2800000, guid: 91074781916a5cc45bbc2c3c73cf35e1, type: 3}
   keyLetterStyle:
     m_Name: 
     m_Normal:

@@ -439,29 +439,31 @@ public class Credits : MonoBehaviour
             ++page;
             WriteCreditsOnTexture(creds[page]);
         }
-        else if (GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
+        else if ((GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
+                 || (GameInput.CurrentGamepad?.startButton.wasPressedThisFrame ?? false)
+                 || GameInput.EscapePressedThisFrame())
         {
             Utils.PlayClip2d(turnBack);
             enabled = false;
         }
         else if (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)
         {
-            Vector2 gui = GuiInput.ScreenToGuiMouse(GameInput.CurrentMouse.position.ReadValue());
-            if (gui.y > Screen.height - 72f)
-            {
-                Utils.PlayClip2d(turnBack);
-                enabled = false;
-            }
-            else if (gui.x < Screen.width * 0.33f && page > 0)
-            {
-                --page;
-                WriteCreditsOnTexture(creds[page]);
-            }
-            else if (gui.x > Screen.width * 0.67f && page < creds.Length - 1)
+            // Anywhere on the screen. Past the last page it goes back to the menu, as the timer does.
+            if (page < creds.Length - 1)
             {
                 ++page;
                 WriteCreditsOnTexture(creds[page]);
             }
+            else
+            {
+                Utils.PlayClip2d(turnBack);
+                enabled = false;
+            }
+        }
+        else if ((GameInput.CurrentMouse?.rightButton.wasPressedThisFrame ?? false) && page > 0)
+        {
+            --page;
+            WriteCreditsOnTexture(creds[page]);
         }
         
         if (pageTime < 0.0f)

@@ -228,9 +228,89 @@ public class CutscenePlayer : MonoBehaviour
     private bool blur;
     private bool subtitleOverride;
     private bool waitForA;
+
+    /// <summary>True while the cutscene stands still until A, a left click or Escape lets it go on.</summary>
+    public bool WaitingForPress => waitForA;
+
+    /// <summary>
+    /// Goes straight to the start of the next scene, which is the next fade in, or to the end when there
+    /// is none.
+    /// </summary>
+    /// <remarks>
+    /// The events skipped are not played - no voice, sound, subtitle or picture of the scene left
+    /// behind - except the three that set something later events go on reading: the string block the
+    /// subtitles come from, the blur and the voice volume. The voice and the sound playing are stopped.
+    /// </remarks>
+    public void SkipToNextScene()
+    {
+        if (events == null)
+        {
+            return;
+        }
+
+        int target = -1;
+        for (int i = eventIndex; i < events.Count; ++i)
+        {
+            CutEvent e = events[i];
+            if ((e.type == CutEventType.Fade && e.value == 1) || e.type == CutEventType.End)
+            {
+                target = i;
+                break;
+            }
+        }
+        if (target < 0)
+        {
+            return;
+        }
+
+        for (int i = eventIndex; i < target; ++i)
+        {
+            CutEvent e = events[i];
+            switch (e.type)
+            {
+            case CutEventType.Block:
+                stringBlock = (int)e.value;
+                break;
+            case CutEventType.Blur:
+                blur = e.value > 0;
+                break;
+            case CutEventType.Vol:
+                audioSource.volume = e.value;
+                break;
+            }
+        }
+
+        eventIndex = target;
+        cutsceneTime = events[target].time;
+        audioSource.Stop();
+        if (soundSource != null)
+        {
+            soundSource.Stop();
+        }
+        subtitleTime = 0.0f;
+        pauseTime = 0.0f;
+        matchVocTime = 0.0f;
+        stopLoop = false;
+        waitForA = false;
+    }
     
+    // The cutscenes Escape or Start leaves: the two story scenes of level 7 (cs002, cs003) and the
+    // dreams of sleep (cs030-cs041). Whoever plays one waits for it to be gone, so leaving early is
+    // safe. The title menu's are left from Logos and FrontEnd.
+    private bool EscapeLeaves => sceneIndex is 2 or 3 or (>= 30 and <= 41);
+
     public void Update()
     {
+        if (EscapeLeaves && (GameInput.EscapePressedThisFrame()
+                             || (GameInput.CurrentGamepad?.startButton.wasPressedThisFrame ?? false)))
+        {
+            // OnDestroy() gives back the clock and the controls at the end of the frame, so the same press
+            // does not open the save menu as well.
+            Destroy(gameObject);
+            enabled = false;
+            return;
+        }
+
         float deltaTime = Time.unscaledDeltaTime;
         deltaTime = Mathf.Min(deltaTime, 0.025f); // Clamp to 1/40th second max
         // pressing the button to select certain cutscenes (e.g., credits) soaked up all the fade in!
