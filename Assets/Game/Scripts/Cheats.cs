@@ -19,6 +19,10 @@ public class Cheats : MonoBehaviour
     public const int FirstLevel = 1;
     public const int LastLevel = 9;
 
+    // The level to go to: the last one set in the panel, not the one the game is on, so the
+    // stairs and a load leave it alone. It is applied only from the panel - typed and confirmed
+    // by leaving the box, Enter in the box even with the value unchanged, or + and -. A new game
+    // starts on the first level and a load on the saved one, whatever the box says.
     public int level = 1;
 
     // The tile to jump to on the level currently loaded: the player lands on its centre when either
@@ -215,6 +219,14 @@ public class Cheats : MonoBehaviour
     public void SpawnCritter()
     {
         CheatsKit.SpawnCritter(critterToSpawn, critterDistance, critterHostile);
+    }
+
+    public void GoToLevel()
+    {
+        if (LevelLoader.sLevelLoader != null)
+        {
+            LevelLoader.sLevelLoader.RequestLevelFromCheats(level);
+        }
     }
 
     public void Teleport()

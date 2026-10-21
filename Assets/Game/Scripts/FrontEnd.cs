@@ -869,8 +869,11 @@ public class FrontEnd : MonoBehaviour
             frontEndCamera.tag = "Untagged";
         }
         
+        // A new game starts on the first level. The level in the Cheats panel is not applied
+        // here: in the Editor it is remembered from one run to the next, and a new game would
+        // start wherever it was last left.
         Instantiate(levelLoader);
-        LevelLoader.sLevelLoader.loadedLevel = Cheats.sCheats.level;
+        LevelLoader.sLevelLoader.loadedLevel = 1;
         Instantiate(player);
 
         // Destroy FrontEnd's AudioListener now that Player's listener is active
@@ -883,7 +886,7 @@ public class FrontEnd : MonoBehaviour
         yield return null;
         
         // New game - explicitly load the starting level
-        LevelLoader.sLevelLoader.LoadLevel(Cheats.sCheats.level);
+        LevelLoader.sLevelLoader.LoadLevel(1);
         PlayerObject.Player.StartAfterLoad();
         
         Destroy(gameObject);

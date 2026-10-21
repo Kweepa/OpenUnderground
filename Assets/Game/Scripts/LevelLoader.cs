@@ -81,6 +81,9 @@ public class LevelLoader : MonoBehaviour
 {
     public static LevelLoader sLevelLoader;
 
+    // A level asked for from the Cheats panel, loaded on the next Update; 0 while none is.
+    private int cheatLevelRequest;
+
     public UUObject sprite;
     public UUObject critter;
     public GameObject lavaLight;
@@ -499,7 +502,6 @@ public class LevelLoader : MonoBehaviour
     public void LoadLevelGeometry(int level)
     {
         loadedLevel = level;
-        Cheats.sCheats.level = level;
 
         // Object indices only mean anything within one level, and this also runs when a save is
         // loaded, so anything the Search skill has already mentioned is forgotten here.
@@ -1934,12 +1936,27 @@ public class LevelLoader : MonoBehaviour
             }
         }
 
-        if (Cheats.sCheats.level != loadedLevel && Cheats.sCheats.level > 0 && Cheats.sCheats.level < 10)
+        if (cheatLevelRequest != 0)
         {
-            DeactivateCurrentLevel();
-            LoadLevel(Cheats.sCheats.level);
-            PlayerObject.Player.DebugJumpToLevelStart();
+            int level = cheatLevelRequest;
+            cheatLevelRequest = 0;
+            if (level != loadedLevel && level >= Cheats.FirstLevel && level <= Cheats.LastLevel)
+            {
+                DeactivateCurrentLevel();
+                LoadLevel(level);
+                PlayerObject.Player.DebugJumpToLevelStart();
+            }
         }
+    }
+
+    /// <summary>
+    /// Load a level asked for from the Cheats panel, on the next Update. Only the panel calls this:
+    /// the level there used to be compared with the loaded one every frame, so whatever it held
+    /// was applied as soon as a game started.
+    /// </summary>
+    public void RequestLevelFromCheats(int level)
+    {
+        cheatLevelRequest = level;
     }
 
     public void ShowMazePath(bool show)

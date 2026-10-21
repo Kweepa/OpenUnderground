@@ -18,6 +18,7 @@ public class CheatsEditor : Editor
 {
     private const string TileXControl = "CheatsTeleportTileX";
     private const string TileYControl = "CheatsTeleportTileY";
+    private const string LevelControl = "CheatsLevel";
 
     // Drawn on the row of another field.
     private static readonly HashSet<string> drawnInRow = new HashSet<string> { "critterDistance", "critterHostile", "skillValue" };
@@ -51,6 +52,11 @@ public class CheatsEditor : Editor
         bool enterInTile = e.type == EventType.KeyDown
             && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
             && (focused == TileXControl || focused == TileYControl);
+        // Enter in the level box goes to the level it shows even when nothing was typed: it holds
+        // the last level set here, which is not always the one the game is on.
+        bool enterInLevel = e.type == EventType.KeyDown
+            && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+            && focused == LevelControl;
 
         SerializedProperty prop = serializedObject.GetIterator();
         bool enterChildren = true;
@@ -66,7 +72,10 @@ public class CheatsEditor : Editor
                 }
                 break;
             case "level":
-                DrawLevel(prop);
+                if (DrawLevel(prop) || enterInLevel)
+                {
+                    action = cheats.GoToLevel;
+                }
                 break;
             case "teleportToTile":
                 if (DrawTeleport(prop) || enterInTile)
@@ -122,12 +131,22 @@ public class CheatsEditor : Editor
         }
     }
 
-    /// <summary>The level, with a + and a - button that stop at the first and the last level.</summary>
-    private static void DrawLevel(SerializedProperty level)
+    /// <summary>
+    /// The level, with a + and a - button that stop at the first and the last level. The box takes
+    /// a typed level only on Enter or when it loses focus. True when the level has just changed
+    /// here; that and Enter in the box are the only times the game goes to it.
+    /// </summary>
+    private static bool DrawLevel(SerializedProperty level)
     {
         float height = EditorGUIUtility.singleLineHeight;
+        int before = level.intValue;
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.PropertyField(level);
+        GUI.SetNextControlName(LevelControl);
+        int typed = EditorGUILayout.DelayedIntField(new GUIContent(level.displayName), level.intValue);
+        if (typed != level.intValue)
+        {
+            level.intValue = typed;
+        }
         using (new EditorGUI.DisabledScope(level.intValue >= Cheats.LastLevel))
         {
             if (GUILayout.Button("+", GUILayout.Width(22), GUILayout.Height(height)))
@@ -150,6 +169,7 @@ public class CheatsEditor : Editor
         {
             level.intValue = clamped;
         }
+        return level.intValue != before;
     }
 
     /// <summary>

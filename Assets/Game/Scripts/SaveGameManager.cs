@@ -736,7 +736,6 @@ public class SaveGameManager : MonoBehaviour
                 // Just set the loaded level - EnsureLevelsInitialized will load geometry
                 // Don't call LoadLevel() since that would create objects from ark that we'll delete anyway
                 LevelLoader.sLevelLoader.loadedLevel = saveData.currentLevel;
-                Cheats.sCheats.level = saveData.currentLevel;
             }
             
             float startTime = Time.realtimeSinceStartup;
@@ -753,7 +752,6 @@ public class SaveGameManager : MonoBehaviour
             // Ensure loadedLevel is set correctly after initializing all levels
             // (LoadLevelGeometry changes loadedLevel, so we need to restore it)
             LevelLoader.sLevelLoader.loadedLevel = saveData.currentLevel;
-            Cheats.sCheats.level = saveData.currentLevel;
             
             // Restore player data
             LoadPlayerData(saveData.playerData);
