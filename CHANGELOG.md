@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Near an anvil, items it can never repair - bows, crossbows, slings, rings, crowns and the like - are thrown as usual, and the pad no longer offers to repair them.
+
 - The dungeon brings creatures back with time, as in the original: about every half hour a spot at least eight tiles away may get its creature back, and a long time away from a level, or a night's sleep, usually fills them all. Each spot keeps at most one such creature alive, so a level never fills up.
 
 - Creating a character rolls as the original does: the first point on a skill is worth about twice the second - a Fighter who takes Attack twice ends near 13 instead of 18 - no skill starts above 30, and the attributes spread wider, one sometimes staying at the class minimum. A new character also starts with full hit points.

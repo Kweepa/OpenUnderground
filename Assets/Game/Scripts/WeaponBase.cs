@@ -1139,9 +1139,14 @@ public class WeaponBase : UUObject
         base.GetQualityString(sb);
     }
 
+    /// <summary>
+    /// What the anvil can work on: not a type of durability 255, which it always refuses
+    /// (Anvil.TryInteract()) - the shiny, jeweled and black swords, and every missile weapon.
+    /// So near an anvil those are thrown, and the pad does not offer to repair them.
+    /// </summary>
     public override bool IsRepairable()
     {
-        return true;
+        return GetDurability() != 255;
     }
 
     protected override string GetIdentifiedName(string baseName)

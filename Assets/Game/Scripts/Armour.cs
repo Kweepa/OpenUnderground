@@ -247,13 +247,14 @@ public class Armour : UUObject
         }
     }
 
+    /// <summary>
+    /// What the anvil can work on: not a type of durability 255, which it always refuses
+    /// (Anvil.TryInteract()) - the crowns, the rings, the dragon skin boots, the jeweled and the
+    /// shiny shield. So near an anvil those are thrown, and the pad does not offer to repair them.
+    /// </summary>
     public override bool IsRepairable()
     {
-        if (type is EObjectType.ShinyShield or EObjectType.IronRing)
-        {
-            return false;
-        }
-        return true;
+        return GetDurability() != 255;
     }
 
     protected override string GetIdentifiedName(string baseName)
