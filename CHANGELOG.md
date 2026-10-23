@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Loading a save no longer moves a lever, switch or pull chain onto a door on another level: the pull chain at the start of the dungeon could leave its wall after a save made deeper down. Saves where it already moved put it back when loaded.
+
 - Near an anvil, items it can never repair - bows, crossbows, slings, rings, crowns and the like - are thrown as usual, and the pad no longer offers to repair them.
 
 - The dungeon brings creatures back with time, as in the original: about every half hour a spot at least eight tiles away may get its creature back, and a long time away from a level, or a night's sleep, usually fills them all. Each spot keeps at most one such creature alive, so a level never fills up.
