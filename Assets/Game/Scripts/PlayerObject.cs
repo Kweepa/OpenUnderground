@@ -1500,6 +1500,7 @@ public class PlayerObject : MonoBehaviour
 
             PlayerData.sData.gameTime += Time.deltaTime;
             PlayerData.sData.playTime += Time.deltaTime;
+            Repopulation.Update();
         }
 
         if (cachedCharacterController != null)

@@ -77,4 +77,11 @@ public class ComObjProps
    public bool floats => (unknown >> 2) == 15;
    public bool canOpenDoors => (unknown & (1 << 2)) != 0;
    public bool canBeSummoned => (unknown & (1 << 2)) == 0;
+
+   /// <summary>
+   /// Bits 2-5 of byte 9, what the original weighs an object by when it would clear it away: above
+   /// the threshold it is kept (UW.EXE 0x29ae6). Of the creature types, 29 have 8, the skeleton 10,
+   /// 30 have 13 and 4 have 15.
+   /// </summary>
+   public int keepValue => (unknown >> 2) & 15;
 }

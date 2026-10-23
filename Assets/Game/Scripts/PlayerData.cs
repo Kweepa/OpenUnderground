@@ -95,6 +95,12 @@ public class PlayerData : MonoBehaviour
     /// </summary>
     public int autoSavedLevels;
 
+    /// <summary>
+    /// For each level, the game time up to which its repopulation checks have been made (Repopulation).
+    /// 0, or no array at all in an older save, is a level whose clock has not started.
+    /// </summary>
+    public double[] repopulationClock;
+
     public List<int> dreamsRemaining;
     public double timeOfLastDream;
     public int cupDreamIndex;

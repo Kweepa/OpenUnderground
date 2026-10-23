@@ -26,6 +26,11 @@ public class CritterSaveData : UUObjectSaveData
     // A trap's second or later creature (Trap.CountCreatureCopy()): absent in an older save, so false.
     public bool repeatTrapCopy;
 
+    // The repopulation's mark, and the trap that made the creature (Repopulation): absent in an older
+    // save, so false and 0, a creature like any other.
+    public bool repopulationMark;
+    public int repopulationTrap;
+
     // Killed by a blow with no attacker (TryDamageWithoutAttacker()): absent in an older save, so false.
     public bool killedWithoutAttacker;
 
@@ -507,6 +512,18 @@ public class Critter : UUObject
     // so the loot follows it at the creature's first run and the experience at its death.
     private bool WithholdsReward => repeatTrapCopy && PlayerInput.RewardOnlyFirstTrapCopy;
 
+    // Bit 0 of critterData[6], bit 8 of the original's word at 0x0d: a creature the repopulation made
+    // (UW.EXE 0x85066 marks the template, and the copy inherits it). While one stands near a template,
+    // its trap makes nothing (Repopulation.MarkedCreatureNear()). The designers left it on one creature.
+    public bool repopulationMark;
+
+    // Ours: the index of the trap whose repopulation made this creature, 0 for any other. That trap
+    // makes nothing more while this creature is alive (Repopulation).
+    public int repopulationTrap;
+
+    /// <summary>Whether the creature is alive: not dying, dead or being cleared away.</summary>
+    public bool IsAlive => hp > 0 && state is not (EState.Die or EState.Dead or EState.Cleanup);
+
     // Killed by a blow nobody struck, the Rune of Warding's: its death pays no experience.
     private bool killedWithoutAttacker;
 
@@ -597,6 +614,12 @@ public class Critter : UUObject
         return critterData != null && (critterData[6] & (1 << 4)) != 0;
     }
 
+    /// <summary>Bit 0 of critterData[6]: see <see cref="repopulationMark"/>.</summary>
+    private static bool IsRepopulationMarkInData(byte[] critterData)
+    {
+        return critterData != null && (critterData[6] & 1) != 0;
+    }
+
     /// <summary>Bit 7 of critterData[2]: see <see cref="deafToPackAlarm"/>.</summary>
     private static bool IsDeafToPackAlarmInData(byte[] critterData)
     {
@@ -604,11 +627,12 @@ public class Critter : UUObject
     }
 
     /// <summary>
-    /// Reads the three markers, <see cref="elite"/>, <see cref="lootAlreadyMade"/> and
-    /// <see cref="deafToPackAlarm"/>, back from the level rather than trusting the save. They are
-    /// static data, and a save written before a marker existed answers false for every creature
-    /// already on a level the player had visited - which would leave it dead for anyone carrying on
-    /// an old game. Creatures with no level of origin, summoned ones, keep what they were given.
+    /// Reads the four markers, <see cref="elite"/>, <see cref="lootAlreadyMade"/>,
+    /// <see cref="deafToPackAlarm"/> and <see cref="repopulationMark"/>, back from the level rather
+    /// than trusting the save. They are static data, and a save written before a marker existed
+    /// answers false for every creature already on a level the player had visited - which would leave
+    /// it dead for anyone carrying on an old game. Creatures with no level of origin, summoned ones and
+    /// a trap's copies, keep what they were given.
     /// </summary>
     private void RefreshMarkersFromLevel()
     {
@@ -623,6 +647,7 @@ public class Critter : UUObject
             elite = IsEliteInData(fromLevel);
             lootAlreadyMade = IsLootMadeInData(fromLevel);
             deafToPackAlarm = IsDeafToPackAlarmInData(fromLevel);
+            repopulationMark = IsRepopulationMarkInData(fromLevel);
         }
     }
 
@@ -650,6 +675,7 @@ public class Critter : UUObject
             elite = IsEliteInData(critterData);
             lootAlreadyMade = IsLootMadeInData(critterData);
             deafToPackAlarm = IsDeafToPackAlarmInData(critterData);
+            repopulationMark = IsRepopulationMarkInData(critterData);
 
             movementType = GetMovementTypeFromData();
         }
@@ -2158,7 +2184,6 @@ public class Critter : UUObject
 
         SpawnInventory();
         SpawnCorpseContents();
-        SpawnRandomReplacement();
         if (!drowned)
         {
             BloodStain.TrySpawnDeathStain(transform.position, stats.Remains, blood);
@@ -2713,9 +2738,9 @@ public class Critter : UUObject
 
     /// <summary>
     /// Whether a creature stops the player from lying down: one within two tiles that knows he is there
-    /// and hunts him (UW.EXE 0x711e1 over the 5x5 tiles around him, 0x7116e). The original asks for goal
-    /// 4, 5 or 9 with the seen bit; the remake has no goal machine, and a hostile creature with the seen
-    /// bit is the one that would be on those goals.
+    /// and hunts him (UW.EXE 0x711e1 over the 6x6 tiles the original walks around him, 0x7116e). The
+    /// original asks for goal 4, 5 or 9 with the seen bit; the remake has no goal machine, and a hostile
+    /// creature with the seen bit is the one that would be on those goals.
     /// </summary>
     public static bool HuntsPlayerNear()
     {
@@ -2723,7 +2748,7 @@ public class Critter : UUObject
         foreach (Critter c in FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
             Vector2Int tile = TileOf(c.transform.position);
-            if (Mathf.Abs(tile.x - playerTile.x) <= 2 && Mathf.Abs(tile.y - playerTile.y) <= 2
+            if (Utils.InOriginalArea(playerTile, 2, tile)
                 && c.hp > 0 && c.awareOfPlayer && c.attitude == EAttitude.Hostile && !c.playerAlly)
             {
                 return true;
@@ -2734,9 +2759,9 @@ public class Critter : UUObject
     }
 
     /// <summary>
-    /// The ambush on a sleeping player (UW.EXE 0x71670, 0x7120c): the creatures within eight tiles of
-    /// him, walked as the original walks them, x outer and y inner, and the first that accepts comes and
-    /// wakes him. Whether one did.
+    /// The ambush on a sleeping player (UW.EXE 0x71670, 0x7120c): the creatures in the 18x18 tiles the
+    /// original walks around him with radius 8, walked as it walks them, x outer and y inner, and the
+    /// first that accepts comes and wakes him. Whether one did.
     /// </summary>
     public static bool AmbushSleeper()
     {
@@ -2745,7 +2770,7 @@ public class Critter : UUObject
         foreach (Critter c in FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
             Vector2Int tile = TileOf(c.transform.position);
-            if (Mathf.Abs(tile.x - playerTile.x) <= 8 && Mathf.Abs(tile.y - playerTile.y) <= 8)
+            if (Utils.InOriginalArea(playerTile, 8, tile))
             {
                 near.Add(c);
             }
@@ -2850,7 +2875,59 @@ public class Critter : UUObject
         return !Physics.CheckCapsule(centre - axis + lift, centre + axis + lift, 0.9f * radius, mask, QueryTriggerInteraction.Ignore);
     }
 
-    private static Vector2Int TileOf(Vector3 position)
+    /// <summary>
+    /// Finds room for a create-object trap's copy as the original's placer does (UW.EXE 0x297cf): the
+    /// point it was put at first, then up to 23 points within half a tile of it, x8 - 4 + rand() % 9
+    /// in eighths of a tile, each through the fit test (0x29498). The creature goes to the first that
+    /// fits, and that tile becomes its home, as the placer writes the home of a mobile. Whether one did.
+    /// </summary>
+    public bool PlaceCopy()
+    {
+        CharacterController cc = cachedCharacterController;
+        if (cc == null)
+        {
+            return true;
+        }
+
+        // Its own body stands at the first point: out of the test.
+        cc.enabled = false;
+        Vector3 exact = transform.position;
+        Vector3? found = null;
+        for (int i = 0; i < 24 && found == null; ++i)
+        {
+            Vector3 pos = exact;
+            if (i > 0)
+            {
+                pos.x += (Random.Range(0, 9) - 4) * Tile.xzScale / 8.0f;
+                pos.z += (Random.Range(0, 9) - 4) * Tile.xzScale / 8.0f;
+                Tile tile = LevelLoader.GetTile(Tile.GetTileX(pos.x), Tile.GetTileY(pos.z));
+                if (tile == null || tile.type == 0)
+                {
+                    continue;
+                }
+
+                pos.y = tile.GetFloorY(pos.x, pos.z) - cc.center.y + 0.5f * cc.height;
+            }
+
+            if (FitsAt(pos))
+            {
+                found = pos;
+            }
+        }
+
+        if (found != null)
+        {
+            transform.position = found.Value;
+            Vector2Int home = TileOf(found.Value);
+            xhome = home.x;
+            yhome = home.y;
+        }
+
+        cc.enabled = true;
+        return found != null;
+    }
+
+    public static Vector2Int TileOf(Vector3 position)
     {
         return new Vector2Int(Tile.GetTileX(position.x), Tile.GetTileY(position.z));
     }
@@ -6782,29 +6859,6 @@ public class Critter : UUObject
         }
     }
 
-    void SpawnRandomReplacement()
-    {
-        // iterate the active create object traps
-        Trap[] allTraps = FindObjectsByType<Trap>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-
-        List<Trap> spawnTraps = allTraps.Where(
-            trap => trap.type == EObjectType.CreateObjectTrap
-                && trap.link > 0 && trap.link < 256 // critters in top 256
-                && LevelLoader.GetLevel().objects[trap.link] != null
-                && trap.flags == 0
-                && !LevelLoader.GetLevel().pvs.IsVisible(trap.initialTile)).ToList();
-        if (spawnTraps.Count > 0)
-        {
-            Trap chosenTrap = spawnTraps[Random.Range(0, spawnTraps.Count)];
-            Critter critter = chosenTrap.DoCreateObjectTrap(chosenTrap) as Critter;
-            if (critter != null && critter.movementType == EMovementType.Flying)
-            {
-                critter.transform.position += 2.0f * Vector3.up;
-                critter.FitFlightHeight();
-            }
-        }
-    }
-
     public void Conversation_setup_to_barter()
     {
         // first scan through loot and pick what is possible
@@ -7186,6 +7240,8 @@ public class Critter : UUObject
             critterData.elite = elite;
             critterData.lootAlreadyMade = lootAlreadyMade;
             critterData.repeatTrapCopy = repeatTrapCopy;
+            critterData.repopulationMark = repopulationMark;
+            critterData.repopulationTrap = repopulationTrap;
             critterData.killedWithoutAttacker = killedWithoutAttacker;
             critterData.movementType = (int)movementType;
             critterData.state = (int)state;
@@ -7280,6 +7336,8 @@ public class Critter : UUObject
             elite = critterData.elite;
             lootAlreadyMade = critterData.lootAlreadyMade;
             repeatTrapCopy = critterData.repeatTrapCopy;
+            repopulationMark = critterData.repopulationMark;
+            repopulationTrap = critterData.repopulationTrap;
             killedWithoutAttacker = critterData.killedWithoutAttacker;
             RefreshMarkersFromLevel();
             movementType = (EMovementType)critterData.movementType;

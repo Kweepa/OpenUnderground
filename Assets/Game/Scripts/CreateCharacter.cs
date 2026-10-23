@@ -126,6 +126,7 @@ public class CreateCharacter : MonoBehaviour
         // PlayerData survives from one game to the next, so a second character in the same
         // session would otherwise inherit the levels the first one had already saved.
         PlayerData.sData.autoSavedLevels = 0;
+        PlayerData.sData.repopulationClock = null;
         for (int i = 0; i < 20; ++i)
         {
             PlayerData.sData.skill[i] = 0;
