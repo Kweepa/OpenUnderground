@@ -632,7 +632,7 @@ public class UUObject : LevelObject
             return;
         }
 
-        Door door = FindDoorOnTile(initialTile);
+        Door door = FindDoorOnTile(initialTile, levelIndex);
         // Sharing an axis is not enough: north and south are the same axis but opposite edges of
         // the tile, and a control on one of them has nothing to do with a door on the other. The
         // sub tile coordinate says which edge each of them is actually on - 0 to 3 is the low
@@ -690,10 +690,6 @@ public class UUObject : LevelObject
     }
 
     /// <summary>
-    /// Finds a door on the tile. Prefers <see cref="Tile.door"/> when already set; otherwise walks the
-    /// object chain (needed when this runs before Door.PostLoadInitialize assigns the tile reference).
-    /// </summary>
-    /// <summary>
     /// Whether two sub tile coordinates fall on the same half of the tile, and so on the same
     /// wall of the pair that share an axis.
     /// </summary>
@@ -702,7 +698,14 @@ public class UUObject : LevelObject
         return (a < 4) == (b < 4);
     }
 
-    private static Door FindDoorOnTile(Tile tile)
+    /// <summary>
+    /// Finds a door on the tile. Prefers <see cref="Tile.door"/> when already set; otherwise walks the
+    /// object chain (needed when this runs before Door.PostLoadInitialize assigns the tile reference).
+    /// The chain is walked on <paramref name="level"/>, the tile's own level: a save load initializes
+    /// the objects of every level while the loaded level is the save's, and the same index on another
+    /// level can be a door, which would pull a control on level 1 onto a door's face on level 6.
+    /// </summary>
+    private static Door FindDoorOnTile(Tile tile, int level)
     {
         if (tile == null)
         {
@@ -714,7 +717,7 @@ public class UUObject : LevelObject
             return tile.door;
         }
 
-        UUObject tileObj = LevelLoader.GetObj(tile.firstObject);
+        UUObject tileObj = LevelLoader.GetObj(tile.firstObject, level);
         while (tileObj != null)
         {
             if (tileObj.getClass == EClass.Doors)
@@ -722,7 +725,7 @@ public class UUObject : LevelObject
                 return tileObj.GetComponent<Door>();
             }
 
-            tileObj = tileObj.chainIndex > 0 ? LevelLoader.GetObj(tileObj.chainIndex) : null;
+            tileObj = tileObj.chainIndex > 0 ? LevelLoader.GetObj(tileObj.chainIndex, level) : null;
         }
 
         return null;
