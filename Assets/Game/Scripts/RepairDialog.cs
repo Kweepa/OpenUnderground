@@ -121,13 +121,19 @@ public class RepairDialog : MonoBehaviour
 
         // And the chance of ruining it, which the original's estimate never mentions: the word
         // only ever described the chance of success. A critical failure needs the roll at or
-        // below x - 12, and the save after it fails when rand & 63 clears quality + Repair, so
-        // the two together are the chance of losing the item on this attempt.
+        // below x - 12, and the save after it fails when rand & 63 clears quality + Repair; a
+        // save that passes still loses the item when the 4 to 11 points it costs reach the
+        // quality left (Anvil.Repair()). Together they are the chance of losing the item on this
+        // attempt.
         float criticalFailure = Mathf.Clamp(18 - difficulty, 0, 31) / 31.0f;
         float saveFails = Mathf.Max(0, 63 - item.quality - repairSkill) / 64.0f;
-        float ruinChance = criticalFailure * saveFails;
+        float blowTakesAll = Mathf.Clamp(12 - Mathf.Max(item.quality, 4), 0, 8) / 8.0f;
+        float ruinChance = criticalFailure * (saveFails + (1 - saveFails) * blowTakesAll);
+        // No word only when nothing can be lost, so that a small chance still reads as one: a
+        // serviceable shortsword at Repair 20 is lost about one time in two hundred.
         sRepairDialog.riskWord = ruinChance <= 0.0f ? ""
-            : ruinChance <= 0.05f ? " and risky"
+            : ruinChance < 0.01f ? " and slightly risky"
+            : ruinChance <= 0.10f ? " and risky"
             : " and very risky";
 
         Utils.PlayClip2d(sRepairDialog.dialogOn);
