@@ -80,6 +80,7 @@ public class PlayerSaveData
     public int skillPoints;
     public int skillPointsXpTier;
     public int autoSavedLevels;
+    public double[] repopulationClock;
     public bool easy;
     public bool dead;
     

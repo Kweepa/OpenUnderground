@@ -109,6 +109,17 @@ public class Utils
         return (int)(Time.unscaledTime / ColourCycleSeconds);
     }
 
+    /// <summary>
+    /// Whether a tile is in the area the original walks around a centre with a radius (UW.EXE 0x34d67):
+    /// its loops run from centre - r to centre + r + 1 inclusive, so the square is 2r + 2 tiles wide,
+    /// one row and one column more on the high side.
+    /// </summary>
+    public static bool InOriginalArea(Vector2Int centre, int r, Vector2Int tile)
+    {
+        return tile.x >= centre.x - r && tile.x <= centre.x + r + 1
+            && tile.y >= centre.y - r && tile.y <= centre.y + r + 1;
+    }
+
     public static float DampedApproachUnscaledTime(float current, float target, float time)
     {
         float threshold = 0.99f; // the value will reach 99% of the 'target' in 'time'

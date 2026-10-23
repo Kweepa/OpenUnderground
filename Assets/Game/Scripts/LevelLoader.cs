@@ -574,6 +574,7 @@ public class LevelLoader : MonoBehaviour
     {
         // Entering a level forgets the pack alarm (UW.EXE 0x71713).
         Critter.ClearPackAlarm();
+        Repopulation.EnteringLevel();
 
         // Check if level was already loaded before calling LoadLevelGeometry
         bool wasAlreadyLoaded = (levels[level] != null);

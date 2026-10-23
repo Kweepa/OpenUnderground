@@ -691,47 +691,82 @@ public class Trap : UUObject
         RestoreFromSaveData(data);
     }
 
-    public UUObject DoCreateObjectTrap(UUObject sender)
+    /// <summary>
+    /// Makes a copy of the trap's template on the sender's target tile (UW.EXE 0x8418f). The copy is
+    /// made unless rand() * 63 / 32768, 0..62, is below the quality, and for the repopulation not
+    /// while a creature it made stands near the template (Repopulation.MarkedCreatureNear()). The
+    /// original applies that cap to a trap a trigger fires too, but it deletes those creatures at a
+    /// level exit; here they are kept, so the cap could stop such a trap for good. A creature
+    /// copy is placed by Critter.PlaceCopy(); when there is no room, a creature of COMOBJ value 10 or
+    /// less is not made and one above 12 is forced in where it is (0x296bb, 0x29b66(10), 0x29ae6).
+    /// A copy the repopulation asks for carries its mark and its trap, and leaves the trap in place;
+    /// any other switches the trap off.
+    /// </summary>
+    public UUObject DoCreateObjectTrap(UUObject sender, bool fromRepopulation = false)
     {
-        // spawns an object from a template
-        if (Random.Range(0, 64) >= quality)
+        if (Random.Range(0, 63) < quality || link == 0)
         {
-            int templateIndex = link;
-            if (templateIndex != 0)
+            return null;
+        }
+
+        UUObject templateObject = LevelLoader.GetObj(link);
+        if (templateObject == null)
+        {
+            return null;
+        }
+
+        if (fromRepopulation && templateObject is Critter template
+            && Repopulation.MarkedCreatureNear(new Vector2Int(template.xhome, template.yhome)))
+        {
+            return null;
+        }
+
+        UUObject newObject = Instantiate(templateObject);
+        newObject.name = templateObject.name;
+        // A copy is made at run time, like a shelf or a summoned creature. Keeping the
+        // template's level let a save put the copy in the template's slot of objects[],
+        // and once that copy died the trap found nothing to copy: the level 3 skeleton
+        // stopped coming after a reload. The index stays, for the logs.
+        newObject.originalLevel = 0;
+        newObject.gameObject.SetActive(true);
+
+        if (newObject is Critter spawnedFromTemplate)
+        {
+            spawnedFromTemplate.PrepareVisibilityAfterTemplateClone();
+            if (fromRepopulation)
             {
-                UUObject templateObject = LevelLoader.GetObj(templateIndex);
-                if (templateObject != null)
-                {
-                    UUObject newObject = Instantiate(templateObject);
-                    newObject.name = templateObject.name;
-                    // A copy is made at run time, like a shelf or a summoned creature. Keeping the
-                    // template's level let a save put the copy in the template's slot of objects[],
-                    // and once that copy died the trap found nothing to copy: the level 3 skeleton
-                    // stopped coming after a reload. The index stays, for the logs.
-                    newObject.originalLevel = 0;
-                    newObject.gameObject.SetActive(true);
-
-                    if (newObject is Critter spawnedFromTemplate)
-                    {
-                        spawnedFromTemplate.PrepareVisibilityAfterTemplateClone();
-                    }
-
-                    Tile t = sender.GetTargetTile();
-                    newObject.x = 3;
-                    newObject.y = 3;
-                    newObject.WorldInitialize(t, t.x, t.y);
-                    newObject.PostLoadInitialize();
-
-                    // clear the trap so it can't spawn again
-                    gameObject.SetActive(false);
-
-                    Debug.Log($"Trap creating object {name}", this);
-                    Debug.Log($"-> New object {newObject.name}.", newObject);
-
-                    return newObject;
-                }
+                spawnedFromTemplate.repopulationMark = true;
+                spawnedFromTemplate.repopulationTrap = objectIndex;
             }
         }
-        return null;
+
+        // At the template's own place within the tile, which Instantiate() has copied.
+        Tile t = sender.GetTargetTile();
+        newObject.WorldInitialize(t, t.x, t.y);
+        newObject.PostLoadInitialize();
+
+        if (newObject is Critter copy && !copy.PlaceCopy())
+        {
+            if (DataLoader.sDataLoader.comObjProps[(int)copy.type].keepValue <= 10 + Random.Range(0, 3))
+            {
+                Debug.Log($"Trap {name}: no room for {copy.name}, not made.", this);
+                LevelLoader.worldObj.Remove(copy);
+                Destroy(copy.gameObject);
+                return null;
+            }
+
+            Debug.Log($"Trap {name}: no room for {copy.name}, forced in.", this);
+        }
+
+        if (!fromRepopulation)
+        {
+            // clear the trap so it can't spawn again
+            gameObject.SetActive(false);
+        }
+
+        Debug.Log($"Trap creating object {name}", this);
+        Debug.Log($"-> New object {newObject.name}.", newObject);
+
+        return newObject;
     }
 }

@@ -1226,6 +1226,7 @@ public class SaveGameManager : MonoBehaviour
         // Away from the block of core stats above on purpose: that is where every mod that adds
         // a saved field puts it, and two of them land on the same line.
         data.autoSavedLevels = playerData.autoSavedLevels;
+        data.repopulationClock = playerData.repopulationClock;
 
         if (playerData.openedChest != null)
         {
@@ -1407,6 +1408,7 @@ public class SaveGameManager : MonoBehaviour
         playerData.booksBurned = data.booksBurned;
         playerData.pacifistStopped = data.pacifistStopped;
         playerData.autoSavedLevels = data.autoSavedLevels;
+        playerData.repopulationClock = data.repopulationClock;
 
         if (data.openedChest != null)
         {

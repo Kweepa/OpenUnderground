@@ -147,6 +147,9 @@ public static class Sleeping
 
         int hours = Random.Range(2, 7);
         PlayerData.sData.gameTime += hours * 60 * 60;
+        // Ours: the repopulation makes up the hours as if the player had stayed awake where he lies,
+        // before a creature may come and wake him.
+        Repopulation.Update();
 
         PlayerObject.Player.PayPoisonInSleep();
         if (way == Forced)
@@ -174,7 +177,9 @@ public static class Sleeping
         else
         {
             // A full sleep. The original also puts every creature of the level back here, as at a
-            // level exit, and fires every respawn trap: fixes 126 and 92, not yet in the remake.
+            // level exit (fix 126, not yet in the remake), deletes the creatures the repopulation
+            // made and fires every respawn trap at any distance; here the repopulation makes up the
+            // hours instead (Repopulation).
             int moreHours = Random.Range(7, 11) - hours;
             if (PlayerData.sData.hp < 10)
             {
@@ -182,6 +187,7 @@ public static class Sleeping
             }
             PlayerData.sData.gameTime += moreHours * 60 * 60;
             hours += moreHours;
+            Repopulation.Update();
 
             bool fed = PlayerData.sData.hunger < 191 && way == OnBedroll;
             int full = fed ? 1 : 0;
