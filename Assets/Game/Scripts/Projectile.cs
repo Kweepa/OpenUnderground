@@ -334,8 +334,9 @@ public class Projectile : UUObject
 
     /// <summary>
     /// A mage's knife that has struck, or met anything, falls to the floor and disappears a moment
-    /// later. Ours, the user's choice of 14 October 2026: it has no gravity in flight, and bounced
-    /// slowly off what it met and floated there.
+    /// later. Ours, the user's choice of 14 October 2026: it had no gravity in flight then, and
+    /// bounced slowly off what it met and floated there. It flies in an arc now
+    /// (Critter.KnifeSpeed).
     /// </summary>
     private void DropKnife()
     {
