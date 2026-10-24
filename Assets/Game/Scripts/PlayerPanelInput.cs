@@ -80,6 +80,13 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
+        // Esc puts a spell waiting for its target away first; the next one closes the panels.
+        if (GameInput.EscapePressedThisFrame() && Magic.sMagic != null && Magic.sMagic.TryCancelMousePrimedSpell())
+        {
+            GameplayCursorPolicy.Apply(PlayerObject.Player);
+            return;
+        }
+
         if (GameInput.EscapePressedThisFrame() && DismissActivePlayerPanels())
         {
             GameplayCursorPolicy.Apply(PlayerObject.Player);
@@ -269,6 +276,11 @@ public class PlayerPanelInput : MonoBehaviour
             outsideClick = m?.rightButton.wasPressedThisFrame ?? false;
         }
         if (!outsideClick)
+        {
+            return false;
+        }
+        // With a spell waiting for its target the right click only puts the spell away (Magic).
+        if (Magic.sMagic != null && Magic.sMagic.HasMousePrimedSpellAwaitingAim)
         {
             return false;
         }

@@ -219,6 +219,7 @@ Look speed and invert options are in Options.
 |Click the rune shelf, with a panel open|Cast the built spell|
 |Click the clear bar|Clear runes|
 |Click an active spell, with a panel open|Dispel it|
+|Right click or Esc, with a spell waiting for its target|Put the spell away|
 |Q, Esc, or right-click outside|Close the panel|
 
 ### Map

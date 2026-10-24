@@ -322,6 +322,16 @@ public class WeaponBase : UUObject
                 ignoreTriggerUntilRelease = true;
             }
         }
+        // With a spell waiting for its target, the right click puts the spell away (Magic) and does
+        // not raise the weapon as well.
+        if (usingKeyboardMouse
+            && Magic.sMagic != null
+            && Magic.sMagic.HasMousePrimedSpellAwaitingAim
+            && attackHeld
+            && state != EState.Prepare)
+        {
+            ignoreTriggerUntilRelease = true;
+        }
         if (!attackHeld)
         {
             ignoreTriggerUntilRelease = false;

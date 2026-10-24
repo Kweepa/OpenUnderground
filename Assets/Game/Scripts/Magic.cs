@@ -1306,6 +1306,21 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Esc with a spell waiting for its target puts the spell away, as a right click does
+    /// (<see cref="TryCancelMousePrimedSpellOnSecondaryClick"/>). False when no spell was waiting.
+    /// </summary>
+    public bool TryCancelMousePrimedSpell()
+    {
+        if (mousePrimedSpellIndex < 0)
+        {
+            return false;
+        }
+
+        ClearMousePrimedSpellIfAny();
+        return true;
+    }
+
     private void ClearMousePrimedSpellIfAny()
     {
         if (mousePrimedSpellIndex < 0)

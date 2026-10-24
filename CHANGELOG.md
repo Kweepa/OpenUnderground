@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A spell waiting for its target can be put away with a right click or Esc. The right click used to swing the weapon as well.
+
 - Hold left Shift while the inventory or magic panel is open, or while a spell waits for its target, and the mouse turns the view again, so you can line up a throw or a spell. A click then aims at the crosshair in the middle of the screen; let go of Shift and the pointer is back.
 
 - When you ready a spell, its red circle now sits exactly where the pointer's cross was, instead of a little up and to the right.
