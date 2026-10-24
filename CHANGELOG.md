@@ -2,6 +2,8 @@
 
 ## Current release
 
+- An imp no longer freezes in mid-air after a heavy blow, hovering in front of you and doing nothing for the rest of the fight. A goblin, rat or other creature standing about fidgets now and then again, not just once.
+
 - A creature you crowd in a fight backs away twice as fast as before, as in the original, and keeps backing while it swings at you. A sling goblin that gets clear takes up its sling and shoots at once. A goblin, imp, gazer, fire elemental or acid slug whose missile misses walks closer, still shooting, until one reaches you; mages keep their distance. Only two of the three goblin types that slung still do: the third carries a club.
 
 - A spell waiting for its target can be put away with a right click or Esc. The right click used to swing the weapon as well.
