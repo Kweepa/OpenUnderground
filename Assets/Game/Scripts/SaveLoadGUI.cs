@@ -932,6 +932,28 @@ public class SaveLoadGUI : MonoBehaviour
         Graphics.DrawTexture(ringRect, xButtonChargeRing, chargeRingMatInstance);
     }
 
+    /// <summary>
+    /// Fills the inside of a button with the wood of the panel. The outline texture is hollow, which
+    /// is right on a panel, but the Main Menu button sits in the corner of the screen, over the world.
+    /// The fill is inset by one texel of the outline, under its opaque ring, so the corners it leaves
+    /// clear stay clear.
+    /// </summary>
+    private void DrawButtonFill(Rect r)
+    {
+        if (background == null)
+        {
+            return;
+        }
+
+        float insetX = r.width / buttonOutline.width;
+        float insetY = r.height / buttonOutline.height;
+        Rect inner = new Rect(r.x + insetX, r.y + insetY, r.width - 2f * insetX, r.height - 2f * insetY);
+        // a strip from the middle of the panel's inner board, away from its frame (texture coordinates
+        // start at the bottom)
+        Rect board = new Rect(0.25f, 0.4f, 0.5f, 0.08f);
+        GUI.DrawTextureWithTexCoords(inner, background, board, true);
+    }
+
     private void DrawQuitToMainMenuControls()
     {
         if (quitConfirmOpen)
@@ -948,6 +970,7 @@ public class SaveLoadGUI : MonoBehaviour
             GuiInput.RegisterBlockingRect(r);
             if (buttonOutline != null)
             {
+                DrawButtonFill(r);
                 GUI.DrawTexture(r, buttonOutline, ScaleMode.StretchToFill, true);
             }
             text.alignment = TextAnchor.MiddleCenter;

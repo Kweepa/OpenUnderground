@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The Main Menu button on the save and load screen is now solid wood inside, instead of showing the dungeon through it.
+
 - Loading a save no longer moves a lever, switch or pull chain onto a door on another level: the pull chain at the start of the dungeon could leave its wall after a save made deeper down. Saves where it already moved put it back when loaded.
 
 - Near an anvil, items it can never repair - bows, crossbows, slings, rings, crowns and the like - are thrown as usual, and the pad no longer offers to repair them.
