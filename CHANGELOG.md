@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A mage no longer casts a fireball or a lightning bolt through the creature standing in front of it, which killed its companion in the blast.
+
 - An acid slug's spit now flies in an arc and falls, as in the original, carrying four tiles at most. A mage's thrown knife flies in an arc too, faster and flatter.
 
 - An imp no longer freezes in mid-air after a heavy blow, hovering in front of you and doing nothing for the rest of the fight. A goblin, rat or other creature standing about fidgets now and then again, not just once.
