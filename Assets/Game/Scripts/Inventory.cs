@@ -4082,6 +4082,7 @@ public class Inventory : MonoBehaviour
             Rect outsideRect = GetPanelGuiRectForOutsideClick();
             Vector2 ogui = GuiInput.ScreenToGuiMouse(om.position.ReadValue());
             bool outsidePanelForThrow = !exploringInventory
+                || Cursor.lockState == CursorLockMode.Locked
                 || (outsideRect.width > 0f && !outsideRect.Contains(ogui));
 
             if (om.leftButton.wasPressedThisFrame && outsidePanelForThrow)
@@ -4164,7 +4165,10 @@ public class Inventory : MonoBehaviour
             return;
         }
 
-        Ray ray = cam.ScreenPointToRay(m.position.ReadValue());
+        // With the cursor locked the throw goes where the centre crosshair points, as a world click does in Interaction.
+        Ray ray = Cursor.lockState == CursorLockMode.Locked
+            ? new Ray(cam.transform.position, cam.transform.forward)
+            : cam.ScreenPointToRay(m.position.ReadValue());
         pendingMouseScreenRayWorldQuery = ray;
         Vector3 d = ray.direction;
         pendingThrowDirectionWorldUnit = d.sqrMagnitude > 1e-10f ? d.normalized : cam.transform.forward;

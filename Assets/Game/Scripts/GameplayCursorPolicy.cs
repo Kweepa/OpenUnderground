@@ -80,13 +80,38 @@ public static class GameplayCursorPolicy
 
         bool unlockFromUiMask = (player.controlsDisabled & cursorFreeMask) != 0;
 
+        // Left Shift held over the panels or a primed spell gives the mouse back to the view, so the player
+        // can turn while aiming; a click then aims at the centre crosshair. Released, the pointer comes back
+        // on the crosshair.
+        bool wasPanelMouseLook = panelMouseLook;
+        panelMouseLook = unlockForMagicInventoryPanels && !unlockFromUiMask && PlayerInput.PanelMouseLookHeld();
+        if (panelMouseLook)
+        {
+            unlockForMagicInventoryPanels = false;
+        }
+
         if (unlockForMagicInventoryPanels || unlockFromUiMask)
         {
             Cursor.lockState = CursorLockMode.None;
+            // Where the unlock leaves the pointer is not quite the centre, and the mouse position may not catch
+            // up until the mouse moves: it is put on the crosshair, and again on the next frame in case the
+            // unlock lands after the first warp.
+            if (wasPanelMouseLook || warpPointerAgain)
+            {
+                SoftwareCursorOverlay.WarpPointerOntoCrosshair();
+                warpPointerAgain = wasPanelMouseLook;
+            }
         }
         else
         {
             Cursor.lockState = CursorLockMode.Locked;
+            warpPointerAgain = false;
         }
     }
+
+    /// <summary>True while left Shift holds the cursor locked over the panels or a primed spell.</summary>
+    private static bool panelMouseLook;
+
+    /// <summary>The pointer was put on the crosshair last frame, when the Shift lock ended: once more.</summary>
+    private static bool warpPointerAgain;
 }

@@ -13,7 +13,7 @@ public enum SoftwareCursorHotspot
 /// Draws the gameplay pointer in IMGUI: OS cursor stays hidden; we paint <see cref="DataLoader.cursorTex"/> [0]
 /// by default, optional <see cref="DefaultTextureOverride"/>, map quill when the map is open (before world-pickup drag),
 /// world-pickup item art,
-/// or nothing while mouselook (<see cref="CursorLockMode.Locked"/>).
+/// or nothing while mouselook (<see cref="CursorLockMode.Locked"/>) except a primed spell's pointer, at the centre.
 /// Save/load and keyboard (options) UI force the neutral arrow only (<see cref="DefaultTextureOverride"/> ignored),
 /// except map note editing keeps the map quill while <see cref="MapScreen"/> is open.
 /// </summary>
@@ -133,7 +133,11 @@ public class SoftwareCursorOverlay : MonoBehaviour
 
         float w = 3f * tex.width;
         float h = 3.6f * tex.height;
-        Vector2 mp = GuiInput.MousePositionGuiSpace;
+        // Locked (left Shift), the mouse position only catches up when the mouse moves: the item goes at once
+        // where the mouse is put back when Shift is let go, so it does not move either way.
+        Vector2 mp = Cursor.lockState == CursorLockMode.Locked
+            ? GuiInput.ScreenToGuiMouse(PointerOnCrosshairScreen())
+            : GuiInput.MousePositionGuiSpace;
         if (inv.TryGetMouseCursorThrowChargeFill(out float throwFill))
         {
             float ringSize = Mathf.Max(w, h);
@@ -168,6 +172,7 @@ public class SoftwareCursorOverlay : MonoBehaviour
     {
         if (Cursor.lockState == CursorLockMode.Locked)
         {
+            TryDrawLockedOverrideAtCentre(allowDefaultTextureOverride);
             return;
         }
 
@@ -193,9 +198,79 @@ public class SoftwareCursorOverlay : MonoBehaviour
             tex = dl.cursorTex[0];
         }
 
+        Vector2 mp = GuiInput.MousePositionGuiSpace;
+        if (tex == DefaultTextureOverride)
+        {
+            DrawOnCross(tex, mp.x, mp.y, PointerScaleX);
+            return;
+        }
+
         float w = 3f * tex.width;
         float h = 3.6f * tex.height;
-        Vector2 mp = GuiInput.MousePositionGuiSpace;
         DrawTextureWithHotspot(tex, mp.x, mp.y, w, h, SoftwareCursorHotspot.Center);
+    }
+
+    /// <summary>
+    /// With the cursor locked over a primed spell (left Shift, see <see cref="PlayerInput.PanelMouseLookHeld"/>),
+    /// the spell's pointer stays on screen, drawn over the centre crosshair, so the aim still reads as a spell.
+    /// </summary>
+    private static void TryDrawLockedOverrideAtCentre(bool allowDefaultTextureOverride)
+    {
+        Texture2D tex = allowDefaultTextureOverride ? DefaultTextureOverride : null;
+        if (tex == null || GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+        {
+            return;
+        }
+
+        DrawOnCross(tex, Screen.width * 0.5f, Screen.height * 0.5f, CrosshairScaleX);
+    }
+
+    /// <summary>Pixels to a texel across of the centre crosshair, as <see cref="Interaction"/> draws it.</summary>
+    private const float CrosshairScaleX = 5f;
+
+    /// <summary>Pixels to a texel across of the free pointer, as drawn here.</summary>
+    private const float PointerScaleX = 3f;
+
+    /// <summary>
+    /// Moves the mouse so that the free pointer's cross lands on the centre crosshair's: the end of the left Shift
+    /// mouselook (<see cref="GameplayCursorPolicy.Apply"/>), so the pointer, or a primed spell's circle, comes back
+    /// exactly where the crosshair was. Both crosses sit half a texel left of their drawn middle.
+    /// </summary>
+    public static void WarpPointerOntoCrosshair()
+    {
+        var mouse = GameInput.CurrentMouse;
+        if (mouse == null)
+        {
+            return;
+        }
+
+        mouse.WarpCursorPosition(PointerOnCrosshairScreen());
+    }
+
+    /// <summary>
+    /// The mouse position, in screen pixels, at which the free pointer's cross lies on the centre crosshair's
+    /// (<see cref="WarpPointerOntoCrosshair"/>): 1 px left of the centre.
+    /// </summary>
+    private static Vector2 PointerOnCrosshairScreen()
+    {
+        float x = Screen.width * 0.5f - 0.5f * CrosshairScaleX + 0.5f * PointerScaleX;
+        return new Vector2(Mathf.Round(x), Mathf.Round(Screen.height * 0.5f));
+    }
+
+
+    /// <summary>
+    /// Draws <paramref name="tex"/> centred on the cross of cursor 0 as it is drawn centred on
+    /// (<paramref name="guiX"/>, <paramref name="guiY"/>), <paramref name="crossScaleX"/> pixels to a texel across:
+    /// 3 for the free pointer here, 5 for the crosshair in <see cref="Interaction"/>. Cursor 0 (16x15) has its cross
+    /// on column 7, half a texel left of the bitmap's middle, so a primed spell's circle centred on the same point
+    /// sat off the cross. Placed on whole pixels.
+    /// </summary>
+    private static void DrawOnCross(Texture2D tex, float guiX, float guiY, float crossScaleX)
+    {
+        float w = 3f * tex.width;
+        float h = 3.6f * tex.height;
+        float x = Mathf.Round(guiX - 0.5f * crossScaleX - w * 0.5f);
+        float y = Mathf.Round(guiY - h * 0.5f);
+        GUI.DrawTexture(new Rect(x, y, w, h), tex);
     }
 }

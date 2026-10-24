@@ -95,6 +95,15 @@ public static class PlayerInput
         return GameInput.CurrentMouse != null && Cursor.lockState == CursorLockMode.Locked;
     }
 
+    /// <summary>
+    /// Left Shift held while the magic or inventory panel is open or a spell waits for its target: the mouse
+    /// turns the view instead of moving the pointer (<see cref="GameplayCursorPolicy.Apply"/>).
+    /// </summary>
+    public static bool PanelMouseLookHeld()
+    {
+        return GameInput.CurrentKeyboard?.leftShiftKey.isPressed ?? false;
+    }
+
     public static bool JumpReleasedThisFrame()
     {
         bool g = GameInput.CurrentGamepad?.aButton.wasReleasedThisFrame ?? false;
