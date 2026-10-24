@@ -2220,6 +2220,8 @@ public class Critter : UUObject
     }
 
     protected bool actionDone;
+    /// <summary>When the current state began (Time.time), for LeftClip().</summary>
+    private float stateStartTime;
     private bool deathProcessed;
     private bool remainsSpawned;
 
@@ -2290,6 +2292,22 @@ public class Critter : UUObject
         SpawnRemains();
     }
 
+    /// <summary>
+    /// Whether the animator has gone on by itself from the clip the state asked for, which then
+    /// ends as on its FinishedEvent. Some clips never send it: the imp's controller leaves its
+    /// Flinch for Idle at 0.75 of the clip, over a quarter of a second, and the event at 0.85 falls
+    /// inside that transition, where FinishedEvent() ignores it (the imp stayed in its flinch for
+    /// good, hovering in front of the player); the gazer's Fidget does the same at 0.95, and six
+    /// creatures' Fidget clips have no event at all (so a standing creature fidgeted only once).
+    /// The first quarter of a second is the crossfade into the clip, when the animator may still
+    /// show what came before it.
+    /// </summary>
+    private bool LeftClip()
+    {
+        return cachedAnimator != null && Time.time - stateStartTime > 0.25f && !cachedAnimator.IsInTransition(0)
+            && !cachedAnimator.GetCurrentAnimatorStateInfo(0).IsName(currentAnimation);
+    }
+
     public void FinishedEvent()
     {
         // if we're crossfading out to a new state, don't want to interrupt that state
@@ -2319,6 +2337,7 @@ public class Critter : UUObject
             advancingAfterMiss = false;
         }
         state = newState;
+        stateStartTime = Time.time;
         frameTime = 0.0f;
         frameIndex = 0;
         actionDone = false;
@@ -4109,7 +4128,7 @@ public class Critter : UUObject
                 else
                 {
                     stateTime -= Time.deltaTime;
-                    bool fidgetEnd = state == EState.Fidget && ((cachedAnimator == null && stateTime < 0.0f) || (cachedAnimator != null && actionDone));
+                    bool fidgetEnd = state == EState.Fidget && ((cachedAnimator == null && stateTime < 0.0f) || (cachedAnimator != null && (actionDone || LeftClip())));
                     bool idleEnd = state == EState.Idle && stateTime < 0.0f;
                     if (fidgetEnd)
                     {
@@ -4470,6 +4489,10 @@ public class Critter : UUObject
                 }
                 break;
             case EState.Flinch:
+                if (!actionDone && LeftClip())
+                {
+                    actionDone = true;
+                }
                 if (hp > 0 && actionDone)
                 {
                     // A blow it answered by running (Retaliate()) caught it in the flinch.
@@ -7658,6 +7681,8 @@ public class Critter : UUObject
                 movementType = GetMovementTypeFromData();
             }
             state = (EState)critterData.state;
+            // The animator is put back on its saved clip at its next update: LeftClip() waits for it.
+            stateStartTime = Time.time;
             stateTime = critterData.stateTime;
             playerAlly = critterData.playerAlly;
             path = critterData.path != null ? new List<Vector3>(critterData.path) : null;
