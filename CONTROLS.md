@@ -150,6 +150,7 @@ time.
 |W A S D or Arrow keys|Move|
 |Mouse (cursor locked)|Look|
 |Left Shift (hold)|Sprint (forward only; uses stamina)|
+|Left Shift (hold), with a panel open or a spell waiting for its target|Look with the mouse; a click aims at the crosshair|
 |Ctrl (hold)|Walk slowly and quietly|
 |Space|Jump|
 

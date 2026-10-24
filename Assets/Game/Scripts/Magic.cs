@@ -1640,6 +1640,14 @@ public class Magic : MonoBehaviour
         string runes = spells[mousePrimedSpellIndex].runes;
         Camera cam = PlayerObject.Player.mainCamera;
 
+        // With the cursor locked (left Shift, see PlayerInput.PanelMouseLookHeld) the click aims at the
+        // centre crosshair, as a world click does in Interaction, and never at a panel.
+        if (Cursor.lockState == CursorLockMode.Locked)
+        {
+            FinalizeMousePrimedSpell(cam.transform.forward, null);
+            return;
+        }
+
         if (runes == "OWY"
             && Inventory.sInv != null
             && Inventory.sInv.TryGetNameEnchantmentInventoryTarget(guiMouse, out UUObject invObj)
