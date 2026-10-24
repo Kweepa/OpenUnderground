@@ -4830,7 +4830,8 @@ public class Critter : UUObject
 
         Vector3 startPos = GetProjectileLaunchPosition(false);
         Vector3 endPos = PlayerObject.Player.mainCamera!.transform.position + 0.5f * Vector3.down;
-        return Projectile.HasRoomToLaunch(projectileType, gameObject, cachedCharacterController.radius, startPos, endPos - startPos);
+        return Projectile.HasRoomToLaunch(projectileType, gameObject, cachedCharacterController.radius, startPos, endPos - startPos,
+            Projectile.MissileRadius(projectileType));
     }
 
     /// <summary>

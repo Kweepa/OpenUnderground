@@ -202,10 +202,12 @@ public class Projectile : UUObject
     /// its own blast: the blast spares nobody, and no contact routine reads who launched the
     /// missile. Here the missile leaves from the hand, so the whole way out to that point has to be
     /// clear, and for a fireball or a lightning bolt far enough that the launcher is outside the
-    /// burst's reach.
+    /// burst's reach. With aimRadius, a creature's launch, the same way is tested again along the
+    /// real aim, up or down, as wide as the missile: a mage's fireball struck the mage standing in
+    /// front of it, a little off the level line, and the burst killed it (fix 397).
     /// </summary>
     public static bool HasRoomToLaunch(EObjectType missileType, GameObject launcher, float launcherRadius,
-        Vector3 start, Vector3 direction)
+        Vector3 start, Vector3 direction, float aimRadius = 0.0f)
     {
         Vector3 heading = direction;
         heading.y = 0.0f;
@@ -233,9 +235,19 @@ public class Projectile : UUObject
 
         int layers = LayerMasks.EnvironmentAndCeiling
                      | (1 << LayerMask.NameToLayer("Characters")) | (1 << LayerMask.NameToLayer("Player"));
-        int count = Physics.SphereCastNonAlloc(start, 0.1f, heading, roomCache, distance, layers,
-            QueryTriggerInteraction.Ignore);
         Transform own = launcher.transform.root;
+        if (!IsWayClear(start, 0.1f, heading, distance, layers, own))
+        {
+            return false;
+        }
+        return aimRadius <= 0.0f || direction.sqrMagnitude < 1e-6f
+            || IsWayClear(start, aimRadius, direction.normalized, distance, layers, own);
+    }
+
+    private static bool IsWayClear(Vector3 start, float radius, Vector3 direction, float distance, int layers, Transform own)
+    {
+        int count = Physics.SphereCastNonAlloc(start, radius, direction, roomCache, distance, layers,
+            QueryTriggerInteraction.Ignore);
         for (int i = 0; i < count; ++i)
         {
             if (roomCache[i].collider.transform.root != own)
@@ -245,6 +257,16 @@ public class Projectile : UUObject
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// How wide a missile is, as its prefab's collisionRadius has it: 0.1 m for the physical ones
+    /// and the mage's knife, 0.2 m for the spells and the acid.
+    /// </summary>
+    public static float MissileRadius(EObjectType missileType)
+    {
+        return missileType is EObjectType.SlingStone or EObjectType.Arrow or EObjectType.CrossbowBolt or EObjectType.Knife
+            ? 0.1f : 0.2f;
     }
 
     /// <summary>
