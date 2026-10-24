@@ -272,11 +272,16 @@ public class Projectile : UUObject
         int mask = fireball ? Resistance.Fire | Resistance.Magic : Resistance.Magic;
         int layers = (1 << LayerMask.NameToLayer("Characters")) | (1 << LayerMask.NameToLayer("Player"));
         int count = Physics.OverlapSphereNonAlloc(point, BurstRadius, burstCache, layers);
+        Critter shooter = projectileOwner != null ? projectileOwner.GetComponent<Critter>() : null;
         for (int i = 0; i < count; ++i)
         {
             if (burstCache[i] is not CharacterController body)
             {
                 continue;
+            }
+            if (shooter != null)
+            {
+                shooter.MissileHit(body.transform, otherIsMiss: false);
             }
 
             int damage = fireball ? Utils.DiceRoll(6, 10) : Utils.DiceRoll(5, 6);
@@ -357,8 +362,20 @@ public class Projectile : UUObject
     public override void OnCollisionEnter(Collision collision)
     {
         base.OnCollisionEnter(collision);
-        if (type != EObjectType.Knife || !doDamage || this == null)
+        if (!doDamage || this == null)
         {
+            return;
+        }
+
+        if (type != EObjectType.Knife)
+        {
+            // A creature's missile that the physics stopped against a wall or a floor before Update()
+            // saw it there has missed all the same (Critter.MissileMissed()).
+            if (projectileOwner != null && (LayerMasks.EnvironmentAndCeiling & (1 << collision.collider.gameObject.layer)) != 0
+                && projectileOwner.TryGetComponent(out Critter shooter))
+            {
+                shooter.MissileMissed(transform.position);
+            }
             return;
         }
 
@@ -444,6 +461,10 @@ public class Projectile : UUObject
                     // Hit environment - stop projectile
                     DrawAxes(transform.position, Color.red, 5.0f);
                     doDamage = false;
+                    if (projectileOwner != null && projectileOwner.TryGetComponent(out Critter shooter))
+                    {
+                        shooter.MissileMissed(transform.position);
+                    }
                     HitSomething();
                     break;
                 }
@@ -512,6 +533,10 @@ public class Projectile : UUObject
                     }
                 }
 
+                if (projectileOwner != null && projectileOwner.TryGetComponent(out Critter shooter))
+                {
+                    shooter.MissileHit(root);
+                }
                 doDamage = false;
                 HitSomething();
             }

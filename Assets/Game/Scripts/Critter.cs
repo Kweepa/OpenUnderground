@@ -1169,8 +1169,31 @@ public class Critter : UUObject
     private float combatStepTime;
     private float combatStepDecisionTime;
 
-    /// <summary>How often a crowded creature decides its step again. Ours: the original decides on every tick.</summary>
-    private const float CombatStepPeriod = 0.5f;
+    /// <summary>
+    /// How often a crowded creature decides its step again: on every tick, as the original does,
+    /// and a creature in a fight ticks every 4/16 s (UW.EXE 0x197af sets its counter to 4 on every
+    /// exit, 0x1b8bb adds it).
+    /// </summary>
+    private const float CombatStepPeriod = 0.25f;
+
+    /// <summary>
+    /// One unit of a creature's speed in metres a second. The original moves a creature only on its
+    /// tick, by speed * 47 (0x2b799 in 0x2b5dc) over the tick's 64 timer units (0x1616b), in sixteenths
+    /// of an eighth of a tile (0x2c9a0, 0x2c621): 47/256 of a tile a second.
+    /// </summary>
+    private const float CreatureSpeedUnit = 47.0f / 256.0f * Tile.xzScale;
+
+    /// <summary>
+    /// How long a swing that starts during a step keeps the step going. The original's swing writes
+    /// no speed or heading, and the physics step goes on moving the creature with those of the
+    /// tick it started on for the swing's five ticks and one more (0x1b60f-0x1b732, 0x1b6d7): so a
+    /// creature that strikes while it backs away goes on backing, 1.6 m at the step's speed, and
+    /// that is what takes a sling goblin out of the melee band to shoot.
+    /// </summary>
+    private const float SwingCarryTime = 6 * CombatStepPeriod;
+
+    /// <summary>What is left of the step a swing carries (SwingCarryTime), however far the target is.</summary>
+    private float stepCarryTime;
 
     /// <summary>
     /// A creature that its target has come too close to steps away, as the original's does.
@@ -1178,14 +1201,15 @@ public class Critter : UUObject
     /// It points the heading at the target and, closer than 7/8 of a tile, one time in four sets the
     /// move 90 degrees to the left or the right at two thirds of the creature's walking speed, and
     /// the other three times straight back at speed 2 (0x1981c-0x198d6). The speeds are in the units
-    /// of critterStats byte 0x0b, the walking speed (0x18cb1), which become a velocity at 47 to the
-    /// unit (0x2b799 in 0x2b5dc). So every creature steps back at the same speed, while the step
-    /// aside depends on the type: for a goblin both are half its walk, and a slug does not move
-    /// aside at all. As the decision is taken again on every tick, the creature keeps stepping while
-    /// it is too close and stops as soon as it is not, and its attack roll goes on meanwhile
-    /// (0x19a01). It keeps facing the target, as the user saw in the original. Its attack reach is
-    /// 10/8 of a tile, so too close is 0.7 of that reach, here of meleeAttackRange. Only where
-    /// IsCombatStepSafe() finds room, and only for the creatures of StepsInCombat().
+    /// of critterStats byte 0x0b, the walking speed (0x18cb1), CreatureSpeedUnit each. So every
+    /// creature steps back at the same speed, 1.1 m/s, while the step aside depends on the type:
+    /// for a goblin both are half its walk, and a slug does not move aside at all. As the decision
+    /// is taken again on every tick, the creature keeps stepping while it is too close and stops
+    /// as soon as it is not, and its attack roll goes on meanwhile (0x19a01); a swing started
+    /// during the step carries it on (SwingCarryTime). It keeps facing the target, as the user saw
+    /// in the original. Its attack reach is 10/8 of a tile, so too close is 0.7 of that reach, here
+    /// of meleeAttackRange. Only where IsCombatStepSafe() finds room, and only for the creatures
+    /// of StepsInCombat().
     /// </summary>
     /// <returns>Whether the creature steps this frame.</returns>
     private bool UpdateCombatStep()
@@ -1193,12 +1217,14 @@ public class Critter : UUObject
         bool wasStepping = combatStepTime > 0.0f;
         combatStepDecisionTime -= Time.deltaTime;
         combatStepTime -= Time.deltaTime;
-        if (combatStepTime > 0.0f && IsCrowdedInCombat() && IsCombatStepSafe(combatStepDirection))
+        stepCarryTime -= Time.deltaTime;
+        if (combatStepTime > 0.0f && (stepCarryTime > 0.0f || IsCrowdedInCombat()) && IsCombatStepSafe(combatStepDirection))
         {
             MoveCombatStep();
             return true;
         }
         combatStepTime = 0.0f;
+        stepCarryTime = 0.0f;
 
         if (combatStepDecisionTime <= 0.0f)
         {
@@ -1292,8 +1318,6 @@ public class Critter : UUObject
         Vector3 direction = aside
             ? Quaternion.AngleAxis(Random.Range(0, 2) == 0 ? 90.0f : -90.0f, Vector3.up) * toTarget
             : -toTarget;
-        // The original's units, with a walk of 4 - goblins, humans and trolls, the commonest -
-        // taken as walkSpeed, since here every type walks at the speed of its prefab. Ours.
         int units = aside ? 2 * stats.WalkSpeed / 3 : 2;
         if (units == 0 || !IsCombatStepSafe(direction))
         {
@@ -1301,7 +1325,7 @@ public class Critter : UUObject
         }
 
         combatStepDirection = direction;
-        combatStepSpeed = units * walkSpeed / 4.0f;
+        combatStepSpeed = units * CreatureSpeedUnit;
         combatStepTime = CombatStepPeriod;
         ChangeAnimation("Walk");
         return true;
@@ -1317,6 +1341,27 @@ public class Critter : UUObject
         {
             PlayWalkBackward();
         }
+        MoveStepFrame();
+    }
+
+    /// <summary>
+    /// Moves one frame of a step that a swing carries, facing the target while the attack plays
+    /// (SwingCarryTime). Stops at a wall, a drop, water or lava, as the step does.
+    /// </summary>
+    private void CarryStepInSwing()
+    {
+        stepCarryTime -= Time.deltaTime;
+        if (stepCarryTime <= 0.0f || !IsCombatStepSafe(combatStepDirection))
+        {
+            stepCarryTime = 0.0f;
+            return;
+        }
+        TurnTo(GetTargetFootPos(), combatTurnSpeed, 20.0f);
+        MoveStepFrame();
+    }
+
+    private void MoveStepFrame()
+    {
         Vector3 motion = combatStepDirection * (combatStepSpeed * Time.deltaTime);
         if (movementType != EMovementType.Flying)
         {
@@ -2095,6 +2140,12 @@ public class Critter : UUObject
     /// <param name="idealRange">The ideal minimum distance from target (in meters)</param>
     public void OnLunge(float idealRange)
     {
+        if (stepCarryTime > 0.0f)
+        {
+            // The swing carries the creature's step instead (SwingCarryTime).
+            return;
+        }
+
         mLungeTime = 0.5f;
         mLungeIdealRange = idealRange;
 
@@ -2258,6 +2309,15 @@ public class Critter : UUObject
         {
             Debug.Log($"{name} {Time.realtimeSinceStartup:F3} state -> {newState}");
         }
+        // A step a swing carries goes on only from the swing into the stance that follows it.
+        bool carryingStep = state == EState.Attack && newState == EState.CombatIdle && stepCarryTime > 0.0f;
+        bool afterShot = state == EState.ProjectileAttack;
+        // The advance after a missed shot ends with a blow in melee, and when the fight ends.
+        if (newState is not (EState.Idle or EState.TurnToApproach or EState.Approach or EState.CombatIdle
+            or EState.CombatTurn or EState.ProjectileIdle or EState.ProjectileAttack or EState.Flinch))
+        {
+            advancingAfterMiss = false;
+        }
         state = newState;
         frameTime = 0.0f;
         frameIndex = 0;
@@ -2294,6 +2354,7 @@ public class Critter : UUObject
             break;
         case EState.Approach:
             slot = 7;
+            advanceShotTime = 0.0f;
             ChangeAnimation("Run");
             wallRubTime = 0.0f;
             flyerBobTime = 0.0f;
@@ -2301,9 +2362,21 @@ public class Critter : UUObject
         case EState.CombatIdle:
             slot = 0;
             stateTime = Random.Range(0.5f, 2.5f);
-            ChangeAnimation("CombatIdle");
-            combatStepTime = 0.0f;
-            combatStepDecisionTime = 0.0f;
+            stanceAfterShot = afterShot;
+            if (carryingStep)
+            {
+                // The rest of the step the swing carried, before the creature decides again.
+                ChangeAnimation("Walk");
+                combatStepTime = stepCarryTime;
+                combatStepDecisionTime = stepCarryTime;
+            }
+            else
+            {
+                ChangeAnimation("CombatIdle");
+                combatStepTime = 0.0f;
+                combatStepDecisionTime = 0.0f;
+                stepCarryTime = 0.0f;
+            }
             PlayerObject.Player.RegisterEncounteredCritter(type, levelIndex, objectIndex, originalHp);
             break;
         case EState.CombatTurn:
@@ -2329,7 +2402,10 @@ public class Critter : UUObject
             mLungeTime = 0.0f; // Reset lunge timer - will be set by animation event
             mLungeDirection = Vector3.zero;
             mLungeDestination = Vector3.zero;
-            if (cachedAnimator != null && movementType != EMovementType.Swimming && !CastsFromRange && !AttackHasLungeEvent())
+            // A swing that starts during a step, while the target is still too close, carries it
+            // on and does not lunge (SwingCarryTime).
+            stepCarryTime = combatStepTime > 0.0f && !CastsFromRange && IsCrowdedInCombat() ? SwingCarryTime : 0.0f;
+            if (stepCarryTime <= 0.0f && cachedAnimator != null && movementType != EMovementType.Swimming && !CastsFromRange && !AttackHasLungeEvent())
             {
                 // The ghosts' and the fire elemental's attacks have no lunge of their own, so they
                 // struck from wherever they stood, up to meleeAttackRange away; this lunges as the
@@ -2340,12 +2416,17 @@ public class Critter : UUObject
             break;
         case EState.ProjectileIdle:
             slot = 0;
-            stateTime = Random.Range(0.5f, 1.5f);
+            // A slinger rolls on every tick; another creature with a missile that has moved since its
+            // last shot shoots at once (ShootAtOnceAfter), the user's rule of 24 October 2026.
+            shootsAtOnce = !Slings && HasProjectileWeapon && MovedSinceLastShot();
+            stateTime = Slings || shootsAtOnce ? 0.0f : Random.Range(0.5f, 1.5f);
+            slingWaitTicks = 0;
             ChangeAnimation("Idle");
             PlayerObject.Player.RegisterEncounteredCritter(type, levelIndex, objectIndex, originalHp);
             break;
         case EState.ProjectileAttack:
             slot = crit.frameCount[5] > 0 ? 5 : 1;
+            travelSinceShot = 0.0f;
             ChangeAnimation("ProjectileAttack");
             stateTime = 1.0f; // when the projectile is generated
             Music.InCombat(this);
@@ -2484,8 +2565,25 @@ public class Critter : UUObject
     /// </summary>
     protected virtual bool CastsFromRange => false;
 
-    /// <summary>Within this of its target a creature fights hand to hand and shoots nothing (UW.EXE 0x19541).</summary>
-    private float MeleeBand => CastsFromRange ? 1.25f * Tile.xzScale : meleeAttackRange + meleeAttackHysteresis;
+    /// <summary>
+    /// Within this of its target a creature fights hand to hand and shoots nothing: 10/8 of a tile in
+    /// the original, for every creature (UW.EXE 0x19541, d² < 100 eighths²), beyond which it tries its
+    /// shot or its spell on every tick. A creature with no missile keeps the remake's reach and its
+    /// hysteresis.
+    /// </summary>
+    private float MeleeBand => CastsFromRange || HasProjectileWeapon ? 1.25f * Tile.xzScale : meleeAttackRange + meleeAttackHysteresis;
+
+    /// <summary>
+    /// Whether the creature has a missile of its own. Of the goblins only types 77 and 78 sling: their
+    /// first piece of equipment in critterStats (byte 0x20) is a sling stone, which is what the
+    /// original's shot asks for (UW.EXE 0x19661-0x19675); type 76 carries a cudgel there.
+    /// </summary>
+    private bool HasProjectileWeapon => type switch
+    {
+        EObjectType.AcidSlug or EObjectType.GoblinD or EObjectType.GoblinE
+            or EObjectType.Imp or EObjectType.Gazer or EObjectType.FireElemental => true,
+        _ => false,
+    };
 
     /// <summary>
     /// A caster backs away from a target closer than the first, fighting on, until it is as far as
@@ -2497,25 +2595,95 @@ public class Critter : UUObject
 
     private bool keepingAway;
 
+    /// <summary>
+    /// Whether the creature is coming closer because its last missile missed: it goes on shooting
+    /// as it walks, and stands to shoot only once a missile strikes its target (MissileMissed()).
+    /// </summary>
+    private bool advancingAfterMiss;
+
+    /// <summary>The wait before the next shot of a creature coming closer (TryShotWhileAdvancing()).</summary>
+    private float advanceShotTime;
+
+    /// <summary>
+    /// How far the creature has walked since its last shot, along its way, and where it was on the
+    /// last frame (MovedSinceLastShot()).
+    /// </summary>
+    private float travelSinceShot = float.MaxValue;
+    private Vector3 travelLastPosition;
+
+    /// <summary>
+    /// How far a creature with a missile has to have moved since its last shot to shoot at once,
+    /// with no roll or wait: after a step back, a swing that carried it, or a walk. Not the casters,
+    /// who back away while they wait. Measured along the way, not from where the last shot left,
+    /// so a goblin that fights hand to hand and backs off to the same spot has moved all the same.
+    /// Ours, the user's rule of 24 October 2026.
+    /// </summary>
+    private const float ShootAtOnceAfter = 1.0f;
+
+    private void CountTravelSinceShot()
+    {
+        Vector3 step = transform.position - travelLastPosition;
+        step.y = 0.0f;
+        travelLastPosition = transform.position;
+        if (travelSinceShot < float.MaxValue)
+        {
+            travelSinceShot += step.magnitude;
+        }
+    }
+
+    private bool MovedSinceLastShot()
+    {
+        return travelSinceShot >= ShootAtOnceAfter;
+    }
+
+    /// <summary>
+    /// Called by the creature's own missile when it misses: it stops against a wall, a floor or a
+    /// slope, or strikes someone other than the target. Rather than shooting again from where it
+    /// stands, the creature comes closer, shooting on the way (TryShotWhileAdvancing()), and goes on
+    /// coming closer after every missile that misses; it stands where it has got to once one
+    /// strikes its target (MissileHit()). Ours, the user's rules of 13 and 24 October 2026: the
+    /// original's shot keeps nothing of the last one (UW.EXE 0x19eab), so its creature shoots again
+    /// from the same place while its eye line holds.
+    /// </summary>
+    public void MissileMissed(Vector3 contact)
+    {
+        // The mages keep their distance: shy by nature, afraid of melee (the user, 24 October 2026).
+        if (hp > 0 && !CastsFromRange)
+        {
+            advancingAfterMiss = true;
+        }
+    }
+
+    /// <summary>
+    /// Called by the creature's own missile when it strikes someone: its target stops the advance,
+    /// anyone else is a miss. A burst calls it for everyone it catches, and only the target counts
+    /// (otherIsMiss false): a fireball that bursts on the wall beside the player and burns him has
+    /// struck him.
+    /// </summary>
+    public void MissileHit(Transform struck, bool otherIsMiss = true)
+    {
+        bool target = attackTarget == null
+            ? struck.GetComponentInParent<PlayerObject>() != null
+            : struck.root == attackTarget.transform.root;
+        if (target)
+        {
+            advancingAfterMiss = false;
+        }
+        else if (otherIsMiss)
+        {
+            MissileMissed(struck.position);
+        }
+    }
+
     private bool CanDoProjectileAttack(float distanceOffset)
     {
-        // some creatures are projectile only?
-        bool hasProjectileWeapon = false;
-        switch (type)
-        {
-        case EObjectType.AcidSlug:
-        case EObjectType.GoblinC:
-        case EObjectType.GoblinD:
-        case EObjectType.GoblinE:
-        case EObjectType.Imp:
-        case EObjectType.Gazer:
-        case EObjectType.FireElemental:
-            hasProjectileWeapon = true;
-            break;
-        }
-        hasProjectileWeapon |= CastsFromRange;
+        return !advancingAfterMiss && HasShotLine(distanceOffset);
+    }
 
-        if (hasProjectileWeapon)
+    /// <summary>Whether the creature has a missile and a clear line to its target within 12 m.</summary>
+    private bool HasShotLine(float distanceOffset)
+    {
+        if (HasProjectileWeapon || CastsFromRange)
         {
             // also needs to be close enough and have line of sight to the target
             if (GetDistanceToTarget() + distanceOffset < 12.0f)
@@ -2545,7 +2713,6 @@ public class Critter : UUObject
         case EObjectType.AcidSlug:
             projectileType = EObjectType.Acid;
             break;
-        case EObjectType.GoblinC:
         case EObjectType.GoblinD:
         case EObjectType.GoblinE:
             projectileType = EObjectType.SlingStone;
@@ -3537,6 +3704,7 @@ public class Critter : UUObject
         }
 
         base.Update();
+        CountTravelSinceShot();
         ForgetIfPlayerLongGone();
         if (awareOfPlayer)
         {
@@ -3857,6 +4025,11 @@ public class Critter : UUObject
                     }
 
                     bool reaches = GetPath(out path, transform.position, GetTargetFootPos(), mayCrossLava: Time.time >= lavaCrossingBarredUntil);
+                    if (!reaches)
+                    {
+                        // No way closer after a missed shot: it shoots from where it can again.
+                        advancingAfterMiss = false;
+                    }
                     // GetTilePath() keeps every path within range tiles of home, so a leash on the path
                     // length would only reject reachable targets. A path that does not reach the player
                     // is the original's failed search: the creature gives up and mills about (UW.EXE
@@ -4077,7 +4250,8 @@ public class Critter : UUObject
                     SetState(EState.Idle);
                 }
                 // see if we're close enough to the target to attack
-                else if (!crossingLava && GetDistanceToTarget() < meleeAttackRange && IsViewToTargetClear())
+                // A creature with a missile stops at its melee band, within which it does not shoot.
+                else if (!crossingLava && GetDistanceToTarget() < Mathf.Min(meleeAttackRange, MeleeBand) && IsViewToTargetClear())
                 {
                     Music.InCombat(this);
                     SetState(EState.CombatIdle);
@@ -4090,6 +4264,10 @@ public class Critter : UUObject
                 {
                     SetState(EState.ProjectileIdle);
                 }
+                else if (!crossingLava)
+                {
+                    TryShotWhileAdvancing();
+                }
                 }
                 break;
             case EState.CombatIdle:
@@ -4100,6 +4278,10 @@ public class Critter : UUObject
                 }
                 TryCloseDoorIfTrapped();
                 UpdateFlyerCombatHeight();
+                if (TryTakeUpMissile())
+                {
+                    break;
+                }
                 if (UpdateCombatStep())
                 {
                     stateTime -= Time.deltaTime;
@@ -4144,6 +4326,11 @@ public class Critter : UUObject
                 break;
             case EState.Attack:
                 TryCloseDoorIfTrapped();
+                if (stepCarryTime > 0.0f)
+                {
+                    CarryStepInSwing();
+                }
+                else
                 {
                 // Lunge forward if triggered by animation event
                 UpdateLunge();
@@ -4189,9 +4376,27 @@ public class Critter : UUObject
                 TurnTo(PlayerObject.Player.transform.position, projectileTurnSpeed, 30.0f);
 
                 stateTime -= Time.deltaTime;
-                if (AdvanceAnim(0.3f) && stateTime < 0.0f)
+                if (Slings)
                 {
-                    EndProjectileIdle();
+                    AdvanceAnim(0.3f);
+                    if (stateTime < 0.0f && !RollSlingShot())
+                    {
+                        stateTime += CombatStepPeriod;
+                    }
+                    else if (stateTime < 0.0f)
+                    {
+                        EndProjectileIdle();
+                    }
+                }
+                else
+                {
+                    // The wait also lasts a loop of the sprite's idle, frames of 0.3 s each, also for a
+                    // creature drawn with a model: not for one that shoots at once.
+                    bool idleLooped = AdvanceAnim(0.3f);
+                    if ((idleLooped || shootsAtOnce) && stateTime < 0.0f)
+                    {
+                        EndProjectileIdle();
+                    }
                 }
                 break;
             case EState.ProjectileAttack:
@@ -4432,6 +4637,106 @@ public class Critter : UUObject
         }
     }
 
+    private float missileCheckTime;
+
+    /// <summary>Whether the combat stance follows a shot, whose pause TryTakeUpMissile() keeps.</summary>
+    private bool stanceAfterShot;
+
+    /// <summary>
+    /// A creature with a missile that finds itself beyond the melee band in its combat stance - a
+    /// swing has carried it out, or the target has stepped back - takes up its missile on its next
+    /// tick, as the original tries its shot on every tick there (UW.EXE 0x19541), instead of
+    /// waiting out the stance; one whose last missile met a wall goes on coming closer
+    /// (MissileMissed()). Not while a swing still carries its step. The stance after a shot is
+    /// waited out as before, so the creatures fire at the remake's rate, except a slinger, whose
+    /// rate is the original's roll (RollSlingShot()).
+    /// </summary>
+    private bool TryTakeUpMissile()
+    {
+        missileCheckTime -= Time.deltaTime;
+        if (!HasProjectileWeapon || CastsFromRange || stepCarryTime > 0.0f || missileCheckTime > 0.0f
+            || (stanceAfterShot && !Slings && !advancingAfterMiss))
+        {
+            return false;
+        }
+        missileCheckTime = CombatStepPeriod;
+
+        if (GetDistanceToTarget() < MeleeBand)
+        {
+            return false;
+        }
+        if (advancingAfterMiss)
+        {
+            // idle will get us closer
+            SetState(EState.Idle);
+            return true;
+        }
+        if (!CanDoProjectileAttack(0.0f))
+        {
+            return false;
+        }
+        SetState(EState.ProjectileIdle);
+        return true;
+    }
+
+    /// <summary>
+    /// A creature coming closer after a missed shot (MissileMissed()) shoots as it walks: once it
+    /// has moved since its last shot (ShootAtOnceAfter), on the first tick with a clear line. The
+    /// user's rule of 24 October 2026.
+    /// </summary>
+    private void TryShotWhileAdvancing()
+    {
+        if (!advancingAfterMiss)
+        {
+            return;
+        }
+        advanceShotTime -= Time.deltaTime;
+        if (advanceShotTime > 0.0f)
+        {
+            return;
+        }
+        advanceShotTime = CombatStepPeriod;
+
+        if (!MovedSinceLastShot()
+            || GetDistanceToTarget() < MeleeBand || !HasShotLine(0.0f) || !IsViewToTargetClear())
+        {
+            return;
+        }
+        SetState(EState.ProjectileAttack);
+    }
+
+    /// <summary>Whether this wait before a shot is none, after a move (ShootAtOnceAfter).</summary>
+    private bool shootsAtOnce;
+
+    /// <summary>Whether the creature's missile is a sling stone, the original's physical shot.</summary>
+    private bool Slings => GetProjectileType() == EObjectType.SlingStone;
+
+    /// <summary>
+    /// The longest a slinger stands before its shot: 12 ticks, 3 s. Ours, the user's choice of 24
+    /// October 2026 after he saw a goblin stand 8 s: it cuts three waits in ten, and the average
+    /// falls from 2.7 s to 1.8 s for a goblin of type 77, from 3.2 s to 2.0 s for one of 78.
+    /// </summary>
+    private const int SlingWaitMaxTicks = 12;
+    private int slingWaitTicks;
+
+    /// <summary>
+    /// One tick of a slinger's wait: it shoots with a chance of (Dexterity + 1) in 192, on every
+    /// tick it stands seeing and facing its target, so a goblin of type 77 waits 2.7 s on average
+    /// and one of 78 3.2 s (UW.EXE 0x19eab). One that has moved since its last shot shoots at
+    /// once (ShootAtOnceAfter). True when the wait is over: the roll came up, or the shot is no
+    /// longer there to take, in the melee band or out of sight, which EndProjectileIdle() then
+    /// sorts out. The wait has no end in the original, and one in 23 lasted over eight seconds;
+    /// here it ends at SlingWaitMaxTicks.
+    /// </summary>
+    private bool RollSlingShot()
+    {
+        return MovedSinceLastShot()
+            || ++slingWaitTicks >= SlingWaitMaxTicks
+            || Random.Range(0, 192) <= stats.Dexterity
+            || GetDistanceToTarget() < MeleeBand
+            || !CanDoProjectileAttack(-2.0f);
+    }
+
     /// <summary>
     /// The end of the wait before a shot. Within the melee band the creature fights hand to hand
     /// instead: the original never starts a missile there, and the shot used to leave at whatever
@@ -4508,7 +4813,13 @@ public class Critter : UUObject
     protected virtual void LaunchProjectile()
     {
         EObjectType projectileType = GetProjectileType();
-        if (projectileType != 0 && HasRoomToLaunch(projectileType))
+        if (projectileType != 0 && !HasRoomToLaunch(projectileType))
+        {
+            // Refused where it would be born, against a wall or too close for its burst: it has not
+            // struck the target, so the creature comes closer as after a miss.
+            MissileMissed(transform.position);
+        }
+        else if (projectileType != 0)
         {
             UUObject proj = LevelLoader.CreateObjectOfType(projectileType);
             proj.PostLoadInitialize();
