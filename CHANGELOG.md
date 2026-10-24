@@ -2,6 +2,8 @@
 
 ## Current release
 
+- A creature you crowd in a fight backs away twice as fast as before, as in the original, and keeps backing while it swings at you. A sling goblin that gets clear takes up its sling and shoots at once. A goblin, imp, gazer, fire elemental or acid slug whose missile misses walks closer, still shooting, until one reaches you; mages keep their distance. Only two of the three goblin types that slung still do: the third carries a club.
+
 - A spell waiting for its target can be put away with a right click or Esc. The right click used to swing the weapon as well.
 
 - Hold left Shift while the inventory or magic panel is open, or while a spell waits for its target, and the mouse turns the view again, so you can line up a throw or a spell. A click then aims at the crosshair in the middle of the screen; let go of Shift and the pointer is back.
