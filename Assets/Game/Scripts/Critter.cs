@@ -4833,6 +4833,42 @@ public class Critter : UUObject
         return Projectile.HasRoomToLaunch(projectileType, gameObject, cachedCharacterController.radius, startPos, endPos - startPos);
     }
 
+    /// <summary>
+    /// How far an acid slug's spit can carry. In the original it falls under gravity in an arc and
+    /// lands within about three tiles, so a slug that spits from farther off, as it does, wastes it
+    /// (seen by the user under DOSBox on 24 October 2026). Here it falls in an arc too, as far as
+    /// four tiles on level ground at its best angle: the user's choice.
+    /// </summary>
+    private const float AcidReach = 4.0f * Tile.xzScale;
+
+    /// <summary>
+    /// How fast a mage's knife is thrown. The knife is ours (mod 56, the user's design of 14 October
+    /// 2026), and so is its arc, the user's choice of 24 October 2026: thrown faster than the acid,
+    /// on a longer arc, which carries 23 m at its best angle and is almost flat at the 3.75 m of
+    /// the melee band, the only place a mage throws it.
+    /// </summary>
+    private const float KnifeSpeed = 15.0f;
+
+    /// <summary>
+    /// The velocity that throws a missile at a given speed from one point onto another, on the
+    /// flatter of the two arcs. Out of reach, it throws at 45 degrees, the farthest, and falls short.
+    /// </summary>
+    private Vector3 LobVelocity(Vector3 from, Vector3 to, float speed)
+    {
+        Vector3 flat = to - from;
+        float rise = flat.y;
+        flat.y = 0.0f;
+        float run = flat.magnitude;
+        Vector3 heading = run > 1e-3f ? flat / run : transform.forward;
+        float g = -Physics.gravity.y;
+        float v2 = speed * speed;
+        float discriminant = v2 * v2 - g * (g * run * run + 2.0f * rise * v2);
+        float angle = discriminant >= 0.0f && run > 1e-3f
+            ? Mathf.Atan((v2 - Mathf.Sqrt(discriminant)) / (g * run))
+            : 0.25f * Mathf.PI;
+        return speed * (Mathf.Cos(angle) * heading + Mathf.Sin(angle) * Vector3.up);
+    }
+
     protected virtual void LaunchProjectile()
     {
         EObjectType projectileType = GetProjectileType();
@@ -4855,7 +4891,13 @@ public class Critter : UUObject
             {
                 float projectileSpeed = 14.0f;
 
-                if (rb.useGravity)
+                if (projectileType is EObjectType.Acid or EObjectType.Knife)
+                {
+                    rb.useGravity = true;
+                    float speed = projectileType == EObjectType.Acid ? Mathf.Sqrt(-Physics.gravity.y * AcidReach) : KnifeSpeed;
+                    rb.linearVelocity = LobVelocity(startPos, endPos, speed);
+                }
+                else if (rb.useGravity)
                 {
                     // calculate velocity to hit player
                     // about 10m/s horizontally
