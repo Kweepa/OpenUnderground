@@ -104,6 +104,7 @@ public class StringLoader
         new [] { "splahes", "splashes" },
         new [] { "Enscribed", "Inscribed" },
         new [] { "gray lizardman&red lizardmen", "gray lizardman&gray lizardmen" },
+        new [] { "a_acid slug", "an_acid slug" },
         new [] { "You detect the activity of many creatures ", "You detect many creatures " },
         new [] { " . . . . .", "..." },
         new [] { " . . .", "..." },

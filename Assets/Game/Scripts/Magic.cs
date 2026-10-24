@@ -2635,8 +2635,8 @@ public class Magic : MonoBehaviour
     /// single success makes the line say "hostile creatures"; and one against
     /// identifyCreatureDifficulty, which names its kind. Both use the player's Track; for the spell,
     /// the higher of Track and Casting: the spell finds the creatures, the skill reads them. The
-    /// names are the plurals of block 4. Hostile means the Hostile attitude only: an upset creature
-    /// is not attacking.
+    /// names are from block 4: the singular with its article when one creature was sensed, else
+    /// the plurals. Hostile means the Hostile attitude only: an upset creature is not attacking.
     /// </remarks>
     public void ReportNearbyCreatures(int radius, int skill, bool isSpell)
     {
@@ -2646,6 +2646,7 @@ public class Magic : MonoBehaviour
         int total = 0;
         bool hostileSensed = false;
         namedKindOrder.Clear();
+        string namedSingle = null;
         // What the creatures are: Track reads them, and for the spell Casting does as well as Track,
         // so a mage with no Track still learns something from it.
         int reading = isSpell
@@ -2716,6 +2717,7 @@ public class Magic : MonoBehaviour
                 && !namedKindOrder.Contains(critter.pluralName))
             {
                 namedKindOrder.Add(critter.pluralName);
+                namedSingle = critter.singularArticle + critter.singularName;
             }
         }
 
@@ -2729,7 +2731,7 @@ public class Magic : MonoBehaviour
         }
 
         // "You detect a few hostile creatures to the North, to the East and to the Southwest."
-        // Each direction is the whole string from the data, and the kinds below are always plural.
+        // Each direction is the whole string from the data.
         // "hostile" goes in before "creature" when any creature was told hostile.
         int index = 59 + (total > 1 ? 1 : 0) + (total > 4 ? 1 : 0);
         List<string> directions = new List<string>();
@@ -2747,11 +2749,13 @@ public class Magic : MonoBehaviour
         }
         string message = detected + JoinList(directions) + ".";
 
-        // "You make out signs of goblins and mongbats." The plural reads right for one creature
-        // as well.
+        // "Probably a goblin." for one creature, "Possibly goblins and mongbats." for more. Each kind
+        // named is there, but the others sensed may not be of those kinds.
         if (namedKindOrder.Count > 0)
         {
-            message += " You make out signs of " + JoinList(namedKindOrder) + ".";
+            message += total == 1
+                ? " Probably " + namedSingle + "."
+                : " Possibly " + JoinList(namedKindOrder) + ".";
         }
 
         Messages.Add(message);
