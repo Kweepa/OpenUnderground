@@ -179,6 +179,11 @@ public class CutscenePlayer : MonoBehaviour
     private void OnDestroy()
     {
         ReleaseTime();
+        if (sceneIndex is 13 or 14 or 15)
+        {
+            // The vision is over, at its end or cut short: the music starts again.
+            Music.VisionOver();
+        }
     }
 
     public void Start()
@@ -200,15 +205,11 @@ public class CutscenePlayer : MonoBehaviour
         Time.timeScale = 0.0f;
         holdsTime = true;
         
-        // Handle cup of wonder cutscenes
+        // Handle cup of wonder cutscenes (the incense visions, played by Incense.TryBurn())
         if (sceneIndex is 13 or 14 or 15)
         {
-            // Stop the music
-            MusicPlayer musicPlayer = MusicPlayer.Instance;
-            if (musicPlayer != null)
-            {
-                musicPlayer.StopMusic();
-            }
+            // Silence the music until the vision is over (OnDestroy)
+            Music.Vision();
             
             Utils.PlayClip2d(cupOfWonderClip);
         }
@@ -421,12 +422,6 @@ public class CutscenePlayer : MonoBehaviour
                 waitForA = true;
                 break;
             case CutEventType.End:
-                // Resume music for cup of wonder cutscene (sceneIndex 13)
-                if (sceneIndex == 13)
-                {
-                    Music.ResumeExploringMusic();
-                }
-                
                 Destroy(gameObject);
                 ReleaseTime();
                 break;
