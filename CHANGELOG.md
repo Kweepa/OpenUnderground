@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Escape on the messagebox that asks how many to take or move now closes only that messagebox, and the inventory stays open, instead of opening the save panel or closing the inventory.
+
 - The mouse wheel scrolls the inventory, an open bag or chest, and the text of a conversation the right way round: turning it down goes down.
 
 - Burning incense no longer plays a dungeon track under the vision: the music falls silent while the vision lasts and starts again when it ends.

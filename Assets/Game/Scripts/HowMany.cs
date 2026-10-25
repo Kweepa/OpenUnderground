@@ -337,7 +337,16 @@ public class HowMany : MonoBehaviour
             else if (GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard)
             {
                 if (GameInput.EscapePressedThisFrame())
+                {
+                    // The inventory slid in for the box, or was open already: it stays open, as it
+                    // does when the items are taken.
+                    bool keepInventory = howManyReason is EHowManyReason.Pickup or EHowManyReason.MoveStuff
+                        or EHowManyReason.MoveStuffMouse;
                     CancelHowMany();
+                    GameInput.ConsumeEscape();
+                    if (keepInventory)
+                        Inventory.ShowPanel();
+                }
                 else if (GameInput.CurrentMouse?.rightButton.wasPressedThisFrame ?? false)
                     SubmitHowMany(true);
             }
