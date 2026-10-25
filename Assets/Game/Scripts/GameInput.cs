@@ -133,8 +133,23 @@ public static class GameInput
         return !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.cKey.wasPressedThisFrame ?? false);
     }
 
+    private static int escapeConsumedFrame = -1;
+
+    /// <summary>
+    /// Called by a dialog that has just closed itself on Esc, so that the readers after it in the same
+    /// frame do not take the same press as their own: closing the "how many?" box opened the save
+    /// panel, or closed the inventory behind it.
+    /// </summary>
+    public static void ConsumeEscape()
+    {
+        escapeConsumedFrame = Time.frameCount;
+    }
+
     public static bool EscapePressedThisFrame()
     {
+        if (escapeConsumedFrame == Time.frameCount)
+            return false;
+
         foreach (InputDevice d in InputSystem.devices)
         {
             if (d is Keyboard k && k.escapeKey.wasPressedThisFrame)
