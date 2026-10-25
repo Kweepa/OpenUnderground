@@ -132,20 +132,56 @@ public class LightSource : UUObject
         TryPreviewLightInInventory();
     }
 
-    /// <summary>Preview lighting while item is in the grid / paperdoll (not equipped on shoulders).</summary>
-    private void TryPreviewLightInInventory()
+    /// <summary>
+    /// The four slots where a light can burn, the original's table at DS:0x171e: the two shoulders
+    /// and the two hands (UW.EXE 0x2af36 burns them, 0x37266 lights them).
+    /// </summary>
+    public static readonly EInvSlot[] WornSlots =
     {
-        if (quality > 0 && quantity == 1)
+        EInvSlot.RightShoulder, EInvSlot.LeftShoulder, EInvSlot.RightHand, EInvSlot.LeftHand
+    };
+
+    private bool IsWorn()
+    {
+        foreach (EInvSlot slot in WornSlots)
         {
-            SetLit(true);
-            if (Inventory.sInv.invSlotContents[(int)EInvSlot.LeftShoulder] != this
-                && Inventory.sInv.invSlotContents[(int)EInvSlot.RightShoulder] != this)
+            if (Inventory.sInv.invSlotContents[(int)slot] == this)
             {
-                extinguishCountdown = 3; // allow it to burn for 15 seconds so we can cook popcorn
-                Inventory.sInv.litLights.Add(this);
+                return true;
             }
         }
-        //Messages.Add(1, 123); // can only be lit if equipped
+
+        return false;
+    }
+
+    /// <summary>
+    /// Lights a light the way the original does (UW.EXE 0x37266): a light that is not worn is moved
+    /// to a free shoulder or the free shield hand first, and lights there; with none free it says
+    /// "Your hands are full." A light no longer burns in the pack for a while.
+    /// </summary>
+    private void TryPreviewLightInInventory()
+    {
+        if (quality <= 0)
+        {
+            Messages.Add(1, 124); // that light is already used up
+            return;
+        }
+
+        if (quantity != 1)
+        {
+            return;
+        }
+
+        if (IsWorn())
+        {
+            SetLit(true);
+            return;
+        }
+
+        if (!Inventory.sInv.TryWearFromPack(this))
+        {
+            Messages.Add(1, 246); // your hands are full
+        }
     }
 
     public override void TryInventorySecondaryUse()
@@ -299,7 +335,7 @@ public class LightSource : UUObject
 
     public static void DecayLights()
     {
-        foreach (EInvSlot slot in new[] { EInvSlot.LeftShoulder, EInvSlot.RightShoulder })
+        foreach (EInvSlot slot in WornSlots)
         {
             LightSource lightSource = Inventory.sInv.invSlotContents[(int)slot] as LightSource;
             if (lightSource != null && lightSource.IsLit() && lightSource.GetDuration() > 0)
@@ -307,7 +343,7 @@ public class LightSource : UUObject
                 if (--lightSource.qualityDropCountdown <= 0)
                 {
                     lightSource.qualityDropCountdown = lightSource.GetDuration();
-                    if (--lightSource.quality == 0)
+                    if (--lightSource.quality <= 0)
                     {
                         lightSource.SetLit(false);
                     }

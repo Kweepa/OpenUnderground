@@ -2,6 +2,12 @@
 
 ## Current release
 
+- The Standard of Honor now fits in a pack, box or chest, and can be carried on a shoulder or in the shield hand, as in the original.
+
+- A torch, candle, taper or lantern can be carried in the shield hand as well as on a shoulder, and burns down there as it does on a shoulder. Lighting one that sits in your pack puts it on a free shoulder or in the free hand; a light no longer burns for a minute in the pack.
+
+- With a bag or chest open, a right click on its icon above the items puts what you are holding back outside it, and the bag stays open; a left click still closes it. Closing a bag brings back the list it was opened from as you left it, instead of scrolling the bag to the last row, and a bag opens where you left it. Arrows, coins or food put into a closed bag join the same pile inside instead of making a second one.
+
 - Escape on the messagebox that asks how many to take or move now closes only that messagebox, and the inventory stays open, instead of opening the save panel or closing the inventory.
 
 - The mouse wheel scrolls the inventory, an open bag or chest, and the text of a conversation the right way round: turning it down goes down.

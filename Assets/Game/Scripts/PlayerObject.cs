@@ -491,13 +491,12 @@ public class PlayerObject : MonoBehaviour
             return 2;
         }
 
-        if (Inventory.sInv.invSlotContents[(int)EInvSlot.LeftShoulder] is LightSource left && left.IsLit())
+        foreach (EInvSlot slot in LightSource.WornSlots)
         {
-            level = Mathf.Max(level, left.Brightness);
-        }
-        if (Inventory.sInv.invSlotContents[(int)EInvSlot.RightShoulder] is LightSource right && right.IsLit())
-        {
-            level = Mathf.Max(level, right.Brightness);
+            if (Inventory.sInv.invSlotContents[(int)slot] is LightSource worn && worn.IsLit())
+            {
+                level = Mathf.Max(level, worn.Brightness);
+            }
         }
         foreach (LightSource light in Inventory.sInv.litLights)
         {

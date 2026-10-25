@@ -431,6 +431,8 @@ public class Inventory : MonoBehaviour
     {
         if (obj == null)
             return EInvSlot.None;
+        if (obj is Standard || obj is LightSource)
+            return FreeHoldingSlotOrFirst();
         EInvSlot invSlot = EInvSlot.None;
         switch (obj.getClass)
         {
@@ -469,6 +471,56 @@ public class Inventory : MonoBehaviour
         return slotIndex == (int)EInvSlot.RightShoulder || slotIndex == (int)EInvSlot.LeftShoulder;
     }
 
+    private static EInvSlot ShieldHandSlot => PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand;
+
+    /// <summary>
+    /// The slots a light or the Standard of Honor can be put in: the two shoulders and the shield
+    /// hand. The original takes any portable object on the shoulders and in both hands (UW.EXE
+    /// 0x7aaeb, bit 5 of COMOBJ byte 3); the weapon hand is left out here because an object there
+    /// that is not a weapon would leave the player no fist to fight with.
+    /// </summary>
+    private static bool IsHoldingSlot(int slotIndex)
+    {
+        return IsShoulderPaperdollSlot(slotIndex) || slotIndex == (int)ShieldHandSlot;
+    }
+
+    /// <summary>The first free holding slot, in the original's order (shoulders, then hand), or None.</summary>
+    private EInvSlot FreeHoldingSlot()
+    {
+        foreach (EInvSlot slot in new[] { EInvSlot.RightShoulder, EInvSlot.LeftShoulder, ShieldHandSlot })
+        {
+            if (invSlotContents[(int)slot] == null)
+                return slot;
+        }
+
+        return EInvSlot.None;
+    }
+
+    /// <summary>The first free holding slot, or the right shoulder to swap with, as a light does.</summary>
+    private EInvSlot FreeHoldingSlotOrFirst()
+    {
+        EInvSlot slot = FreeHoldingSlot();
+        return slot != EInvSlot.None ? slot : EInvSlot.RightShoulder;
+    }
+
+    /// <summary>
+    /// Puts an object from the pack, or the cursor, into the first free holding slot and equips it;
+    /// false, with nothing moved, when all three are taken. A light lights there.
+    /// </summary>
+    public bool TryWearFromPack(UUObject obj)
+    {
+        EInvSlot slot = FreeHoldingSlot();
+        if (slot == EInvSlot.None)
+            return false;
+
+        RemoveItemFromInventory(obj);
+        invSlotContents[(int)slot] = obj;
+        obj.Equip();
+        Utils.PlayClip2d(PlayerObject.Player.pickupClip);
+        index = Mathf.Max(0, Mathf.Min(index, GetCurrentListInternal().Count - 1));
+        return true;
+    }
+
     /// <summary>Mouse floating drop / cursor: whether this paperdoll slot accepts the carried item.</summary>
     private bool PaperdollSlotAcceptsFloatingEquip(UUObject obj, int slotIndex)
     {
@@ -480,6 +532,9 @@ public class Inventory : MonoBehaviour
             return true;
 
         if (obj.getClass == UUObject.EClass.LampsAndWands && IsShoulderPaperdollSlot(slotIndex))
+            return true;
+
+        if ((obj is LightSource || obj is Standard) && IsHoldingSlot(slotIndex))
             return true;
 
         if ((obj is Food || obj is Potion) && IsEatOrQuaffPaperdollSlot(slotIndex))
@@ -940,11 +995,51 @@ public class Inventory : MonoBehaviour
     {
         if (stack.Count == 0)
             return false;
-        float panelLeft = Screen.width - invPosition;
-        Rect r = new Rect(panelLeft + ix, iy - 64, 48, 58);
-        if (!r.Contains(guiMouse))
+        if (!OpenContainerIconRect(invPosition).Contains(guiMouse))
             return false;
         BackOutOfContainer();
+        return true;
+    }
+
+    /// <summary>The icon of the open container, above the grid: a left click on it closes the container.</summary>
+    private Rect OpenContainerIconRect(float invPosition)
+    {
+        float panelLeft = Screen.width - invPosition;
+        return new Rect(panelLeft + ix, iy - 64, 48, 58);
+    }
+
+    /// <summary>
+    /// Mouse RMB while carrying, on the open container's icon: <see cref="mouseCursorCarriedPortable"/>
+    /// goes into the list that holds the container, joining a stack there, and the container stays open.
+    /// </summary>
+    private bool TryMouseStoreCarriedPortableOutOfOpenContainer(Vector2 guiMouse, float invPosition)
+    {
+        if (mouseCursorCarriedPortable == null || stack.Count == 0
+            || IsInventoryModalUiBlocking(PlayerObject.Player) || lerpIn < 0.001f)
+            return false;
+        if (!OpenContainerIconRect(invPosition).Contains(guiMouse))
+            return false;
+
+        UUObject carried = mouseCursorCarriedPortable;
+        UUObject parent = stack.Count > 1 ? stack[^2] : null;
+        if (parent != null && !ValidatePutUsingItemInContainer(parent, carried))
+            return false;
+
+        List<UUObject> parentList = parent != null ? parent.contents : inventory;
+        RemoveItemFromInventory(carried);
+        mouseCursorCarriedPortable = null;
+        UUObject joined = FindStackToJoin(parentList, carried, carried.quantity);
+        if (joined != null)
+        {
+            joined.quantity += carried.quantity;
+            Utils.DestroyItem(carried);
+        }
+        else
+        {
+            parentList.Add(carried);
+        }
+
+        Utils.PlayClip2d(place);
         return true;
     }
 
@@ -1025,10 +1120,7 @@ public class Inventory : MonoBehaviour
                 bool openToStow = container.type is EObjectType.Sack or EObjectType.Pack or EObjectType.Box;
                 if (openToStow)
                 {
-                    stack.Add(container);
-                    index = 0;
-                    viewIndex = 0;
-                    Utils.PlayClip2d(open);
+                    OpenContainer(container);
                     mouseCursorCarriedPortable = usingItem;
                     usingItem = null;
                     return true;
@@ -1443,7 +1535,7 @@ public class Inventory : MonoBehaviour
         // === HUGE (SIZE 5) ===
         { EObjectType.TowerShield, 5 },
         { EObjectType.Bedroll, 5 },
-        { EObjectType.Standard, 5 }, // A battle standard/flag
+        { EObjectType.Standard, 4 }, // A battle standard/flag: a pack holds it; the original takes it anywhere at 0.4 stones
         { EObjectType.Fountain, 5 },
         { EObjectType.Boulder, 5 },
         { EObjectType.LotusEspritTurbo, 5 }
@@ -1596,6 +1688,8 @@ public class Inventory : MonoBehaviour
     {
         inventory.Clear();
         stack.Clear();
+        viewIndexWhenOpened.Clear();
+        viewIndexWhenClosed.Clear();
         for (int i = 0; i < invSlotContents.Length; ++i)
         {
             if (invSlotContents[i] != null)
@@ -1615,6 +1709,8 @@ public class Inventory : MonoBehaviour
     public void ClearStack()
     {
         stack.Clear();
+        viewIndexWhenOpened.Clear();
+        viewIndexWhenClosed.Clear();
     }
 
     public List<UUObject> GetCurrentListInternal()
@@ -1653,12 +1749,46 @@ public class Inventory : MonoBehaviour
         return null;
     }
 
+    /// <summary>The view of the list below each container when it was last opened, put back when it closes.</summary>
+    private readonly Dictionary<UUObject, int> viewIndexWhenOpened = new();
+
+    /// <summary>The view inside each container when it was last closed, put back when it opens again.</summary>
+    private readonly Dictionary<UUObject, int> viewIndexWhenClosed = new();
+
+    /// <summary>
+    /// The lowest a view can go for a list of <paramref name="count"/>: the one where the empty cell
+    /// after the last item is on the bottom row, as <see cref="TryApplyStuffViewScroll"/> allows.
+    /// </summary>
+    private static int MaxViewIndex(int count)
+    {
+        return Mathf.Max(0, (count - 12) & ~3);
+    }
+
+    private void OpenContainer(UUObject container)
+    {
+        viewIndexWhenOpened[container] = viewIndex;
+        stack.Add(container);
+        // Back where the player left it, unless what it holds has shrunk since.
+        viewIndexWhenClosed.TryGetValue(container, out int closed);
+        viewIndex = Mathf.Clamp(closed & ~3, 0, MaxViewIndex(GetCurrentListInternal().Count));
+        index = viewIndex;
+        Utils.PlayClip2d(open);
+    }
+
     public void BackOutOfContainer()
     {
         UUObject bag = stack[^1];
+        viewIndexWhenClosed[bag] = viewIndex;
         stack.Remove(bag);
         index = GetCurrentListInternal().IndexOf(bag);
-        viewIndex = Mathf.Max(0, index - 12) & ~3;
+        // The list comes back as it was when the container was opened, with the container where it
+        // was; only if the list has changed so that it would be out of sight is it brought to the
+        // last row.
+        if (viewIndexWhenOpened.TryGetValue(bag, out int opened) && index >= opened && index < opened + 16
+            && opened <= MaxViewIndex(GetCurrentListInternal().Count))
+            viewIndex = opened;
+        else
+            viewIndex = Mathf.Max(0, index - 12) & ~3;
         Utils.PlayClip2d(backOut);
     }
 
@@ -1922,7 +2052,11 @@ public class Inventory : MonoBehaviour
         currentList.Remove(obj);
         
         EInvSlot invSlot = EInvSlot.None;
-        switch (obj.getClass)
+        if (obj is Standard || obj is LightSource)
+        {
+            invSlot = FreeHoldingSlotOrFirst();
+        }
+        else switch (obj.getClass)
         {
         case UUObject.EClass.Armour:
         case UUObject.EClass.Armour2:
@@ -1993,6 +2127,16 @@ public class Inventory : MonoBehaviour
         UUObject obj = currentList[index];
         if (obj == null)
         {
+            return;
+        }
+
+        // A used-up light is not put on: lighting it is all Equip is for (UW.EXE 0x37266 refuses it
+        // with string 124).
+        if (obj is LightSource && obj.quality <= 0)
+        {
+            Messages.Add(1, 124); // that light is already used up
+            Utils.PlayClip2d(fail);
+            usingItem = null;
             return;
         }
 
@@ -2484,6 +2628,30 @@ public class Inventory : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// The stack in <paramref name="list"/> that <paramref name="howMany"/> of <paramref name="obj"/> join
+    /// when put there, by the rule of <see cref="AddRecursive"/>; null if there is none.
+    /// </summary>
+    private static UUObject FindStackToJoin(List<UUObject> list, UUObject obj, int howMany)
+    {
+        if (list == null || !obj.stackable)
+        {
+            return null;
+        }
+
+        foreach (UUObject other in list)
+        {
+            if (other != null && other != obj && other.type == obj.type
+                && other.quantity + howMany < 368
+                && SameStackMergeIdentity(other, obj))
+            {
+                return other;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Copy stack identity fields onto a peeled/split object (mirrors UUObject world partial pickup).</summary>
     public static void CopyPeeledStackProperties(UUObject source, UUObject peeled)
     {
@@ -2832,7 +3000,22 @@ public class Inventory : MonoBehaviour
             howMany = Mathf.Clamp(HowMany.sHowMany.howMany, 1, usingItem.quantity);
         }
 
-        if (usingItem.stackable && howMany != usingItem.quantity)
+        // A stack put into a closed container joins the same stack inside, as it does when it is
+        // dropped on that stack with the container open.
+        UUObject joined = FindStackToJoin(targetContainer.contents, usingItem, howMany);
+        if (joined != null)
+        {
+            joined.quantity += howMany;
+            if (howMany == usingItem.quantity)
+            {
+                Utils.DestroyItem(usingItem);
+            }
+            else
+            {
+                usingItem.quantity -= howMany;
+            }
+        }
+        else if (usingItem.stackable && howMany != usingItem.quantity)
         {
             UUObject newItem = LevelLoader.CreateObjectOfType(usingItem.type);
             newItem.quantity = howMany;
@@ -3099,12 +3282,7 @@ public class Inventory : MonoBehaviour
             }
             else
             {
-                // open the container
-                stack.Add(currentList[index]);
-                index = 0;
-                viewIndex = 0;
-
-                Utils.PlayClip2d(open);
+                OpenContainer(currentList[index]);
             }
         }
         else if (index < currentList.Count && currentList[index] != null && usingItem != null)
@@ -3563,7 +3741,8 @@ public class Inventory : MonoBehaviour
             }
 
             Vector2 guiMouseCarried = GuiInput.ScreenToGuiMouse(mouse.position.ReadValue());
-            if (mouse.rightButton.wasReleasedThisFrame)
+            if (mouse.rightButton.wasReleasedThisFrame
+                && !TryMouseStoreCarriedPortableOutOfOpenContainer(guiMouseCarried, invPosition))
                 TryMouseStoreCarriedPortableInContainer(guiMouseCarried, invPosition);
 
             return;
@@ -4585,10 +4764,9 @@ public class Inventory : MonoBehaviour
             }
         }
 
-        UUObject shield = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand)];
+        UUObject shield = GetShieldHandPiece(armourOnly: true);
         if (shield != null)
         {
-            // a weapon in that hand answers 0, so this only counts shields
             armour[(int)EBodyPart.Torso] += Of(shield, asKnown);
             armour[(int)EBodyPart.Arms] += Of(shield, asKnown);
         }
@@ -4631,7 +4809,8 @@ public class Inventory : MonoBehaviour
     /// The original rebuilds four bytes at DS:0x266a from the worn pieces every time the equipment
     /// changes (UW.EXE 0x7dea4 clears them, 0x7e1d0 fills them). Its loop walks slots 0 to 10 and
     /// asks 0x79c12 whether each one counts: the five armour slots and both rings always do, the
-    /// shield hand only for a shield or a piece of headgear, and the weapon hand and shoulders never
+    /// shield hand only for a shield or one of five ids from plate boots to dragon skin boots
+    /// (<see cref="GetShieldHandPiece"/>), and the weapon hand and shoulders never
     /// do. Only armour can carry this enchantment - on a weapon the same numbers 704-711 read as
     /// Accuracy instead - so asking every slot for <see cref="UUObject.GetMagicProtection"/> lands
     /// on the same set. A ring covers torso and arms, the way the shield hand does, because the
@@ -4659,7 +4838,7 @@ public class Inventory : MonoBehaviour
             }
         }
 
-        UUObject shield = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand)];
+        UUObject shield = GetShieldHandPiece(armourOnly: false);
         if (shield != null)
         {
             protection[(int)EBodyPart.Torso] += Of(shield, asKnown);
@@ -4697,6 +4876,25 @@ public class Inventory : MonoBehaviour
         }
 
         return (total + perPart.Length / 2) / perPart.Length;
+    }
+
+    /// <summary>
+    /// What the shield hand holds, if it counts. In the original its armour comes only from the five
+    /// shields, tower shield to jeweled shield (ids 0x3b-0x3f, UW.EXE 0x7e4d4-0x7e527); protection and
+    /// toughness also from plate boots to dragon skin boots (0x2b-0x2f, the gate at 0x79c12). Anything
+    /// else held there - a ring, a crown, a vest - gives nothing. The shiny shield (0x37) counts here
+    /// as a shield, which the original does not do: a choice of ours, so that it is worth holding.
+    /// </summary>
+    private UUObject GetShieldHandPiece(bool armourOnly)
+    {
+        UUObject piece = invSlotContents[(int)ShieldHandSlot];
+        if (piece == null)
+            return null;
+        if (piece.type is >= EObjectType.TowerShield and <= EObjectType.JeweledShield or EObjectType.ShinyShield)
+            return piece;
+        if (!armourOnly && piece.type is >= EObjectType.PlateBoots and <= EObjectType.DragonskinBoots)
+            return piece;
+        return null;
     }
 
     // The slots the original maps to torso and arms both, apart from the shield hand.
@@ -4742,7 +4940,7 @@ public class Inventory : MonoBehaviour
             }
         }
 
-        UUObject shield = invSlotContents[(int)(PlayerData.sData.leftHanded ? EInvSlot.RightHand : EInvSlot.LeftHand)];
+        UUObject shield = GetShieldHandPiece(armourOnly: false);
         if (shield != null)
         {
             toughness[(int)EBodyPart.Torso] += 2 * Of(shield, asKnown);

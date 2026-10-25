@@ -22,7 +22,7 @@ public class FlickerLight : MonoBehaviour
     }
 
     /// <summary>
-    /// The light the player is currently carrying: the two shoulder slots, the ambient light of
+    /// The light the player is currently carrying: the shoulder and hand slots, the ambient light of
     /// level 9, and the Daylight, Night Vision and Light spells, resolved together.
     /// </summary>
     /// <remarks>
@@ -32,8 +32,6 @@ public class FlickerLight : MonoBehaviour
     /// </remarks>
     public static void GetPlayerLightProps(out float lightRange, out float lightIntensity, out float lightFlicker)
     {
-        UUObject objA = Inventory.sInv.invSlotContents[(int) EInvSlot.LeftShoulder];
-        UUObject objB = Inventory.sInv.invSlotContents[(int) EInvSlot.RightShoulder];
         lightRange = 12.0f;
         lightIntensity = 1.2f;
         lightFlicker = 1.0f;
@@ -45,8 +43,11 @@ public class FlickerLight : MonoBehaviour
             lightFlicker = 0.96f;
         }
         
-        if (objA != null) objA.GetLightProps(ref lightRange, ref lightIntensity, ref lightFlicker);
-        if (objB != null) objB.GetLightProps(ref lightRange, ref lightIntensity, ref lightFlicker);
+        foreach (EInvSlot slot in LightSource.WornSlots)
+        {
+            UUObject obj = Inventory.sInv.invSlotContents[(int)slot];
+            if (obj != null) obj.GetLightProps(ref lightRange, ref lightIntensity, ref lightFlicker);
+        }
 
         if (Magic.sMagic != null)
         {

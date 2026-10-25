@@ -2094,7 +2094,7 @@ public class Magic : MonoBehaviour
 
         if (Inventory.sInv != null)
         {
-            foreach (EInvSlot slot in new[] { EInvSlot.LeftShoulder, EInvSlot.RightShoulder })
+            foreach (EInvSlot slot in LightSource.WornSlots)
             {
                 if (Inventory.sInv.invSlotContents[(int)slot] is LightSource light && light.IsLit())
                 {
