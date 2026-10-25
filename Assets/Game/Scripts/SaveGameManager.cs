@@ -455,10 +455,15 @@ public class SaveGameManager : MonoBehaviour
     /// The save itself waits for the level's objects to be finished, a frame or two, and is taken
     /// while the screen is still black from the level change, so its stall is not seen. Writing it
     /// here would catch the level before its objects exist. The thumbnail waits for the fade.
+    ///
+    /// With Options_AutoSave off nothing is asked and the level is not marked: turned on again,
+    /// the option saves on the next entry into any level that has no save of its own, those
+    /// visited while it was off included.
     /// </remarks>
     public void RequestAutoSaveForLevel(int level)
     {
-        if (level <= 0 || level >= 32 || level == VoidLevel || PlayerData.sData == null)
+        if (level <= 0 || level >= 32 || level == VoidLevel || PlayerData.sData == null
+            || !PlayerInput.AutoSave)
         {
             return;
         }

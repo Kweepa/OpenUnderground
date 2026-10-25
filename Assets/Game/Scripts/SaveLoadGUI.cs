@@ -1586,6 +1586,7 @@ public class SaveLoadGUI : MonoBehaviour
         PlayerPrefs.SetInt("Options_AmbientSilenceMax", (int)PlayerInput.AmbientSilenceMax);
         PlayerPrefs.SetInt("Options_ShieldSpellsSoak", PlayerInput.ShieldSpellsSoak ? 1 : 0);
         PlayerPrefs.SetInt("Options_RewardOnlyFirstTrapCopy", PlayerInput.RewardOnlyFirstTrapCopy ? 1 : 0);
+        PlayerPrefs.SetInt("Options_AutoSave", PlayerInput.AutoSave ? 1 : 0);
         PlayerPrefs.Save();
         
         // Apply music volume to MusicPlayer

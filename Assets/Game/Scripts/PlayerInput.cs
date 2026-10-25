@@ -65,6 +65,12 @@ public static class PlayerInput
     /// </summary>
     public static bool RewardOnlyFirstTrapCopy => PlayerPrefs.GetInt("Options_RewardOnlyFirstTrapCopy", 1) == 1;
 
+    /// <summary>
+    /// Whether the game saves by itself the first time the character sets foot on a level. On
+    /// unless the player turns it off. Off, only the quicksave and the saves made by hand are written.
+    /// </summary>
+    public static bool AutoSave => PlayerPrefs.GetInt("Options_AutoSave", 1) == 1;
+
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     public static Vector2 ReadMoveVector()
     {
