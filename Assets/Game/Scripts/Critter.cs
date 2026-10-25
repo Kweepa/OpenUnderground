@@ -31,8 +31,13 @@ public class CritterSaveData : UUObjectSaveData
     public bool repopulationMark;
     public int repopulationTrap;
 
-    // Killed by a blow with no attacker (TryDamageWithoutAttacker()): absent in an older save, so false.
-    public bool killedWithoutAttacker;
+    // Which copy of its trap the repopulation made this creature, 1 for the first (Trap.DoCreateObjectTrap()):
+    // absent in an older save, so 0, which pays like a first.
+    public int repopulationCopy;
+
+    // The last blow that hurt the creature was the player's (Critter.StruckByPlayer()): absent in an older
+    // save, so false.
+    public bool lastBlowByPlayer;
 
     public int movementType;
     public int state;
@@ -521,11 +526,23 @@ public class Critter : UUObject
     // makes nothing more while this creature is alive (Repopulation).
     public int repopulationTrap;
 
+    // Ours: which copy of its trap the repopulation made this creature, 1 for the first and 0 for a
+    // creature it did not make. From the second on a copy carries no loot and the n-th pays 1/n of its
+    // experience, so that a trap the dungeon refills by itself is no endless well of either.
+    public int repopulationCopy;
+
+    // Whether this creature carries no loot: a repeat of a trap the player set off, when the option
+    // asks for it, or a repopulation copy after the first.
+    private bool WithholdsLoot => WithholdsReward || repopulationCopy > 1;
+
     /// <summary>Whether the creature is alive: not dying, dead or being cleared away.</summary>
     public bool IsAlive => hp > 0 && state is not (EState.Die or EState.Dead or EState.Cleanup);
 
-    // Killed by a blow nobody struck, the Rune of Warding's: its death pays no experience.
-    private bool killedWithoutAttacker;
+    // Whether the last blow that hurt this creature was the player's: his weapon, missile or spell
+    // (StruckByPlayer()). Only then does its death pay experience, as in the original, which pays
+    // only when the attacker's index is 1, the player (UW.EXE 0x1c409). Another creature's blow,
+    // lava and the Rune of Warding, which strikes with no attacker, leave it false.
+    private bool lastBlowByPlayer;
 
     // Bit 7 of critterData[2], byte 0x0a of the original's record: a creature with it set neither
     // raises the pack alarm when struck nor answers one (UW.EXE 0x1c383, 0x1ba43). Nothing in UW.EXE
@@ -2225,6 +2242,35 @@ public class Critter : UUObject
     private bool deathProcessed;
     private bool remainsSpawned;
 
+    /// <summary>
+    /// The experience this creature pays when the player kills it, in the remake's units, which are
+    /// half the original's (the level thresholds are twice its own, so the pace is the same).
+    /// </summary>
+    /// <remarks>
+    /// The original pays 4 * Exp + 2d(Exp), 4 * Exp + 2 to 6 * Exp, and multiplies a marked creature's
+    /// by (rand() % 24 + 24) / 16, 1.5 to 2.94 (UW.EXE 0x25b35, the bonus at 0x25b98). It works that
+    /// product out in 16 bits, which wraps above Exp 116 and can then take experience away: Dorna
+    /// Ironfist, marked with Exp 325, costs experience seven kills in ten. Above 116 the gain stays
+    /// plain. Ours on top: the n-th copy of a repopulation trap pays 1/n.
+    /// </remarks>
+    private int KillExperience()
+    {
+        int exp = stats.Exp;
+        int gain = 4 * exp + Utils.DiceRoll(exp, 2);
+        if (elite && exp <= 116)
+        {
+            gain = gain * Random.Range(24, 48) / 16;
+        }
+
+        gain *= 2;
+        if (repopulationCopy > 1)
+        {
+            gain /= repopulationCopy;
+        }
+
+        return gain;
+    }
+
     private void EnsureDeathProcessedOnce(bool drowned = false)
     {
         if (deathProcessed)
@@ -2241,11 +2287,10 @@ public class Critter : UUObject
         {
             BloodStain.TrySpawnDeathStain(transform.position, stats.Remains, blood);
 
-            // TODO: reduce based on relative level of player and enemy
-            // also maybe reduce based on max abyss level reached...?
-            if (!WithholdsReward && !killedWithoutAttacker)
+            // PlayerObject.AddXP() halves it when the player is too far above the depth
+            if (!WithholdsReward && lastBlowByPlayer)
             {
-                PlayerObject.AddXP(10 * stats.Exp);
+                PlayerObject.AddXP(KillExperience());
             }
         }
 
@@ -5625,6 +5670,7 @@ public class Critter : UUObject
     private void BurnInLava()
     {
         hp -= PlayerObject.RollLavaBurn(originalHp);
+        lastBlowByPlayer = false;
         Utils.PlayClipOccluded(DataLoader.sDataLoader.lavaBurn, transform.position);
     }
 
@@ -6060,6 +6106,7 @@ public class Critter : UUObject
         // A blow that landed is answered: a miss or a taunt took nothing this frame.
         if (lastDamageFrame == Time.frameCount)
         {
+            lastBlowByPlayer = true;
             Retaliate();
         }
 
@@ -6166,7 +6213,7 @@ public class Critter : UUObject
 
     /// <summary>
     /// A blow that nobody struck, the Rune of Warding's: the same as any other, but a creature it
-    /// kills pays no experience.
+    /// kills pays no experience, since no StruckByPlayer() follows it.
     /// </summary>
     /// <remarks>
     /// In the original the ward trap's damage goes through the damage gate with no attacker
@@ -6176,10 +6223,6 @@ public class Critter : UUObject
     public void TryDamageWithoutAttacker(int damage, int mask)
     {
         TryDamage(damage, Skills.ESkillTestResult.Success, mask);
-        if (hp <= 0)
-        {
-            killedWithoutAttacker = true;
-        }
     }
 
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
@@ -6190,6 +6233,8 @@ public class Critter : UUObject
             damage = damage * 3 / 2;
         }
         hp -= damage;
+        // whoever struck it; the player's blows say so afterwards, in StruckByPlayer()
+        lastBlowByPlayer = false;
 
         CritterHealthDisplay.CritterDamaged(hp / (float)originalHp);
 
@@ -7027,7 +7072,7 @@ public class Critter : UUObject
     // player can tell apart. Nothing is made if the level data says it already was.
     private void SpawnLoot()
     {
-        if (WithholdsReward)
+        if (WithholdsLoot)
         {
             // the link is the template's own inventory, which this creature must not carry off
             link = 0;
@@ -7619,7 +7664,8 @@ public class Critter : UUObject
             critterData.repeatTrapCopy = repeatTrapCopy;
             critterData.repopulationMark = repopulationMark;
             critterData.repopulationTrap = repopulationTrap;
-            critterData.killedWithoutAttacker = killedWithoutAttacker;
+            critterData.repopulationCopy = repopulationCopy;
+            critterData.lastBlowByPlayer = lastBlowByPlayer;
             critterData.movementType = (int)movementType;
             critterData.state = (int)state;
             critterData.stateTime = stateTime;
@@ -7715,7 +7761,8 @@ public class Critter : UUObject
             repeatTrapCopy = critterData.repeatTrapCopy;
             repopulationMark = critterData.repopulationMark;
             repopulationTrap = critterData.repopulationTrap;
-            killedWithoutAttacker = critterData.killedWithoutAttacker;
+            repopulationCopy = critterData.repopulationCopy;
+            lastBlowByPlayer = critterData.lastBlowByPlayer;
             RefreshMarkersFromLevel();
             movementType = (EMovementType)critterData.movementType;
             if (movementType == EMovementType.TwilightZone)

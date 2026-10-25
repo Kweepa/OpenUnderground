@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Experience is earned as in the original: once your level is more than twice the depth plus two (above 4 on the first level), every gain is halved, and a marked creature pays about twice as much. Only your own kills pay, the silver sapling costs an eighth of your experience instead of a fifth, and a creature the dungeon brings back pays less each time it returns from the same place, and carries no loot after the first.
+
 - The Standard of Honor now fits in a pack, box or chest, and can be carried on a shoulder or in the shield hand, as in the original.
 
 - A torch, candle, taper or lantern can be carried in the shield hand as well as on a shoulder, and burns down there as it does on a shoulder. Lighting one that sits in your pack puts it on a free shoulder or in the free hand; a light no longer burns for a minute in the pack.
