@@ -5965,10 +5965,12 @@ public class Inventory : MonoBehaviour
                 Rect stuffGridRect = GetStuffGridHitRect(panelLeft);
                 if (stuffGridRect.Contains(Event.current.mousePosition))
                 {
+                    // An IMGUI wheel event has a positive delta.y when the wheel turns down, the
+                    // opposite of the Input System's Mouse.scroll.
                     float scrollY = Event.current.delta.y;
                     if (Mathf.Abs(scrollY) > 0.01f)
                     {
-                        int rowDelta = scrollY > 0f ? -1 : 1;
+                        int rowDelta = scrollY > 0f ? 1 : -1;
                         if (TryApplyStuffViewScroll(rowDelta, itemsToDisplay.Count))
                         {
                             Event.current.Use();
