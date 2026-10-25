@@ -16,6 +16,9 @@ public class TrapSaveData : UUObjectSaveData
 {
     // Absent in an older save, so a trap that has made nothing yet.
     public int creatureCopiesMade;
+
+    // Absent in an older save, so a trap the repopulation has used for nothing yet.
+    public int repopulationCopiesMade;
 }
 
 public class Trap : UUObject
@@ -28,6 +31,9 @@ public class Trap : UUObject
 
     // How many creatures this trap has made when the player set it off (CountCreatureCopy).
     private int creatureCopiesMade;
+
+    // How many creatures the repopulation has made with this trap (DoCreateObjectTrap()).
+    private int repopulationCopiesMade;
     
     public override void TryInteract(UUObject originator, UUObject sender, EAction action)
     {
@@ -649,6 +655,7 @@ public class Trap : UUObject
         if (data is TrapSaveData trapData)
         {
             trapData.creatureCopiesMade = creatureCopiesMade;
+            trapData.repopulationCopiesMade = repopulationCopiesMade;
         }
     }
 
@@ -659,6 +666,7 @@ public class Trap : UUObject
         if (data is TrapSaveData trapData)
         {
             creatureCopiesMade = trapData.creatureCopiesMade;
+            repopulationCopiesMade = trapData.repopulationCopiesMade;
         }
     }
 
@@ -756,6 +764,12 @@ public class Trap : UUObject
             }
 
             Debug.Log($"Trap {name}: no room for {copy.name}, forced in.", this);
+        }
+
+        // Counted only once the copy is in the world: its number decides its loot and its experience.
+        if (fromRepopulation && newObject is Critter counted)
+        {
+            counted.repopulationCopy = ++repopulationCopiesMade;
         }
 
         if (!fromRepopulation)

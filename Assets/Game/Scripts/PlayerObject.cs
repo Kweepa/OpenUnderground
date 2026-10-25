@@ -2172,10 +2172,25 @@ public class PlayerObject : MonoBehaviour
         return level;
     }
 
+    /// <summary>
+    /// Adds experience, halved while the character is more than twice the depth plus two levels up.
+    /// </summary>
+    /// <remarks>
+    /// The original halves every gain then, g / 2 + 1 (UW.EXE 0x3424a, in the accumulator 0x341d8):
+    /// on level 1 a character earns in full up to his level 4, on level 4 up to his level 10. A
+    /// remake unit is half an original one, so the same halving is (x / 4 + 1) * 2 here, never more
+    /// than the gain itself: the original gets a gain of one unit or two through whole, and so does
+    /// the map's single point.
+    /// </remarks>
     public static void AddXP(int xpToAdd)
     {
         if (PlayerData.sData.charLevel < 16)
         {
+            if (PlayerData.sData.charLevel > 2 * LevelLoader.sLevelLoader.loadedLevel + 2)
+            {
+                xpToAdd = Math.Min(xpToAdd, (xpToAdd / 4 + 1) * 2);
+            }
+
             PlayerData.sData.xp += xpToAdd;
             ApplyXpProgress();
         }
@@ -2412,9 +2427,9 @@ public class PlayerObject : MonoBehaviour
             yield return null;
         }
 
-        // lose 20% xp
-        PlayerData.sData.xp *= 8;
-        PlayerData.sData.xp /= 10;
+        // An eighth of the experience is lost, as in the original, which takes it at every death
+        // (UW.EXE 0x82880, at 0x828c1); without a sapling a death there ends the game, as here.
+        PlayerData.sData.xp -= PlayerData.sData.xp >> 3;
 
         PlayerData.sData.dead = false;
         PlayerData.sData.hp = PlayerData.sData.vitality;
