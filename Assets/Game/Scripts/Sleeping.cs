@@ -70,7 +70,7 @@ public static class Sleeping
             Messages.Add(1, 15); // you make camp
 
             // turn out the lights
-            foreach (EInvSlot slot in new[] { EInvSlot.LeftShoulder, EInvSlot.RightShoulder })
+            foreach (EInvSlot slot in LightSource.WornSlots)
             {
                 LightSource lightSource = Inventory.sInv.invSlotContents[(int)slot] as LightSource;
                 if (lightSource != null && lightSource.IsLit())

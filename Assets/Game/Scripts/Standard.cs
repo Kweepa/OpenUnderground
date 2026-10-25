@@ -11,6 +11,18 @@ public class Standard : UUObject
         loreResult = Skills.ESkillTestResult.CriticalSuccess;
     }
     
+    // Carried on a shoulder or in the shield hand, as in the original (see Inventory.IsHoldingSlot).
+    public override EEquipAction Equip()
+    {
+        return EEquipAction.Equip;
+    }
+
+    // Gives the Y button and the right click their Equip, with its hint.
+    public override string GetUseText()
+    {
+        return "Equip";
+    }
+
     private const float PlantRayLength = 6.0f;
 
     public override bool Throw()
