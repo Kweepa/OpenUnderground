@@ -2325,7 +2325,9 @@ public class Conversations : MonoBehaviour
                 Rect chatViewRect = GetConversationChatViewRect();
                 if (chatViewRect.Contains(Event.current.mousePosition))
                 {
-                    chatScrollOffset += Event.current.delta.y * chatScrollWheelSpeed;
+                    // The offset grows towards the older lines, and an IMGUI wheel event has a
+                    // positive delta.y when the wheel turns down, towards the newer ones.
+                    chatScrollOffset -= Event.current.delta.y * chatScrollWheelSpeed;
                     chatScrollOffset = Mathf.Clamp(chatScrollOffset, 0f, maxScroll);
                     Event.current.Use();
                 }
