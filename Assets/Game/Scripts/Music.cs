@@ -104,6 +104,9 @@ public class Music : MonoBehaviour
     
     // True from the moment the title track is left playing until the first ambient track is due.
     private bool openingSilencePending;
+
+    // An incense vision is playing, and the music waits for it to end (Vision(), VisionOver()).
+    private bool inVision;
     
     /// <summary>Seconds before trying again when no ambient track can be played.</summary>
     private const float noTrackRetry = 10.0f;
@@ -410,6 +413,41 @@ public class Music : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// An incense vision has begun: the music stops, and stays stopped until VisionOver().
+    /// </summary>
+    /// <remarks>
+    /// The vision plays a sound of its own. Stopping the MusicPlayer alone left this component in
+    /// its exploring state with nothing playing, which Update() reads as a track that has ended:
+    /// it started the next one at once, under the vision, or after the silence between tracks
+    /// when the player has set one.
+    /// </remarks>
+    public static void Vision()
+    {
+        if (sMusic != null && sMusic.musicPlayer != null)
+        {
+            sMusic.inVision = true;
+            sMusic.musicPlayer.StopMusic();
+            sMusic.currentPlayingTrack = "";
+        }
+    }
+
+    /// <summary>
+    /// The incense vision is over: an exploring track starts at once, whatever was playing before.
+    /// </summary>
+    public static void VisionOver()
+    {
+        if (sMusic != null && sMusic.inVision)
+        {
+            sMusic.inVision = false;
+            // From an exploring state StartExploringMusic() draws a track at once instead of arming
+            // the silence it leaves after a fight.
+            sMusic.musicState = EMusicState.ExploringA;
+            sMusic.exploringSilenceTimer = 0.0f;
+            sMusic.StartExploringMusic();
+        }
+    }
+
     public static void Dead()
     {
         sMusic.musicState = EMusicState.Death;
@@ -668,6 +706,7 @@ public class Music : MonoBehaviour
     {
         sMusic = this;
         if (musicPlayer == null) return;
+        if (inVision) return;
         
         switch (musicState)
         {

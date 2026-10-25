@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Burning incense no longer plays a dungeon track under the vision: the music falls silent while the vision lasts and starts again when it ends.
+
 - Setup, a new entry on the title menu, lets you choose the music for each moment of the game, from exploring and combat to the map and the title screen: the original tracks, your own MP3, OGG or WAV files, or both, one picked at random when there are several; each can be listened to there, through any of the soundfonts, and switched off without removing it. The choice is kept in a music.txt you can also edit by hand, and the sequel's ambient tracks, if you had added them, are already in it.
 
 - Changing the soundfont, in the options or on the Setup screen, no longer starts the music over: the track carries on from where it was, with the new instruments, and the title music keeps looping.
