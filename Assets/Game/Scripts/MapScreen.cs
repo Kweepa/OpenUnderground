@@ -113,7 +113,48 @@ public class MapPage
         
         // overwrite the eraser with some noise from elsewhere
         CloneStamp(ec[0], ec[1], ec[2], ec[3], ec[0] - 32, ec[1]);
-    
+
+        blank = (Color[])col.Clone();
+        bg.SetPixels(col);
+        bg.Apply();
+    }
+
+    /// <summary>
+    /// Wipes the page back to the blank parchment, to be drawn again from its mapped tiles when its
+    /// level is next played.
+    /// </summary>
+    public void Clear()
+    {
+        if (blank == null)
+        {
+            return;
+        }
+        col = (Color[])blank.Clone();
+        bg.SetPixels(col);
+        bg.Apply();
+        needsRedraw = true;
+    }
+
+    /// <summary>
+    /// Draws the page again from the blank parchment. A tile draws its walls on its neighbours'
+    /// pixels and darkens what is there, so a tile cannot be drawn again on its own without leaving
+    /// or erasing someone else's line: when a hidden tile comes out, the whole page is drawn again.
+    /// </summary>
+    public void Redraw(int levelIndex)
+    {
+        Level level = LevelLoader.sLevelLoader.levels[levelIndex];
+        if (blank == null || level == null)
+        {
+            return;
+        }
+        col = (Color[])blank.Clone();
+        for (int i = 0; i < 64 * 64; ++i)
+        {
+            if (mapped[i])
+            {
+                UpdateTile(level.tiles[i % 64, i / 64], levelIndex);
+            }
+        }
         bg.SetPixels(col);
         bg.Apply();
     }
@@ -132,7 +173,9 @@ public class MapPage
         }
         bool floorStep = n.type == 0 || t.floorHeight - n.floorHeight > 2;
         bool isSquare = t.type == 1 || (t.type is >= 6 and <= 9);
-        bool hidden = n.hidden && n.door == null;
+        // A secret door not yet found shows as wall, as the tile behind it is not drawn: with its door
+        // left out of the test, as before, its side was an opening in the wall line.
+        bool hidden = n.hidden;
         switch (dir)
         {
         case 0: // north
@@ -182,6 +225,8 @@ public class MapPage
         
         // Use current loaded level for RewriteTile (called during gameplay)
         UpdateTile(t, LevelLoader.sLevelLoader.loadedLevel);
+        bg.SetPixels(col);
+        bg.Apply();
     }
 
     public void UpdateTile(Tile t, int levelIndex)
@@ -321,66 +366,107 @@ public class MapPage
         }
     }
 
-    private static int[] xo = { 0, 0, -1, 1, -1, 1, 0, 0, 0, 0 };
-    private static int[] yo = { 0, 0, -1, -1, 1, 1, 0, 0, 0, 0 };
+    // The view the map is drawn from, shared by every page: the original keeps its grid between
+    // frames and levels alike.
+    private static readonly AutomapView view = new AutomapView();
+    private static readonly int[] viewTypes = new int[64 * 64];
+    private static readonly List<int> newlyDrawn = new List<int>();
 
+    /// <summary>
+    /// What a tile newly drawn on the map pays, in the remake's units, by dungeon level: what the
+    /// original pays on average for exploring the level whole, divided by its walkable tiles. Nothing
+    /// in the Void.
+    /// </summary>
+    /// <remarks>
+    /// Ours, in place of the original's rule. The original pays count * level / 10 a view draw for the
+    /// cells of a band 33 tiles wide around the view that it marks without drawing - rock and the tiles
+    /// behind walls - truncated at every draw (UW.EXE 0x211c5, 0x21ebc), so it pays for what the player
+    /// never sees, and nothing in the Void. Its average per level comes from that rule run on simulated
+    /// explorations of every level with a torch, ten each: 169, 488, 838, 1115, 1553, 1937, 2248 and
+    /// 2702 original units, about 11,050 for levels 1 to 8, here over the tiles of each level's largest
+    /// connected region (2017, 1970, 1769, 1471, 1559, 1934, 2145, 1986), doubled for the remake's
+    /// unit. Before, every tile paid 1 at any depth, the Void included: about 1000 original units a
+    /// level, 8900 in all.
+    /// </remarks>
+    private static readonly float[] xpPerTile = { 0.0f, 0.17f, 0.50f, 0.95f, 1.52f, 1.99f, 2.00f, 2.10f, 2.72f, 0.0f };
+
+    /// <summary>
+    /// Draws on the map what the player's light shows close ahead, as the original does once a frame
+    /// (AutomapView), and pays for every walkable tile newly drawn (xpPerTile). On level 9 the original's
+    /// map is off for the whole stay (UW.EXE 0x80d16): nothing is drawn there.
+    /// </summary>
+    /// <remarks>
+    /// A hidden tile, a secret door not yet found, is solid to the view, so the map never shows it
+    /// as an opening; the original draws it like any open tile, which the user ruled a spoiler.
+    /// </remarks>
     public void Update(bool debugRevealMap)
     {
-        // update the map as we go
         int tileX = Tile.GetTileX(PlayerObject.Player.transform.position.x);
         int tileY = Tile.GetTileY(PlayerObject.Player.transform.position.z);
-        Tile pt = LevelLoader.GetTile(tileX, tileY);
+        int level = LevelLoader.sLevelLoader.loadedLevel;
 
-        int radius = debugRevealMap ? 63 : 1;
-        for (int x = Mathf.Max(0, tileX - radius); x <= Mathf.Min(tileX + radius, 63); ++x)
+        if (needsRedraw)
         {
-            for (int y = Mathf.Max(0, tileY - radius); y <= Mathf.Min(tileY + radius, 63); ++y)
+            needsRedraw = false;
+            Redraw(level);
+        }
+
+        // if you somehow get to a hidden tile, reveal it
+        Tile pt = LevelLoader.GetTile(tileX, tileY);
+        if (pt.hidden)
+        {
+            MapScreen.RevealTile(pt);
+        }
+
+        if (debugRevealMap)
+        {
+            for (int i = 0; i < 64 * 64; ++i)
             {
-                Tile t = LevelLoader.GetTile(x, y);
-
-                // if you somehow get to a hidden tile, reveal it
-                if (x == tileX && y == tileY && t.hidden)
+                if (!mapped[i])
                 {
-                    t.hidden = false;
-                }
-
-                if (t.hidden && !debugRevealMap)
-                {
-                    continue;
-                }
-
-                if (!debugRevealMap)
-                {
-                    int dx = x - tileX;
-                    int dy = y - tileY;
-                    // diagonal
-                    if (dx * dx + dy * dy == 2)
-                    {
-                        // can't look through solid wall of triangular tile
-                        if (x - tileX == xo[pt.type] && y - tileY == yo[pt.type])
-                        {
-                            continue;
-                        }
-                        // can't look through pinch point
-                        if (LevelLoader.GetTile(tileX + dx, tileY).type == 0
-                            && LevelLoader.GetTile(tileX, tileY + dy).type == 0)
-                        {
-                            continue;
-                        }
-                    }
-                }
-
-                if (!mapped[64 * y + x])
-                {
-                    mapped[64 * y + x] = true;
-                    if (t.type != 0)
-                    {
-                        PlayerObject.AddXP(1);
-                        ++PlayerData.sData.mapTilesRevealed;
-                    }
-                    UpdateTile(t, LevelLoader.sLevelLoader.loadedLevel);
+                    mapped[i] = true;
+                    UpdateTile(LevelLoader.GetTile(i % 64, i / 64), level);
                 }
             }
+            bg.SetPixels(col);
+            bg.Apply();
+            return;
+        }
+
+        if (level == 9)
+        {
+            return;
+        }
+
+        for (int i = 0; i < 64 * 64; ++i)
+        {
+            Tile t = LevelLoader.GetTile(i % 64, i / 64);
+            // A hidden tile already drawn was found: a save does not keep a found door, so a reload
+            // hides it again, and the map would show a wall across a tile it draws.
+            if (t.hidden && mapped[i])
+            {
+                MapScreen.RevealTile(t);
+            }
+            viewTypes[i] = t.hidden ? 0 : t.type;
+        }
+        int eyeX = Mathf.Clamp((int)(PlayerObject.Player.transform.position.x / Tile.xzScale * 256.0f), 0, 64 * 256 - 1);
+        int eyeY = Mathf.Clamp((int)(PlayerObject.Player.transform.position.z / Tile.xzScale * 256.0f), 0, 64 * 256 - 1);
+        int heading = Mathf.RoundToInt(PlayerObject.Player.transform.eulerAngles.y / 360.0f * 65536.0f) & 0xffff;
+
+        newlyDrawn.Clear();
+        view.Draw(viewTypes, eyeX, eyeY, heading, PlayerObject.MapLightLevel(), mapped, newlyDrawn);
+        if (newlyDrawn.Count == 0)
+        {
+            return;
+        }
+
+        // Only walkable tiles are ever drawn.
+        PlayerData.sData.mapTilesRevealed += newlyDrawn.Count;
+        PlayerObject.AddExplorationXP(newlyDrawn.Count * xpPerTile[level]);
+
+        foreach (int i in newlyDrawn)
+        {
+            UpdateTile(LevelLoader.GetTile(i % 64, i / 64), level);
         }
         bg.SetPixels(col);
         bg.Apply();
@@ -395,6 +481,8 @@ public class MapPage
 
     public Texture2D bg;
     internal Color[] col; // Internal: accessible within assembly but not exposed to Unity Inspector
+    private Color[] blank; // the parchment as Init() leaves it, for Redraw()
+    private bool needsRedraw; // wiped by Clear(), to be drawn from its mapped tiles
     
     public bool[] mapped = new bool[64 * 64];
 
@@ -789,6 +877,20 @@ public class MapScreen : MonoBehaviour
         sMapScreen.mapPages[LevelLoader.sLevelLoader.loadedLevel].RewriteTile(t);
     }
 
+    /// <summary>
+    /// A secret door found: the tile is no longer hidden, and the page is drawn again, so the tiles
+    /// around it drawn so far lose the wall they showed towards it.
+    /// </summary>
+    public static void RevealTile(Tile t)
+    {
+        t.hidden = false;
+        if (sMapScreen != null)
+        {
+            int level = LevelLoader.sLevelLoader.loadedLevel;
+            sMapScreen.mapPages[level].Redraw(level);
+        }
+    }
+
     private void DrawLegend(Texture2D[] icons, string[] labels, GUIStyle labelStyle)
     {
         float w = 32.0f * Screen.width / 320;
@@ -1090,8 +1192,12 @@ public class MapScreen : MonoBehaviour
                         mapPages[i].bg.SetPixels(mapPages[i].col);
                         mapPages[i].bg.Apply();
                     }
-                    // If level is not loaded yet, the map will be updated when the level is first loaded
-                    // (via MapScreen.Update() which calls UpdateTile as tiles are revealed)
+                    else
+                    {
+                        // The level is not loaded yet: the page is wiped of the game played before
+                        // and drawn the first time the level is (MapPage.Update()).
+                        mapPages[i].Clear();
+                    }
                 }
                 
                 // Restore notes from save data

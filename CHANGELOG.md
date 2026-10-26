@@ -2,6 +2,12 @@
 
 ## Current release
 
+- The map fills in with what your light shows as you go, as in the original: in the dark only the spot you stand on, with a torch a narrow trail, a wider one with Night Vision or Daylight, and nothing at all in the Void. Each new tile on the map pays experience that grows with the depth: the first level explored whole pays about a sixth of what it did, from the fourth down one and a half to almost three times as much, a little more than before over the whole dungeon, and the Void nothing.
+
+- A secret door not yet found no longer shows on the map as a gap in the wall.
+
+- Loading a save no longer leaves the map pages of other levels drawn as they were in the game played before.
+
 - The magic panel now opens with a parchment on the right listing the spells you know, by circle, each with its runes: at first the forty in the manual, then each of the others as you read its runes in a book or hear them in a conversation, or first cast it. A message tells you when one is added.
 
 - The Flameproof spell is now called Resist Fire, as in the manual, wherever the game shows its name, on enchanted items and potions too.
