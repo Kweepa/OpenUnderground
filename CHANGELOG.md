@@ -2,6 +2,8 @@
 
 ## Current release
 
+- Creatures swing as often as in the original, about every two and a quarter seconds instead of every three and a third, so fights are shorter and harder: the first goblin of the dungeon swings half again as often. A creature's critical blow now makes you flinch, with a harder shake, rumble and grunt, and sets back the attack you are charging, to the start of the red if it was charged, as your own critical blows already cost a creature its swing; and a creature always cries out at your critical blows.
+
 - Experience is earned as in the original: once your level is more than twice the depth plus two (above 4 on the first level), every gain is halved, and a marked creature pays about twice as much. Only your own kills pay, the silver sapling costs an eighth of your experience instead of a fifth, and a creature the dungeon brings back pays less each time it returns from the same place, and carries no loot after the first.
 
 - The Standard of Honor now fits in a pack, box or chest, and can be carried on a shoulder or in the shield hand, as in the original.

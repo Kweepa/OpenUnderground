@@ -1194,6 +1194,18 @@ public class Critter : UUObject
     private const float CombatStepPeriod = 0.25f;
 
     /// <summary>
+    /// The longest a creature stands in its combat stance before it swings again. In the original
+    /// a swing is five ticks from the decision to the blow (UW.EXE 0x1b138), the tick after the blow
+    /// decides again, and each deciding tick swings one time in four (0x197af, 0x19a09): blow to
+    /// blow is 0.25 * (5 + N) s with N geometric, 2.25 s on average, 1.5 s at least. Here the
+    /// swing's clip runs 1.85 s to its FinishedEvent(), so a stance of up to 0.8 s gives the same
+    /// average, 2.25 s, with a narrower spread; ending the swing a tick after its blow and rolling
+    /// on every tick would give the spread as well, but cuts the clip's follow-through. The stance
+    /// was 0.5-2.5 s, 3.35 s blow to blow, and the creatures swung 1.4 times more slowly.
+    /// </summary>
+    private const float StanceMaxSeconds = 0.8f;
+
+    /// <summary>
     /// One unit of a creature's speed in metres a second. The original moves a creature only on its
     /// tick, by speed * 47 (0x2b799 in 0x2b5dc) over the tick's 64 timer units (0x1616b), in sixteenths
     /// of an eighth of a tile (0x2c9a0, 0x2c621): 47/256 of a tile a second.
@@ -2126,6 +2138,67 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// The cry of a creature that takes a critical blow and lives, so that the player hears the
+    /// critical: its Flinch sound, or its Alert where it has none. Ours: the original's one sign of
+    /// the player's critical is a second blood splat (UW.EXE 0x24f88-0x24fc7), and a creature that
+    /// does not bleed shows nothing. A flinch whose clip plays the sound itself is left to the clip.
+    /// </summary>
+    private void PlayCriticalCry(bool flinching)
+    {
+        if (!HasSound(CritterSoundType.Flinch))
+        {
+            PlaySoundByEnum(CritterSoundType.Alert);
+        }
+        else if (!flinching || !FlinchClipPlaysSound())
+        {
+            PlaySoundByEnum(CritterSoundType.Flinch);
+        }
+    }
+
+    /// <summary>Whether this creature's sound data has a clip for the sound.</summary>
+    private bool HasSound(CritterSoundType soundType)
+    {
+        CritterSoundCategory[] sounds = GetSounds();
+        if (sounds != null)
+        {
+            foreach (CritterSoundCategory category in sounds)
+            {
+                if (category.soundType == soundType)
+                {
+                    return category.clips != null && category.clips.Length > 0;
+                }
+            }
+        }
+        return false;
+    }
+
+    private bool flinchSoundChecked;
+    private bool flinchClipSounds;
+
+    /// <summary>Whether a clip of this creature's animator plays its Flinch sound, as a flinch clip does.</summary>
+    private bool FlinchClipPlaysSound()
+    {
+        if (!flinchSoundChecked)
+        {
+            flinchSoundChecked = true;
+            RuntimeAnimatorController controller = cachedAnimator != null ? cachedAnimator.runtimeAnimatorController : null;
+            if (controller != null)
+            {
+                foreach (AnimationClip clip in controller.animationClips)
+                {
+                    foreach (AnimationEvent clipEvent in clip.events)
+                    {
+                        flinchClipSounds |= clipEvent.functionName == nameof(PlaySound)
+                            && clipEvent.stringParameter == nameof(CritterSoundType.Flinch);
+                    }
+                }
+            }
+        }
+
+        return flinchClipSounds;
+    }
+
     private bool attackLungeChecked;
     private bool attackHasLunge;
 
@@ -2425,7 +2498,7 @@ public class Critter : UUObject
             break;
         case EState.CombatIdle:
             slot = 0;
-            stateTime = Random.Range(0.5f, 2.5f);
+            stateTime = Random.Range(0.0f, StanceMaxSeconds);
             stanceAfterShot = afterShot;
             if (carryingStep)
             {
@@ -6259,6 +6332,10 @@ public class Critter : UUObject
             chaseBlocked = false;
         }
 
+        // A critical blow makes the creature flinch and lose the swing it was making. Ours: the
+        // original has no flinch, and a creature hit mid-swing still strikes (UW.EXE 0x1c2d2 writes
+        // no action or phase). A creature's critical on the player costs the player his charge in
+        // return (PlayerObject.DamageFromBlow()).
         bool flinching = false;
         if (result == Skills.ESkillTestResult.CriticalSuccess && hp > 0 && !returningHome)
         {
@@ -6267,6 +6344,11 @@ public class Critter : UUObject
                 SetState(EState.Flinch);
                 flinching = true;
             }
+        }
+
+        if (result == Skills.ESkillTestResult.CriticalSuccess && hp > 0)
+        {
+            PlayCriticalCry(flinching);
         }
 
         if (!flinching && !returningHome && state is EState.Wander or EState.TurnToWander or EState.Approach or EState.TurnToApproach)
@@ -7031,7 +7113,7 @@ public class Critter : UUObject
                 // resists poison (UW.EXE 0x259ee at 0x25aba-0x25afc).
                 bool poisoning = poison > PlayerData.sData.poison && PlayerObject.TryPoison(poison);
                 damage = PlayerObject.Player.AbsorbWithArmour(damage, bodyPart);
-                PlayerObject.Player.Damage(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage, Resistance.Blow);
+                PlayerObject.Player.DamageFromBlow(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage, Resistance.Blow);
             }
             else
             {

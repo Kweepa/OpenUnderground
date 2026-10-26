@@ -680,7 +680,12 @@ public class PlayerObject : MonoBehaviour
         }
     }
 
-    private void PlayDamageGrunt(float volume)
+    /// <summary>
+    /// A grunt for a blow taken. With <paramref name="flinch"/> it is pitched down (FlinchGruntPitch)
+    /// at full volume: any blow of 2 points or more already grunts at full volume, so only the pitch
+    /// tells a critical apart.
+    /// </summary>
+    private void PlayDamageGrunt(float volume, bool flinch = false)
     {
         AudioClip[] g = PlayerData.sData.female ? grunts : maleGrunts;
         if (g.Length > 0)
@@ -693,9 +698,19 @@ public class PlayerObject : MonoBehaviour
 
             lastGrunt = i;
 
-            Utils.PlayClip2d(g[i], volume);
+            if (flinch)
+            {
+                Utils.PlayClip2dAtPitch(g[i], FlinchGruntPitch, 1.0f);
+            }
+            else
+            {
+                Utils.PlayClip2d(g[i], volume);
+            }
         }
     }
+
+    /// <summary>The pitch of the grunt when the player flinches (DamageFromBlow()), against 0.9-1.1 for any blow.</summary>
+    private const float FlinchGruntPitch = 0.7f;
 
     private float lastGoodFloorCheckTime;
     private bool lastFloorCheckHit;
@@ -821,10 +836,17 @@ public class PlayerObject : MonoBehaviour
 
     private bool IsWeaponBlockingSprint()
     {
+        WeaponBase weapon = GetHeldWeapon();
+        return weapon != null && weapon.IsSprintBlocked();
+    }
+
+    /// <summary>The weapon in the weapon hand, or the fist when it holds none.</summary>
+    private static WeaponBase GetHeldWeapon()
+    {
         EInvSlot slot = PlayerData.sData.leftHanded ? EInvSlot.LeftHand : EInvSlot.RightHand;
         WeaponBase weapon = Inventory.sInv.invSlotContents[(int)slot] as WeaponBase;
         if (weapon == null) weapon = Inventory.sInv.fist;
-        return weapon != null && weapon.IsSprintBlocked();
+        return weapon;
     }
 
     /// <summary>
@@ -1882,10 +1904,24 @@ public class PlayerObject : MonoBehaviour
     }
 
     /// <summary>
-    /// <see cref="Damage(Skills.ESkillTestResult, int, EDamageType, int)"/>, with the grunt and with
-    /// the rumble and the screen shake each left out when false: the poison's pulses use it.
+    /// A creature's blow in melee (Critter.TryDamageTarget()): <see cref="Damage(Skills.ESkillTestResult, int, EDamageType, int)"/>,
+    /// and a critical one that reaches the hit points makes the player flinch: a harder rumble, shake
+    /// and grunt, and the attack being charged is set back (WeaponBase.LoseCharge()). Ours: the original shows
+    /// nothing for a creature's critical on the player. It answers the creatures' own flinch on the
+    /// player's criticals (Critter.TryDamage()), which the original does not have either.
     /// </summary>
-    private void Damage(Skills.ESkillTestResult result, int damage, EDamageType damageType, int mask, bool grunt, bool shake)
+    public void DamageFromBlow(Skills.ESkillTestResult result, int damage, EDamageType damageType, int mask)
+    {
+        Damage(result, damage, damageType, mask, true, true, result == Skills.ESkillTestResult.CriticalSuccess);
+    }
+
+    /// <summary>
+    /// <see cref="Damage(Skills.ESkillTestResult, int, EDamageType, int)"/>, with the grunt and with
+    /// the rumble and the screen shake each left out when false: the poison's pulses use it. With
+    /// <paramref name="flinch"/>, the flinch of <see cref="DamageFromBlow"/>.
+    /// </summary>
+    private void Damage(Skills.ESkillTestResult result, int damage, EDamageType damageType, int mask, bool grunt, bool shake,
+        bool flinch = false)
     {
         if (damage > 0)
         {
@@ -1915,6 +1951,7 @@ public class PlayerObject : MonoBehaviour
             {
                 Die();
             }
+            flinch = flinch && !PlayerData.sData.dead;
 
             DamageFlash flash = mainCamera.GetComponentInChildren<DamageFlash>();
             if (flash != null)
@@ -1924,7 +1961,14 @@ public class PlayerObject : MonoBehaviour
 
             if (shake)
             {
-                Rumble(0.1f, 0.2f, 0.3f);
+                if (flinch)
+                {
+                    Rumble(0.5f, 0.8f, 0.5f);
+                }
+                else
+                {
+                    Rumble(0.1f, 0.2f, 0.3f);
+                }
 
                 // A blow makes the player louder for a while (UW.EXE 0x24eca).
                 blowNoiseTime = Mathf.Max(blowNoiseTime, 0.25f * damage);
@@ -1932,7 +1976,16 @@ public class PlayerObject : MonoBehaviour
 
             if (grunt)
             {
-                PlayDamageGrunt(Math.Min(0.75f + damage / 8.0f, 1.0f));
+                PlayDamageGrunt(Math.Min(0.75f + damage / 8.0f, 1.0f), flinch);
+            }
+
+            if (flinch)
+            {
+                WeaponBase weapon = GetHeldWeapon();
+                if (weapon != null)
+                {
+                    weapon.LoseCharge();
+                }
             }
 
             // try to damage armour - not by lava, which in the original wears nothing
@@ -1948,10 +2001,13 @@ public class PlayerObject : MonoBehaviour
             
             if (shake)
             {
-                GetComponentInChildren<ScreenShake>().Shake();
+                GetComponentInChildren<ScreenShake>().Shake(flinch ? FlinchShake : 1.0f);
             }
         }
     }
+
+    /// <summary>How much harder the screen shakes when the player flinches (DamageFromBlow()).</summary>
+    private const float FlinchShake = 1.6f;
 
     /// <summary>
     /// A spell that backfires: <paramref name="dice"/>d8 taken straight off the hit points, with
