@@ -113,6 +113,13 @@ public class RangedWeapon : WeaponBase
         }
     }
 
+    public override void LoseCharge()
+    {
+        base.LoseCharge();
+        // A whirling sling takes up its whirl again from where the hold now is, and its swooshes with it.
+        swooshNum = 0;
+    }
+
     public override void Update()
     {
         base.Update();

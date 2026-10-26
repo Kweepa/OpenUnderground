@@ -684,6 +684,22 @@ public class WeaponBase : UUObject
         return Mathf.Clamp(steps * GetWeaponSpeed(), 0, 100);
     }
 
+    /// <summary>
+    /// The player's flinch at a creature's critical blow (PlayerObject.DamageFromBlow()), while the
+    /// button stays down: an attack still in its wind-up, the cursor grey, starts again from nothing;
+    /// one already charged, red or more, goes back to its first step, the start of the red, so the
+    /// wind-up is not lost too (the user's rule of 26 October 2026). A swing already let go is not
+    /// touched.
+    /// </summary>
+    public virtual void LoseCharge()
+    {
+        if (state == EState.Prepare)
+        {
+            prepareTime = GetChargePercent() > 0 ? WindUpSeconds + ChargeStepSeconds : 0.0f;
+            WeaponChargeGem.sChargeGem.power = GetChargePercent() / 100.0f;
+        }
+    }
+
     private void TryStartAttack(bool announce)
     {
         if (CanStartAttack(announce))

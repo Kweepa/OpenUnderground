@@ -18,9 +18,13 @@ public class ScreenShake : MonoBehaviour
         lastShakeTime = -shakeFrequency;
     }
 
-    public void Shake()
+    // How hard the current shake is, as a multiple of shakeMagnitude
+    private float shakeStrength = 1.0f;
+
+    public void Shake(float strength = 1.0f)
     {
         shakeTimer = shakeDuration;
+        shakeStrength = strength;
         currentRoll = 0.0f; // Start from zero roll
     }
 
@@ -31,7 +35,7 @@ public class ScreenShake : MonoBehaviour
             // Update target roll at the specified frequency
             if (Time.time - lastShakeTime >= 1.0f / shakeFrequency)
             {
-                targetRoll = Random.Range(-1.0f, 1.0f) * shakeMagnitude; // New random target
+                targetRoll = Random.Range(-1.0f, 1.0f) * shakeMagnitude * shakeStrength; // New random target
                 lastShakeTime = Time.time;
             }
 
