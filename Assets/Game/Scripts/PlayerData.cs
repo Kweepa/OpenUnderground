@@ -59,6 +59,8 @@ public class PlayerData : MonoBehaviour
     public int maxMana;
     public int mana;
     public int xp;
+    // What exploring has earned below a whole unit, paid once it adds up to one (PlayerObject.AddExplorationXP()).
+    public float explorationXpFraction;
     public int charLevel = 1;
     // One, not three: character creation writes a single point (UW.EXE 0x6c84e,
     // movb $0x1, 0x52(%bx), right beside the level being set to 1 and the experience

@@ -541,8 +541,7 @@ public class Door : Lockable
 
             if (initialTile.hidden)
             {
-                initialTile.hidden = false;
-                MapScreen.UpdateTile(initialTile);
+                MapScreen.RevealTile(initialTile);
             }
 
             if (type is EObjectType.Portcullis)
@@ -811,6 +810,12 @@ public class Door : Lockable
         {
             opening = doorData.opening;
             openAmount = doorData.openAmount;
+
+            // a secret door saved open was found: the level's loading hid its tile again
+            if (opening && initialTile != null && initialTile.hidden)
+            {
+                MapScreen.RevealTile(initialTile);
+            }
         }
     }
 

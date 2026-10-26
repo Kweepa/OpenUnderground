@@ -1134,6 +1134,7 @@ public class SaveGameManager : MonoBehaviour
         data.maxMana = playerData.maxMana;
         data.mana = playerData.mana;
         data.xp = playerData.xp;
+        data.explorationXpFraction = playerData.explorationXpFraction;
         data.charLevel = playerData.charLevel;
         data.skillPoints = playerData.skillPoints;
         data.skillPointsXpTier = playerData.skillPointsXpTier;
@@ -1307,6 +1308,7 @@ public class SaveGameManager : MonoBehaviour
         playerData.maxMana = data.maxMana;
         playerData.mana = data.mana;
         playerData.xp = data.xp;
+        playerData.explorationXpFraction = data.explorationXpFraction;
         playerData.charLevel = data.charLevel;
         // max with current display XP so older saves missing this field do not backdate awards
         playerData.skillPointsXpTier = Mathf.Max(data.skillPointsXpTier, data.xp / 20 / 300);

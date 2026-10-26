@@ -76,6 +76,7 @@ public class PlayerSaveData
     public int maxMana;
     public int mana;
     public int xp;
+    public float explorationXpFraction;
     public int charLevel;
     public int skillPoints;
     public int skillPointsXpTier;

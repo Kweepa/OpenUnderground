@@ -516,6 +516,21 @@ public class PlayerObject : MonoBehaviour
     }
 
     /// <summary>
+    /// The light the view is drawn with, on the original's scale 0 to 7: the player's light, and Night
+    /// Vision at 5, which lights his eyes (UW.EXE 0x7e444, 0x7e007). It sets how far the automap reaches
+    /// and how much of it is drawn (AutomapView).
+    /// </summary>
+    public static int MapLightLevel()
+    {
+        int level = PlayerLightLevel();
+        if (Magic.sMagic != null && Magic.sMagic.IsSpellActive(Magic.ESpell.NightVision))
+        {
+            level = Mathf.Max(level, 5);
+        }
+        return level;
+    }
+
+    /// <summary>
     /// The Sneak the noise, Critter.SneaksPastNearHearing() and the surprise blow go by: the skill, or 30
     /// under Stealth. The original's Stealth takes the noise base to 0 (UW.EXE 0x7e31d), quieter than any
     /// Sneak reaches; here it is a Sneak of 30, so it gives the roll and not silence: the user's choice,
@@ -2235,8 +2250,7 @@ public class PlayerObject : MonoBehaviour
     /// The original halves every gain then, g / 2 + 1 (UW.EXE 0x3424a, in the accumulator 0x341d8):
     /// on level 1 a character earns in full up to his level 4, on level 4 up to his level 10. A
     /// remake unit is half an original one, so the same halving is (x / 4 + 1) * 2 here, never more
-    /// than the gain itself: the original gets a gain of one unit or two through whole, and so does
-    /// the map's single point.
+    /// than the gain itself: the original gets a gain of one unit or two through whole.
     /// </remarks>
     public static void AddXP(int xpToAdd)
     {
@@ -2248,6 +2262,26 @@ public class PlayerObject : MonoBehaviour
             }
 
             PlayerData.sData.xp += xpToAdd;
+            ApplyXpProgress();
+        }
+    }
+
+    /// <summary>
+    /// Adds the experience of exploring, a fraction of a unit a tile on the upper levels: the
+    /// fractions add up in PlayerData.explorationXpFraction and are paid as whole units.
+    /// </summary>
+    /// <remarks>
+    /// Without the halving of AddXP(), ours: the original halves exploration too, but a level is
+    /// rarely left half explored for a character to come back to once far above it.
+    /// </remarks>
+    public static void AddExplorationXP(float xpToAdd)
+    {
+        PlayerData.sData.explorationXpFraction += xpToAdd;
+        int whole = (int)PlayerData.sData.explorationXpFraction;
+        PlayerData.sData.explorationXpFraction -= whole;
+        if (whole > 0 && PlayerData.sData.charLevel < 16)
+        {
+            PlayerData.sData.xp += whole;
             ApplyXpProgress();
         }
     }
