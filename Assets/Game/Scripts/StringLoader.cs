@@ -127,6 +127,10 @@ public class StringLoader
         new [] { "the Cup of Wonder.\n", "the Cup of Wonder" },
         new [] { "the Sword of Justice.\n", "the Sword of Justice" },
         new [] { "the Ring of Humility.\n", "the Ring of Humility" },
+        // The manual calls Sanct Flam "Resist Fire", and the strings file "Flameproof" - in block 6,
+        // as the spell (278), the enchantment of an item (54) and an effect (394), its only three
+        // uses. The spell lets part of the fire through, as the manual's name says.
+        new [] { "Flameproof", "Resist Fire" },
     };
 
     // Cache this at the class level to reuse the memory buffer

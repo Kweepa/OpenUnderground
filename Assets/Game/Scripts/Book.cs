@@ -154,6 +154,7 @@ public class Book : UUObject
             {
                 int messageIndex = special - 512;
                 Messages.Add(3, messageIndex);
+                Magic.LearnSpellsFromText(3, messageIndex);
                 if (!read)
                 {
                     ++PlayerData.sData.booksRead;

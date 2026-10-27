@@ -25,6 +25,7 @@ This project is a wrapper for the well-known 1992 dungeon crawler by Blue Sky Pr
   - every few seconds the Search skill looks for you, and points out possible secrets and trapped objects in front of you
   - every few seconds the Track skill tells you of creatures nearby, and in which direction
   - a history of the last hundred messages: Page Up and Page Down, or the d-pad, scroll back through what you missed
+  - a list of the spells you know beside the magic panel, with their runes: those in the manual from the start, the others as you find them
 
 **Faithful to the original**
 
