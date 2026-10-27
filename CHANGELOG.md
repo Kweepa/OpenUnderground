@@ -2,6 +2,10 @@
 
 ## Current release
 
+- The magic panel now opens with a parchment on the right listing the spells you know, by circle, each with its runes: at first the forty in the manual, then each of the others as you read its runes in a book or hear them in a conversation, or first cast it. A message tells you when one is added.
+
+- The Flameproof spell is now called Resist Fire, as in the manual, wherever the game shows its name, on enchanted items and potions too.
+
 - Creatures swing as often as in the original, about every two and a quarter seconds instead of every three and a third, so fights are shorter and harder: the first goblin of the dungeon swings half again as often. A creature's critical blow now makes you flinch, with a harder shake, rumble and grunt, and sets back the attack you are charging, to the start of the red if it was charged, as your own critical blows already cost a creature its swing; and a creature always cries out at your critical blows.
 
 - Experience is earned as in the original: once your level is more than twice the depth plus two (above 4 on the first level), every gain is halved, and a marked creature pays about twice as much. Only your own kills pay, the silver sapling costs an eighth of your experience instead of a fifth, and a creature the dungeon brings back pays less each time it returns from the same place, and carries no loot after the first.
@@ -160,7 +164,7 @@
 
 - The potion of Poison Resistance now works, for about five minutes, and casting Curse now curses the creatures in front of you; before, both did nothing.
 
-- The spell icons are no longer stretched sideways, so Flameproof's sphere is round again. Poison Resistance, Magic Protection, Regeneration, Mana Regeneration and the dragon skin boots now show an icon when worn, and a few icons move gently, like the Light icon, at the same pace on any screen.
+- The spell icons are no longer stretched sideways, so Resist Fire's sphere is round again. Poison Resistance, Magic Protection, Regeneration, Mana Regeneration and the dragon skin boots now show an icon when worn, and a few icons move gently, like the Light icon, at the same pace on any screen.
 
 - Lava now burns 16 to 24 percent of your hit points every second, so about five seconds in it kill, where before it barely hurt; it no longer damages your armour. It now matters to creatures too: one that wanders stops at its edge, one that chases you may cut across it and is burnt on the way, and one left standing in it burns and walks out; the fire elemental walks in it freely. And lava spares what it spares in the original: keys and rune stones come through, while a moonstone burns; a burning sack, pack, box or pouch spills what it holds into the lava first.
 
@@ -168,7 +172,7 @@
 
 - Poison works as in the original: a venomous bite always poisons you, the poison does its level in damage every minute, one point at a time, and then weakens by one, and sleeping pays what is left at once.
 
-- Flameproof and Poison Resistance let a third of the damage through, and Poison Resistance does not stop acid; the dragon skin boots still keep lava off entirely.
+- Resist Fire and Poison Resistance let a third of the damage through, and Poison Resistance does not stop acid; the dragon skin boots still keep lava off entirely.
 
 - Resist Blows, Thick Skin and Iron Flesh now take 1, 2 and 3 points off every blow, down from 2, 3 and 5, whether cast or worn. The original's data says 2, 3 and 5, but the code in the original makes them do nothing at all; at 2, a first-circle spell shrugged off most bites on the first level.
 

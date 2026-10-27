@@ -314,7 +314,7 @@ public class PlayerPanelInput : MonoBehaviour
             {
                 return false;
             }
-            if (r.Contains(gui))
+            if (r.Contains(gui) || Magic.sMagic.SpellListContains(gui))
             {
                 return false;
             }

@@ -787,6 +787,7 @@ public partial class Conversation
             case EOp.Say:
                 s0 = Pop();
                 AddDelayedText(MakeSubstitutions(s0));
+                Magic.LearnSpellsFromText(stringBlock, s0);
                 disassemble.AppendLine("    // " + StringLoader.GetString(stringBlock, s0));
                 break;
             case EOp.Respond:

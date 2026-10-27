@@ -46,6 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cursor: {fileID: 2800000, guid: 5297c3d9cfb4892469cd884dfc2a69c2, type: 3}
   font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
+  runeFont: {fileID: 12800000, guid: e6e2fff8c5bf0224281f08f969cd40f2, type: 3}
   aButton: {fileID: 2800000, guid: b6511337e45c0fb41bcd61af323b2ce9, type: 3}
   bButton: {fileID: 2800000, guid: 30ef8c8f932fbcc4c99ee7b9b89dffc8, type: 3}
   xButton: {fileID: 2800000, guid: fc5689391c16d3542969bd5aa2fc51cf, type: 3}

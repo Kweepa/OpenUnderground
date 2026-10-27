@@ -57,6 +57,10 @@ public class MagicSaveData
     /// <summary>Parallel to Magic.castSpells (spell cast tracking / achievements). Null in older saves.</summary>
     public bool[] castSpells;
 
+    /// <summary>Parallel to Magic.learnedSpells: the spells the manual leaves out that the player has
+    /// read in the game. Null in older saves, where only the spells already cast are on the list.</summary>
+    public bool[] learnedSpells;
+
     /// <summary>Mouse-only primed aim after rune success; mana not yet spent. Missing in older saves: JsonUtility defaults to false.</summary>
     public bool hasMousePrimedSpell;
 
@@ -80,6 +84,8 @@ public class Magic : MonoBehaviour
 {
     public Texture cursor;
     public Font font;
+    /// <summary>The runes of the spell list: Britannian Runes I, whose capitals are the runes.</summary>
+    public Font runeFont;
     public Texture2D aButton;
     public Texture2D bButton;
     public Texture2D xButton;
@@ -478,6 +484,193 @@ public class Magic : MonoBehaviour
     private readonly List<SPermanentSpell> permanentSpells = new();
 
     public readonly bool[] castSpells = new bool[spells.Count];
+
+    /// <summary>
+    /// The spells the manual leaves out that the player has read in the game; see
+    /// <see cref="LearnSpellsFromText"/>. With the manual's and the ones cast, they make the spell list.
+    /// </summary>
+    public readonly bool[] learnedSpells = new bool[spells.Count];
+
+    /// <summary>
+    /// The one spell of each circle the manual does not list (its pages 28-29 give five of the six):
+    /// the player has to find these in the game.
+    /// </summary>
+    private static readonly ESpell[] spellsNotInTheManual =
+    {
+        ESpell.Leap, ESpell.Curse, ESpell.ThickSkin, ESpell.WaterWalk,
+        ESpell.SmiteUndead, ESpell.SheetLightning, ESpell.SummonMonster, ESpell.Armageddon
+    };
+
+    /// <summary>A text of STRINGS.PAK, by block and string, and the spell whose runes it gives.</summary>
+    private readonly struct SpellText
+    {
+        public readonly int block;
+        public readonly int index;
+        public readonly ESpell spell;
+
+        public SpellText(int block, int index, ESpell spell)
+        {
+            this.block = block;
+            this.index = index;
+            this.spell = spell;
+        }
+    }
+
+    /// <summary>
+    /// The texts of the game that give the runes of a spell the manual leaves out, as STRINGS.PAK
+    /// block and string: block 3 holds the books and scrolls, 0x0e00 plus a conversation's number its
+    /// lines. Read or heard, they put the spell on the list. Curse, Thick Skin and Summon Monster
+    /// have none - no text in the strings file names their runes (searched for each rune pair in every
+    /// block) - so they go on the list when they are first cast.
+    /// </summary>
+    private static readonly SpellText[] spellTexts =
+    {
+        new(3, 4, ESpell.Leap), // "Uus Por for large jumps"
+        new(3, 196, ESpell.Leap), // "In Lor, Bet In Sanct, Ort Jux, In Mani Ylem, Sanct Hur, Uus Por, ..."
+        new(3, 69, ESpell.WaterWalk), // "... For walk water, Ylem Por do."
+        new(3, 132, ESpell.SmiteUndead), // "An Corp Mani deals great blows to undead."
+        new(0x0e19, 15, ESpell.SheetLightning), // "... it is cast by using the Vas, Ort and Grav runestones."
+        new(0x0e19, 37, ESpell.SheetLightning), // the same, asked again
+        new(0x0f3a, 10, ESpell.Armageddon), // "... the spell Vas Kal Corp will bring an end to life ..."
+    };
+
+    /// <summary>Puts on the spell list any spell whose runes the text just read or heard gives.</summary>
+    public static void LearnSpellsFromText(int block, int index)
+    {
+        if (sMagic == null)
+        {
+            return;
+        }
+
+        foreach (SpellText text in spellTexts)
+        {
+            if (text.block == block && text.index == index)
+            {
+                sMagic.AddToSpellList((int)text.spell);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether a spell is on the spell list: one of the 48 that can be cast, and either in the manual,
+    /// read in the game or already cast.
+    /// </summary>
+    private bool IsOnSpellList(int i)
+    {
+        if (!IsCastableSpell(i))
+        {
+            return false;
+        }
+
+        return System.Array.IndexOf(spellsNotInTheManual, (ESpell)i) < 0 || learnedSpells[i] || castSpells[i];
+    }
+
+    /// <summary>The eight circles of six: block 6 names them from 256, six to a circle.</summary>
+    private static bool IsCastableSpell(int i) => spells[i].stringIndex >= 256 && spells[i].stringIndex < 256 + 8 * 6;
+
+    /// <summary>
+    /// A spell's circle as the manual gives it, the grouping of block 6, six names to a circle: not
+    /// <see cref="SSpell.circle"/>, which comes from the cost and differs for five spells.
+    /// </summary>
+    private static int SpellListCircle(int i) => (spells[i].stringIndex - 256) / 6 + 1;
+
+    /// <summary>Made on the first draw, never in the constructor: see the styles in <see cref="SpellListPanel"/>.</summary>
+    private SpellListPanel spellListPanel;
+    private List<SpellListPanel.Entry> spellListEntries;
+    private ulong spellListMask;
+
+    /// <summary>
+    /// Names too long for the spell list's columns, and the short form it writes instead; matched on
+    /// the name from the strings file, so a translated name is left as it is.
+    /// </summary>
+    private static readonly Dictionary<string, string> spellListShortNames = new()
+    {
+        { "Name Enchantment", "Name Enchant." },
+    };
+
+    /// <summary>
+    /// The spell list's entries, all 48 spells that can be cast with whether each is known, by circle
+    /// and then by name; built again when a spell joins the list.
+    /// </summary>
+    private List<SpellListPanel.Entry> GetSpellListEntries()
+    {
+        ulong mask = 0;
+        for (int i = 0; i < spells.Count && i < 64; ++i)
+        {
+            if (IsOnSpellList(i))
+            {
+                mask |= 1UL << i;
+            }
+        }
+
+        if (spellListEntries != null && mask == spellListMask)
+        {
+            return spellListEntries;
+        }
+
+        spellListMask = mask;
+        spellListEntries = new List<SpellListPanel.Entry>();
+        for (int i = 0; i < spells.Count && i < 64; ++i)
+        {
+            if (IsCastableSpell(i))
+            {
+                spellListEntries.Add(new SpellListPanel.Entry
+                {
+                    circle = SpellListCircle(i), runes = spells[i].runes,
+                    name = spellListShortNames.TryGetValue(spells[i].name, out string shortName) ? shortName : spells[i].name,
+                    known = (mask & (1UL << i)) != 0
+                });
+            }
+        }
+
+        spellListEntries.Sort((a, b) => a.circle != b.circle
+            ? a.circle.CompareTo(b.circle)
+            : string.CompareOrdinal(a.name, b.name));
+        return spellListEntries;
+    }
+
+    /// <summary>Spells that have just joined the list, to be told once no conversation is running.</summary>
+    private readonly List<int> spellListAnnouncements = new();
+
+    /// <summary>
+    /// Marks a spell as learned. One that was not on the list yet is announced: after the text that
+    /// taught it, or after the cast.
+    /// </summary>
+    private void AddToSpellList(int i)
+    {
+        bool wasOnList = IsOnSpellList(i);
+        learnedSpells[i] = true;
+        if (!wasOnList && IsOnSpellList(i))
+        {
+            spellListAnnouncements.Add(i);
+        }
+    }
+
+    /// <summary>
+    /// Tells the spells that joined the list. In a conversation the lines are shown one by one with a
+    /// pause, so a message added at once would come before the line that taught the spell; it waits
+    /// for the conversation to end.
+    /// </summary>
+    private void AnnounceSpellListAdditions()
+    {
+        if (spellListAnnouncements.Count == 0 || Conversations.runningConversation != null)
+        {
+            return;
+        }
+
+        foreach (int i in spellListAnnouncements)
+        {
+            Messages.Add($"{spells[i].name} has been added to your spell list.");
+        }
+
+        spellListAnnouncements.Clear();
+    }
+
+    /// <summary>Whether a point is on the spell list, which belongs to the magic panel for an outside click.</summary>
+    public bool SpellListContains(Vector2 guiPoint)
+    {
+        return lerpIn >= 0.02f && SpellListPanel.GetRect(lerpIn).Contains(guiPoint);
+    }
 
     /// <summary>How often a worn Regeneration or Mana Regeneration gives its point: one world tick.</summary>
     private const int RegenerationSeconds = 20;
@@ -1014,6 +1207,8 @@ public class Magic : MonoBehaviour
 
     public void Update()
     {
+        AnnounceSpellListAdditions();
+
         if (suppressWorldMousePrimaryUntilReleased)
         {
             Mouse mouse = Mouse.current;
@@ -1943,6 +2138,8 @@ public class Magic : MonoBehaviour
                     Utils.PlayClip2d(castFailed);
                     break;
                 case Skills.ESkillTestResult.Success:
+                    // runes that worked go on the spell list, whatever happens to the spell next
+                    AddToSpellList(i);
                     if (TryBeginMousePrimedSpellAfterRuneSuccess(i, false) || MissileHasNoRoom(i, null))
                     {
                         break;
@@ -1954,6 +2151,7 @@ public class Magic : MonoBehaviour
                     castSpells[i] = true;
                     break;
                 case Skills.ESkillTestResult.CriticalSuccess:
+                    AddToSpellList(i);
                     if (TryBeginMousePrimedSpellAfterRuneSuccess(i, true) || MissileHasNoRoom(i, null))
                     {
                         break;
@@ -4270,6 +4468,9 @@ public class Magic : MonoBehaviour
                     }
                 }
             }
+
+            spellListPanel ??= new SpellListPanel();
+            spellListPanel.Draw(lerpIn, GetSpellListEntries(), font, runeFont);
         }
 
         // for now draw health flask here
@@ -4305,6 +4506,8 @@ public class Magic : MonoBehaviour
         {
             saveData.castSpells[i] = castSpells[i];
         }
+
+        saveData.learnedSpells = (bool[])learnedSpells.Clone();
         
         // Save active spells
         foreach (SActiveSpell activeSpell in activeSpells)
@@ -4352,6 +4555,11 @@ public class Magic : MonoBehaviour
         for (int i = 0; i < castSpells.Length; i++)
         {
             castSpells[i] = data.castSpells != null && i < data.castSpells.Length && data.castSpells[i];
+        }
+
+        for (int i = 0; i < learnedSpells.Length; i++)
+        {
+            learnedSpells[i] = data.learnedSpells != null && i < data.learnedSpells.Length && data.learnedSpells[i];
         }
         
         // Clear and restore active spells
