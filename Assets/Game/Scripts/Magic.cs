@@ -580,8 +580,10 @@ public class Magic : MonoBehaviour
     private ulong spellListMask;
 
     /// <summary>
-    /// Names too long for the spell list's columns, and the short form it writes instead; matched on
-    /// the name from the strings file, so a translated name is left as it is.
+    /// Names too long for the spell list's columns, and the short form the list writes instead; the
+    /// rest of the game keeps the full name. Matched on the name from the strings file, so the table
+    /// holds every language's: a translation adds its own long names here. A name with no short form
+    /// is written smaller to fit, down to SpellListPanel's smallest size, and cut short beyond it.
     /// </summary>
     private static readonly Dictionary<string, string> spellListShortNames = new()
     {

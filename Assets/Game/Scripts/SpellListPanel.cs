@@ -4,8 +4,9 @@ using UnityEngine;
 /// <summary>
 /// The spells the player knows, on a sheet of parchment that comes in on the right while the magic
 /// panel is open: by circle, the first four in the left column and the rest in the right, each spell
-/// as its runes and its name. The original has no such list - players keep their own notes - so
-/// this is an addition; which spells it holds is up to <see cref="Magic"/>.
+/// as its name and then its runes, as the printed manual lists them. The original has no such list -
+/// players keep their own notes - so this is an addition; which spells it holds is up to
+/// <see cref="Magic"/>.
 /// </summary>
 /// <remarks>
 /// The parchment is cut from the original's blank map, BLNKMAP.BYT, the player's own copy, so nothing
@@ -50,29 +51,45 @@ public class SpellListPanel
     // play: the left column starts at the left margin and the right one ends at the right margin, and
     // the gap between them is what is left.
     private const float TopMargin = 19;
-    private const float LeftMargin = 48;
-    private const float RightMargin = 25;
+    private const float LeftMargin = 38;
+    private const float RightMargin = 26;
 
     // The rune glyphs of Britannian Runes I are 0.588 of its em tall, the capitals of the Avatar font
     // 0.733 of its own (the fonts' tables): at 0.733 / 0.588 the runes would be as tall as the
     // capitals, and they are drawn 30% larger than that, and bold, to stand out.
-    private const float RuneScale = 1.3f * 0.733f / 0.588f;
+    private const float NameCapHeight = 0.733f;
+    private const float RuneScale = 1.3f * NameCapHeight / 0.588f;
 
     // The runes are in the orange of the menus, #BB7B01: the yellow of the runes carved on the
     // runestones (OBJECTS.GR 232-255, colour 161 of palette 0, #F2AC0C) is too bright on the parchment.
     private static readonly Color RuneInk = new(0xbb / 255f, 0x7b / 255f, 0x01 / 255f);
 
-    // How tall a rune glyph is, in ems of its font: 61 to 2470 of 4096 (the glyphs' bounding boxes).
+    // How tall a rune glyph is, in ems of its font: 61 to 2470 of 4096 above the baseline (the glyphs'
+    // bounding boxes), so its middle is at 1265.5.
     private const float RuneGlyphHeight = (2470f - 61) / 4096;
+    private const float RuneGlyphMiddle = (2470f + 61) / 2 / 4096;
 
     // Baselines from the top of a line, in ems, from the fonts' ascenders: Avatar 1948 of 2048, the
     // runes 2863 of 4096. Unity lays a dynamic font's line from its ascender (ascentCalculationMode 1
-    // on both fonts), so a rune line moves down by the difference to sit on the names' baseline.
+    // on both fonts), so a rune line moves by the difference to put the runes' middle on the middle
+    // of the names' capitals.
     private const float NameAscent = 1948f / 2048;
     private const float RuneAscent = 2863f / 4096;
 
-    // The size of the names and headings: fixed, the gap between the columns taking what is left.
+    // The size of the names and headings, and the smallest a long one is made to fit its place, chosen
+    // in play: below it the Avatar font is hard to read. A name too long even at the smallest size is
+    // cut short at the runes; the cure is a shorter form for the list (Magic.spellListShortNames).
     private const int FontSize = 16;
+    private const int MinFontSize = 11;
+
+    // The columns are fixed, so a longer name - another language's - is written smaller, alone, and
+    // nothing moves. Their widths, in screen pixels, are the English list's at FontSize as Unity
+    // measures it: the longest names, Strengthen Door on the left (111.14) and Missile Protection on the
+    // right (118.78), and the widest runes, three in bold (40.5). A column is an indent, its names, a
+    // gap and the runes.
+    private const float LeftNamesWidth = 111.5f;
+    private const float RightNamesWidth = 119;
+    private const float RunesWidth = 40.5f;
 
     // The ink of the names and headings, #190E06, chosen in play: a very dark brown, near the map's own
     // writing (MapScreen, 0.2, 0.1, 0.1).
@@ -86,9 +103,9 @@ public class SpellListPanel
     private List<Entry> laidOutEntries;
     private float lineStep;
     private float headingGap;
-    private float runesWidth;
-    private float leftColumnWidth;
-    private float rightColumnWidth;
+    // the size each entry's name is written at, in the entries' order, and each circle's heading
+    private readonly List<int> nameSizes = new();
+    private readonly int[] headingSizes = new int[2 * LastCircleOnTheLeft + 1];
     // Made on the first draw: Unity refuses a GUIStyle's settings from a MonoBehaviour's constructor,
     // and this panel belongs to one, Magic.
     private GUIStyle nameStyle;
@@ -135,8 +152,8 @@ public class SpellListPanel
 
         if (nameStyle == null)
         {
-            nameStyle = new GUIStyle { fontStyle = FontStyle.Italic, wordWrap = false };
-            headingStyle = new GUIStyle { fontStyle = FontStyle.BoldAndItalic, wordWrap = false };
+            nameStyle = new GUIStyle { fontStyle = FontStyle.Normal, wordWrap = false, clipping = TextClipping.Clip };
+            headingStyle = new GUIStyle { fontStyle = FontStyle.Bold, wordWrap = false, clipping = TextClipping.Clip };
             runeStyle = new GUIStyle { fontStyle = FontStyle.Bold, wordWrap = false };
         }
 
@@ -151,28 +168,32 @@ public class SpellListPanel
         float innerY = rect.y + TopMargin;
         float innerWidth = rect.width - LeftMargin - RightMargin;
 
-        SetFontSize();
         if (!ReferenceEquals(entries, laidOutEntries))
         {
             LayOut(entries);
             laidOutEntries = entries;
         }
 
+        runeStyle.fontSize = RuneFontSize;
+
         // the left column from the left margin, the right one up to the right margin
         float leftX = innerX;
-        float rightX = innerX + innerWidth - rightColumnWidth;
-        float runeDrop = Mathf.Round(NameAscent * FontSize - RuneAscent * runeStyle.fontSize);
+        float rightX = innerX + innerWidth - ColumnWidth(true);
+
+        float runeDrop = Mathf.Round(TextMiddle(FontSize) - (RuneAscent - RuneGlyphMiddle) * runeStyle.fontSize);
 
         int circle = 0;
         int row = 0;
-        foreach (Entry entry in entries)
+        for (int i = 0; i < entries.Count; ++i)
         {
+            Entry entry = entries[i];
             if (entry.circle != circle)
             {
                 circle = entry.circle;
                 row = 0;
                 bool right = circle > LastCircleOnTheLeft;
-                GUI.Label(new Rect(right ? rightX : leftX, CircleTop(circle, innerY), right ? rightColumnWidth : leftColumnWidth, lineStep),
+                headingStyle.fontSize = headingSizes[circle];
+                GUI.Label(new Rect(right ? rightX : leftX, CircleTop(circle, innerY) + TextDrop(headingSizes[circle]), ColumnWidth(right), lineStep),
                     CircleHeading(circle), headingStyle);
             }
 
@@ -182,12 +203,12 @@ public class SpellListPanel
             }
 
             bool onTheRight = circle > LastCircleOnTheLeft;
-            float x = onTheRight ? rightX : leftX;
+            float nameX = (onTheRight ? rightX : leftX) + NameIndent;
+            float namesWidth = NamesWidth(onTheRight);
             float y = CircleTop(circle, innerY) + lineStep * (1 + row) + headingGap;
-            GUI.Label(new Rect(x, y + runeDrop, runesWidth, lineStep), entry.runes, runeStyle);
-            float nameX = x + runesWidth + RuneGap;
-            GUI.Label(new Rect(nameX, y, (onTheRight ? rightX + rightColumnWidth : leftX + leftColumnWidth) - nameX, lineStep),
-                entry.name, nameStyle);
+            nameStyle.fontSize = nameSizes[i];
+            GUI.Label(new Rect(nameX, y + TextDrop(nameSizes[i]), namesWidth, lineStep), entry.name, nameStyle);
+            GUI.Label(new Rect(nameX + namesWidth + RuneGap, y + runeDrop, RunesWidth, lineStep), entry.runes, runeStyle);
             ++row;
         }
     }
@@ -217,57 +238,66 @@ public class SpellListPanel
     // The gap under a heading: half the space between the runes of two rows.
     private const float HeadingGapShare = 0.5f;
 
-    // between the runes and the name: about a third of the font size
+    // between the longest name of a column and the runes: about a third of the font size
     private const float RuneGap = 0.65f * 0.5f * FontSize;
+    // the names start a little in from the heading: one pixel of the sheet
+    private const float NameIndent = ScaleX;
     // between the last row of a circle and the next circle's heading
     private const float GroupGap = 5;
 
-    private void SetFontSize()
-    {
-        nameStyle.fontSize = FontSize;
-        headingStyle.fontSize = FontSize;
-        runeStyle.fontSize = Mathf.RoundToInt(FontSize * RuneScale);
-    }
+    // The runes are not translated and keep their size.
+    private static int RuneFontSize => Mathf.RoundToInt(FontSize * RuneScale);
+
+    private static float NamesWidth(bool right) => right ? RightNamesWidth : LeftNamesWidth;
+
+    private static float ColumnWidth(bool right) => NameIndent + NamesWidth(right) + RuneGap + RunesWidth;
+
+    /// <summary>How far below the top of a line the middle of the capitals is, at a size.</summary>
+    private static float TextMiddle(int size) => (NameAscent - NameCapHeight / 2) * size;
 
     /// <summary>
-    /// Measures the rows and the columns at the fixed size. Every spell is measured, known or not, so
-    /// nothing moves when one is learned. The runes take one width for every spell, the widest, so the
-    /// names start at one place whether a spell has two runes or three. Under each heading goes a gap half
-    /// as tall as the space between the runes of two rows.
+    /// How far down a smaller name or heading is moved to keep its middle where the full size has it:
+    /// the rows are those of the full size, whatever the text's size.
+    /// </summary>
+    private static float TextDrop(int size) => Mathf.Round(TextMiddle(FontSize) - TextMiddle(size));
+
+    /// <summary>
+    /// Measures the rows at the full size, and gives each name and each heading its own size: the full
+    /// one, or the largest at which it fits its place, so only a long name is written smaller. Every
+    /// spell is measured, known or not, so nothing changes when one is learned. Under each heading goes
+    /// a gap half as tall as the space between the runes of two rows.
     /// </summary>
     private void LayOut(List<Entry> entries)
     {
+        nameStyle.fontSize = FontSize;
+        runeStyle.fontSize = RuneFontSize;
         lineStep = Mathf.Ceil(LineSpacing * nameStyle.CalcSize(new GUIContent("Ag")).y);
         headingGap = Mathf.Max(0, Mathf.Round(HeadingGapShare * (lineStep - RuneGlyphHeight * runeStyle.fontSize)));
 
-        runesWidth = 0;
+        nameSizes.Clear();
         foreach (Entry entry in entries)
         {
-            runesWidth = Mathf.Max(runesWidth, runeStyle.CalcSize(new GUIContent(entry.runes)).x);
+            nameSizes.Add(FittingSize(nameStyle, entry.name, NamesWidth(entry.circle > LastCircleOnTheLeft)));
         }
 
-        leftColumnWidth = 0;
-        rightColumnWidth = 0;
         for (int circle = 1; circle <= 2 * LastCircleOnTheLeft; ++circle)
         {
-            float width = headingStyle.CalcSize(new GUIContent(CircleHeading(circle))).x;
-            foreach (Entry entry in entries)
-            {
-                if (entry.circle == circle)
-                {
-                    width = Mathf.Max(width, runesWidth + RuneGap + nameStyle.CalcSize(new GUIContent(entry.name)).x);
-                }
-            }
-
-            if (circle > LastCircleOnTheLeft)
-            {
-                rightColumnWidth = Mathf.Max(rightColumnWidth, width);
-            }
-            else
-            {
-                leftColumnWidth = Mathf.Max(leftColumnWidth, width);
-            }
+            headingSizes[circle] = FittingSize(headingStyle, CircleHeading(circle), ColumnWidth(circle > LastCircleOnTheLeft));
         }
+    }
+
+    /// <summary>The largest size, from the full one down to the smallest, at which a text fits a width.</summary>
+    private static int FittingSize(GUIStyle style, string text, float width)
+    {
+        int size = FontSize;
+        style.fontSize = size;
+        while (size > MinFontSize && style.CalcSize(new GUIContent(text)).x > width)
+        {
+            --size;
+            style.fontSize = size;
+        }
+
+        return size;
     }
 
     /// <summary>
