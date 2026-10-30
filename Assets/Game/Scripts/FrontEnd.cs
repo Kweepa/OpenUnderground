@@ -1077,11 +1077,18 @@ public class FrontEnd : MonoBehaviour
     // The load screen is drawn at the one interface scale, UiScale.
 
     // The block - the list, a gap, the preview - is laid out in reference pixels at fixed sizes and
-    // centred across the screen, so it keeps its shape from 1366 to 1920 wide. Its top is 270 from
-    // the top of a 1080 line screen, under the logo painted on the art, and the same share of a
-    // shorter one, since the art is stretched to the screen: 192 at 768, below which everything
-    // scales. The list is as long as the height leaves room for.
+    // centred across the screen, so it keeps its shape from 1366 to 1920 wide. The room for it starts
+    // 270 from the top of a 1080 line screen, under the logo painted on the art, and the same share of
+    // a shorter or taller one, since the art is stretched to the screen: 192 at 768, below which
+    // everything scales. The list is as long as that room allows, up to ten rows, and the block is
+    // centred between the foot of the logo and the bottom of the screen, as the achievements are
+    // between their title and footer, but never higher than that start: when the interface is kept
+    // from growing on a large screen (UiScale.GrowthPercent), the room is far taller than ten rows,
+    // and a block hung from its top left the lower part of the screen empty.
     private const float LoadBlockTopShare = 270f / 1080f;
+    // The foot of the logo, as a share of the height: row 57 of the 200-row picture, which is drawn
+    // without its top 27 rows, so (57 - 27) / 173; 187 at 1080 lines.
+    private const float LogoFootShare = (57f - 27f) / 173f;
     // Wide enough for the longest name the game writes itself, "Autosave - Unbroken - Lvl 4", at the
     // full size of the font, with the em kept for the scroll arrow: 506 + 44 by tools/fontmetrics.py;
     // the rest of the width is room to spare, chosen so that the block leaves 43 each side at 1366.
@@ -1121,9 +1128,12 @@ public class FrontEnd : MonoBehaviour
 
         float blockW = LoadListWidth + (panelW > 0.0f ? LoadBlockGap + panelW : 0.0f);
         float left = (UiScale.Width - blockW) / 2;
-        float top = LoadBlockTopNow;
+        float listH = LoadMenuVisibleRows * LoadRowHeight;
+        float blockH = Mathf.Max(listH, panelH);
+        float foot = LogoFootShare * UiScale.Height;
+        float top = Mathf.Max(LoadBlockTopNow, foot + (UiScale.Height - foot - blockH) / 2);
 
-        list = UiScale.R(left, top, LoadListWidth, LoadMenuVisibleRows * LoadRowHeight);
+        list = UiScale.R(left, top, LoadListWidth, listH);
         panel = panelW > 0.0f ? UiScale.R(left + LoadListWidth + LoadBlockGap, top, panelW, panelH) : default;
     }
 

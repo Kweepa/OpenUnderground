@@ -17,7 +17,9 @@ using UnityEngine;
 /// a Steam Deck (1280x800) and 1280x720 both get about 0.94. Above 1920x1080 everything grows
 /// together until Max, past which the border grows instead of the interface, so a very large
 /// display does not get a billboard. The scale is 1 at both ends of the middle range, so it never
-/// jumps. Every layout therefore has to fit 1366x768 reference pixels.
+/// jumps. Every layout therefore has to fit 1366x768 reference pixels. How much of the growth above
+/// 1920x1080 the player wants is a preference, <see cref="GrowthPercent"/>: at 0 the panels keep
+/// their 1920x1080 size on any larger screen, at 100 (the default) they grow as described.
 ///
 /// A panel is written in reference pixels, measuring the screen with <see cref="Width"/> and
 /// <see cref="Height"/> where it used Screen.width and Screen.height, and converts at the draw
@@ -34,6 +36,37 @@ public static class UiScale
     public const float MinHeight = 768f;
     public const float Max = 2f;
 
+    /// <summary>The preference behind <see cref="GrowthPercent"/>, an int from 0 to 100.</summary>
+    public const string GrowthPrefsKey = "Options_InterfaceGrowth";
+    public const int DefaultGrowthPercent = 100;
+
+    // Factor is read hundreds of times a frame, so the preference is read once and kept; whoever
+    // changes it goes through GrowthPercent, which keeps this in step.
+    private static int growthPercent = -1;
+
+    /// <summary>
+    /// How much of the growth above 1920x1080 the interface takes, in percent: 0 keeps the panels at
+    /// their 1920x1080 size on any larger screen, 100 lets them grow with it up to <see cref="Max"/>,
+    /// and anything between grows them that share of the way. Below 1920x1080 it changes nothing.
+    /// Setting it writes the preference and takes effect on the next frame.
+    /// </summary>
+    public static int GrowthPercent
+    {
+        get
+        {
+            if (growthPercent < 0)
+            {
+                growthPercent = Mathf.Clamp(PlayerPrefs.GetInt(GrowthPrefsKey, DefaultGrowthPercent), 0, 100);
+            }
+            return growthPercent;
+        }
+        set
+        {
+            growthPercent = Mathf.Clamp(value, 0, 100);
+            PlayerPrefs.SetInt(GrowthPrefsKey, growthPercent);
+        }
+    }
+
     /// <summary>Screen pixels per reference pixel. See the remarks.</summary>
     public static float Factor
     {
@@ -45,15 +78,45 @@ public static class UiScale
                 return below;
             }
 
-            return Mathf.Clamp(Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight), 1f, Max);
+            return Grown(Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight));
+        }
+    }
+
+    /// <summary>
+    /// The share of <see cref="Factor"/> that the player's <see cref="GrowthPercent"/> leaves: 1 at
+    /// 100, or on a screen no larger than 1920x1080; less on a larger screen when the growth is held
+    /// back. For a page that sizes something by a measure of its own, such as the achievements grid
+    /// by the screen's width, so that it is held back with the rest.
+    /// </summary>
+    public static float GrowthShare
+    {
+        get
+        {
+            float full = Mathf.Clamp(Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight), 1f, Max);
+            return Grown(full) / full;
         }
     }
 
     /// <summary>
     /// The scale that fits a whole 1920x1080 page on the screen, for the one page still laid out
     /// that way (the music page of the Setup screen); everything else uses <see cref="Factor"/>.
+    /// Above 1920x1080 it is held back by <see cref="GrowthPercent"/> like the rest.
     /// </summary>
-    public static float Fit => Mathf.Min(Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight), Max);
+    public static float Fit
+    {
+        get
+        {
+            float fit = Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight);
+            return fit < 1f ? fit : Grown(fit);
+        }
+    }
+
+    /// <summary>A ratio of the screen to 1920x1080 of 1 or more, as the interface takes it: capped at Max, then held back by the growth.</summary>
+    private static float Grown(float ratio)
+    {
+        float full = Mathf.Clamp(ratio, 1f, Max);
+        return 1f + (full - 1f) * GrowthPercent / 100f;
+    }
 
     /// <summary>The screen's width in reference pixels: what Screen.width is to a panel laid out at 1920x1080.</summary>
     public static float Width => Screen.width / Factor;

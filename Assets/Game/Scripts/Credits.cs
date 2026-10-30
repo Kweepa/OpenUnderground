@@ -482,7 +482,8 @@ public class Credits : MonoBehaviour
 
     /// <summary>
     /// Bottom of the page's title in screen pixels, set by FrontEnd while it draws the title; 0 without one. The
-    /// names then go in the space under it, above the hints, as large as it allows (TextBand).
+    /// names then go in the space under it, above the hints, as large as it allows (TextBand), less what the
+    /// player's limit on the interface's growth takes off (UiScale.GrowthShare).
     /// </summary>
     [System.NonSerialized] public float TextTop;
 
@@ -536,8 +537,9 @@ public class Credits : MonoBehaviour
         float bandWidth = band.x * copy.width;
         float bandHeight = band.y * copy.height;
         float bottom = Screen.safeArea.yMax - UiScale.S(TextBottomMargin);
+        // as large as the space allows, held back with the interface when the player keeps it from growing
         float scale = Mathf.Min((bottom - TextTop) / bandHeight,
-            (Screen.safeArea.width - 2 * UiScale.S(TextSideMargin)) / bandWidth);
+            (Screen.safeArea.width - 2 * UiScale.S(TextSideMargin)) / bandWidth) * UiScale.GrowthShare;
         Rect page = new Rect(Screen.safeArea.x + (Screen.safeArea.width - bandWidth * scale) / 2,
             TextTop + (bottom - TextTop - bandHeight * scale) / 2, bandWidth * scale, bandHeight * scale);
         GUI.DrawTextureWithTexCoords(page, copy, new Rect((1f - band.x) / 2, (1f - band.y) / 2, band.x, band.y));
