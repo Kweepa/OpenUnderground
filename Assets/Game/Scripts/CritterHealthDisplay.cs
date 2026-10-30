@@ -73,6 +73,6 @@ public class CritterHealthDisplay : MonoBehaviour
         Texture2D tex = DataLoader.sDataLoader.eyesTex[index];
         float w = 5 * tex.width;
         float h = 6 * tex.height;
-        GUI.DrawTexture(new Rect((Screen.width - w) / 2, (20 + h) * visibleY - h, w, h), tex); 
+        UiScale.DrawTexture(UiScale.R((UiScale.Width - w) / 2, (20 + h) * visibleY - h, w, h), tex);
     }
 }

@@ -67,7 +67,7 @@ public class WeaponChargeGem : MonoBehaviour
         Texture2D tex = powerTex[power < 1.0f ? (int)(power * (powerTex.Length - 5)) : powerTex.Length - 5 + sparkleIndex];
         float width = 3 * tex.width;
         float height = 3 * tex.height;
-        GUI.DrawTexture(new Rect(Screen.width - 140 - width / 2, Screen.height - height, width, height), tex);
+        UiScale.DrawTexture(UiScale.R(UiScale.Width - 140 - width / 2, UiScale.Height - height, width, height), tex);
     }
 #endif
 }

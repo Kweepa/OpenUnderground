@@ -88,6 +88,9 @@ public class Messages : MonoBehaviour
     private bool wrappedDirty = true;
 
     /// <summary>The message style with no word wrap, to measure the lines and draw them.</summary>
+    private GUIStyle referenceLineStyle;
+
+    /// <summary>The line style at the interface scale, set at the start of every OnGUI(): the box is laid out in screen pixels.</summary>
     private GUIStyle lineStyle;
 
     /// <summary>The live messages wrapped to the box, rebuilt on every repaint.</summary>
@@ -134,11 +137,10 @@ public class Messages : MonoBehaviour
     private const float ArrowGap = 2.0f;
 
     /// <summary>
-    /// Box width on a 1280 wide screen, the narrowest the game is laid out for: centred there, it
-    /// stays 10 pixels clear of the bars of the timed spells, which end at x 312 whatever the
-    /// resolution (Magic.OnGUI(): HudRowX 94, then 68 to the bar and 150 of bar). A narrower
-    /// window keeps this width; a wider one widens the box as much as the screen, so the gap
-    /// stays 10 pixels.
+    /// Box width, in reference pixels (UiScale), on a screen 1280 of them wide: centred there, it
+    /// stays 10 pixels clear of the bars of the timed spells, which end at x 312 (Magic.OnGUI():
+    /// HudRowX 94, then 68 to the bar and 150 of bar). A screen is at least 1366 reference pixels
+    /// wide; from there the box widens as much as the screen, so the gap stays 10 pixels.
     /// </summary>
     private const float MinBoxWidth = 1280 - 2 * (312 + 10);
 
@@ -226,6 +228,11 @@ public class Messages : MonoBehaviour
     /// </remarks>
     private void UpdateHistoryScrolling()
     {
+        if (SmallWindowWarning.BlocksInput)
+        {
+            // the small-window warning is modal: the history neither scrolls nor times out until it is closed and its keys let go
+            return;
+        }
         // The virtual keyboard and conversations both write into this same message area, so
         // leave the input to them while either is up.
         bool blocked = (KeyboardGUI.sKeyboard != null && KeyboardGUI.sKeyboard.IsVisible())
@@ -338,14 +345,17 @@ public class Messages : MonoBehaviour
             return;
         }
 
-        lineStyle ??= new GUIStyle(fontStyle) { wordWrap = false };
+        referenceLineStyle ??= new GUIStyle(fontStyle) { wordWrap = false };
+        lineStyle = UiScale.Style(referenceLineStyle);
+        float s = UiScale.Factor;
 
         // The box is centred, widens with the screen from MinBoxWidth at 1280 to MaxBoxWidth at
-        // 1920, and ends just above the row of flasks, rune shelf and worn spells.
-        float boxWidth = Mathf.Clamp(MinBoxWidth + (Screen.width - 1280), MinBoxWidth, MaxBoxWidth);
-        float textWidth = boxWidth - BoxPadLeft - BoxPadRight;
+        // 1920 reference pixels, and ends just above the row of flasks, rune shelf and worn
+        // spells. From here on the box is in screen pixels, like the text measured in it.
+        float boxWidth = s * Mathf.Clamp(MinBoxWidth + (UiScale.Width - 1280), MinBoxWidth, MaxBoxWidth);
+        float textWidth = boxWidth - s * (BoxPadLeft + BoxPadRight);
         float boxX = (Screen.width - boxWidth) * 0.5f;
-        float boxBottom = Magic.HudRowTop - 4;
+        float boxBottom = s * (Magic.HudRowTop - 4);
 
         bool moreAbove = false;
         bool moreBelow = false;
@@ -355,7 +365,7 @@ public class Messages : MonoBehaviour
         if (browsing)
         {
             // The history is always as tall as its HistoryLineCount lines, however few there are.
-            boxHeight = lineStyle.CalcHeight(new GUIContent(FullBoxSample), textWidth) + 2.0f * BoxPadY;
+            boxHeight = lineStyle.CalcHeight(new GUIContent(FullBoxSample), textWidth) + 2.0f * s * BoxPadY;
         }
         else
         {
@@ -379,26 +389,27 @@ public class Messages : MonoBehaviour
         // fixed: the text sits on it, and the live box grows upward as messages arrive and
         // shrinks back down as they expire.
         float textHeight = lineStyle.CalcHeight(new GUIContent(allMessages), textWidth);
-        boxHeight = Mathf.Max(boxHeight, textHeight + 2.0f * BoxPadY);
+        boxHeight = Mathf.Max(boxHeight, textHeight + 2.0f * s * BoxPadY);
         Rect boxRect = new Rect(boxX, boxBottom - boxHeight, boxWidth, boxHeight);
 
         Color previousGuiColor = GUI.color;
         GUI.color = new Color(0.5f, 0.5f, 0.5f, 0.2f);
         GUI.DrawTexture(boxRect, Texture2D.whiteTexture);
         GUI.color = new Color(0.0f, 0.0f, 0.0f, 0.7f);
-        GUI.DrawTexture(new Rect(boxRect.x, boxRect.y, boxRect.width, BoxBorder), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(boxRect.x, boxRect.yMax - BoxBorder, boxRect.width, BoxBorder), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(boxRect.x, boxRect.y, BoxBorder, boxRect.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(boxRect.xMax - BoxBorder, boxRect.y, BoxBorder, boxRect.height), Texture2D.whiteTexture);
+        float border = s * BoxBorder;
+        GUI.DrawTexture(new Rect(boxRect.x, boxRect.y, boxRect.width, border), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(boxRect.x, boxRect.yMax - border, boxRect.width, border), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(boxRect.x, boxRect.y, border, boxRect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(boxRect.xMax - border, boxRect.y, border, boxRect.height), Texture2D.whiteTexture);
         GUI.color = previousGuiColor;
 
-        Rect textRect = new Rect(boxX + BoxPadLeft, boxBottom - BoxPadY - textHeight, textWidth, textHeight);
+        Rect textRect = new Rect(boxX + s * BoxPadLeft, boxBottom - s * BoxPadY - textHeight, textWidth, textHeight);
         Color previousTextColor = lineStyle.normal.textColor;
         lineStyle.normal.textColor = new Color(0, 0, 0, 1.0f);
         GUI.Label(textRect, allMessages, lineStyle);
         // Pale yellow while browsing: without a cue there is no telling history from live text.
         lineStyle.normal.textColor = browsing ? new Color(1.0f, 0.85f, 0.4f, 1.0f) : Color.white;
-        GUI.Label(new Rect(textRect.x + 1.0f, textRect.y - 1.0f, textRect.width, textRect.height), allMessages, lineStyle);
+        GUI.Label(new Rect(textRect.x + s, textRect.y - s, textRect.width, textRect.height), allMessages, lineStyle);
         lineStyle.normal.textColor = previousTextColor;
 
         DrawScrollArrows(boxRect, moreAbove, moreBelow);
@@ -516,9 +527,12 @@ public class Messages : MonoBehaviour
     /// The up and down arrows of the original's cursors, at the size the quantity prompt draws
     /// its left and right ones, in the right margin of the box: up in the top corner when there
     /// is more to read further back, down in the bottom corner when there is more further on.
+    /// The box is in screen pixels.
     /// </summary>
     private static void DrawScrollArrows(Rect box, bool up, bool down)
     {
+        float s = UiScale.Factor;
+        float inset = s * (BoxBorder + ArrowGap);
         Texture2D[] cursors = DataLoader.sDataLoader != null ? DataLoader.sDataLoader.cursorTex : null;
         if (cursors == null || cursors.Length <= 2)
         {
@@ -528,17 +542,17 @@ public class Messages : MonoBehaviour
         Texture2D upArrow = cursors[1];
         if (up && upArrow != null)
         {
-            float width = 1.5f * upArrow.width;
-            GUI.DrawTexture(new Rect(box.xMax - BoxBorder - ArrowGap - width, box.y + BoxBorder + ArrowGap + 1,
-                width, 1.5f * upArrow.height), upArrow);
+            float width = s * 1.5f * upArrow.width;
+            GUI.DrawTexture(new Rect(box.xMax - inset - width, box.y + inset + s,
+                width, s * 1.5f * upArrow.height), upArrow);
         }
 
         Texture2D downArrow = cursors[2];
         if (down && downArrow != null)
         {
-            float width = 1.5f * downArrow.width;
-            float height = 1.5f * downArrow.height;
-            GUI.DrawTexture(new Rect(box.xMax - BoxBorder - ArrowGap - width, box.yMax - BoxBorder - ArrowGap - 1 - height,
+            float width = s * 1.5f * downArrow.width;
+            float height = s * 1.5f * downArrow.height;
+            GUI.DrawTexture(new Rect(box.xMax - inset - width, box.yMax - inset - s - height,
                 width, height), downArrow);
         }
     }

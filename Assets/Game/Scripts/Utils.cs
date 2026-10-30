@@ -45,6 +45,7 @@ public enum EGUIDepth
     CritterViewer,
     CritterDebug,
     SoftwareCursorOverlay,
+    SmallWindowWarning,
     Achievements,
     FrontEnd,
     Credits,
@@ -91,6 +92,7 @@ public enum EControlMask
     Resting = 1024,
     SaveLoad = 2048,
     Keyboard = 4096,
+    Warning = 8192,
 }
 
 public class Utils
@@ -1247,16 +1249,39 @@ public class Utils
         return poisonRating;
     }
 
+    /// <summary>The text cut short with an ellipsis so that it fits the width, or whole when it does.</summary>
+    public static string Ellipsize(string content, GUIStyle style, float width)
+    {
+        if (style.CalcSize(new GUIContent(content)).x <= width)
+        {
+            return content;
+        }
+        int low = 0;
+        int high = content.Length;
+        while (low < high)
+        {
+            int mid = (low + high + 1) / 2;
+            if (style.CalcSize(new GUIContent(content.Substring(0, mid) + "...")).x <= width)
+            {
+                low = mid;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+        return content.Substring(0, low).TrimEnd() + "...";
+    }
+
+    /// <summary>A label with a black shadow two pixels down and right; the rect and the style's font size are in reference pixels (UiScale).</summary>
     public static void DropShadowText(string text, float x, float y, float w, float h, GUIStyle style)
     {
-        Rect r = new Rect(x + 2, y + 2, w, h);
-        Color textColor = style.normal.textColor;
-        style.normal.textColor = Color.black;
-        GUI.Label(r, text, style);
-        style.normal.textColor = textColor;
-        r.x -= 2;
-        r.y -= 2;
-        GUI.Label(r, text, style);
+        GUIStyle scaled = UiScale.Style(style);
+        Color textColor = scaled.normal.textColor;
+        scaled.normal.textColor = Color.black;
+        GUI.Label(UiScale.R(x + 2, y + 2, w, h), text, scaled);
+        scaled.normal.textColor = textColor;
+        GUI.Label(UiScale.R(x, y, w, h), text, scaled);
     }
 
     public static Transform FindDeepChild(Transform parent, string name)

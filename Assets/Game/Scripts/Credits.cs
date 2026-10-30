@@ -480,13 +480,66 @@ public class Credits : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Bottom of the page's title in screen pixels, set by FrontEnd while it draws the title; 0 without one. The
+    /// names then go in the space under it, above the hints, as large as it allows (TextBand).
+    /// </summary>
+    [System.NonSerialized] public float TextTop;
+
+    // Room kept at the foot for FrontEnd's hints, and at the sides, in reference pixels (UiScale).
+    private const float TextBottomMargin = 80f;
+    private const float TextSideMargin = 40f;
+
+    // Texels kept round the widest line and the tallest page when the page is cut to them.
+    private const int TextBandMargin = 8;
+
+    // The part of the 640 x 400 page that any page of names reaches, centred, as fractions of it: the pages are
+    // centred on it, so under a title the page is cut to this and drawn as large as the space allows.
+    private Vector2 textBand;
+
+    private Vector2 TextBand()
+    {
+        if (textBand == Vector2.zero)
+        {
+            int widest = 0;
+            int tallest = 0;
+            foreach (string[] m in creds)
+            {
+                tallest = Mathf.Max(tallest, GetHeight(m));
+                foreach (string line in m)
+                {
+                    widest = Mathf.Max(widest, GetWidth(line.ToLower()));
+                }
+            }
+            textBand = new Vector2(Mathf.Min(1f, (widest + 2f * TextBandMargin) / 640f),
+                Mathf.Min(1f, (tallest + 2f * TextBandMargin) / 400f));
+        }
+        return textBand;
+    }
+
     private void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Credits;
         GUI.DrawTexture(Screen.safeArea, background);
-        if (copy != null)
+        if (copy == null)
+        {
+            return;
+        }
+
+        if (TextTop <= 0f)
         {
             GUI.DrawTexture(Screen.safeArea, copy);
+            return;
         }
+
+        Vector2 band = TextBand();
+        float bandWidth = band.x * copy.width;
+        float bandHeight = band.y * copy.height;
+        float bottom = Screen.safeArea.yMax - UiScale.S(TextBottomMargin);
+        float scale = Mathf.Min((bottom - TextTop) / bandHeight,
+            (Screen.safeArea.width - 2 * UiScale.S(TextSideMargin)) / bandWidth);
+        Rect page = new Rect(Screen.safeArea.x + (Screen.safeArea.width - bandWidth * scale) / 2,
+            TextTop + (bottom - TextTop - bandHeight * scale) / 2, bandWidth * scale, bandHeight * scale);
+        GUI.DrawTextureWithTexCoords(page, copy, new Rect((1f - band.x) / 2, (1f - band.y) / 2, band.x, band.y));
     }
 }

@@ -7,15 +7,11 @@ using UnityEngine.InputSystem;
 /// <remarks>
 /// One page so far, the music. The screen owns what every page shares - the background, the title,
 /// the scale, the way back - so that the next page is only its own contents.
-/// It is laid out in the pixels of a 1920x1080 screen and drawn at one uniform scale, capped at 2,
-/// like the load list: at 1920x1080 nothing moves, and on a smaller screen it shrinks whole.
+/// It is laid out in the pixels of a 1920x1080 screen and drawn whole at UiScale.Fit: at
+/// 1920x1080 nothing moves, and on a smaller screen it shrinks whole.
 /// </remarks>
 public class SetupScreen
 {
-    private const float RefWidth = 1920f;
-    private const float RefHeight = 1080f;
-    private const float MaxScale = 2f;
-
     private readonly FrontEnd frontEnd;
     private readonly MusicSetupPage music;
 
@@ -57,12 +53,12 @@ public class SetupScreen
             GUI.DrawTexture(screen, frontEnd.achievementsBackground, ScaleMode.ScaleAndCrop);
         }
 
-        float scale = Mathf.Min(Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight), MaxScale);
-        Rect area = new Rect((Screen.width - RefWidth * scale) / 2, (Screen.height - RefHeight * scale) / 2,
-            RefWidth * scale, RefHeight * scale);
+        float scale = UiScale.Fit;
+        Rect area = new Rect((Screen.width - UiScale.RefWidth * scale) / 2, (Screen.height - UiScale.RefHeight * scale) / 2,
+            UiScale.RefWidth * scale, UiScale.RefHeight * scale);
 
-        GUIStyle header = new GUIStyle(frontEnd.achievementHeaderStyle) { fontSize = Mathf.RoundToInt(72 * scale) };
-        GUI.Label(new Rect(area.x, area.y + 30 * scale, area.width, 100 * scale), "Setup: Music", header);
+        // the title as every page draws its own, at the interface scale; the page below keeps UiScale.Fit
+        frontEnd.DrawPageTitle("Setup: Music", 72);
 
         music.OnGUI(area, scale);
 

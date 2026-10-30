@@ -709,7 +709,7 @@ public class MusicSetupPage
             Rect nameRect = new Rect(rect.x + 60 * scale, rect.y, duration.x - rect.x - 72 * scale, rect.height);
 
             // A long name is cut short with an ellipsis rather than run under the length.
-            Label(nameRect, Ellipsize(name, text, nameRect.width), text, color);
+            Label(nameRect, Utils.Ellipsize(name, text, nameRect.width), text, color);
             if (present)
             {
                 Label(duration, TrackLengths.Text(path, frontEnd), durationText, color);
@@ -856,30 +856,6 @@ public class MusicSetupPage
         GUI.color = draggingThumb || thumb.Contains(GuiInput.MousePositionGuiSpace) ? Color.white : unselectColor;
         GUI.DrawTexture(thumb, Texture2D.whiteTexture);
         GUI.color = previous;
-    }
-
-    /// <summary>The text cut short with an ellipsis so that it fits the width, or whole when it does.</summary>
-    private static string Ellipsize(string content, GUIStyle style, float width)
-    {
-        if (style.CalcSize(new GUIContent(content)).x <= width)
-        {
-            return content;
-        }
-        int low = 0;
-        int high = content.Length;
-        while (low < high)
-        {
-            int mid = (low + high + 1) / 2;
-            if (style.CalcSize(new GUIContent(content.Substring(0, mid) + "...")).x <= width)
-            {
-                low = mid;
-            }
-            else
-            {
-                high = mid - 1;
-            }
-        }
-        return content.Substring(0, low).TrimEnd() + "...";
     }
 
     /// <summary>A Yes or No of the question: lit when it is the answer the keys would give.</summary>

@@ -823,16 +823,34 @@ public class Achievements : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    public string DrawAllAchievements(bool revealAchievements)
+    private const float AchievementRowHeight = 45;
+    private const float AchievementRowPitch = 59;
+
+    // The least room left above and below the grid, in screen pixels at the interface scale.
+    private const float AchievementGridMinGap = 10;
+
+    /// <summary>
+    /// The grid of the achievements, four across, centred between top and bottom (screen pixels: the
+    /// page's title and its footer). It takes the width of the screen, and is made smaller still
+    /// when that would not fit the height between the two, so a short screen keeps it off the footer.
+    /// </summary>
+    public string DrawAllAchievements(bool revealAchievements, float top, float bottom)
     {
         Matrix4x4 oldMatrix = GUI.matrix;
-        float scale = Screen.safeArea.width / (340 * 4 + 100);
+        int rows = ((int)EAchievement.Count + 3) / 4;
+        float gridHeight = (rows - 1) * AchievementRowPitch + AchievementRowHeight;
+        float room = bottom - top - 2 * UiScale.S(AchievementGridMinGap);
+        float scale = Mathf.Min(Screen.safeArea.width / (340 * 4 + 100), room / gridHeight);
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1.0f));
+
+        float gridTop = (top + bottom - gridHeight * scale) / 2 / scale;
+        // centred across too, now that it can be narrower than the screen
+        float gridLeft = (Screen.safeArea.width / scale - (340 * 4 + 100)) / 2;
 
         int numAchieved = 0;
         for (int i = 0; i < (int) EAchievement.Count; ++i)
         {
-            Rect r = new Rect(20 + 360 * (i % 4), 100 + 60 * (i / 4), 340, 45);
+            Rect r = new Rect(gridLeft + 20 + 360 * (i % 4), gridTop + AchievementRowPitch * (i / 4), 340, AchievementRowHeight);
             if (achieved[i])
             {
                 GUI.Label(r, achievementNames[i], titleStyle);
@@ -854,10 +872,11 @@ public class Achievements : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.Achievements;
 
-        float y = Screen.height - 180;
+        // in reference pixels (UiScale)
+        float y = UiScale.Height - 180;
         foreach (AchievementDisplay disp in displayed)
         {
-            float x = Screen.width - 350;
+            float x = UiScale.Width - 350;
             switch (disp.phase)
             {
             case EDisplayPhase.SlideIn:
@@ -868,9 +887,9 @@ public class Achievements : MonoBehaviour
                 break;
             }
 
-            Rect r = new Rect(x, y, 340, 45);
-            GUI.Label(r, achievementNames[disp.index], titleStyle);
-            GUI.Label(r, achievementDescs[disp.index], textStyle);
+            Rect r = UiScale.R(x, y, 340, 45);
+            GUI.Label(r, achievementNames[disp.index], UiScale.Style(titleStyle));
+            GUI.Label(r, achievementDescs[disp.index], UiScale.Style(textStyle));
 
             y -= 50;
         }

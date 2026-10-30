@@ -121,12 +121,16 @@ public class SpellListPanel
     /// </summary>
     private const int RowsPerCircle = 6;
 
-    /// <summary>The sheet as drawn, coming in from the right edge as the magic panel comes in from the left.</summary>
+    /// <summary>
+    /// The sheet as drawn, coming in from the right edge as the magic panel comes in from the left, in
+    /// reference pixels (UiScale). The layout is measured with the styles at their reference size and
+    /// drawn with them scaled.
+    /// </summary>
     public static Rect GetRect(float lerpIn)
     {
         float w = ScaleX * SheetWidth;
         float h = ScaleY * SheetHeight;
-        float x = Screen.width - lerpIn * (w + PlayerPanelState.PanelMargin);
+        float x = UiScale.Width - lerpIn * (w + PlayerPanelState.PanelMargin);
         return new Rect(x, PlayerPanelState.PanelMargin, w, h);
     }
 
@@ -138,7 +142,7 @@ public class SpellListPanel
     public void Draw(float lerpIn, List<Entry> entries, Font nameFont, Font runeFont)
     {
         Rect rect = GetRect(lerpIn);
-        GuiInput.RegisterBlockingRect(rect);
+        GuiInput.RegisterBlockingRect(UiScale.R(rect));
 
         if (sheet == null)
         {
@@ -147,7 +151,7 @@ public class SpellListPanel
 
         if (sheet != null)
         {
-            GUI.DrawTexture(rect, sheet);
+            UiScale.DrawTexture(UiScale.R(rect), sheet);
         }
 
         if (nameStyle == null)
@@ -193,8 +197,8 @@ public class SpellListPanel
                 row = 0;
                 bool right = circle > LastCircleOnTheLeft;
                 headingStyle.fontSize = headingSizes[circle];
-                GUI.Label(new Rect(right ? rightX : leftX, CircleTop(circle, innerY) + TextDrop(headingSizes[circle]), ColumnWidth(right), lineStep),
-                    CircleHeading(circle), headingStyle);
+                GUI.Label(UiScale.R(right ? rightX : leftX, CircleTop(circle, innerY) + TextDrop(headingSizes[circle]), ColumnWidth(right), lineStep),
+                    CircleHeading(circle), UiScale.Style(headingStyle));
             }
 
             if (!entry.known)
@@ -207,8 +211,8 @@ public class SpellListPanel
             float namesWidth = NamesWidth(onTheRight);
             float y = CircleTop(circle, innerY) + lineStep * (1 + row) + headingGap;
             nameStyle.fontSize = nameSizes[i];
-            GUI.Label(new Rect(nameX, y + TextDrop(nameSizes[i]), namesWidth, lineStep), entry.name, nameStyle);
-            GUI.Label(new Rect(nameX + namesWidth + RuneGap, y + runeDrop, RunesWidth, lineStep), entry.runes, runeStyle);
+            GUI.Label(UiScale.R(nameX, y + TextDrop(nameSizes[i]), namesWidth, lineStep), entry.name, UiScale.Style(nameStyle));
+            GUI.Label(UiScale.R(nameX + namesWidth + RuneGap, y + runeDrop, RunesWidth, lineStep), entry.runes, UiScale.Style(runeStyle));
             ++row;
         }
     }

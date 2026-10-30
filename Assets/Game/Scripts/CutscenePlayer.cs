@@ -781,7 +781,7 @@ public class CutscenePlayer : MonoBehaviour
         GUIStyle style = new GUIStyle();
         style.font = font;
         style.normal.textColor = Color.white;
-        style.fontSize = 40;
+        style.fontSize = UiScale.Font(40);
         style.alignment = TextAnchor.UpperCenter;
         style.wordWrap = true;
 
@@ -850,8 +850,8 @@ public class CutscenePlayer : MonoBehaviour
 
         if (waitForA && aButton != null && GameInput.LastActiveDevice == GameInputDevice.Gamepad)
         {
-            float aw = 48;
-            float ah = 48;
+            float aw = UiScale.S(48);
+            float ah = UiScale.S(48);
             float yBorder = 0.05f * Screen.height;
             GUI.DrawTexture(new Rect(Screen.width / 2 - aw / 2, Screen.height - yBorder - ah, aw, ah), aButton);
         }
