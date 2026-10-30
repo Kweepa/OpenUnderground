@@ -232,7 +232,7 @@ public class HowMany : MonoBehaviour
             && cachedHasArrowRects
             && (GameInput.CurrentMouse?.leftButton.isPressed ?? false))
         {
-            Vector2 mouse = GuiInput.MousePositionGuiSpace;
+            Vector2 mouse = UiScale.ToRef(GuiInput.MousePositionGuiSpace);
             if (cachedLeftArrowRect.Contains(mouse))
             {
                 return -1;
@@ -269,8 +269,8 @@ public class HowMany : MonoBehaviour
 
         Texture2D panelTex = dl.invTex[6];
         Rect r = new Rect(
-            (Screen.width - 3 * panelTex.width) / 2,
-            (Screen.height - 3.6f * panelTex.height) / 2,
+            (UiScale.Width - 3 * panelTex.width) / 2,
+            (UiScale.Height - 3.6f * panelTex.height) / 2,
             3 * panelTex.width,
             3.6f * panelTex.height);
         Texture2D itemTex = howManyItem.GetInventoryTex();
@@ -288,6 +288,11 @@ public class HowMany : MonoBehaviour
     protected void Update()
     {
         PlayerObject.DisableControls(EControlMask.HowMany, IsActive());
+        if (SmallWindowWarning.BlocksInput)
+        {
+            // the small-window warning is modal: nothing here answers until it is closed and its keys let go
+            return;
+        }
 
         if (howManyItem != null)
         {
@@ -398,14 +403,14 @@ public class HowMany : MonoBehaviour
             GUI.depth = (int)EGUIDepth.HowMany; 
             
             Texture2D tex = DataLoader.sDataLoader.invTex[6];
-            Rect r = new Rect((Screen.width - 3 * tex.width) / 2, (Screen.height - 3.6f * tex.height) / 2, 3 * tex.width, 3.6f * tex.height);
-            GuiInput.RegisterBlockingRect(r);
-            GUI.DrawTexture(r, tex);
+            Rect r = new Rect((UiScale.Width - 3 * tex.width) / 2, (UiScale.Height - 3.6f * tex.height) / 2, 3 * tex.width, 3.6f * tex.height);
+            GuiInput.RegisterBlockingRect(UiScale.R(r));
+            UiScale.DrawTexture(UiScale.R(r), tex);
             Texture2D itemTex = howManyItem.GetInventoryTex();
-            GUI.DrawTexture(new Rect(r.x + 20, r.y + 20, 3 * itemTex.width, 3.6f * itemTex.height), itemTex);
+            UiScale.DrawTexture(UiScale.R(r.x + 20, r.y + 20, 3 * itemTex.width, 3.6f * itemTex.height), itemTex);
             howManyStyle.alignment = TextAnchor.UpperCenter;
             howManyStyle.fontSize = 20;
-            GUI.Label(new Rect(r.x, r.y + 20, r.width, r.height), "How many?", howManyStyle);
+            GUI.Label(UiScale.R(r.x, r.y + 20, r.width, r.height), "How many?", UiScale.Style(howManyStyle));
 
             string countText = $"{howMany}/{howManyItem.quantity}";
             bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
@@ -430,19 +435,19 @@ public class HowMany : MonoBehaviour
                 float countLeft = bandLeft + aw + arrowGap;
                 Rect countRect = new Rect(countLeft, countCenterY - countSize.y * 0.5f, maxTextWidth, countSize.y);
 
-                GUI.Label(countRect, countText, howManyStyle);
+                GUI.Label(UiScale.R(countRect), countText, UiScale.Style(howManyStyle));
 
                 RefreshCachedArrowRects();
                 if (cachedHasArrowRects)
                 {
-                    GUI.DrawTexture(cachedLeftArrowRect, leftArrow);
-                    GUI.DrawTexture(cachedRightArrowRect, rightArrow);
+                    UiScale.DrawTexture(UiScale.R(cachedLeftArrowRect), leftArrow);
+                    UiScale.DrawTexture(UiScale.R(cachedRightArrowRect), rightArrow);
                 }
             }
             else
             {
                 howManyStyle.fontSize = CalcCountFontSize(countText, r.width);
-                GUI.Label(r, countText, howManyStyle);
+                GUI.Label(UiScale.R(r), countText, UiScale.Style(howManyStyle));
             }
 
             Rect hintCancelRect = new Rect(r.x + 16, r.y + r.height - 42, 72, 29);
@@ -450,46 +455,46 @@ public class HowMany : MonoBehaviour
             Rect hintRightRect = new Rect(r.x + r.width - 88, r.y + r.height - 42, 72, 29);
             if (mouseUi && buttonOutline != null)
             {
-                GUI.DrawTexture(hintCancelRect, buttonOutline, ScaleMode.StretchToFill, true);
-                GUI.DrawTexture(hintCenterRect, buttonOutline, ScaleMode.StretchToFill, true);
-                GUI.DrawTexture(hintRightRect, buttonOutline, ScaleMode.StretchToFill, true);
+                UiScale.DrawTexture(UiScale.R(hintCancelRect), buttonOutline, ScaleMode.StretchToFill, true);
+                UiScale.DrawTexture(UiScale.R(hintCenterRect), buttonOutline, ScaleMode.StretchToFill, true);
+                UiScale.DrawTexture(UiScale.R(hintRightRect), buttonOutline, ScaleMode.StretchToFill, true);
             }
 
             Texture2D leftHintIcon = mouseUi && escapeKey != null ? escapeKey : bButton;
-            GUI.DrawTexture(new Rect(hintCancelRect.x + 5, hintCancelRect.y + 5, 16, 16), leftHintIcon);
-            GUI.Label(new Rect(hintCancelRect.x + 21, hintCancelRect.y, 51, 29), "Cancel", howManyButtonStyle);
+            UiScale.DrawTexture(UiScale.R(hintCancelRect.x + 5, hintCancelRect.y + 5, 16, 16), leftHintIcon);
+            GUI.Label(UiScale.R(hintCancelRect.x + 21, hintCancelRect.y, 51, 29), "Cancel", UiScale.Style(howManyButtonStyle));
             if (!mouseUi)
             {
-                GUI.DrawTexture(new Rect(hintCenterRect.x + 5, hintCenterRect.y + 5, 16, 16), aButton);
-                GUI.Label(new Rect(hintCenterRect.x + 21, hintCenterRect.y, 51, 29), verb[(int)howManyReason], howManyButtonStyle);
+                UiScale.DrawTexture(UiScale.R(hintCenterRect.x + 5, hintCenterRect.y + 5, 16, 16), aButton);
+                GUI.Label(UiScale.R(hintCenterRect.x + 21, hintCenterRect.y, 51, 29), verb[(int)howManyReason], UiScale.Style(howManyButtonStyle));
             }
             else
             {
                 howManyButtonStyle.alignment = TextAnchor.MiddleCenter;
-                GUI.Label(hintCenterRect, verb[(int)howManyReason], howManyButtonStyle);
+                GUI.Label(UiScale.R(hintCenterRect), verb[(int)howManyReason], UiScale.Style(howManyButtonStyle));
                 howManyButtonStyle.alignment = TextAnchor.MiddleLeft;
             }
             Texture2D rightHintIcon = mouseUi && rightMouseButton != null ? rightMouseButton : yButton;
-            GUI.DrawTexture(new Rect(hintRightRect.x + 5, hintRightRect.y + 5, 16, 16), rightHintIcon);
-            GUI.Label(new Rect(hintRightRect.x + 21, hintRightRect.y, 51, 29), "All", howManyButtonStyle);
+            UiScale.DrawTexture(UiScale.R(hintRightRect.x + 5, hintRightRect.y + 5, 16, 16), rightHintIcon);
+            GUI.Label(UiScale.R(hintRightRect.x + 21, hintRightRect.y, 51, 29), "All", UiScale.Style(howManyButtonStyle));
 
-            if (GuiInput.TryConsumeClickInRect(hintCancelRect))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(hintCancelRect)))
             {
                 CancelHowMany();
                 return;
             }
-            if (GuiInput.TryConsumeClickInRect(hintCenterRect))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(hintCenterRect)))
             {
                 SubmitHowMany(false);
                 return;
             }
-            if (GuiInput.TryConsumeClickInRect(hintRightRect))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(hintRightRect)))
             {
                 SubmitHowMany(true);
                 return;
             }
 
-            GuiInput.TryConsumeClickInPanel(r);
+            GuiInput.TryConsumeClickInPanel(UiScale.R(r));
 
             // A left click outside the dialog takes one, as the right button takes them all, and it
             // goes no further: marked as used, the world behind neither looks nor acts on it.

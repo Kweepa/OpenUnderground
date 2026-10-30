@@ -412,9 +412,9 @@ public abstract class Lockable : UUObject
                 guiCam.WorldToScreenPoint(keyholePos + 0.05f * unlockTime * Vector3.up);
             if (screenPoint.z > 0.0f)
             {
-                float w = 64;
-                float h = 64 * 1.2f;
-                GUI.DrawTexture(new Rect(screenPoint.x - w / 2, guiCam.pixelHeight - screenPoint.y - h / 2, w, h), tex);
+                float w = UiScale.S(64);
+                float h = UiScale.S(64 * 1.2f);
+                UiScale.DrawTexture(new Rect(screenPoint.x - w / 2, guiCam.pixelHeight - screenPoint.y - h / 2, w, h), tex);
             }
         }
     }

@@ -37,8 +37,9 @@ public class Shrine : UUObject
 #if UNITY_EDITOR
         EditorApplication.ExecuteMenuItem("Window/General/Game");
 #endif
-        float keyboardX = Screen.width / 2 - 200;
-        float keyboardY = Screen.height / 3 + 40;
+        // in screen pixels, as Show() takes them; the offsets are at the interface scale
+        float keyboardX = Screen.width / 2 - UiScale.S(200);
+        float keyboardY = Screen.height / 3 + UiScale.S(40);
         KeyboardGUI.sKeyboard.Show(mantra, result =>
             {
                 // Empty string cancels - process as "not a mantra"

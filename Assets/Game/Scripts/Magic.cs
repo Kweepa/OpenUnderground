@@ -174,8 +174,8 @@ public class Magic : MonoBehaviour
     private const float StaminaGaugeFullWidth = 3 * SpellGaugeWidth;
     private const int WornIconHeight = HudRowHeight - StaminaGaugeGap - GaugeHeight - GaugeShadow;
 
-    /// <summary>Top of the bottom row, for whatever has to keep clear of it: the messages.</summary>
-    public static float HudRowTop => Screen.height - HudRowFromBottom;
+    /// <summary>Top of the bottom row in reference pixels (UiScale), for whatever has to keep clear of it: the messages.</summary>
+    public static float HudRowTop => UiScale.Height - HudRowFromBottom;
 
     /// <summary>Top of the magic panel; every place on it is measured from here.</summary>
     private const float PanelTop = PlayerPanelState.PanelMargin;
@@ -671,7 +671,7 @@ public class Magic : MonoBehaviour
     /// <summary>Whether a point is on the spell list, which belongs to the magic panel for an outside click.</summary>
     public bool SpellListContains(Vector2 guiPoint)
     {
-        return lerpIn >= 0.02f && SpellListPanel.GetRect(lerpIn).Contains(guiPoint);
+        return lerpIn >= 0.02f && UiScale.R(SpellListPanel.GetRect(lerpIn)).Contains(guiPoint);
     }
 
     /// <summary>How often a worn Regeneration or Mana Regeneration gives its point: one world tick.</summary>
@@ -1129,7 +1129,7 @@ public class Magic : MonoBehaviour
             PlayerPanelState.SetPanel(EPlayerPanel.None);
     }
 
-    /// <summary>GUI rect of the sliding magic panel (for outside-click dismiss).</summary>
+    /// <summary>GUI rect of the sliding magic panel in screen pixels (for outside-click dismiss).</summary>
     public Rect GetPanelGuiRectForOutsideClick()
     {
         if (lerpIn < 0.02f)
@@ -1139,7 +1139,7 @@ public class Magic : MonoBehaviour
         Texture2D tex = DataLoader.sDataLoader.panelsTex[1];
         float w = 3 * tex.width;
         float bottom = Mathf.Max(PanelTop + 3.6f * tex.height, PanelTop + 484f + 70f);
-        return new Rect(invPosition, PanelTop, w, bottom - PanelTop);
+        return UiScale.R(invPosition, PanelTop, w, bottom - PanelTop);
     }
 
     public void Start()
@@ -4019,7 +4019,7 @@ public class Magic : MonoBehaviour
         if (GameInput.LastActiveDevice == GameInputDevice.Gamepad)
             return;
 
-        Vector2 guiMouse = GuiInput.MousePositionGuiSpace;
+        Vector2 guiMouse = UiScale.ToRef(GuiInput.MousePositionGuiSpace);
         for (int i = 0; i < 24; ++i)
         {
             if (!hasRunestone[i])
@@ -4042,7 +4042,7 @@ public class Magic : MonoBehaviour
             return;
         if (Event.current.type != EventType.MouseDown || Event.current.button != 0)
             return;
-        Vector2 m = Event.current.mousePosition;
+        Vector2 m = UiScale.ToRef(Event.current.mousePosition);
 
         Texture2D panelTex = DataLoader.sDataLoader.panelsTex[1];
         float panelW = 3 * panelTex.width;
@@ -4104,13 +4104,11 @@ public class Magic : MonoBehaviour
         }
     }
 
+    /// <summary>Draws tex at a rect in reference pixels (UiScale), as everything in the panel and the HUD row is laid out.</summary>
     private void DrawTex(float x, float y, float w, float h, Texture tex)
     {
-        gr.x = x;
-        gr.y = y;
-        gr.width = w;
-        gr.height = h;
-        GUI.DrawTexture(gr, tex);
+        gr = UiScale.R(x, y, w, h);
+        UiScale.DrawTexture(gr, tex);
     }
 
     private void DrawFlask(int x, int flaskY, int type, int numSegs)
@@ -4224,8 +4222,8 @@ public class Magic : MonoBehaviour
 
         if (HudTakesClicks())
         {
-            GuiInput.RegisterBlockingRect(shelfRect);
-            if (GameInput.LastActiveDevice != GameInputDevice.Gamepad && GuiInput.TryConsumeClickInRect(shelfRect))
+            GuiInput.RegisterBlockingRect(UiScale.R(shelfRect));
+            if (GameInput.LastActiveDevice != GameInputDevice.Gamepad && GuiInput.TryConsumeClickInRect(UiScale.R(shelfRect)))
             {
                 TryCastFromSpellRunes();
             }
@@ -4236,9 +4234,9 @@ public class Magic : MonoBehaviour
             Texture2D tex = DataLoader.sDataLoader.objTex[232 + spellInProgress[i]];
             // only the stone: the top-left RuneStone pixels of the image, whose top is v = 1
             Rect stone = new Rect(0, 1 - (float)RuneStone / tex.height, (float)RuneStone / tex.width, (float)RuneStone / tex.height);
-            GUI.DrawTextureWithTexCoords(
-                new Rect(x + RuneShelfEdgeX + (RuneOnShelfWidth + RuneShelfGapPixels) * i, y + RuneShelfEdgeY,
-                         RuneOnShelfWidth, RuneOnShelfHeight),
+            UiScale.DrawTextureWithTexCoords(
+                UiScale.R(x + RuneShelfEdgeX + (RuneOnShelfWidth + RuneShelfGapPixels) * i, y + RuneShelfEdgeY,
+                          RuneOnShelfWidth, RuneOnShelfHeight),
                 tex, stone);
         }
     }
@@ -4316,9 +4314,9 @@ public class Magic : MonoBehaviour
         {
             SSpell spell = spells[activeSpells[i].spell];
             Texture2D tex = GetSpellIcon(activeSpells[i].spell);
-            float y = Screen.height - HudRowFromBottom - 4 - 64 * (i + 1);
+            float y = UiScale.Height - HudRowFromBottom - 4 - 64 * (i + 1);
             DrawIcon(HudRowX, y, 64, tex);
-            GUI.Label(new Rect(HudRowX + 68, y + 20, 100, 20), spell.name, style);
+            GUI.Label(UiScale.R(HudRowX + 68, y + 20, 100, 20), spell.name, UiScale.Style(style));
             float fullTime = activeSpells[i].fullTime > 0 ? activeSpells[i].fullTime : spell.duration;
             DrawGauge(HudRowX + 68, y + 50, SpellGaugeWidth,
                 Mathf.Round(SpellGaugeWidth * Mathf.Min(activeSpells[i].time / fullTime, 1)));
@@ -4335,8 +4333,8 @@ public class Magic : MonoBehaviour
             Rect iconRect = new Rect(HudRowX, y, 64, 64);
             if (hudTakesClicks)
             {
-                GuiInput.RegisterBlockingRect(iconRect);
-                if (GuiInput.TryConsumeClickInRect(iconRect))
+                GuiInput.RegisterBlockingRect(UiScale.R(iconRect));
+                if (GuiInput.TryConsumeClickInRect(UiScale.R(iconRect)))
                 {
                     dispelled = i;
                 }
@@ -4357,7 +4355,7 @@ public class Magic : MonoBehaviour
             float wornLeft = HudRowX + RuneShelfWidth + wornIconGap;
             float psx = wornLeft - (WornIconHeight - wornIconWidth) / 2;
 
-            DrawStaminaGauge(Mathf.Round(wornLeft), Screen.height - PlayerPanelState.PanelMargin);
+            DrawStaminaGauge(Mathf.Round(wornLeft), UiScale.Height - PlayerPanelState.PanelMargin);
 
             // Only the stronger of the two protections counts (GetResistances()), so only it is shown.
             bool greaterProtectionShown = IsSpellKnownActive(ESpell.GreaterMagicProtection);
@@ -4369,7 +4367,7 @@ public class Magic : MonoBehaviour
                     int icon = spells[(int)spell.spell].icon;
                     if (icon >= 0)
                     {
-                        DrawIcon(psx, Screen.height - HudRowFromBottom, WornIconHeight, SpellIcons.Get(icon));
+                        DrawIcon(psx, UiScale.Height - HudRowFromBottom, WornIconHeight, SpellIcons.Get(icon));
                         psx += wornIconStep;
                     }
                 }
@@ -4379,7 +4377,7 @@ public class Magic : MonoBehaviour
             // the lava, so they are not among the permanent spells. Nothing to identify on them.
             if (Inventory.sInv != null && Inventory.sInv.Wearing(EObjectType.DragonskinBoots))
             {
-                DrawIcon(psx, Screen.height - HudRowFromBottom, WornIconHeight, SpellIcons.Get(SpellIcons.LavaResistance));
+                DrawIcon(psx, UiScale.Height - HudRowFromBottom, WornIconHeight, SpellIcons.Get(SpellIcons.LavaResistance));
             }
         }
 
@@ -4435,15 +4433,15 @@ public class Magic : MonoBehaviour
                     if (hasRunestone[index])
                     {
                         style.fontSize = 16;
-                        GUI.Label(new Rect(invPosition + 5, PanelTop, 100, 20), DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + index), style);
+                        GUI.Label(UiScale.R(invPosition + 5, PanelTop, 100, 20), DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + index), UiScale.Style(style));
                     }
                 }
             }
             else if (magicGridHoverRuneIndex >= 0 && hasRunestone[magicGridHoverRuneIndex])
             {
                 style.fontSize = 16;
-                GUI.Label(new Rect(invPosition + 5, PanelTop, 100, 20),
-                    DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + magicGridHoverRuneIndex), style);
+                GUI.Label(UiScale.R(invPosition + 5, PanelTop, 100, 20),
+                    DataLoader.GetCleanedObjectName(EObjectType.RunestoneAn + magicGridHoverRuneIndex), UiScale.Style(style));
             }
 
             // draw current spell runes
@@ -4452,7 +4450,7 @@ public class Magic : MonoBehaviour
                 Texture2D tex = DataLoader.sDataLoader.objTex[232 + spellInProgress[i]];
                 DrawTex(invPosition + PanelShelfX + PanelShelfSlot * i, PanelTop + 414, 3 * tex.width, 3.6f * tex.height, tex);
                 style.fontSize = 16;
-                GUI.Label(new Rect(invPosition + PanelShelfX + 6 + PanelShelfSlot * i, PanelTop + 460, 40, 20), runeShortNames[spellInProgress[i]], style);
+                GUI.Label(UiScale.R(invPosition + PanelShelfX + 6 + PanelShelfSlot * i, PanelTop + 460, 40, 20), runeShortNames[spellInProgress[i]], UiScale.Style(style));
             }
 
             if (lerpIn > 0.02f && GameInput.LastActiveDevice == GameInputDevice.Gamepad)
@@ -4463,13 +4461,13 @@ public class Magic : MonoBehaviour
                 if (activeSpellCursor >= 0 || hasRunestone[index])
                 {
                     DrawTex(invPosition + 60, PanelTop + 484, sz, sz, aButton);
-                    GUI.Label(new Rect(invPosition + 90, PanelTop + 484, 100, 60),
-                        activeSpellCursor >= 0 ? "Dispel" : "Select", style);
+                    GUI.Label(UiScale.R(invPosition + 90, PanelTop + 484, 100, 60),
+                        activeSpellCursor >= 0 ? "Dispel" : "Select", UiScale.Style(style));
                 }
                 if (spellInProgress.Count > 1)
                 {
                     DrawTex(invPosition + 140, PanelTop + 484, sz, sz, xButton);
-                    GUI.Label(new Rect(invPosition + 170, PanelTop + 484, 100, 60), "Cast", style);
+                    GUI.Label(UiScale.R(invPosition + 170, PanelTop + 484, 100, 60), "Cast", UiScale.Style(style));
                 }
                 if (spellInProgress.Count > 0)
                 {
@@ -4505,13 +4503,13 @@ public class Magic : MonoBehaviour
             }
             // the flasks stand on the bottom of the row, like the shelf, the worn spells and the
             // compass: DrawFlask() draws the base down to flaskY + 21
-            int flaskY = Screen.height - (int)(HudRowFromBottom - HudRowHeight) - 21;
+            int flaskY = Mathf.RoundToInt(UiScale.Height) - (int)(HudRowFromBottom - HudRowHeight) - 21;
             DrawFlask(PlayerPanelState.PanelMargin, flaskY, 1, manaSegs);
-            DrawRuneShelf(HudRowX, Screen.height - HudRowFromBottom);
+            DrawRuneShelf(HudRowX, UiScale.Height - HudRowFromBottom);
 
             int numSegs = PlayerData.sData.vitality > 0 ? 13 * PlayerData.sData.hp / PlayerData.sData.vitality : 13;
             int type = PlayerData.sData.poison > 0 ? 2 : 0;
-            DrawFlask((int)(Screen.width - PlayerPanelState.PanelMargin - FlaskWidth), flaskY, type, numSegs);
+            DrawFlask(Mathf.RoundToInt(UiScale.Width - PlayerPanelState.PanelMargin - FlaskWidth), flaskY, type, numSegs);
         }
     }
     

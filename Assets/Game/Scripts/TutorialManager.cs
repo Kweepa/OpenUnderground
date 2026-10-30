@@ -811,8 +811,9 @@ public class TutorialManager : MonoBehaviour
             return;
         }
 
+        // laid out in reference pixels (UiScale) and measured with the style at its reference size
         const float maxTextWidthFraction = 0.55f;
-        float textWidth = Screen.width * maxTextWidthFraction;
+        float textWidth = UiScale.Width * maxTextWidthFraction;
         GUIContent content = new GUIContent(text);
         float textHeight = textStyle.CalcHeight(content, textWidth);
 
@@ -820,8 +821,8 @@ public class TutorialManager : MonoBehaviour
         const float padY = 10f;
         float boxW = textWidth + padX * 2f;
         float boxH = textHeight + padY * 2f;
-        float boxX = (Screen.width - boxW) * 0.5f;
-        float boxY = Screen.height * 0.1f;
+        float boxX = (UiScale.Width - boxW) * 0.5f;
+        float boxY = UiScale.Height * 0.1f;
 
         if (backgroundTex == null)
         {
@@ -830,7 +831,7 @@ public class TutorialManager : MonoBehaviour
             backgroundTex.Apply();
         }
 
-        GUI.DrawTexture(new Rect(boxX, boxY, boxW, boxH), backgroundTex);
+        UiScale.DrawTexture(UiScale.R(boxX, boxY, boxW, boxH), backgroundTex);
         Utils.DropShadowText(text, boxX + padX, boxY + padY, textWidth, textHeight, textStyle);
     }
 

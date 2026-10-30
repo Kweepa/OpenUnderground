@@ -1805,6 +1805,12 @@ public class Conversations : MonoBehaviour
 
     protected void Update()
     {
+        if (SmallWindowWarning.BlocksInput)
+        {
+            // the small-window warning is modal: nothing here answers until it is closed and its keys let go
+            return;
+        }
+
         // Inventory sets controlsDisabled.Inventory while the panel is open — do not gate Conversation.Update on it or dialogue stalls.
         // Still pause while How Many? is open (quantity dialog).
         if (runningConversation != null && (PlayerObject.Player.controlsDisabled & EControlMask.HowMany) == 0)
@@ -1901,9 +1907,10 @@ public class Conversations : MonoBehaviour
         }
     }
 
-    private void DrawTexture(Texture2D tex, int x, int y, float aspect)
+    /// <summary>Draws tex with its top left at x, y in reference pixels (UiScale).</summary>
+    private void DrawTexture(Texture2D tex, float x, float y, float aspect)
     {
-        GUI.DrawTexture(new Rect(x, y, 3.6f / aspect * tex.width, 3.6f * tex.height), tex);
+        UiScale.DrawTexture(UiScale.R(x, y, 3.6f / aspect * tex.width, 3.6f * tex.height), tex);
     }
 
     private static readonly Color32 textColor = new Color32(50, 29, 18, 255);
@@ -1913,16 +1920,27 @@ public class Conversations : MonoBehaviour
 
     /// <summary>
     /// Interpolate layout compression between 1000px (none) and 800px (max): shorter chat log and tighter vertical space around the option strip.
+    /// The heights are reference pixels (UiScale); a screen is never less than 768 of them tall. At the most the
+    /// option strip also loses boxTrim above and below its answers: it moves up by that, and is that much shorter; and its
+    /// top edge, the line under the chat, comes down by dividerDrop over the answers, which do not move.
     /// </summary>
-    private static void GetConversationShortLayout(out float chatCompress, out float gapCompress)
+    private static void GetConversationShortLayout(out float chatCompress, out float gapCompress, out float boxTrim)
+    {
+        GetConversationShortLayout(out chatCompress, out gapCompress, out boxTrim, out _);
+    }
+
+    private static void GetConversationShortLayout(out float chatCompress, out float gapCompress, out float boxTrim,
+        out float dividerDrop)
     {
         const float refHeight = 1000f;
         const float minHeight = 800f;
-        float h = Screen.height;
+        float h = UiScale.Height;
         if (h >= refHeight)
         {
             chatCompress = 0f;
             gapCompress = 0f;
+            boxTrim = 0f;
+            dividerDrop = 0f;
             return;
         }
 
@@ -1930,7 +1948,30 @@ public class Conversations : MonoBehaviour
         t = Mathf.Clamp01(t);
         chatCompress = 100f * t;
         gapCompress = 50f * t;
+        boxTrim = 7f * t;
+        dividerDrop = 8f * t;
     }
+
+    /// <summary>
+    /// The conversation's width in reference pixels (UiScale). It was 882 from the first release; the right side, which
+    /// had 18 pixels between the end of the text and the scroll edge, gave them up on 30 October 2026 (mod 640), and
+    /// everything right of the middle moved left with it, the text keeping its 842.
+    /// </summary>
+    public const float PanelWidth = 864f;
+
+    /// <summary>How much the right half moved left when the panel lost its 20: name box, trade tray, portrait.</summary>
+    private const float RightShift = 882f - PanelWidth;
+
+    /// <summary>Left of the trade trays, from the panel's left edge, for <see cref="Inventory"/>'s trade slots.</summary>
+    public const float LeftTrayX = 140f;
+    public const float RightTrayX = 575f - RightShift;
+
+    /// <summary>
+    /// The panel's left edge in reference pixels: centred, but never so far right that it runs under the inventory,
+    /// which slides in from the right for a trade (1366 wide, the narrowest, puts it four pixels clear).
+    /// </summary>
+    public static float PanelLeft =>
+        Mathf.Min((UiScale.Width - PanelWidth) / 2, UiScale.Width - Inventory.InvSlide - PanelWidth - 4f);
 
     /// <summary>Screen-space rect for the centered conversation UI (matches <see cref="OnGUI"/> layout).</summary>
     public static Rect GetConversationPanelGuiRect()
@@ -1940,14 +1981,14 @@ public class Conversations : MonoBehaviour
             return default;
         }
 
-        GetConversationShortLayout(out float chatCompress, out float gapCompress);
-        const float panelWidth = 882f;
-        float xoff = (Screen.width - panelWidth) * 0.5f;
+        GetConversationShortLayout(out float chatCompress, out float gapCompress, out float boxTrim);
+        const float panelWidth = PanelWidth;
+        float xoff = PanelLeft;
         const float optionsPanelBaseTop = 760f;
-        float optionsTop = optionsPanelBaseTop - chatCompress - gapCompress;
+        float optionsTop = optionsPanelBaseTop - chatCompress - gapCompress - boxTrim;
         const float top = 10f;
-        float bottom = optionsTop + 4f + 160f + 4f;
-        return new Rect(xoff, top, panelWidth, bottom - top);
+        float bottom = optionsTop + 4f + 160f - boxTrim + 4f;
+        return UiScale.R(xoff, top, panelWidth, bottom - top);
     }
 
     /// <summary>Screen-space rect for the conversation chat log (matches <see cref="OnGUI"/> viewRect).</summary>
@@ -1958,11 +1999,10 @@ public class Conversations : MonoBehaviour
             return default;
         }
 
-        GetConversationShortLayout(out float chatCompress, out _);
-        const float panelWidth = 882f;
-        float xoff = (Screen.width - panelWidth) * 0.5f;
-        float viewRectHeight = 500f - chatCompress;
-        return new Rect(xoff + 10f, 200f, 842f, viewRectHeight);
+        GetConversationShortLayout(out float chatCompress, out _, out _, out float dividerDrop);
+        float xoff = PanelLeft;
+        float viewRectHeight = 500f - chatCompress + dividerDrop;
+        return UiScale.R(xoff + 10f, 200f, GambitPanelWidth, viewRectHeight);
     }
 
     private static bool IsChatScrollAllowed()
@@ -2158,7 +2198,7 @@ public class Conversations : MonoBehaviour
             string measure = FormatGambitMeasurement(gambitList[i], i, mouseUi);
             string display = FormatGambitDisplay(gambitList[i], i, mouseUi, highlighted);
             float h = MeasureGambitBlockHeight(textStyle, measure);
-            GUI.Label(new Rect(xLeft, y, GambitPanelWidth, h), new GUIContent(display), textStyle);
+            GUI.Label(UiScale.R(xLeft, y, GambitPanelWidth, h), new GUIContent(display), UiScale.Style(textStyle));
             y += h + GambitLineGap;
         }
     }
@@ -2178,7 +2218,7 @@ public class Conversations : MonoBehaviour
             string measure = FormatGambitMeasurement(gambitList[i], i, mouseUi);
             float h = MeasureGambitBlockHeight(textStyle, measure);
             Rect hit = new Rect(xLeft, y, GambitPanelWidth, h);
-            if (GuiInput.TryConsumeClickInRect(GUI.matrix, hit))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(hit)))
             {
                 SelectGambitAtIndex(i);
                 break;
@@ -2192,30 +2232,32 @@ public class Conversations : MonoBehaviour
     {
         GUI.depth = (int)EGUIDepth.Conversation;
         
-        // center the conversation
-        int xoff = (Screen.width - 882) / 2;
-        GUI.matrix.SetTRS(new Vector3(xoff, 0, 0), Quaternion.identity, Vector3.one);
+        // center the conversation; it is laid out in reference pixels (UiScale)
+        float xoff = PanelLeft;
+        // the gambits are hit-tested through this, from screen to reference pixels
+        Matrix4x4 referenceToScreen = Matrix4x4.Scale(new Vector3(UiScale.Factor, UiScale.Factor, 1f));
 
         if (runningConversation != null)
         {
             GuiInput.RegisterBlockingRect(GetConversationPanelGuiRect());
 
-            GetConversationShortLayout(out float chatCompress, out float gapCompress);
+            GetConversationShortLayout(out float chatCompress, out float gapCompress, out float boxTrim, out float dividerDrop);
             const float chatPaperTop = 194f;
             float chatPaperHeight = 520f - chatCompress;
             float chatScrollRowH = chatPaperHeight / 5f;
-            float viewRectHeight = 500f - chatCompress;
+            // the chat runs down to the line over the answers, wherever dividerDrop puts it
+            float viewRectHeight = 500f - chatCompress + dividerDrop;
             const float optionsPanelBaseTop = 760f;
-            float optionsTop = optionsPanelBaseTop - chatCompress - gapCompress;
-            float optionsInnerY = optionsTop + 4f;
+            float optionsTop = optionsPanelBaseTop - chatCompress - gapCompress - boxTrim;
+            float optionsHeight = 160f - boxTrim;
             float gambitsY = optionsTop + 17f;
 
             DrawTexture(convTex[0], xoff, 10, 1.2f); // name box
-            DrawTexture(convTex[0], xoff + 600, 10, 1.2f); // name box
+            DrawTexture(convTex[0], xoff + 600 - RightShift, 10, 1.2f); // name box
             DrawTexture(convTex[2], xoff, 50, 1.0f); // portrait box
-            DrawTexture(convTex[1], xoff + 140, 50, 1.2f); // trade tray
-            DrawTexture(convTex[1], xoff + 575, 50, 1.2f); // trade tray
-            DrawTexture(convTex[2], xoff + 745, 50, 1.0f); // portrait box
+            DrawTexture(convTex[1], xoff + LeftTrayX, 50, 1.2f); // trade tray
+            DrawTexture(convTex[1], xoff + RightTrayX, 50, 1.2f); // trade tray
+            DrawTexture(convTex[2], xoff + 745 - RightShift, 50, 1.0f); // portrait box
             Critter npc = runningConversation.npc;
             Texture2D npcHeadTex = null;
             if (npc.whoami != EWhoAmI.None)
@@ -2248,7 +2290,7 @@ public class Conversations : MonoBehaviour
             {
                 playerHeadTex = newPlayerPortraits[playerHeadIndex];
             }
-            DrawTexture(playerHeadTex, xoff + 753, 57, 1.0f);
+            DrawTexture(playerHeadTex, xoff + 753 - RightShift, 57, 1.0f);
 
             Texture2D paper = new Texture2D(1, 1);
             paper.SetPixels(new Color[] { paperColor });
@@ -2256,16 +2298,16 @@ public class Conversations : MonoBehaviour
             Texture2D paperEdge = new Texture2D(1, 1);
             paperEdge.SetPixels(new Color[] { paperEdgeColor });
             paperEdge.Apply();
-            GUI.DrawTexture(new Rect(xoff, 190, 882, 4), paperEdge);
-            GUI.DrawTexture(new Rect(xoff, chatPaperTop, 882, chatPaperHeight), paper);
-            GUI.DrawTexture(new Rect(xoff, chatPaperTop + chatPaperHeight, 882, 4), paperEdge);
+            UiScale.DrawTexture(UiScale.R(xoff, 190, PanelWidth, 4), paperEdge);
+            UiScale.DrawTexture(UiScale.R(xoff, chatPaperTop, PanelWidth, chatPaperHeight), paper);
+            UiScale.DrawTexture(UiScale.R(xoff, chatPaperTop + chatPaperHeight, PanelWidth, 4), paperEdge);
             for (int i = 0; i < 5; ++i)
             {
                 float rowY = chatPaperTop + chatScrollRowH * i;
                 Texture2D left = scrledgeTex[i];
-                GUI.DrawTexture(new Rect(xoff, rowY, 3 * left.width, chatScrollRowH), left);
+                UiScale.DrawTexture(UiScale.R(xoff, rowY, 3 * left.width, chatScrollRowH), left);
                 Texture2D right = scrledgeTex[5 + i];
-                GUI.DrawTexture(new Rect(882 + xoff - 12, rowY, 3 * right.width, chatScrollRowH), right);
+                UiScale.DrawTexture(UiScale.R(PanelWidth + xoff - 12, rowY, 3 * right.width, chatScrollRowH), right);
             }
 
             GUIStyle textStyle = new GUIStyle
@@ -2279,26 +2321,30 @@ public class Conversations : MonoBehaviour
 
             if (!waitForEnd && !waitForRelease && !waitAFrameAfterRelease)
             {
-                GUI.DrawTexture(new Rect(xoff, optionsTop, 882, 4), paperEdge);
-                GUI.DrawTexture(new Rect(xoff, optionsInnerY, 882, 160), paper);
-                GUI.DrawTexture(new Rect(xoff, optionsInnerY + 160, 882, 4), paperEdge);
+                // On a short screen the strip overlaps the foot of the chat's paper; its top edge, the line between
+                // the two, comes down by dividerDrop and the answers stay where they are.
+                float stripTop = optionsTop + dividerDrop;
+                float stripHeight = optionsHeight - dividerDrop;
+                UiScale.DrawTexture(UiScale.R(xoff, stripTop, PanelWidth, 4), paperEdge);
+                UiScale.DrawTexture(UiScale.R(xoff, stripTop + 4f, PanelWidth, stripHeight), paper);
+                UiScale.DrawTexture(UiScale.R(xoff, stripTop + 4f + stripHeight, PanelWidth, 4), paperEdge);
                 for (int i = 0; i < 2; ++i)
                 {
                     Texture2D left = scrledgeTex[10 + i];
-                    GUI.DrawTexture(new Rect(xoff, optionsInnerY + 80 * i, 3 * left.width, 80), left);
+                    UiScale.DrawTexture(UiScale.R(xoff, stripTop + 4f + stripHeight / 2 * i, 3 * left.width, stripHeight / 2), left);
                     Texture2D right = scrledgeTex[16 + i];
-                    GUI.DrawTexture(new Rect(882 + xoff - 12, optionsInnerY + 80 * i, 3 * right.width, 80), right);
+                    UiScale.DrawTexture(UiScale.R(PanelWidth + xoff - 12, stripTop + 4f + stripHeight / 2 * i, 3 * right.width, stripHeight / 2), right);
                 }
             }
 
             textStyle.alignment = TextAnchor.MiddleLeft;
             // add this to see attitude changes ({(CritterObject.EAttitude) runningConversation.npc.attitude})
             // would be awesome to have portraits change with attitude... :)
-            GUI.Label(new Rect(xoff + 20, 10, 3 * convTex[0].width - 40, 3.6f * convTex[0].height),
-                $"{runningConversation.npcName}", textStyle);
+            GUI.Label(UiScale.R(xoff + 20, 10, 3 * convTex[0].width - 40, 3.6f * convTex[0].height),
+                $"{runningConversation.npcName}", UiScale.Style(textStyle));
             textStyle.alignment = TextAnchor.MiddleRight;
-            GUI.Label(new Rect(xoff + 620, 10, 3 * convTex[0].width - 40, 3.6f * convTex[0].height), PlayerData.sData.playerName,
-                textStyle);
+            GUI.Label(UiScale.R(xoff + 620 - RightShift, 10, 3 * convTex[0].width - 40, 3.6f * convTex[0].height), PlayerData.sData.playerName,
+                UiScale.Style(textStyle));
 
             textStyle.normal.textColor = textColor;
             textStyle.padding.left = 10;
@@ -2312,7 +2358,7 @@ public class Conversations : MonoBehaviour
             // five step approach below is to avoid clipping the left side of italic characters
             // when the text overflows the rectangle
             // 1. Define your display area
-            Rect viewRect = new Rect(xoff + 10, 200, 842, viewRectHeight);
+            Rect viewRect = new Rect(xoff + 10, 200, GambitPanelWidth, viewRectHeight);
 
             // 2. Calculate how tall the text actually is
             GUIContent content = new GUIContent(convText);
@@ -2342,13 +2388,13 @@ public class Conversations : MonoBehaviour
             }
 
             // 4. Draw using a Group to ensure clean clipping
-            GUI.BeginGroup(viewRect);
+            GUI.BeginGroup(UiScale.R(viewRect));
                 // Use UpperLeft alignment in your style for stability
                 textStyle.alignment = TextAnchor.UpperLeft;
         
                 // 5. Draw the label at our calculated Y position
                 Rect labelRect = new Rect(0, yOffset, viewRect.width, textHeight);
-                GUI.Label(labelRect, content, textStyle);
+                GUI.Label(UiScale.R(labelRect), content, UiScale.Style(textStyle));
             GUI.EndGroup();
             
             if (runningConversation.pauseTime <= 0.0f)
@@ -2371,14 +2417,14 @@ public class Conversations : MonoBehaviour
                                 // write the string to string 0
                                 StringLoader.SetString(runningConversation.stringBlock, 0, runningConversation.babl_input);
                             }
-                        }, null, new Vector2(keyboardX, keyboardY), "Response:", false, false); // allowCancel = false (can't cancel or enter empty string)
+                        }, null, new Vector2(UiScale.S(keyboardX), UiScale.S(keyboardY)), "Response:", false, false); // allowCancel = false (can't cancel or enter empty string)
                     }
                 }
                 else
                 {
                     textStyle.alignment = TextAnchor.UpperLeft;
                     textStyle.clipping = TextClipping.Overflow;
-                    DrawGambitOptions(xoff + 10f, gambitsY, textStyle, gambits, currentGambit, GUI.matrix);
+                    DrawGambitOptions(xoff + 10f, gambitsY, textStyle, gambits, currentGambit, referenceToScreen);
                     TryMousePickGambit(xoff + 10f, gambitsY, textStyle, gambits);
                 }
             }

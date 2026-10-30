@@ -77,6 +77,9 @@ public class FrontEnd : MonoBehaviour
     }
 
     private EState state = EState.Initialize;
+
+    /// <summary>Whether the title's main menu is on screen, for <see cref="SmallWindowWarning"/>.</summary>
+    public bool ShowsMainMenu => state == EState.Menu;
     private SetupScreen setupScreen;
     private CutscenePlayer cutscene;
     private CreateCharacter creator;
@@ -122,8 +125,8 @@ public class FrontEnd : MonoBehaviour
     private Texture2D[] saveScreenshots = new Texture2D[0];
     private int loadScroll;
 
-    /// <summary>How many save rows the menu art has room for.</summary>
-    private const int LOAD_MENU_VISIBLE_ROWS = 10;
+    /// <summary>The most save rows the list shows, on a screen 1080 reference pixels tall or more.</summary>
+    private const int LOAD_MENU_MAX_ROWS = 10;
     private string pendingLoadSlot;
     private bool hasSaves = false;
 
@@ -426,8 +429,11 @@ public class FrontEnd : MonoBehaviour
         case EState.Menu:
             palCycle = ((int)(10 * stateTime)) % openingScreen.Length;
             UpdateFade();
-            // use inputs to highlight and select options
-            UpdateMenu();
+            // use inputs to highlight and select options, unless the small window warning has them
+            if (!SmallWindowWarning.BlocksInput)
+            {
+                UpdateMenu();
+            }
             break;
         case EState.LoadMenu:
             palCycle = ((int)(10 * stateTime)) % openingScreen.Length;
@@ -633,7 +639,7 @@ public class FrontEnd : MonoBehaviour
             }
         }
 
-        float scale = UiScale();
+        float scale = UiScale.Factor;
         float height = 48f * scale;
         Rect row = introduction
             ? new Rect(0, 12f * scale, Screen.width, height)
@@ -730,14 +736,14 @@ public class FrontEnd : MonoBehaviour
 
     private void ClampLoadScroll()
     {
-        int maxScroll = Mathf.Max(0, saves.Length - LOAD_MENU_VISIBLE_ROWS);
+        int maxScroll = Mathf.Max(0, saves.Length - LoadMenuVisibleRows);
         if (menuIndex < loadScroll)
         {
             loadScroll = menuIndex;
         }
-        else if (menuIndex >= loadScroll + LOAD_MENU_VISIBLE_ROWS)
+        else if (menuIndex >= loadScroll + LoadMenuVisibleRows)
         {
-            loadScroll = menuIndex - LOAD_MENU_VISIBLE_ROWS + 1;
+            loadScroll = menuIndex - LoadMenuVisibleRows + 1;
         }
 
         loadScroll = Mathf.Clamp(loadScroll, 0, maxScroll);
@@ -1014,9 +1020,9 @@ public class FrontEnd : MonoBehaviour
 
         // The wheel scrolls the list without moving the selection.
         float wheel = m.scroll.ReadValue().y;
-        if (wheel != 0.0f && saves.Length > LOAD_MENU_VISIBLE_ROWS)
+        if (wheel != 0.0f && saves.Length > LoadMenuVisibleRows)
         {
-            int maxScroll = saves.Length - LOAD_MENU_VISIBLE_ROWS;
+            int maxScroll = saves.Length - LoadMenuVisibleRows;
             loadScroll = Mathf.Clamp(loadScroll + (wheel > 0.0f ? -1 : 1), 0, maxScroll);
         }
 
@@ -1025,7 +1031,7 @@ public class FrontEnd : MonoBehaviour
 
         Vector2 guiMouse = GuiInput.ScreenToGuiMouse(m.position.ReadValue());
 
-        for (int i = loadScroll; i < saves.Length && i < loadScroll + LOAD_MENU_VISIBLE_ROWS; i++)
+        for (int i = loadScroll; i < saves.Length && i < loadScroll + LoadMenuVisibleRows; i++)
         {
             Rect r = GetLoadSlotRectGui(i - loadScroll);
             if (r.Contains(guiMouse))
@@ -1041,47 +1047,64 @@ public class FrontEnd : MonoBehaviour
     }
 
     // --- Screen layout ---------------------------------------------------------------------
-    //
-    // The load screen is laid out in the pixels of a 1920x1080 screen and drawn at one uniform
-    // scale, so it keeps its shape on any monitor instead of stretching with the aspect ratio.
-    // 1920x1080 is the size this project's interface is already drawn at: it is the default
-    // window size in the project settings, and the in game panels are sized in raw pixels to
-    // suit it, so there the scale is 1 and nothing moves. Below that everything shrinks
-    // together, down to 1280x800, the smallest screen these menus are meant to fit - it is a
-    // Steam Deck, and 800 is the height below which panels run off the bottom today. Above it
-    // everything grows together until MaxUiScale, past which the border grows instead of the
-    // menu, so a very large display does not get a billboard.
-    private const float RefScreenWidth = 1920f;
-    private const float RefScreenHeight = 1080f;
-    private const float MaxUiScale = 2.0f;
 
-    // The load screen hangs off the title painted behind it: the list starts where the title
-    // starts, and the preview ends where the title ends. The art is stretched across the whole
-    // screen rect, so those two edges are the same fraction of the width at any resolution.
-    // Measured on the image rather than judged by eye: the title's letters are the colours the
-    // screen cycles - palette indices 64 to 127, the range ReadBYT is told to animate - and they
-    // occupy columns 25 to 295 of the 320 the picture is wide, in one band on rows 35 to 61.
-    private const float TitleLeftFraction = 25f / 320f;
-    private const float TitleRightFraction = 296f / 320f;
+    /// <summary>
+    /// The space above a page's title is this share of its style's top padding: 15% less than the
+    /// style gives, the user's measure for the achievements page of 30 October 2026, and the same on
+    /// every page with a title of its own.
+    /// </summary>
+    private const float PageTitleTopShare = 0.85f;
 
-    // Two characters of air outside the block, so the list and the preview sit just inside the
-    // title rather than flush against its ends, which read as a mistake once it was seen in the
-    // game. Two characters of the row font is about one em, which is the font size itself.
-    private const float LoadBlockInset = LoadRowFontSize;
-
-    // The list takes whatever the preview leaves, down to this floor.
-    private const float LoadListMinWidth = 320f;
-    private const float LoadRowHeight = 65f;
-    private const float LoadRowFontSize = 54f;
-    private const float LoadBlockGap = 40f;
-    private const float LoadBlockTop = 320f;
-
-    private static float UiScale()
+    /// <summary>
+    /// Draws the title of a full-screen page (Achievements, Setup) across the top of the screen at
+    /// the interface scale, in the achievements' header style, at fontSize reference pixels or the
+    /// style's own size; returns its bottom in screen pixels.
+    /// </summary>
+    public float DrawPageTitle(string text, int fontSize = 0)
     {
-        return Mathf.Min(
-            Mathf.Min(Screen.width / RefScreenWidth, Screen.height / RefScreenHeight),
-            MaxUiScale);
+        // Made from the header style on every call, not kept in a field: a GUIStyle field of a component placed in a
+        // scene is filled with an empty style when the Editor reloads the scripts, so a "make it once if null" never
+        // runs, and the title came out in the default font, black and to the left (30 October 2026).
+        GUIStyle source = fontSize > 0 && fontSize != achievementHeaderStyle.fontSize
+            ? new GUIStyle(achievementHeaderStyle) { fontSize = fontSize }
+            : achievementHeaderStyle;
+        GUIStyle header = UiScale.Style(source);
+        header.padding.top = Mathf.RoundToInt(header.padding.top * PageTitleTopShare);
+        GUI.Label(Screen.safeArea, text, header);
+        return Screen.safeArea.y + header.CalcHeight(new GUIContent(text), Screen.safeArea.width);
     }
+    //
+    // The load screen is drawn at the one interface scale, UiScale.
+
+    // The block - the list, a gap, the preview - is laid out in reference pixels at fixed sizes and
+    // centred across the screen, so it keeps its shape from 1366 to 1920 wide. Its top is 270 from
+    // the top of a 1080 line screen, under the logo painted on the art, and the same share of a
+    // shorter one, since the art is stretched to the screen: 192 at 768, below which everything
+    // scales. The list is as long as the height leaves room for.
+    private const float LoadBlockTopShare = 270f / 1080f;
+    // Wide enough for the longest name the game writes itself, "Autosave - Unbroken - Lvl 4", at the
+    // full size of the font, with the em kept for the scroll arrow: 506 + 44 by tools/fontmetrics.py;
+    // the rest of the width is room to spare, chosen so that the block leaves 43 each side at 1366.
+    private const float LoadListWidth = 586f;
+    private const float LoadRowHeight = 65f;
+    private const float LoadRowFontSize = 44f;
+    private const float LoadBlockGap = 30f;
+    private const float LoadBlockMinBottom = 30f;
+
+    /// <summary>
+    /// A name too long for its row is written smaller, down to this share of the row's font, and
+    /// past that cut short with an ellipsis.
+    /// </summary>
+    private const float LoadRowMinFontShare = 0.375f;
+
+    private static float LoadBlockTopNow => LoadBlockTopShare * UiScale.Height;
+
+    /// <summary>
+    /// As many rows as fit between the top of the block and LoadBlockMinBottom above the bottom of
+    /// the screen, up to LOAD_MENU_MAX_ROWS: ten at 1080 lines, eight at 768 and on a Steam Deck.
+    /// </summary>
+    private static int LoadMenuVisibleRows => Mathf.Clamp(
+        Mathf.FloorToInt((UiScale.Height - LoadBlockMinBottom - LoadBlockTopNow) / LoadRowHeight), 1, LOAD_MENU_MAX_ROWS);
 
     /// <summary>
     /// Where the load screen goes, in screen pixels: the list, the preview panel beside it, and
@@ -1089,25 +1112,19 @@ public class FrontEnd : MonoBehaviour
     /// </summary>
     private void GetLoadMenuLayout(out float scale, out Rect list, out Rect panel)
     {
-        scale = UiScale();
+        scale = UiScale.Factor;
 
         // The panel keeps its shape: its size is in the same reference pixels its insides are
-        // laid out in, scaled as one. Only where it sits comes from the title behind it.
-        float panelW = savePanelBackground != null ? 8.0f * savePanelBackground.width * scale : 0.0f;
-        float panelH = savePanelBackground != null ? 4.0f * savePanelBackground.height * scale : 0.0f;
+        // laid out in, scaled as one.
+        float panelW = savePanelBackground != null ? 8.0f * savePanelBackground.width : 0.0f;
+        float panelH = savePanelBackground != null ? 4.0f * savePanelBackground.height : 0.0f;
 
-        float left = TitleLeftFraction * Screen.width + LoadBlockInset * scale;
-        float right = TitleRightFraction * Screen.width - LoadBlockInset * scale;
-        float top = LoadBlockTop * scale;
+        float blockW = LoadListWidth + (panelW > 0.0f ? LoadBlockGap + panelW : 0.0f);
+        float left = (UiScale.Width - blockW) / 2;
+        float top = LoadBlockTopNow;
 
-        float listW = right - left;
-        if (panelW > 0.0f)
-        {
-            listW = Mathf.Max(LoadListMinWidth * scale, listW - panelW - LoadBlockGap * scale);
-        }
-
-        list = new Rect(left, top, listW, LOAD_MENU_VISIBLE_ROWS * LoadRowHeight * scale);
-        panel = panelW > 0.0f ? new Rect(right - panelW, top, panelW, panelH) : default;
+        list = UiScale.R(left, top, LoadListWidth, LoadMenuVisibleRows * LoadRowHeight);
+        panel = panelW > 0.0f ? UiScale.R(left + LoadListWidth + LoadBlockGap, top, panelW, panelH) : default;
     }
 
     /// <summary>
@@ -1258,7 +1275,7 @@ public class FrontEnd : MonoBehaviour
                     style.fontSize = rowFontSize;
                     style.alignment = TextAnchor.UpperLeft;
 
-                    for (int row = 0; row < LOAD_MENU_VISIBLE_ROWS; ++row)
+                    for (int row = 0; row < LoadMenuVisibleRows; ++row)
                     {
                         int i = loadScroll + row;
                         if (i >= saves.Length)
@@ -1277,15 +1294,18 @@ public class FrontEnd : MonoBehaviour
                         // below are drawn at the full size again.
                         string label = saves[i].displayName ?? saves[i].slotName ?? "";
                         // One em of the row less, which is where the scroll arrow sits when there
-                        // is one: a long name stops short of it instead of running underneath.
-                        style.fontSize = SaveUIHelper.FitFontSize(style, label, r.width - rowFontSize,
-                            rowFontSize, Mathf.Max(10, rowFontSize / 2));
+                        // is one: a long name stops short of it instead of running underneath. Past
+                        // the smallest size it is cut short.
+                        float labelWidth = r.width - rowFontSize;
+                        style.fontSize = SaveUIHelper.FitFontSize(style, label, labelWidth,
+                            rowFontSize, Mathf.Max(10, Mathf.RoundToInt(rowFontSize * LoadRowMinFontShare)));
+                        label = Utils.Ellipsize(label, style, labelWidth);
                         GUI.Label(r, label, style);
                         style.fontSize = rowFontSize;
 
                         // There is more list above or below: say so on the first and last row drawn.
                         bool moreAbove = row == 0 && loadScroll > 0;
-                        bool moreBelow = row == LOAD_MENU_VISIBLE_ROWS - 1 && i < saves.Length - 1;
+                        bool moreBelow = row == LoadMenuVisibleRows - 1 && i < saves.Length - 1;
                         if (moreAbove || moreBelow)
                         {
                             style.alignment = TextAnchor.UpperRight;
@@ -1348,34 +1368,35 @@ public class FrontEnd : MonoBehaviour
             foreach (Achievements ach in GameObject.FindObjectsByType<Achievements>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
                 GUI.DrawTexture(Screen.safeArea, achievementsBackground);
-                GUI.Label(Screen.safeArea, "Achievements", achievementHeaderStyle);
-                // draw all achievements is here
-                string numAchieved = ach.DrawAllAchievements(revealAchievements);
-                GUI.Label(new Rect(50, Screen.height - 50, 100, 24), numAchieved, buttonLabelStyle);
+                // The title and the footer at the interface scale.
+                float titleBottom = DrawPageTitle("Achievements");
+                // draw all achievements is here, between the title and the footer
+                string numAchieved = ach.DrawAllAchievements(revealAchievements, titleBottom, Screen.height - UiScale.S(50));
+                GUI.Label(UiScale.R(50, UiScale.Height - 50, 100, 24), numAchieved, UiScale.Style(buttonLabelStyle));
 
                 bool useGamepadIcons = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
 
-                Rect toggleIconRect = new Rect(Screen.width / 2 - 100, Screen.height - 50, 24, 24);
+                Rect toggleIconRect = UiScale.R(UiScale.Width / 2 - 100, UiScale.Height - 50, 24, 24);
                 Texture2D toggleIcon = useGamepadIcons ? yButton : blankKeyTexture;
                 GUI.DrawTexture(toggleIconRect, toggleIcon);
                 if (!useGamepadIcons)
-                    GUI.Label(toggleIconRect, "T", keyLetterStyle);
+                    GUI.Label(toggleIconRect, "T", UiScale.Style(keyLetterStyle));
                 string label = revealAchievements ? "Hide unattained achievements" : "Reveal unattained achievements";
-                Rect toggleTextRect = new Rect(Screen.width / 2 - 60, Screen.height - 50, 240, 24);
-                GUI.Label(toggleTextRect, label, buttonLabelStyle);
+                Rect toggleTextRect = UiScale.R(UiScale.Width / 2 - 60, UiScale.Height - 50, 240, 24);
+                GUI.Label(toggleTextRect, label, UiScale.Style(buttonLabelStyle));
 
-                Rect backIconRect = new Rect(Screen.width - 140, Screen.height - 50, 24, 24);
+                Rect backIconRect = UiScale.R(UiScale.Width - 140, UiScale.Height - 50, 24, 24);
                 Texture2D backIcon = useGamepadIcons ? bButton : escapeKeyTexture;
                 GUI.DrawTexture(backIconRect, backIcon);
-                Rect backTextRect = new Rect(Screen.width - 100, Screen.height - 50, 100, 24);
-                GUI.Label(backTextRect, "Back", buttonLabelStyle);
+                Rect backTextRect = UiScale.R(UiScale.Width - 100, UiScale.Height - 50, 100, 24);
+                GUI.Label(backTextRect, "Back", UiScale.Style(buttonLabelStyle));
 
                 // Mouse click support: click on icon or text.
-                if (GuiInput.TryConsumeClickInRect(new Rect(toggleIconRect.x, toggleIconRect.y, toggleTextRect.xMax - toggleIconRect.x, 28)))
+                if (GuiInput.TryConsumeClickInRect(new Rect(toggleIconRect.x, toggleIconRect.y, toggleTextRect.xMax - toggleIconRect.x, UiScale.S(28))))
                 {
                     ToggleRevealAchievements();
                 }
-                else if (GuiInput.TryConsumeClickInRect(new Rect(backIconRect.x, backIconRect.y, backTextRect.xMax - backIconRect.x, 28)))
+                else if (GuiInput.TryConsumeClickInRect(new Rect(backIconRect.x, backIconRect.y, backTextRect.xMax - backIconRect.x, UiScale.S(28))))
                 {
                     BackFromAchievements();
                 }
@@ -1389,6 +1410,8 @@ public class FrontEnd : MonoBehaviour
             }
             break;
         case EState.PortCredits:
+            // the page's title, and the pages of names under it
+            credits.TextTop = DrawPageTitle("Acknowledgements");
             DrawScreenHints(false);
             break;
         }

@@ -169,20 +169,21 @@ public class KeyboardGUI : MonoBehaviour
         float buttonAreaHeight = 30;
         float panelHeight = TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10; // Extra 10 pixels
         
+        // The panel is laid out in reference pixels (UiScale); the position comes in screen pixels.
         if (position.HasValue)
         {
-            keyboardPosition = position.Value;
+            keyboardPosition = UiScale.ToRef(position.Value);
         }
         else
         {
             // Default: center of screen
-            keyboardPosition = new Vector2((Screen.width - panelWidth) / 2, (Screen.height - panelHeight) / 2);
+            keyboardPosition = new Vector2((UiScale.Width - panelWidth) / 2, (UiScale.Height - panelHeight) / 2);
         }
         
         // Clamp keyboard position to stay on screen with 10 pixel buffer
         float buffer = 10.0f;
-        keyboardPosition.x = Mathf.Clamp(keyboardPosition.x, buffer, Screen.width - panelWidth - buffer);
-        keyboardPosition.y = Mathf.Clamp(keyboardPosition.y, buffer, Screen.height - panelHeight - buffer);
+        keyboardPosition.x = Mathf.Clamp(keyboardPosition.x, buffer, UiScale.Width - panelWidth - buffer);
+        keyboardPosition.y = Mathf.Clamp(keyboardPosition.y, buffer, UiScale.Height - panelHeight - buffer);
         
         // Pause game and disable controls, remembering previous time scale
         previousTimeScale = Time.timeScale;
@@ -233,7 +234,7 @@ public class KeyboardGUI : MonoBehaviour
             Vector2 rightStick = GameInput.CurrentGamepad.rightStick.ReadValue();
             if (rightStick.magnitude > 0.1f) // Dead zone
             {
-                float moveSpeed = 0.3f * Screen.width * Time.unscaledDeltaTime; // Use unscaled time since game is paused
+                float moveSpeed = 0.3f * UiScale.Width * Time.unscaledDeltaTime; // Use unscaled time since game is paused
                 float panelWidth = (KEY_WIDTH + KEY_SPACING) * 10 - KEY_SPACING + PANEL_PADDING * 2;
                 float buttonAreaHeight = 30;
                 float panelHeight = TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10;
@@ -243,8 +244,8 @@ public class KeyboardGUI : MonoBehaviour
                 
                 // Clamp to screen bounds with 10 pixel buffer
                 float buffer = 10.0f;
-                keyboardPosition.x = Mathf.Clamp(keyboardPosition.x, buffer, Screen.width - panelWidth - buffer);
-                keyboardPosition.y = Mathf.Clamp(keyboardPosition.y, buffer, Screen.height - panelHeight - buffer);
+                keyboardPosition.x = Mathf.Clamp(keyboardPosition.x, buffer, UiScale.Width - panelWidth - buffer);
+                keyboardPosition.y = Mathf.Clamp(keyboardPosition.y, buffer, UiScale.Height - panelHeight - buffer);
             }
             
             // Navigation - d-pad only (left stick is used for conversation chat scroll elsewhere)
@@ -457,10 +458,10 @@ public class KeyboardGUI : MonoBehaviour
         float buttonAreaHeight = 30;
         float panelHeight = TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10; // Extra 10 pixels
         Rect panelRect = new Rect(keyboardPosition.x, keyboardPosition.y, panelWidth, panelHeight);
-        GuiInput.RegisterBlockingRect(panelRect);
+        GuiInput.RegisterBlockingRect(UiScale.R(panelRect));
 
         // Draw background panel (extended to include button area)
-        GUI.DrawTexture(panelRect, panelBackgroundTex);
+        UiScale.DrawTexture(UiScale.R(panelRect), panelBackgroundTex);
         
         float currentY = keyboardPosition.y + PANEL_PADDING;
         
@@ -510,14 +511,14 @@ public class KeyboardGUI : MonoBehaviour
         if (!string.IsNullOrEmpty(contextLabel))
         {
             // Label on left side
-            GUI.Label(new Rect(keyboardPosition.x + PANEL_PADDING, currentY, labelStyle.CalcSize(new GUIContent(contextLabel)).x, TEXT_FIELD_HEIGHT), contextLabel, labelStyle);
+            GUI.Label(UiScale.R(keyboardPosition.x + PANEL_PADDING, currentY, labelStyle.CalcSize(new GUIContent(contextLabel)).x, TEXT_FIELD_HEIGHT), contextLabel, UiScale.Style(labelStyle));
         }
 
-        GUI.Label(new Rect(textFieldX, currentY, textFieldWidth, TEXT_FIELD_HEIGHT), currentText, textFieldStyle);
+        GUI.Label(UiScale.R(textFieldX, currentY, textFieldWidth, TEXT_FIELD_HEIGHT), currentText, UiScale.Style(textFieldStyle));
         float enteredTextWidth = textFieldStyle.CalcSize(new GUIContent(currentText)).x;
         if (IsTextEntryCursorVisible())
         {
-            GUI.Label(new Rect(textFieldX + enteredTextWidth, currentY, textFieldWidth - enteredTextWidth, TEXT_FIELD_HEIGHT), TextEntryCursor, textFieldStyle);
+            GUI.Label(UiScale.R(textFieldX + enteredTextWidth, currentY, textFieldWidth - enteredTextWidth, TEXT_FIELD_HEIGHT), TextEntryCursor, UiScale.Style(textFieldStyle));
         }
         currentY += TEXT_FIELD_HEIGHT + PANEL_PADDING;
         
@@ -543,13 +544,13 @@ public class KeyboardGUI : MonoBehaviour
                 
                 // Draw key background
                 GUI.color = bgColor;
-                GUI.DrawTexture(new Rect(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), keyBackgroundTex);
+                UiScale.DrawTexture(UiScale.R(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), keyBackgroundTex);
                 GUI.color = Color.white;
                 
                 // Draw cursor if selected
                 if (isSelected && cursor != null)
                 {
-                    GUI.DrawTexture(new Rect(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), cursor);
+                    UiScale.DrawTexture(UiScale.R(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), cursor);
                 }
                 
                 // Draw key label - use shifted array when shift is active
@@ -558,7 +559,7 @@ public class KeyboardGUI : MonoBehaviour
                 // Larger font for everything except Shift, Space, and Del
                 int keyFontSize = (displayKey == "Shift" || displayKey == "Space" || displayKey == "Del") ? 14 : 24;
                 GUIStyle keyStyle = new GUIStyle { font = font, normal = { textColor = txtColor }, fontSize = keyFontSize, alignment = TextAnchor.MiddleCenter };
-                GUI.Label(new Rect(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), displayKey, keyStyle);
+                GUI.Label(UiScale.R(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), displayKey, UiScale.Style(keyStyle));
                 
                 currentX += KEY_WIDTH + KEY_SPACING;
             }
@@ -580,14 +581,14 @@ public class KeyboardGUI : MonoBehaviour
             {
                 if (mouseRightButtonHint != null)
                 {
-                    GUI.DrawTexture(new Rect(buttonX, buttonY, buttonSize, buttonSize), mouseRightButtonHint);
-                    GUI.Label(new Rect(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", buttonLabelStyle);
+                    UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), mouseRightButtonHint);
+                    GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", UiScale.Style(buttonLabelStyle));
                 }
             }
             else if (xButton != null)
             {
-                GUI.DrawTexture(new Rect(buttonX, buttonY, buttonSize, buttonSize), xButton);
-                GUI.Label(new Rect(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", buttonLabelStyle);
+                UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), xButton);
+                GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", UiScale.Style(buttonLabelStyle));
             }
         }
         
@@ -596,9 +597,9 @@ public class KeyboardGUI : MonoBehaviour
         {
             float buttonSize = 24;
             float buttonX = keyboardPosition.x + (panelWidth - buttonSize) / 2.0f;
-            GUI.DrawTexture(new Rect(buttonX, buttonY, buttonSize, buttonSize), bButton);
+            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), bButton);
             GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
-            GUI.Label(new Rect(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Clear", buttonLabelStyle);
+            GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Clear", UiScale.Style(buttonLabelStyle));
         }
         
         // Y button + Enter label (bottom right) — gamepad hint only
@@ -606,15 +607,15 @@ public class KeyboardGUI : MonoBehaviour
         {
             float buttonSize = 24;
             float buttonX = keyboardPosition.x + panelWidth - PANEL_PADDING - buttonSize - 50;
-            GUI.DrawTexture(new Rect(buttonX, buttonY, buttonSize, buttonSize), yButton);
+            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), yButton);
             GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
-            GUI.Label(new Rect(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Enter", buttonLabelStyle);
+            GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Enter", UiScale.Style(buttonLabelStyle));
         }
 
         if (GuiInput.IsLeftMouseDownGui)
         {
             string trimmedText = currentText?.Trim() ?? "";
-            if (!panelRect.Contains(Event.current.mousePosition))
+            if (!panelRect.Contains(UiScale.ToRef(Event.current.mousePosition)))
             {
                 if (!string.IsNullOrEmpty(trimmedText))
                 {
@@ -640,7 +641,7 @@ public class KeyboardGUI : MonoBehaviour
                 for (int col = 0; col < 10; col++)
                 {
                     Rect keyRect = new Rect(cx, cy, KEY_WIDTH, KEY_HEIGHT);
-                    if (keyRect.Contains(Event.current.mousePosition))
+                    if (keyRect.Contains(UiScale.ToRef(Event.current.mousePosition)))
                     {
                         cursorX = col;
                         cursorY = row;
@@ -667,7 +668,7 @@ public class KeyboardGUI : MonoBehaviour
                     cancelHitW = xButton != null ? buttonSize + 90f : 0f;
 
                 if (cancelHitW > 0f
-                    && GuiInput.TryConsumeClickInRect(new Rect(keyboardPosition.x + PANEL_PADDING, buttonAreaY, cancelHitW, buttonSize + 8)))
+                    && GuiInput.TryConsumeClickInRect(UiScale.R(keyboardPosition.x + PANEL_PADDING, buttonAreaY, cancelHitW, buttonSize + 8)))
                 {
                     MarkMapPrimaryClickHandled();
                     Cancel();
@@ -678,7 +679,7 @@ public class KeyboardGUI : MonoBehaviour
             if (bButton != null && !string.IsNullOrEmpty(currentText?.Trim()))
             {
                 float bx = keyboardPosition.x + (panelWidth - buttonSize) / 2.0f;
-                if (GuiInput.TryConsumeClickInRect(new Rect(bx, buttonAreaY, 120, buttonSize + 8)))
+                if (GuiInput.TryConsumeClickInRect(UiScale.R(bx, buttonAreaY, 120, buttonSize + 8)))
                 {
                     MarkMapPrimaryClickHandled();
                     currentText = "";
@@ -690,14 +691,14 @@ public class KeyboardGUI : MonoBehaviour
             if (yButton != null && !string.IsNullOrEmpty(currentText?.Trim()))
             {
                 float yx = keyboardPosition.x + panelWidth - PANEL_PADDING - buttonSize - 50;
-                if (GuiInput.TryConsumeClickInRect(new Rect(yx, buttonAreaY, 130, buttonSize + 8)))
+                if (GuiInput.TryConsumeClickInRect(UiScale.R(yx, buttonAreaY, 130, buttonSize + 8)))
                 {
                     MarkMapPrimaryClickHandled();
                     Confirm();
                 }
             }
 
-            GuiInput.TryConsumeClickInPanel(panelRect);
+            GuiInput.TryConsumeClickInPanel(UiScale.R(panelRect));
         }
     }
 }

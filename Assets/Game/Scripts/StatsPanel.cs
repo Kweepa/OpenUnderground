@@ -79,7 +79,7 @@ public class StatsPanel : MonoBehaviour
         return pinnedOpen || holdTime > 0f || lerpIn > 0.002f;
     }
 
-    /// <summary>GUI rect of the sliding stats panel (for outside-click dismiss).</summary>
+    /// <summary>GUI rect of the sliding stats panel in screen pixels (for outside-click dismiss).</summary>
     public Rect GetPanelGuiRectForOutsideClick()
     {
         if (lerpIn < 0.001f || background == null)
@@ -87,7 +87,7 @@ public class StatsPanel : MonoBehaviour
             return default;
         }
 
-        return GetPanelRect();
+        return UiScale.R(GetPanelRect());
     }
 
     // The panel is drawn without the outer row of pixels on its top, bottom and right, to take
@@ -115,13 +115,13 @@ public class StatsPanel : MonoBehaviour
         onLeft = fromGamepad && PlayerData.sData != null && !PlayerData.sData.leftHanded;
     }
 
-    /// <summary>The panel as drawn, on its side and sliding in from it.</summary>
+    /// <summary>The panel as drawn, on its side and sliding in from it, in reference pixels (UiScale).</summary>
     private Rect GetPanelRect()
     {
         float w = ScaleX * (background.width - CropRight);
         float h = ScaleY * (background.height - CropTop - CropBottom);
         float slide = lerpIn * (w + PlayerPanelState.PanelMargin);
-        float x = onLeft ? slide - w : Screen.width - slide;
+        float x = onLeft ? slide - w : UiScale.Width - slide;
         return new Rect(x, PlayerPanelState.PanelMargin, w, h);
     }
 
@@ -212,19 +212,19 @@ public class StatsPanel : MonoBehaviour
 
             GUIStyle rightStyle = new GUIStyle(style) { alignment = TextAnchor.UpperRight };
             
-            GUI.DrawTextureWithTexCoords(panel, tex,
+            UiScale.DrawTextureWithTexCoords(UiScale.R(panel), tex,
                 new Rect(0, (float)CropBottom / tex.height, (float)(tex.width - CropRight) / tex.width,
                          (float)(tex.height - CropTop - CropBottom) / tex.height));
 
             style.alignment = TextAnchor.UpperCenter;
             // centred over the two columns of stats below, which run from 33 to 370
-            GUI.Label(new Rect(invPosition + 33, top + 20, 337, style.fontSize), PlayerData.sData.playerName, style);
+            GUI.Label(UiScale.R(invPosition + 33, top + 20, 337, style.fontSize), PlayerData.sData.playerName, UiScale.Style(style));
             style.alignment = TextAnchor.UpperLeft;
-            GUI.Label(new Rect(invPosition + 33, top + 57, 170, style.fontSize), PlayerData.sData.playerClass.ToString(), style);
+            GUI.Label(UiScale.R(invPosition + 33, top + 57, 170, style.fontSize), PlayerData.sData.playerClass.ToString(), UiScale.Style(style));
             string level = PlayerData.sData.charLevel < 4
                 ? new [] { "1st", "2nd", "3rd" }[PlayerData.sData.charLevel - 1]
                 : PlayerData.sData.charLevel.ToString() + "th"; 
-            GUI.Label(new Rect(invPosition + 33, top + 57, 337, style.fontSize), level, rightStyle);
+            GUI.Label(UiScale.R(invPosition + 33, top + 57, 337, style.fontSize), level, UiScale.Style(rightStyle));
 
             style.fontSize = 24;
             rightStyle.fontSize = 24;
@@ -246,13 +246,13 @@ public class StatsPanel : MonoBehaviour
                 Rect r = new Rect(invPosition + 33 + 187 * (i / 3), top + 97 + 30 * (i % 3), 150, style.fontSize);
                 if (i == 5 && vals[i].Length > 2)
                 {
-                    GUI.Label(r, "Exp.", style);
+                    GUI.Label(UiScale.R(r), "Exp.", UiScale.Style(style));
                 }
                 else
                 {
-                    GUI.Label(r, stats[i], style);
+                    GUI.Label(UiScale.R(r), stats[i], UiScale.Style(style));
                 }
-                GUI.Label(r, vals[i], rightStyle);
+                GUI.Label(UiScale.R(r), vals[i], UiScale.Style(rightStyle));
             }
 
             // One sentence a line, as the strings' own line breaks have it, with what changes in bold.
@@ -299,13 +299,13 @@ public class StatsPanel : MonoBehaviour
             // and the poison - to seven lines, above the skills.
             style.fontSize = 20;
             style.fontStyle = FontStyle.Normal;
-            GUI.Label(new Rect(invPosition + 30, top + 200, 365, 177), status, style);
+            GUI.Label(UiScale.R(invPosition + 30, top + 200, 365, 177), status, UiScale.Style(style));
             style.richText = false;
 
             style.fontSize = 24;
             style.fontStyle = PlayerData.sData.skillPoints > 0 ? FontStyle.Italic : FontStyle.Normal;
             // "Available skill points" is ours: the original shows no such line, nor any string for it
-            GUI.Label(new Rect(invPosition + 47, top + 635, 333, style.fontSize), $"Available skill points {PlayerData.sData.skillPoints}", style);
+            GUI.Label(UiScale.R(invPosition + 47, top + 635, 333, style.fontSize), $"Available skill points {PlayerData.sData.skillPoints}", UiScale.Style(style));
 
             style.fontSize = 24;
             rightStyle.fontSize = 24;
@@ -325,8 +325,8 @@ public class StatsPanel : MonoBehaviour
                 style.normal.textColor = new Color(0.5f, 0.5f, 0.7f) * (1.0f + PlayerData.sData.skill[i] / 60.0f);
                 rightStyle.normal.textColor = style.normal.textColor;
 
-                GUI.Label(new Rect(invPosition + x, y, columnWidth, style.fontSize), ((ESkill)i).ToString(), style);
-                GUI.Label(new Rect(invPosition + x, y, columnWidth, style.fontSize), PlayerData.sData.skill[i].ToString(), rightStyle);
+                GUI.Label(UiScale.R(invPosition + x, y, columnWidth, style.fontSize), ((ESkill)i).ToString(), UiScale.Style(style));
+                GUI.Label(UiScale.R(invPosition + x, y, columnWidth, style.fontSize), PlayerData.sData.skill[i].ToString(), UiScale.Style(rightStyle));
             }
         }
     }

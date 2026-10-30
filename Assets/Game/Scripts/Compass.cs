@@ -101,15 +101,20 @@ namespace Game.Scripts
 
             Texture2D partialTex = compassTex[partial];
             Texture2D northTex = DataLoader.sDataLoader.compassTex[4 + north];
-            int x = Screen.width - 260;
-            int y = Screen.height - 90;
-            if ((PlayerObject.Player.controlsDisabled & (EControlMask.Map)) > 0)
+            // In the HUD the compass is in reference pixels, at the interface scale. Over the map it
+            // sits on the map's picture, which is stretched to the screen, so there it keeps to
+            // screen pixels as the rest of the map does.
+            bool onMap = (PlayerObject.Player.controlsDisabled & (EControlMask.Map)) > 0;
+            float s = onMap ? 1.0f : UiScale.Factor;
+            float x = s * (UiScale.Width - 260);
+            float y = s * (UiScale.Height - 90);
+            if (onMap)
             {
                 x = Screen.width - 42 * Screen.width / 320 - 3 * partialTex.width / 2;
                 y = Screen.height - 12 * Screen.height / 200 - 3 * partialTex.height / 2;
             }
-            GUI.DrawTexture(new Rect(x, y, 3 * partialTex.width, 3 * partialTex.height), partialTex);
-            GUI.DrawTexture(new Rect(x + 3 * northOffsetsX[north], y + 3 * northOffsetsY[north], 3 * northTex.width, 3 * northTex.height), northTex);
+            UiScale.DrawTexture(new Rect(x, y, s * 3 * partialTex.width, s * 3 * partialTex.height), partialTex);
+            UiScale.DrawTexture(new Rect(x + s * 3 * northOffsetsX[north], y + s * 3 * northOffsetsY[north], s * 3 * northTex.width, s * 3 * northTex.height), northTex);
         }
     }
 }

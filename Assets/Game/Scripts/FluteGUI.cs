@@ -171,6 +171,12 @@ public class FluteGUI : MonoBehaviour
 
     public void Update()
     {
+        if (SmallWindowWarning.BlocksInput)
+        {
+            // the small-window warning is modal: nothing here answers until it is closed and its keys let go
+            return;
+        }
+
         if (GameInput.EscapePressedThisFrame()
             || (Gamepad.current?.bButton.wasReleasedThisFrame ?? false))
         {
@@ -206,8 +212,8 @@ public class FluteGUI : MonoBehaviour
         GUI.depth = (int)EGUIDepth.Flute;
 
         Texture2D tex = DataLoader.sDataLoader.invTex[6];
-        Rect r = new Rect((Screen.width - 3 * tex.width) / 2, (Screen.height - 3.6f * tex.height) / 2, 3 * tex.width, 3.6f * tex.height);
-        GuiInput.RegisterBlockingRect(r);
+        Rect r = new Rect((UiScale.Width - 3 * tex.width) / 2, (UiScale.Height - 3.6f * tex.height) / 2, 3 * tex.width, 3.6f * tex.height);
+        GuiInput.RegisterBlockingRect(UiScale.R(r));
         Event e = Event.current;
         if (e.type == EventType.KeyDown)
         {
@@ -222,31 +228,31 @@ public class FluteGUI : MonoBehaviour
 
         bool mouseKbHints = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
 
-        GUI.DrawTexture(r, tex);
+        UiScale.DrawTexture(UiScale.R(r), tex);
         if (!mouseKbHints)
         {
-            GUI.DrawTexture(new Rect(r.x + 29, r.y + 69, 24, 24), upDownTex);
+            UiScale.DrawTexture(UiScale.R(r.x + 29, r.y + 69, 24, 24), upDownTex);
         }
         tex = DataLoader.sDataLoader.objTex[(int)instrumentType];
-        GUI.DrawTexture(new Rect(r.x + 38, r.y + 32, 3 * tex.width, 3.6f * tex.height), tex);
+        UiScale.DrawTexture(UiScale.R(r.x + 38, r.y + 32, 3 * tex.width, 3.6f * tex.height), tex);
 
         if (mouseKbHints)
         {
-            GUI.DrawTexture(new Rect(r.x + 100, r.y + 30, 24, 24), blankKeyTex);
-            GUI.Label(new Rect(r.x + 100, r.y + 30, 24, 24), "0", keyLetterStyle);
-            GUI.Label(new Rect(r.x + 125, r.y + 30, 20, 29), "-", tuneStyle);
-            GUI.DrawTexture(new Rect(r.x + 130, r.y + 30, 24, 24), blankKeyTex);
-            GUI.Label(new Rect(r.x + 130, r.y + 30, 24, 24), "9", keyLetterStyle);
-            GUI.Label(new Rect(r.x + 160, r.y + 30, 120, 29), "Play", tuneStyle);
+            UiScale.DrawTexture(UiScale.R(r.x + 100, r.y + 30, 24, 24), blankKeyTex);
+            GUI.Label(UiScale.R(r.x + 100, r.y + 30, 24, 24), "0", UiScale.Style(keyLetterStyle));
+            GUI.Label(UiScale.R(r.x + 125, r.y + 30, 20, 29), "-", UiScale.Style(tuneStyle));
+            UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 30, 24, 24), blankKeyTex);
+            GUI.Label(UiScale.R(r.x + 130, r.y + 30, 24, 24), "9", UiScale.Style(keyLetterStyle));
+            GUI.Label(UiScale.R(r.x + 160, r.y + 30, 120, 29), "Play", UiScale.Style(tuneStyle));
 
             Rect escHintRect = new Rect(r.x + 130, r.y + 60, 140, 29);
             if (escapeKeyTex != null)
             {
-                GUI.DrawTexture(new Rect(r.x + 130, r.y + 60, 24, 24), escapeKeyTex);
+                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 60, 24, 24), escapeKeyTex);
             }
-            GUI.Label(new Rect(r.x + 160, r.y + 60, 120, 29), "Stop", tuneStyle);
+            GUI.Label(UiScale.R(r.x + 160, r.y + 60, 120, 29), "Stop", UiScale.Style(tuneStyle));
 
-            if (GuiInput.TryConsumeClickInRect(escHintRect))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(escHintRect)))
             {
                 DismissFlute();
                 return;
@@ -254,22 +260,22 @@ public class FluteGUI : MonoBehaviour
         }
         else
         {
-            GUI.Label(new Rect(r.x + 77, r.y + 22, 32, 32), $"{note}", noteStyle);
+            GUI.Label(UiScale.R(r.x + 77, r.y + 22, 32, 32), $"{note}", UiScale.Style(noteStyle));
 
             if (aButtonTex != null)
             {
-                GUI.DrawTexture(new Rect(r.x + 130, r.y + 30, 24, 24), aButtonTex);
+                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 30, 24, 24), aButtonTex);
             }
-            GUI.Label(new Rect(r.x + 160, r.y + 30, 100, 20), "Play", tuneStyle);
+            GUI.Label(UiScale.R(r.x + 160, r.y + 30, 100, 20), "Play", UiScale.Style(tuneStyle));
             if (bButtonTex != null)
             {
-                GUI.DrawTexture(new Rect(r.x + 130, r.y + 60, 24, 24), bButtonTex);
+                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 60, 24, 24), bButtonTex);
             }
-            GUI.Label(new Rect(r.x + 160, r.y + 60, 100, 20), "Stop", tuneStyle);
+            GUI.Label(UiScale.R(r.x + 160, r.y + 60, 100, 20), "Stop", UiScale.Style(tuneStyle));
         }
 
-        GUI.Label(new Rect(r.x + 80, r.y + 100, 100, 20), tune, tuneStyle);
+        GUI.Label(UiScale.R(r.x + 80, r.y + 100, 100, 20), tune, UiScale.Style(tuneStyle));
         //GUI.Label(Screen.safeArea, "354237875");
-        GuiInput.TryConsumeClickInPanel(r);
+        GuiInput.TryConsumeClickInPanel(UiScale.R(r));
     }
 }

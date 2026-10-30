@@ -359,29 +359,29 @@ public class GameDirectoryDialog : MonoBehaviour
         // Draw background
         GUI.Box(new Rect(0, 0, Screen.width, Screen.height), "");
         
-        // Calculate dialog area (centered, with padding for 2x font sizes)
+        // Calculate dialog area (centered, with padding for 2x font sizes), in reference pixels (UiScale)
         float dialogWidth = 900;
         float dialogHeight = 650;
-        float dialogX = Screen.width / 2 - dialogWidth / 2;
-        float dialogY = Screen.height / 2 - dialogHeight / 2;
+        float dialogX = UiScale.Width / 2 - dialogWidth / 2;
+        float dialogY = UiScale.Height / 2 - dialogHeight / 2;
         
         // Draw background rectangle
         Color originalColor = GUI.color;
         GUI.color = backgroundColor;
-        GUI.DrawTexture(new Rect(dialogX, dialogY, dialogWidth, dialogHeight), Texture2D.whiteTexture);
+        UiScale.DrawTexture(UiScale.R(dialogX, dialogY, dialogWidth, dialogHeight), Texture2D.whiteTexture);
         GUI.color = originalColor;
         
         // Title - centered at top with padding
         float titleY = dialogY + 40;
-        GUI.Label(new Rect(dialogX, titleY, dialogWidth, 100), 
-            "Select Game Installation Directory", titleStyle);
+        GUI.Label(UiScale.R(dialogX, titleY, dialogWidth, 100), 
+            "Select Game Installation Directory", UiScale.Style(titleStyle));
         
         // Instructions - centered below title with good spacing; hidden while the search at start may still find the game
         float instructionsY = titleY + 100;
         if (!startupSearch)
         {
-            GUI.Label(new Rect(dialogX + 60, instructionsY, dialogWidth - 120, 100),
-                "Press Auto Search to look for the original game, or Browse to pick it in its installation folder - GOG, Steam or the original DOS game - search for: game.gog, game.bin or UW.EXE.", labelStyle);
+            GUI.Label(UiScale.R(dialogX + 60, instructionsY, dialogWidth - 120, 100),
+                "Press Auto Search to look for the original game, or Browse to pick it in its installation folder - GOG, Steam or the original DOS game - search for: game.gog, game.bin or UW.EXE.", UiScale.Style(labelStyle));
         }
         
         // Path input section - centered vertically in dialog
@@ -399,7 +399,7 @@ public class GameDirectoryDialog : MonoBehaviour
         DrawButtonWithBox(textFieldRect, "", textFieldSelected);
         
         GUI.SetNextControlName("pathInput");
-        inputPath = GUI.TextField(textFieldRect, inputPath, textFieldStyle);
+        inputPath = GUI.TextField(UiScale.R(textFieldRect), inputPath, UiScale.Style(textFieldStyle));
         
         // Keep focus on text field if it's selected
         if (selectedControl == ESelectedControl.TextField)
@@ -411,7 +411,7 @@ public class GameDirectoryDialog : MonoBehaviour
         Rect browseRect = new Rect(dialogX + dialogWidth - 60 - browseButtonWidth, inputSectionY + 70, browseButtonWidth, 60);
         bool browseSelected = selectedControl == ESelectedControl.Browse;
         DrawButtonWithBox(browseRect, "Browse", browseSelected);
-        if (GUI.Button(browseRect, "Browse", buttonStyle))
+        if (GUI.Button(UiScale.R(browseRect), "Browse", UiScale.Style(buttonStyle)))
         {
             BrowseForFolder();
         }
@@ -434,8 +434,8 @@ public class GameDirectoryDialog : MonoBehaviour
                 GUI.color = Color.red;
             }
             
-            GUI.Label(new Rect(dialogX + 60, statusY, dialogWidth - 120, 100), 
-                statusMessage, statusStyle);
+            GUI.Label(UiScale.R(dialogX + 60, statusY, dialogWidth - 120, 100), 
+                statusMessage, UiScale.Style(statusStyle));
             GUI.color = originalColor;
         }
         
@@ -450,7 +450,7 @@ public class GameDirectoryDialog : MonoBehaviour
         Rect autoSearchRect = new Rect(buttonStartX, buttonsY, buttonWidth, 80);
         bool autoSearchSelected = selectedControl == ESelectedControl.AutoSearch;
         DrawButtonWithBox(autoSearchRect, "Auto Search", autoSearchSelected);
-        if (GUI.Button(autoSearchRect, "Auto Search", buttonStyle))
+        if (GUI.Button(UiScale.R(autoSearchRect), "Auto Search", UiScale.Style(buttonStyle)))
         {
             StartCoroutine(AutoSearch());
         }
@@ -462,7 +462,7 @@ public class GameDirectoryDialog : MonoBehaviour
         bool canValidate = CanValidate();
         GUI.enabled = canValidate;
         DrawButtonWithBox(validateRect, "Validate Path", validateSelected && canValidate);
-        if (GUI.Button(validateRect, "Validate Path", buttonStyle))
+        if (GUI.Button(UiScale.R(validateRect), "Validate Path", UiScale.Style(buttonStyle)))
         {
             ValidateInputPath();
         }
@@ -474,7 +474,7 @@ public class GameDirectoryDialog : MonoBehaviour
         bool continueSelected = selectedControl == ESelectedControl.ContinueQuit;
         string continueButtonText = "Quit";
         DrawButtonWithBox(continueRect, continueButtonText, continueSelected);
-        if (GUI.Button(continueRect, continueButtonText, buttonStyle))
+        if (GUI.Button(UiScale.R(continueRect), continueButtonText, UiScale.Style(buttonStyle)))
         {
             Application.Quit();
         }
@@ -493,7 +493,7 @@ public class GameDirectoryDialog : MonoBehaviour
     private void DrawButtonWithBox(Rect buttonRect, string text, bool isSelected)
     {
         // Check if mouse is over the button or if controller selected
-        bool isHighlighted = buttonRect.Contains(Event.current.mousePosition) || isSelected;
+        bool isHighlighted = buttonRect.Contains(UiScale.ToRef(Event.current.mousePosition)) || isSelected;
         Color boxColor = isHighlighted ? buttonBoxHighlightColor : buttonBoxColor;
         // A greyed-out button has a dark box, and neither the pointer nor the pad's selection lights it.
         if (!GUI.enabled)
@@ -507,13 +507,13 @@ public class GameDirectoryDialog : MonoBehaviour
         GUI.color = boxColor;
         
         // Top line
-        GUI.DrawTexture(new Rect(buttonRect.x, buttonRect.y, buttonRect.width, lineWidth), Texture2D.whiteTexture);
+        UiScale.DrawTexture(UiScale.R(buttonRect.x, buttonRect.y, buttonRect.width, lineWidth), Texture2D.whiteTexture);
         // Bottom line
-        GUI.DrawTexture(new Rect(buttonRect.x, buttonRect.y + buttonRect.height - lineWidth, buttonRect.width, lineWidth), Texture2D.whiteTexture);
+        UiScale.DrawTexture(UiScale.R(buttonRect.x, buttonRect.y + buttonRect.height - lineWidth, buttonRect.width, lineWidth), Texture2D.whiteTexture);
         // Left line
-        GUI.DrawTexture(new Rect(buttonRect.x, buttonRect.y, lineWidth, buttonRect.height), Texture2D.whiteTexture);
+        UiScale.DrawTexture(UiScale.R(buttonRect.x, buttonRect.y, lineWidth, buttonRect.height), Texture2D.whiteTexture);
         // Right line
-        GUI.DrawTexture(new Rect(buttonRect.x + buttonRect.width - lineWidth, buttonRect.y, lineWidth, buttonRect.height), Texture2D.whiteTexture);
+        UiScale.DrawTexture(UiScale.R(buttonRect.x + buttonRect.width - lineWidth, buttonRect.y, lineWidth, buttonRect.height), Texture2D.whiteTexture);
         
         GUI.color = originalColor;
     }

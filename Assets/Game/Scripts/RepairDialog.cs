@@ -190,6 +190,11 @@ public class RepairDialog : MonoBehaviour
     protected void Update()
     {
         PlayerObject.DisableControls(EControlMask.RepairDialog, IsActive());
+        if (SmallWindowWarning.BlocksInput)
+        {
+            // the small-window warning is modal: nothing here answers until it is closed and its keys let go
+            return;
+        }
 
         if (IsOpen && GameInput.EscapePressedThisFrame())
         {
@@ -302,28 +307,28 @@ public class RepairDialog : MonoBehaviour
             // six rows the last one landed on top of the buttons.
             float h = 7 * tex.height;
 
-            Rect r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
-            GuiInput.RegisterBlockingRect(r);
-            GUI.DrawTexture(r, tex);
+            Rect r = new Rect((UiScale.Width - w) / 2, (UiScale.Height - h) / 2, w, h);
+            GuiInput.RegisterBlockingRect(UiScale.R(r));
+            UiScale.DrawTexture(UiScale.R(r), tex);
 
             // Item icon on the left
             Texture2D itemTex = itemToRepair.GetInventoryTex();
             if (itemTex != null)
             {
-                GUI.DrawTexture(new Rect(r.x + 30, r.y + 20, 3 * itemTex.width, 3.6f * itemTex.height), itemTex);
+                UiScale.DrawTexture(UiScale.R(r.x + 30, r.y + 20, 3 * itemTex.width, 3.6f * itemTex.height), itemTex);
             }
 
             // Anvil sprite on the right
             Texture2D anvilTex = DataLoader.sDataLoader.objTex[(int)EObjectType.Anvil];
             if (anvilTex != null)
             {
-                GUI.DrawTexture(new Rect(r.x + w - 40 - 3 * anvilTex.width, r.y + 20, 3 * anvilTex.width, 3.6f * anvilTex.height), anvilTex);
+                UiScale.DrawTexture(UiScale.R(r.x + w - 40 - 3 * anvilTex.width, r.y + 20, 3 * anvilTex.width, 3.6f * anvilTex.height), anvilTex);
             }
 
             // Title: "Repair?"
             repairDialogStyle.alignment = TextAnchor.UpperCenter;
             repairDialogStyle.fontSize = 30;
-            GUI.Label(new Rect(r.x, r.y + 10, w, h), "Repair?", repairDialogStyle);
+            GUI.Label(UiScale.R(r.x, r.y + 10, w, h), "Repair?", UiScale.Style(repairDialogStyle));
 
             // Difficulty text: "You think it will be [difficulty] to repair the [item name]."
             repairDialogStyle.fontSize = 24;
@@ -338,12 +343,12 @@ public class RepairDialog : MonoBehaviour
             // panel: that keeps a long line off the buttons however it wraps, and puts the block
             // half a row lower than centring on the panel did. The strip is 54 tall in the mouse
             // layout, which is the taller of the two.
-            GUI.Label(new Rect(r.x + w / 4, r.y + tex.height, w / 2, r.height - tex.height - 54),
-                      difficultyText, repairDialogStyle);
+            GUI.Label(UiScale.R(r.x + w / 4, r.y + tex.height, w / 2, r.height - tex.height - 54),
+                      difficultyText, UiScale.Style(repairDialogStyle));
 
             DrawButtons(r, "Forgo", "Attempt");
 
-            GuiInput.TryConsumeClickInPanel(r);
+            GuiInput.TryConsumeClickInPanel(UiScale.R(r));
         }
     }
 
@@ -356,18 +361,18 @@ public class RepairDialog : MonoBehaviour
         float w = 5 * tex.width;
         float h = 5 * tex.height;
 
-        Rect r = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
-        GuiInput.RegisterBlockingRect(r);
-        GUI.DrawTexture(r, tex);
+        Rect r = new Rect((UiScale.Width - w) / 2, (UiScale.Height - h) / 2, w, h);
+        GuiInput.RegisterBlockingRect(UiScale.R(r));
+        UiScale.DrawTexture(UiScale.R(r), tex);
 
         repairDialogStyle.fontSize = 24;
         repairDialogStyle.alignment = TextAnchor.MiddleCenter;
-        GUI.Label(new Rect(r.x + w / 8, r.y, 3 * w / 4, r.height - 54), question, repairDialogStyle);
+        GUI.Label(UiScale.R(r.x + w / 8, r.y, 3 * w / 4, r.height - 54), question, UiScale.Style(repairDialogStyle));
 
         // The original's two words for its prompt (DS:0xaa2 and DS:0xaa6).
         DrawButtons(r, "No", "Yes");
 
-        GuiInput.TryConsumeClickInPanel(r);
+        GuiInput.TryConsumeClickInPanel(UiScale.R(r));
     }
 
     /// <summary>The two buttons along the foot of the panel: cancel on the left, confirm on the right.</summary>
@@ -391,26 +396,26 @@ public class RepairDialog : MonoBehaviour
 
             if (buttonOutline != null)
             {
-                GUI.DrawTexture(hintCancelRect, buttonOutline, ScaleMode.StretchToFill, true);
-                GUI.DrawTexture(hintConfirmRect, buttonOutline, ScaleMode.StretchToFill, true);
+                UiScale.DrawTexture(UiScale.R(hintCancelRect), buttonOutline, ScaleMode.StretchToFill, true);
+                UiScale.DrawTexture(UiScale.R(hintConfirmRect), buttonOutline, ScaleMode.StretchToFill, true);
             }
 
             if (escapeKey != null)
             {
-                GUI.DrawTexture(new Rect(hintCancelRect.x + 10, hintCancelRect.y + 2, 24, 24), escapeKey);
+                UiScale.DrawTexture(UiScale.R(hintCancelRect.x + 10, hintCancelRect.y + 2, 24, 24), escapeKey);
             }
-            GUI.Label(new Rect(hintCancelRect.x + 10 + 24 + 5, hintCancelRect.y, ww, kk), cancelLabel, repairDialogStyle);
+            GUI.Label(UiScale.R(hintCancelRect.x + 10 + 24 + 5, hintCancelRect.y, ww, kk), cancelLabel, UiScale.Style(repairDialogStyle));
 
             repairDialogStyle.alignment = TextAnchor.MiddleCenter;
-            GUI.Label(hintConfirmRect, confirmLabel, repairDialogStyle);
+            GUI.Label(UiScale.R(hintConfirmRect), confirmLabel, UiScale.Style(repairDialogStyle));
             repairDialogStyle.alignment = TextAnchor.MiddleLeft;
 
-            if (GuiInput.TryConsumeClickInRect(hintCancelRect))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(hintCancelRect)))
             {
                 deferredMouseRepairAction = DeferredMouseRepairAction.Cancel;
                 executeDeferredMouseRepairOnFrame = -1;
             }
-            else if (GuiInput.TryConsumeClickInRect(hintConfirmRect))
+            else if (GuiInput.TryConsumeClickInRect(UiScale.R(hintConfirmRect)))
             {
                 deferredMouseRepairAction = DeferredMouseRepairAction.Confirm;
                 executeDeferredMouseRepairOnFrame = -1;
@@ -428,24 +433,24 @@ public class RepairDialog : MonoBehaviour
 
             if (bButton != null)
             {
-                GUI.DrawTexture(bRect, bButton);
+                UiScale.DrawTexture(UiScale.R(bRect), bButton);
             }
-            GUI.Label(bLabelRect, cancelLabel, repairDialogStyle);
+            GUI.Label(UiScale.R(bLabelRect), cancelLabel, UiScale.Style(repairDialogStyle));
 
             if (aButton != null)
             {
-                GUI.DrawTexture(aRect, aButton);
+                UiScale.DrawTexture(UiScale.R(aRect), aButton);
             }
-            GUI.Label(aLabelRect, confirmLabel, repairDialogStyle);
+            GUI.Label(UiScale.R(aLabelRect), confirmLabel, UiScale.Style(repairDialogStyle));
 
             int kk = 20;
             Rect cancelRect = new Rect(r.x + 50, footY - kk, 200, kk + 8);
             Rect confirmRect = new Rect(r.x + r.width - 220, footY - kk, 200, kk + 8);
-            if (GuiInput.TryConsumeClickInRect(cancelRect))
+            if (GuiInput.TryConsumeClickInRect(UiScale.R(cancelRect)))
             {
                 CancelRepair();
             }
-            else if (GuiInput.TryConsumeClickInRect(confirmRect))
+            else if (GuiInput.TryConsumeClickInRect(UiScale.R(confirmRect)))
             {
                 ConfirmRepair();
             }

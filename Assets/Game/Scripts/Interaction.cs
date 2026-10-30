@@ -614,11 +614,11 @@ public class Interaction : MonoBehaviour
             return;
         }
 
-        float w = 5 * cursorTex.width;
-        float h = 6 * cursorTex.height;
+        float w = UiScale.S(5 * cursorTex.width);
+        float h = UiScale.S(6 * cursorTex.height);
         Color originalColor = GUI.color;
         GUI.color = color;
-        GUI.DrawTexture(new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h), cursorTex);
+        UiScale.DrawTexture(new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h), cursorTex);
         GUI.color = originalColor;
     }
 
@@ -678,8 +678,8 @@ public class Interaction : MonoBehaviour
                     cursorColor = Color.gray;
                 }
                 
-                float w = 5 * cursorTex.width;
-                float h = 6 * cursorTex.height;
+                float w = UiScale.S(5 * cursorTex.width);
+                float h = UiScale.S(6 * cursorTex.height);
                 bool drawCenterCrosshair = Cursor.lockState == CursorLockMode.Locked;
 
                 if (drawCenterCrosshair)
@@ -702,8 +702,8 @@ public class Interaction : MonoBehaviour
                     else
                     {
                         Vector2 guiMouse = GuiInput.MousePositionGuiSpace;
-                        textX = guiMouse.x + 8f;
-                        textY = guiMouse.y + 8f;
+                        textX = guiMouse.x + UiScale.S(8f);
+                        textY = guiMouse.y + UiScale.S(8f);
                     }
                     
                     // Check if object is interactable (accounts for telekinesis distance)
@@ -748,6 +748,8 @@ public class Interaction : MonoBehaviour
                     }
                     nameStyle.normal.background = nameLabelBgTex;
                     nameStyle.padding = new RectOffset(4, 4, 2, 2);
+                    // the label is placed in screen pixels, at the crosshair or the pointer
+                    nameStyle = UiScale.Style(nameStyle);
                     
                     // Use GetUnderCursorName for the object name (hides door frames)
                     string displayText = centeredObject.GetUnderCursorName();

@@ -186,8 +186,8 @@ public class Gravestone : UUObject
         }
 
         GUI.depth = (int)EGUIDepth.Cutscene;
-        float aw = 48;
-        float ah = 48;
+        float aw = UiScale.S(48);
+        float ah = UiScale.S(48);
         float yBorder = 0.05f * Screen.height;
         GUI.DrawTexture(new Rect(Screen.width / 2 - aw / 2, Screen.height - yBorder - ah, aw, ah), aButton);
     }

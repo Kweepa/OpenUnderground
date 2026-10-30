@@ -25,7 +25,8 @@ public static class GameplayCursorPolicy
         | EControlMask.HowMany
         | EControlMask.RepairDialog
         | EControlMask.Map
-        | EControlMask.SaveLoad;
+        | EControlMask.SaveLoad
+        | EControlMask.Warning;
 
     /// <summary>
     /// Applies cursor lock state; keeps hardware cursor invisible so <see cref="SoftwareCursorOverlay"/> is the pointer.

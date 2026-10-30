@@ -92,10 +92,10 @@ public class SoftwareCursorOverlay : MonoBehaviour
         switch (hotspot)
         {
             case SoftwareCursorHotspot.Center:
-                GUI.DrawTexture(new Rect(guiX - width * 0.5f, guiY - height * 0.5f, width, height), tex);
+                UiScale.DrawTexture(new Rect(guiX - width * 0.5f, guiY - height * 0.5f, width, height), tex);
                 break;
             case SoftwareCursorHotspot.BottomLeft:
-                GUI.DrawTexture(new Rect(guiX, guiY - height, width, height), tex);
+                UiScale.DrawTexture(new Rect(guiX, guiY - height, width, height), tex);
                 break;
         }
     }
@@ -131,8 +131,8 @@ public class SoftwareCursorOverlay : MonoBehaviour
             return false;
         }
 
-        float w = 3f * tex.width;
-        float h = 3.6f * tex.height;
+        float w = UiScale.S(3f * tex.width);
+        float h = UiScale.S(3.6f * tex.height);
         // Locked (left Shift), the mouse position only catches up when the mouse moves: the item goes at once
         // where the mouse is put back when Shift is let go, so it does not move either way.
         Vector2 mp = Cursor.lockState == CursorLockMode.Locked
@@ -151,7 +151,8 @@ public class SoftwareCursorOverlay : MonoBehaviour
         if (item.quantity > 1)
         {
             inv.descriptionStyle.alignment = TextAnchor.UpperRight;
-            GUI.Label(new Rect(mp.x - w * 0.5f + w - 40f, mp.y - h * 0.5f, 36f, 18f), item.quantity.ToString(), inv.descriptionStyle);
+            GUI.Label(new Rect(mp.x - w * 0.5f + w - UiScale.S(40f), mp.y - h * 0.5f, UiScale.S(36f), UiScale.S(18f)), item.quantity.ToString(),
+                UiScale.Style(inv.descriptionStyle));
             inv.descriptionStyle.alignment = TextAnchor.UpperLeft;
         }
 
@@ -205,8 +206,8 @@ public class SoftwareCursorOverlay : MonoBehaviour
             return;
         }
 
-        float w = 3f * tex.width;
-        float h = 3.6f * tex.height;
+        float w = UiScale.S(3f * tex.width);
+        float h = UiScale.S(3.6f * tex.height);
         DrawTextureWithHotspot(tex, mp.x, mp.y, w, h, SoftwareCursorHotspot.Center);
     }
 
@@ -225,10 +226,10 @@ public class SoftwareCursorOverlay : MonoBehaviour
         DrawOnCross(tex, Screen.width * 0.5f, Screen.height * 0.5f, CrosshairScaleX);
     }
 
-    /// <summary>Pixels to a texel across of the centre crosshair, as <see cref="Interaction"/> draws it.</summary>
+    /// <summary>Reference pixels (UiScale) to a texel across of the centre crosshair, as <see cref="Interaction"/> draws it.</summary>
     private const float CrosshairScaleX = 5f;
 
-    /// <summary>Pixels to a texel across of the free pointer, as drawn here.</summary>
+    /// <summary>Reference pixels to a texel across of the free pointer, as drawn here.</summary>
     private const float PointerScaleX = 3f;
 
     /// <summary>
@@ -253,7 +254,7 @@ public class SoftwareCursorOverlay : MonoBehaviour
     /// </summary>
     private static Vector2 PointerOnCrosshairScreen()
     {
-        float x = Screen.width * 0.5f - 0.5f * CrosshairScaleX + 0.5f * PointerScaleX;
+        float x = Screen.width * 0.5f - UiScale.S(0.5f * CrosshairScaleX - 0.5f * PointerScaleX);
         return new Vector2(Mathf.Round(x), Mathf.Round(Screen.height * 0.5f));
     }
 
@@ -267,10 +268,10 @@ public class SoftwareCursorOverlay : MonoBehaviour
     /// </summary>
     private static void DrawOnCross(Texture2D tex, float guiX, float guiY, float crossScaleX)
     {
-        float w = 3f * tex.width;
-        float h = 3.6f * tex.height;
-        float x = Mathf.Round(guiX - 0.5f * crossScaleX - w * 0.5f);
+        float w = UiScale.S(3f * tex.width);
+        float h = UiScale.S(3.6f * tex.height);
+        float x = Mathf.Round(guiX - UiScale.S(0.5f * crossScaleX) - w * 0.5f);
         float y = Mathf.Round(guiY - h * 0.5f);
-        GUI.DrawTexture(new Rect(x, y, w, h), tex);
+        UiScale.DrawTexture(new Rect(x, y, w, h), tex);
     }
 }
