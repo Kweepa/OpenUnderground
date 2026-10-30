@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// Merges gamepad and keyboard/mouse input for player movement and actions.
@@ -72,24 +71,30 @@ public static class PlayerInput
     public static bool AutoSave => PlayerPrefs.GetInt("Options_AutoSave", 1) == 1;
 
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
+    /// <remarks>The keyboard wins whenever one of its movement keys is down.</remarks>
     public static Vector2 ReadMoveVector()
     {
-        Vector2 v = GameInput.CurrentGamepad != null ? GameInput.CurrentGamepad.leftStick.ReadValue() : Vector2.zero;
+        Vector2 keys = ReadKeyboardMove(withArrows: true, out bool keysHeld);
+        return keysHeld ? keys : GameActions.PadWorld.Move.ReadValue<Vector2>();
+    }
 
-        Keyboard kb = GameInput.CurrentKeyboard;
-        if (kb != null)
+    /// <summary>
+    /// The keyboard's movement keys as one vector, each axis -1, 0 or 1 and normalised on the diagonal: W, S, A and
+    /// D, plus the arrows unless a panel has them for its cursor.
+    /// </summary>
+    public static Vector2 ReadKeyboardMove(bool withArrows, out bool hasInput)
+    {
+        Vector2 v = GameActions.KeysWorld.Move.ReadValue<Vector2>();
+        if (withArrows)
         {
-            float x = 0f, y = 0f;
-            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) x -= 1f;
-            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) x += 1f;
-            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) y += 1f;
-            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) y -= 1f;
-            if (x != 0f || y != 0f)
-            {
-                v = new Vector2(x, y);
-                if (v.sqrMagnitude > 1f)
-                    v.Normalize();
-            }
+            Vector2 arrows = GameActions.KeysWorld.MoveAlternate.ReadValue<Vector2>();
+            v = new Vector2(Mathf.Clamp(v.x + arrows.x, -1f, 1f), Mathf.Clamp(v.y + arrows.y, -1f, 1f));
+        }
+
+        hasInput = v.x != 0f || v.y != 0f;
+        if (v.sqrMagnitude > 1f)
+        {
+            v.Normalize();
         }
 
         return v;
@@ -107,79 +112,7 @@ public static class PlayerInput
     /// </summary>
     public static bool PanelMouseLookHeld()
     {
-        return GameInput.CurrentKeyboard?.leftShiftKey.isPressed ?? false;
-    }
-
-    public static bool JumpReleasedThisFrame()
-    {
-        bool g = GameInput.CurrentGamepad?.aButton.wasReleasedThisFrame ?? false;
-        bool k = GameInput.CurrentKeyboard?.spaceKey.wasReleasedThisFrame ?? false;
-        return g || k;
-    }
-
-    public static bool JumpHeld()
-    {
-        bool g = GameInput.CurrentGamepad?.aButton.isPressed ?? false;
-        bool k = GameInput.CurrentKeyboard?.spaceKey.isPressed ?? false;
-        return g || k;
-    }
-
-    public static bool SprintModifierHeld()
-    {
-        return GameInput.CurrentGamepad?.leftStickButton.isPressed ?? false
-               || (GameInput.CurrentKeyboard?.leftShiftKey.isPressed ?? false);
-    }
-
-    public static bool GamepadAttackTriggerPressedThisFrame()
-    {
-        var gp = GameInput.CurrentGamepad;
-        if (gp == null || PlayerData.sData == null)
-        {
-            return false;
-        }
-
-        var t = PlayerData.sData.leftHanded ? gp.leftTrigger : gp.rightTrigger;
-        return t.wasPressedThisFrame;
-    }
-
-    public static bool AttackTriggerPressed()
-    {
-        if (GamepadAttackTriggerPressedThisFrame())
-        {
-            return true;
-        }
-
-        return GameInput.CurrentMouse?.rightButton.wasPressedThisFrame ?? false;
-    }
-
-    public static bool AttackTriggerHeld()
-    {
-        var gp = GameInput.CurrentGamepad;
-        if (gp != null && PlayerData.sData != null)
-        {
-            var t = PlayerData.sData.leftHanded ? gp.leftTrigger : gp.rightTrigger;
-            if (t.isPressed)
-                return true;
-        }
-        return GameInput.CurrentMouse?.rightButton.isPressed ?? false;
-    }
-
-    public static bool CancelOrBlockPressed()
-    {
-        return (GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
-               || (GameInput.CurrentKeyboard?.bKey.wasPressedThisFrame ?? false);
-    }
-
-    public static bool CancelOrBlockHeld()
-    {
-        return (GameInput.CurrentGamepad?.bButton.isPressed ?? false)
-               || (GameInput.CurrentKeyboard?.bKey.isPressed ?? false);
-    }
-
-    /// <summary>Gamepad X — look (mouse: short LMB release).</summary>
-    public static bool InteractLookPressed()
-    {
-        return GameInput.CurrentGamepad?.xButton.wasPressedThisFrame ?? false;
+        return GameActions.KeysWorld.MouseLook.IsPressed();
     }
 
     /// <summary>Keyboard F5 — write a quicksave, at once.</summary>
@@ -189,7 +122,7 @@ public static class PlayerInput
     /// </remarks>
     public static bool QuickSaveKeyPressed()
     {
-        return GameInput.CurrentKeyboard?.f5Key.wasPressedThisFrame ?? false;
+        return GameActions.KeysWorld.Quicksave.WasPressedThisFrame();
     }
 
     /// <summary>Gamepad right stick click (R3) held down — the quicksave button, which wants a hold.</summary>
@@ -206,13 +139,13 @@ public static class PlayerInput
     /// </remarks>
     public static bool QuickSaveButtonHeld()
     {
-        return GameInput.CurrentGamepad?.rightStickButton.isPressed ?? false;
+        return GameActions.PadWorld.Quicksave.IsPressed();
     }
 
     /// <summary>Keyboard F10 — sleep, the original's key for it (UW.EXE 0x82345).</summary>
     public static bool SleepKeyPressed()
     {
-        return GameInput.CurrentKeyboard?.f10Key.wasPressedThisFrame ?? false;
+        return GameActions.KeysWorld.Sleep.WasPressedThisFrame();
     }
 
     /// <summary>Gamepad D-pad left held down — sleep, which wants a hold.</summary>
@@ -223,12 +156,6 @@ public static class PlayerInput
     /// </remarks>
     public static bool SleepButtonHeld()
     {
-        return GameInput.CurrentGamepad?.dpad.left.isPressed ?? false;
-    }
-
-    /// <summary>Gamepad Y — use (mouse uses LMB hold / drag; keyboard F, see <see cref="Interaction"/>).</summary>
-    public static bool InteractUsePressed()
-    {
-        return GameInput.CurrentGamepad?.yButton.wasPressedThisFrame ?? false;
+        return GameActions.PadWorld.Sleep.IsPressed();
     }
 }

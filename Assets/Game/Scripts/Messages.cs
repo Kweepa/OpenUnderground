@@ -252,12 +252,14 @@ public class Messages : MonoBehaviour
             return;
         }
 
-        bool upPressed = (keyboard?.pageUpKey.wasPressedThisFrame ?? false)
-            || (pad?.dpad.up.wasPressedThisFrame ?? false);
-        bool downPressed = (keyboard?.pageDownKey.wasPressedThisFrame ?? false)
-            || (pad?.dpad.down.wasPressedThisFrame ?? false);
-        bool up = (keyboard?.pageUpKey.isPressed ?? false) || (pad?.dpad.up.isPressed ?? false);
-        bool down = (keyboard?.pageDownKey.isPressed ?? false) || (pad?.dpad.down.isPressed ?? false);
+        bool upPressed = (keyboard != null && GameActions.KeysWorld.MessagesBack.WasPressedThisFrame())
+            || (pad != null && GameActions.PadWorld.MessagesBack.WasPressedThisFrame());
+        bool downPressed = (keyboard != null && GameActions.KeysWorld.MessagesForward.WasPressedThisFrame())
+            || (pad != null && GameActions.PadWorld.MessagesForward.WasPressedThisFrame());
+        bool up = (keyboard != null && GameActions.KeysWorld.MessagesBack.IsPressed())
+            || (pad != null && GameActions.PadWorld.MessagesBack.IsPressed());
+        bool down = (keyboard != null && GameActions.KeysWorld.MessagesForward.IsPressed())
+            || (pad != null && GameActions.PadWorld.MessagesForward.IsPressed());
         int step = 0;
 
         if (upPressed)

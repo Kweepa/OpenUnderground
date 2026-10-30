@@ -201,7 +201,7 @@ public class Interaction : MonoBehaviour
             return;
         }
 
-        if (GameInput.FKeyPressedThisFrame())
+        if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Use))
         {
             UseFromKeyboard();
         }
@@ -238,23 +238,19 @@ public class Interaction : MonoBehaviour
 
     private void UpdateGamepadInteraction(bool hasMaterialHit, RaycastHit objectHit)
     {
-        Gamepad gp = GameInput.CurrentGamepad;
-        if (gp == null)
-            return;
-
-        bool tryingLook = gp.xButton.wasPressedThisFrame;
+        bool tryingLook = GameActions.PadWorld.LookAt.WasPressedThisFrame();
         if (tryingLook)
         {
             DoLook(hasMaterialHit, objectHit);
         }
 
-        bool tryingUse = gp.yButton.wasPressedThisFrame;
+        bool tryingUse = GameActions.PadWorld.Use.WasPressedThisFrame();
         if (tryingUse)
         {
             DoUse();
         }
 
-        if (gp.bButton.wasPressedThisFrame)
+        if (GameActions.PadWorld.Cancel.WasPressedThisFrame())
         {
             Inventory.sInv.usingItem = null;
             Inventory.sInv.mouseCursorCarriedPortable = null;

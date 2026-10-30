@@ -154,14 +154,12 @@ public class StatsPanel : MonoBehaviour
             holdTime = 2.0f;
         }
 
-        Gamepad gp = Gamepad.current;
-        if (gp != null
-            && PlayerData.sData != null
+        if (PlayerData.sData != null
             && PlayerPanelState.ArePanelsAvailable
-            && !gp.leftShoulder.isPressed)
+            && !GameActions.PadWorld.MagicPanel.IsPressed())
         {
-            var statsTrigger = PlayerData.sData.leftHanded ? gp.rightTrigger : gp.leftTrigger;
-            float v = statsTrigger.ReadValue();
+            // The trigger the weapon hand leaves free (GameActions.Refresh), on a threshold of its own.
+            float v = GameActions.PadWorld.Stats.ReadValue<float>();
             bool held = v > 0.65f;
             bool edge = held && !statsAnalogTriggerWasHeld;
             statsAnalogTriggerWasHeld = held;

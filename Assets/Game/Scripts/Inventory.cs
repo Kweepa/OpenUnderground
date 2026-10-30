@@ -2378,28 +2378,28 @@ public class Inventory : MonoBehaviour
     private float invMoveNextFireDown = -1f;
 
     private static bool InvMoveLeftHeld()
-        => (Gamepad.current?.dpad.left.isPressed ?? false) || (Keyboard.current?.leftArrowKey.isPressed ?? false);
+        => GameActions.PadInventory.Left.IsPressed() || GameActions.KeysInventory.Left.IsPressed();
 
     private static bool InvMoveLeftPressedThisFrame()
-        => (Gamepad.current?.dpad.left.wasPressedThisFrame ?? false) || (Keyboard.current?.leftArrowKey.wasPressedThisFrame ?? false);
+        => GameActions.PadInventory.Left.WasPressedThisFrame() || GameActions.KeysInventory.Left.WasPressedThisFrame();
 
     private static bool InvMoveRightHeld()
-        => (Gamepad.current?.dpad.right.isPressed ?? false) || (Keyboard.current?.rightArrowKey.isPressed ?? false);
+        => GameActions.PadInventory.Right.IsPressed() || GameActions.KeysInventory.Right.IsPressed();
 
     private static bool InvMoveRightPressedThisFrame()
-        => (Gamepad.current?.dpad.right.wasPressedThisFrame ?? false) || (Keyboard.current?.rightArrowKey.wasPressedThisFrame ?? false);
+        => GameActions.PadInventory.Right.WasPressedThisFrame() || GameActions.KeysInventory.Right.WasPressedThisFrame();
 
     private static bool InvMoveUpHeld()
-        => (Gamepad.current?.dpad.up.isPressed ?? false) || (Keyboard.current?.upArrowKey.isPressed ?? false);
+        => GameActions.PadInventory.Up.IsPressed() || GameActions.KeysInventory.Up.IsPressed();
 
     private static bool InvMoveUpPressedThisFrame()
-        => (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false) || (Keyboard.current?.upArrowKey.wasPressedThisFrame ?? false);
+        => GameActions.PadInventory.Up.WasPressedThisFrame() || GameActions.KeysInventory.Up.WasPressedThisFrame();
 
     private static bool InvMoveDownHeld()
-        => (Gamepad.current?.dpad.down.isPressed ?? false) || (Keyboard.current?.downArrowKey.isPressed ?? false);
+        => GameActions.PadInventory.Down.IsPressed() || GameActions.KeysInventory.Down.IsPressed();
 
     private static bool InvMoveDownPressedThisFrame()
-        => (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false) || (Keyboard.current?.downArrowKey.wasPressedThisFrame ?? false);
+        => GameActions.PadInventory.Down.WasPressedThisFrame() || GameActions.KeysInventory.Down.WasPressedThisFrame();
 
     private bool ShouldInventoryMoveRepeat(ref float nextFireUnscaledTime, bool held, bool pressedThisFrame)
     {
@@ -2574,11 +2574,11 @@ public class Inventory : MonoBehaviour
                 currentArea = EInventoryArea.Stuff;
             }
         }
-        else if (Gamepad.current?.yButton.wasPressedThisFrame ?? false)
+        else if (GameActions.PadInventory.SecondaryUse.WasPressedThisFrame())
         {
             RunPaperdollUnequipToStuffList(equipSlot);
         }
-        else if ((Gamepad.current?.aButton.wasReleasedThisFrame ?? false) && aPressedTime < 0.2f)
+        else if (GameActions.PadInventory.Select.WasReleasedThisFrame() && aPressedTime < 0.2f)
         {
             RunPaperdollShortPrimaryReleaseAtSlot(equipSlot);
         }
@@ -3439,8 +3439,7 @@ public class Inventory : MonoBehaviour
             return;
         }
 
-        Gamepad gp = Gamepad.current;
-        if (gp == null)
+        if (Gamepad.current == null)
         {
             ClearGamepadStuffYUseChargeState();
             gamepadYUseAwaitingRelease = false;
@@ -3449,14 +3448,14 @@ public class Inventory : MonoBehaviour
 
         List<UUObject> currentList = GetCurrentListInternal();
 
-        if (gp.yButton.wasReleasedThisFrame)
+        if (GameActions.PadInventory.SecondaryUse.WasReleasedThisFrame())
         {
             gamepadYUseAwaitingRelease = false;
             ClearGamepadStuffYUseChargeState();
             return;
         }
 
-        if (gp.yButton.wasPressedThisFrame)
+        if (GameActions.PadInventory.SecondaryUse.WasPressedThisFrame())
         {
             if (!gamepadYUseAwaitingRelease
                 && index >= 0 && index < currentList.Count && currentList[index] != null
@@ -3480,7 +3479,7 @@ public class Inventory : MonoBehaviour
             return;
         }
 
-        if (gp.yButton.isPressed && gamepadYUseChargeIndex >= 0)
+        if (GameActions.PadInventory.SecondaryUse.IsPressed() && gamepadYUseChargeIndex >= 0)
         {
             if (index != gamepadYUseChargeIndex
                 || index < 0
@@ -3509,8 +3508,7 @@ public class Inventory : MonoBehaviour
 
     private bool IsGamepadStuffYChargeBlockingNavigation()
     {
-        Gamepad gp = Gamepad.current;
-        if (gp == null || !gp.yButton.isPressed)
+        if (!GameActions.PadInventory.SecondaryUse.IsPressed())
         {
             return false;
         }
@@ -3541,11 +3539,11 @@ public class Inventory : MonoBehaviour
             return;
         }
 
-        if ((Gamepad.current?.aButton.wasReleasedThisFrame ?? false) && aPressedTime < 0.2f)
+        if (GameActions.PadInventory.Select.WasReleasedThisFrame() && aPressedTime < 0.2f)
         {
             RunStuffShortPrimaryRelease();
         }
-        else if ((Gamepad.current?.bButton.wasPressedThisFrame ?? false) && stack.Count > 0)
+        else if (GameActions.PadInventory.Back.WasPressedThisFrame() && stack.Count > 0)
         {
             BackOutOfContainer();
         }
@@ -3623,7 +3621,7 @@ public class Inventory : MonoBehaviour
                     Utils.PlayClip2d(moveCursor);
                 }
             }
-            else if ((Gamepad.current?.aButton.wasReleasedThisFrame ?? false) && aPressedTime < 0.2f)
+            else if (GameActions.PadInventory.Select.WasReleasedThisFrame() && aPressedTime < 0.2f)
             {
                 UUObject x = GetCurrentItemInternal();
                 if (x != null)
@@ -4044,11 +4042,11 @@ public class Inventory : MonoBehaviour
             tradeSlot += 4;
             Utils.PlayClip2d(moveCursor);
         }
-        else if (Gamepad.current?.yButton.wasPressedThisFrame ?? false)
+        else if (GameActions.PadInventory.SecondaryUse.WasPressedThisFrame())
         {
             TryTakeSelectionFromTradeTray();
         }
-        else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
+        else if (GameActions.PadInventory.Select.WasPressedThisFrame())
         {
             if (tradeSlotSelected[tradeSlot])
             {
@@ -4198,12 +4196,12 @@ public class Inventory : MonoBehaviour
 
         if (exploringInventory && currentArea == EInventoryArea.Stuff && Conversations.runningConversation == null)
         {
-            if (Gamepad.current?.xButton.wasPressedThisFrame ?? false)
+            if (GameActions.PadInventory.Throw.WasPressedThisFrame())
             {
                 throwTime = 0.0f;
                 throwItem = GetCurrentItem();
             }
-            else if (Gamepad.current?.xButton.wasReleasedThisFrame ?? false)
+            else if (GameActions.PadInventory.Throw.WasReleasedThisFrame())
             {
                 if (throwItem != null && throwItem == GetCurrentItem() && throwTime > 0.0f)
                 {
@@ -4219,7 +4217,7 @@ public class Inventory : MonoBehaviour
                     }
                 }
             }
-            else if ((Gamepad.current?.xButton.isPressed ?? false) && throwItem != null && throwItem == GetCurrentItem())
+            else if (GameActions.PadInventory.Throw.IsPressed() && throwItem != null && throwItem == GetCurrentItem())
             {
                 throwTime += Time.deltaTime;
                 throwTime = Mathf.Min(throwTime, 1.0f);
@@ -4304,7 +4302,7 @@ public class Inventory : MonoBehaviour
         float lerpTarget = (holdTime > 0.0f ? 1.0f : 0.0f);
         lerpIn = Utils.DampedApproachUnscaledTime(lerpIn, lerpTarget, 0.2f);
 
-        aPressedTime = Gamepad.current?.aButton.isPressed ?? false ? aPressedTime + Time.unscaledDeltaTime : 0.0f;
+        aPressedTime = GameActions.PadInventory.Select.IsPressed() ? aPressedTime + Time.unscaledDeltaTime : 0.0f;
     }
 
     private float throwTime;
@@ -5476,7 +5474,7 @@ public class Inventory : MonoBehaviour
     {
         if (currentArea != EInventoryArea.Stuff
             || Conversations.runningConversation != null
-            || Gamepad.current?.yButton.isPressed != true
+            || !GameActions.PadInventory.SecondaryUse.IsPressed()
             || gamepadYUseChargeIndex < 0)
         {
             return;

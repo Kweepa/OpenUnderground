@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 
 /// <summary>
 /// Central access to keyboard, gamepad, and mouse, plus common combined checks (dpad + arrows, panel keys, etc.).
@@ -90,47 +89,13 @@ public static class GameInput
         }
     }
 
-    public static bool SelectPressedThisFrame() => CurrentGamepad?.selectButton.wasPressedThisFrame ?? false;
-
-    public static bool DpadOrArrowLeftPressedThisFrame()
+    /// <summary>
+    /// A keyboard action pressed this frame, unless the keyboard is writing - typing runes or on the on-screen
+    /// keyboard (<see cref="EControlMask.Keyboard"/>).
+    /// </summary>
+    public static bool KeyPressedThisFrame(InputAction action)
     {
-        return (CurrentGamepad?.dpad.left.wasPressedThisFrame ?? false)
-               || (!IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.leftArrowKey.wasPressedThisFrame ?? false));
-    }
-
-    public static bool DpadOrArrowRightPressedThisFrame()
-    {
-        return (CurrentGamepad?.dpad.right.wasPressedThisFrame ?? false)
-               || (!IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.rightArrowKey.wasPressedThisFrame ?? false));
-    }
-
-    public static bool DpadOrArrowUpPressedThisFrame()
-    {
-        return (CurrentGamepad?.dpad.up.wasPressedThisFrame ?? false)
-               || (!IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.upArrowKey.wasPressedThisFrame ?? false));
-    }
-
-    public static bool DpadOrArrowDownPressedThisFrame()
-    {
-        return (CurrentGamepad?.dpad.down.wasPressedThisFrame ?? false)
-               || (!IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.downArrowKey.wasPressedThisFrame ?? false));
-    }
-
-    public static bool MagicRuneSelectPressedThisFrame()
-    {
-        return (CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
-               || (!IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.enterKey.wasPressedThisFrame ?? false));
-    }
-
-    public static bool MagicClearRunesPressedThisFrame()
-    {
-        return (CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
-               || (!IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.bKey.wasPressedThisFrame ?? false));
-    }
-
-    public static bool MagicCastKeyboardConfirmPressedThisFrame()
-    {
-        return !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.cKey.wasPressedThisFrame ?? false);
+        return !IsGameplayKeyboardInputBlocked() && action.WasPressedThisFrame();
     }
 
     private static int escapeConsumedFrame = -1;
@@ -161,38 +126,6 @@ public static class GameInput
 #else
         return false;
 #endif
-    }
-
-    public static bool TabPressedThisFrame()
-    {
-        return !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.tabKey.wasPressedThisFrame ?? false);
-    }
-
-    public static bool Digit1PressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.digit1Key.wasPressedThisFrame ?? false);
-    public static bool Digit2PressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.digit2Key.wasPressedThisFrame ?? false);
-    public static bool Digit3PressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.digit3Key.wasPressedThisFrame ?? false);
-
-    public static bool QKeyPressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.qKey.wasPressedThisFrame ?? false);
-    public static bool EKeyPressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.eKey.wasPressedThisFrame ?? false);
-    public static bool RKeyPressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.rKey.wasPressedThisFrame ?? false);
-    public static bool FKeyPressedThisFrame() =>
-        !IsGameplayKeyboardInputBlocked() && (CurrentKeyboard?.fKey.wasPressedThisFrame ?? false);
-
-    public static bool ShoulderLeftPressedThisFrame() => CurrentGamepad?.leftShoulder.wasPressedThisFrame ?? false;
-    public static bool ShoulderRightPressedThisFrame() => CurrentGamepad?.rightShoulder.wasPressedThisFrame ?? false;
-
-    /// <summary>Stats panel: primary trigger for held-to-show (handedness from <see cref="PlayerData"/>).</summary>
-    public static AxisControl StatsTrigger()
-    {
-        if (CurrentGamepad == null || PlayerData.sData == null)
-            return null;
-        return PlayerData.sData.leftHanded ? CurrentGamepad.rightTrigger : CurrentGamepad.leftTrigger;
     }
 }
 

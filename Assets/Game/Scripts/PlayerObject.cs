@@ -965,10 +965,10 @@ public class PlayerObject : MonoBehaviour
         
         // Sprint: left stick click + moving forward only, when not in combat/weapon busy and have stamina
         const float sprintForwardThreshold = 0.5f;
-        bool stickPressedGamepad = GameInput.CurrentGamepad?.leftStickButton.isPressed ?? false;
-        bool shiftPressedKeyboard = GameInput.CurrentKeyboard?.leftShiftKey.isPressed ?? false;
-        bool sprintModifierHeld = usingKeyboardMove ? shiftPressedKeyboard : stickPressedGamepad;
-        bool slowWalk = usingKeyboardMove && (GameInput.CurrentKeyboard?.ctrlKey.isPressed ?? false);
+        bool sprintModifierHeld = usingKeyboardMove
+            ? GameActions.KeysWorld.Sprint.IsPressed()
+            : GameActions.PadWorld.Sprint.IsPressed();
+        bool slowWalk = usingKeyboardMove && GameActions.KeysWorld.WalkQuietly.IsPressed();
 
         bool wantsSprint = sprintModifierHeld
                           && !slowWalk
@@ -1718,9 +1718,9 @@ public class PlayerObject : MonoBehaviour
         }
 
         const float sprintForwardThreshold = 0.5f;
-        bool stickPressedGamepad = GameInput.CurrentGamepad?.leftStickButton.isPressed ?? false;
-        bool shiftPressedKeyboard = GameInput.CurrentKeyboard?.leftShiftKey.isPressed ?? false;
-        bool sprintModifierHeld = usingKeyboardMove ? shiftPressedKeyboard : stickPressedGamepad;
+        bool sprintModifierHeld = usingKeyboardMove
+            ? GameActions.KeysWorld.Sprint.IsPressed()
+            : GameActions.PadWorld.Sprint.IsPressed();
 
         bool wantsSprint = sprintModifierHeld
                           && moveControl.y > sprintForwardThreshold
@@ -1746,110 +1746,25 @@ public class PlayerObject : MonoBehaviour
 
     private Vector2 ReadMoveVectorSeparated(out bool usingKeyboard)
     {
-        usingKeyboard = false;
-
-        Vector2 kb = ReadMoveVectorMouseKeyboard(out bool kbHas);
-        if (kbHas)
-        {
-            usingKeyboard = true;
-            return kb;
-        }
-
-        return ReadMoveVectorGamepad();
+        Vector2 kb = PlayerInput.ReadKeyboardMove(withArrows: true, out usingKeyboard);
+        return usingKeyboard ? kb : ReadMoveVectorGamepad();
     }
 
     private static Vector2 ReadMoveVectorWasdOnly(out bool hasInput)
     {
-        hasInput = false;
-        Keyboard kb = GameInput.CurrentKeyboard;
-        if (kb == null)
-        {
-            return Vector2.zero;
-        }
-
-        float x = 0f, y = 0f;
-        if (kb.aKey.isPressed)
-        {
-            x -= 1f;
-        }
-        if (kb.dKey.isPressed)
-        {
-            x += 1f;
-        }
-        if (kb.wKey.isPressed)
-        {
-            y += 1f;
-        }
-        if (kb.sKey.isPressed)
-        {
-            y -= 1f;
-        }
-
-        if (x == 0f && y == 0f)
-        {
-            return Vector2.zero;
-        }
-
-        hasInput = true;
-        Vector2 v = new Vector2(x, y);
-        if (v.sqrMagnitude > 1f)
-        {
-            v.Normalize();
-        }
-
-        return v;
+        return PlayerInput.ReadKeyboardMove(withArrows: false, out hasInput);
     }
 
     private static Vector2 ReadMoveVectorGamepad()
     {
-        return GameInput.CurrentGamepad != null ? GameInput.CurrentGamepad.leftStick.ReadValue() : Vector2.zero;
-    }
-
-    private static Vector2 ReadMoveVectorMouseKeyboard(out bool hasInput)
-    {
-        hasInput = false;
-        Keyboard kb = GameInput.CurrentKeyboard;
-        if (kb == null)
-            return Vector2.zero;
-
-        float x = 0f, y = 0f;
-        if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) x -= 1f;
-        if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) x += 1f;
-        if (kb.wKey.isPressed || kb.upArrowKey.isPressed) y += 1f;
-        if (kb.sKey.isPressed || kb.downArrowKey.isPressed) y -= 1f;
-
-        if (x == 0f && y == 0f)
-            return Vector2.zero;
-
-        hasInput = true;
-        Vector2 v = new Vector2(x, y);
-        if (v.sqrMagnitude > 1f)
-            v.Normalize();
-        return v;
+        return GameActions.PadWorld.Move.ReadValue<Vector2>();
     }
 
     private static bool IsJumpPressedSeparated()
     {
-        bool kbJump = GameInput.CurrentKeyboard?.spaceKey.wasPressedThisFrame ?? false;
-        bool gpJump = !PlayerPanelsWantWasdOnlyMovement()
-            && (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false);
+        bool kbJump = GameActions.KeysWorld.Jump.WasPressedThisFrame();
+        bool gpJump = !PlayerPanelsWantWasdOnlyMovement() && GameActions.PadWorld.Jump.WasPressedThisFrame();
         return gpJump || kbJump;
-    }
-
-    private static bool IsJumpReleasedSeparated()
-    {
-        bool kbJump = GameInput.CurrentKeyboard?.spaceKey.wasReleasedThisFrame ?? false;
-        bool gpJump = !PlayerPanelsWantWasdOnlyMovement()
-            && (GameInput.CurrentGamepad?.aButton.wasReleasedThisFrame ?? false);
-        return gpJump || kbJump;
-    }
-
-    private static bool IsJumpHeldSeparated()
-    {
-        bool kbJumpHeld = GameInput.CurrentKeyboard?.spaceKey.isPressed ?? false;
-        bool gpJumpHeld = !PlayerPanelsWantWasdOnlyMovement()
-            && (GameInput.CurrentGamepad?.aButton.isPressed ?? false);
-        return gpJumpHeld || kbJumpHeld;
     }
 
     private void ResetMouseLookSmoothing()
@@ -1874,7 +1789,7 @@ public class PlayerObject : MonoBehaviour
 
     private static void ReadLookGamepad(out float pitchDelta, out float yawDelta)
     {
-        Vector2 stick = GameInput.CurrentGamepad?.rightStick.ReadValue() ?? Vector2.zero;
+        Vector2 stick = GameActions.PadWorld.Look.ReadValue<Vector2>();
         pitchDelta = 90.0f * Time.deltaTime * Utils.DeadZone(stick.y);
         yawDelta = Utils.DeadZone(stick.x) * 180.0f * Time.deltaTime;
     }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem.Controls;
 using Random = UnityEngine.Random;
 
 public class WeaponBase : UUObject
@@ -484,12 +483,12 @@ public class WeaponBase : UUObject
 
     private static bool IsCancelPressedMouseKeyboard()
     {
-        return GameInput.CurrentKeyboard?.xKey.wasPressedThisFrame ?? false;
+        return GameActions.KeysWorld.CancelCharge.WasPressedThisFrame();
     }
 
     private static bool IsCancelHeldMouseKeyboard()
     {
-        return GameInput.CurrentKeyboard?.xKey.isPressed ?? false;
+        return GameActions.KeysWorld.CancelCharge.IsPressed();
     }
 
     private static bool IsAttackPressedMouseKeyboard()
@@ -502,32 +501,25 @@ public class WeaponBase : UUObject
         return GameInput.CurrentMouse?.rightButton.isPressed ?? false;
     }
 
-    private static ButtonControl GetAttackTriggerGamepad()
-    {
-        var gp = GameInput.CurrentGamepad;
-        if (gp == null || PlayerData.sData == null)
-            return null;
-        return PlayerData.sData.leftHanded ? gp.leftTrigger : gp.rightTrigger;
-    }
-
+    /// <summary>The trigger of the weapon hand: <see cref="GameActions.Refresh"/> follows the hand.</summary>
     private static bool IsAttackPressedGamepad()
     {
-        return GetAttackTriggerGamepad()?.wasPressedThisFrame ?? false;
+        return PlayerData.sData != null && GameActions.PadWorld.Attack.WasPressedThisFrame();
     }
 
     private static bool IsAttackHeldGamepad()
     {
-        return GetAttackTriggerGamepad()?.isPressed ?? false;
+        return PlayerData.sData != null && GameActions.PadWorld.Attack.IsPressed();
     }
 
     private static bool IsCancelPressedGamepad()
     {
-        return GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false;
+        return GameActions.PadWorld.Cancel.WasPressedThisFrame();
     }
 
     private static bool IsCancelHeldGamepad()
     {
-        return GameInput.CurrentGamepad?.bButton.isPressed ?? false;
+        return GameActions.PadWorld.Cancel.IsPressed();
     }
 
     /// <summary>Direct child transform excluded from lowered-hide toggling (e.g. ranged projectile).</summary>
