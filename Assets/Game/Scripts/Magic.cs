@@ -1198,6 +1198,12 @@ public class Magic : MonoBehaviour
         Utils.PlayClip2d(moveToEmpty);
     }
 
+    /// <summary>The rune cursor's d-pad, or its arrow key unless the keyboard is typing runes.</summary>
+    private static bool CursorPressedThisFrame(InputAction pad, InputAction key)
+    {
+        return pad.WasPressedThisFrame() || GameInput.KeyPressedThisFrame(key);
+    }
+
     public void RestoreMana(int mana)
     {
         if (!PlayerData.sData.dead)
@@ -1322,10 +1328,10 @@ public class Magic : MonoBehaviour
             }
 
             int column = index % 4;
-            bool padLeft = GameInput.DpadOrArrowLeftPressedThisFrame();
-            bool padRight = GameInput.DpadOrArrowRightPressedThisFrame();
-            bool padUp = GameInput.DpadOrArrowUpPressedThisFrame();
-            bool padDown = GameInput.DpadOrArrowDownPressedThisFrame();
+            bool padLeft = CursorPressedThisFrame(GameActions.PadMagic.Left, GameActions.KeysMagic.Left);
+            bool padRight = CursorPressedThisFrame(GameActions.PadMagic.Right, GameActions.KeysMagic.Right);
+            bool padUp = CursorPressedThisFrame(GameActions.PadMagic.Up, GameActions.KeysMagic.Up);
+            bool padDown = CursorPressedThisFrame(GameActions.PadMagic.Down, GameActions.KeysMagic.Down);
             // The active spells are stacked upwards below the panel, the last one on top, so the
             // cursor steps down onto the top one and back up onto the runes.
             if (activeSpellCursor >= 0)
@@ -1370,7 +1376,7 @@ public class Magic : MonoBehaviour
 
             if (GameInput.LastActiveDevice == GameInputDevice.Gamepad)
             {
-                if (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
+                if (GameActions.PadMagic.Select.WasPressedThisFrame())
                 {
                     if (activeSpellCursor >= 0)
                     {
@@ -1383,13 +1389,13 @@ public class Magic : MonoBehaviour
                     }
                 }
 
-                if (GameInput.CurrentGamepad?.bButton.wasPressedThisFrame ?? false)
+                if (GameActions.PadMagic.Clear.WasPressedThisFrame())
                 {
                     spellInProgress.Clear();
                     Utils.PlayClip2d(clearSpell);
                 }
 
-                if ((GameInput.CurrentGamepad?.xButton.wasPressedThisFrame ?? false) && spellInProgress.Count > 1)
+                if (GameActions.PadMagic.Cast.WasPressedThisFrame() && spellInProgress.Count > 1)
                     TryCastFromSpellRunes();
             }
         }
@@ -1402,7 +1408,7 @@ public class Magic : MonoBehaviour
         // dialog, sleep. The two panels and Roaming Sight are the masks that leave C free.
         const EControlMask castKeyFree = EControlMask.Magic | EControlMask.Inventory | EControlMask.RoamingSight;
         if ((PlayerObject.Player.controlsDisabled & ~castKeyFree) == 0
-            && GameInput.MagicCastKeyboardConfirmPressedThisFrame())
+            && GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Cast))
         {
             TryCastFromSpellRunes();
         }
@@ -3532,7 +3538,7 @@ public class Magic : MonoBehaviour
         pos.y = Utils.DampedApproach(pos.y, 14.0f, 1.0f);
 
         Vector2 kbMove = PlayerInput.ReadMoveVector();
-        Vector2 gpMove = GameInput.CurrentGamepad?.leftStick.ReadValue() ?? Vector2.zero;
+        Vector2 gpMove = GameActions.PadWorld.Move.ReadValue<Vector2>();
         Vector2 moveControl = kbMove.sqrMagnitude > 0.0001f ? kbMove : gpMove;
 
         // left/right at 75%, backward at 50% of forward speed
@@ -3543,7 +3549,7 @@ public class Magic : MonoBehaviour
         vel.z = Utils.DampedApproach(vel.z, desiredMove.z, 1.0f);
         pos.z += vel.z * Time.deltaTime;
 
-        float targetYawVel = 45.0f * (GameInput.CurrentGamepad?.rightStick.ReadValue().x ?? 0.0f);
+        float targetYawVel = 45.0f * GameActions.PadWorld.Look.ReadValue<Vector2>().x;
         if (PlayerInput.ShouldApplyMouseLook() && GameInput.CurrentMouse != null)
         {
             float sens = PlayerInput.MouseLookSpeed * roamingSightMouseSensitivity;

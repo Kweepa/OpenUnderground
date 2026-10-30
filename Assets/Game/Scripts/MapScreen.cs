@@ -732,8 +732,8 @@ public class MapScreen : MonoBehaviour
         if (!visible
             && !mapDisabled
             && (map != null || Cheats.sCheats.mapWithoutMap)
-            && (GameInput.SelectPressedThisFrame()
-                || GameInput.TabPressedThisFrame()
+            && (GameActions.PadWorld.Map.WasPressedThisFrame()
+                || GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Map)
                 || (map != null && map.popUpMap)))
         {
             if (map != null)
@@ -761,11 +761,11 @@ public class MapScreen : MonoBehaviour
         }
         else if (visible
                  && !MapKeyboardOverlayActive()
-                 && (GameInput.SelectPressedThisFrame()
+                 && (GameActions.PadMap.Close.WasPressedThisFrame()
                      || GameInput.EscapePressedThisFrame()
-                     || GameInput.TabPressedThisFrame()
-                     || (GameInput.CurrentGamepad?.bButton.wasReleasedThisFrame ?? false)
-                     || (awaitingCloseAButtonRelease && (GameInput.CurrentGamepad?.aButton.wasReleasedThisFrame ?? false))
+                     || GameInput.KeyPressedThisFrame(GameActions.KeysMap.Close)
+                     || GameActions.PadMap.Back.WasReleasedThisFrame()
+                     || (awaitingCloseAButtonRelease && GameActions.PadMap.Select.WasReleasedThisFrame())
                      || (awaitingCloseAButtonRelease
                          && GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard
                          && (GameInput.CurrentMouse?.leftButton.wasReleasedThisFrame ?? false))))
@@ -786,8 +786,8 @@ public class MapScreen : MonoBehaviour
             }
             else
             {
-                float stickX = GameInput.CurrentGamepad?.leftStick.x.value ?? 0.0f;
-                float stickY = GameInput.CurrentGamepad?.leftStick.y.value ?? 0.0f;
+                float stickX = GameActions.PadMap.QuillX.ReadValue<float>();
+                float stickY = GameActions.PadMap.QuillY.ReadValue<float>();
 
                 float signX = stickX >= 0 ? 1.0f : -1.0f;
                 float signY = stickY >= 0 ? 1.0f : -1.0f;
@@ -829,10 +829,10 @@ public class MapScreen : MonoBehaviour
 
             bool keyboardActive = MapKeyboardOverlayActive();
 
-            if (!keyboardActive && highlightedNote != null && (GameInput.CurrentGamepad?.xButton.wasPressedThisFrame ?? false))
+            if (!keyboardActive && highlightedNote != null && GameActions.PadMap.EraseNote.WasPressedThisFrame())
                 TryEraseHighlightedMapNote();
 
-            if (!keyboardActive && (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false))
+            if (!keyboardActive && GameActions.PadMap.Select.WasPressedThisFrame())
                 TryApplyMapPrimaryAction();
 
             if (!keyboardActive
@@ -856,12 +856,12 @@ public class MapScreen : MonoBehaviour
                 currentNote.x = quillX * 320.0f / Screen.width;
                 currentNote.y = quillY * 200.0f / Screen.height;
             }
-            else if ((GameInput.CurrentGamepad?.dpad.up.wasPressedThisFrame ?? false) && selectedPage > 1)
+            else if (GameActions.PadMap.PreviousPage.WasPressedThisFrame() && selectedPage > 1)
             {
                 --selectedPage;
                 mapPage = mapPages[selectedPage];
             }
-            else if ((GameInput.CurrentGamepad?.dpad.down.wasPressedThisFrame ?? false) && selectedPage < mapPages.Length - 1)
+            else if (GameActions.PadMap.NextPage.WasPressedThisFrame() && selectedPage < mapPages.Length - 1)
             {
                 ++selectedPage;
                 mapPage = mapPages[selectedPage];

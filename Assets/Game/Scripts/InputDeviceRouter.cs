@@ -1,7 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Runs <see cref="GameInput.RefreshLastActiveDevice"/> early each frame so inventory/magic can branch gamepad vs mouse/kb.
+/// Runs <see cref="GameInput.RefreshLastActiveDevice"/> early each frame so inventory/magic can branch gamepad vs mouse/kb,
+/// and <see cref="GameActions.Refresh"/>, which follows the weapon hand onto the pad's triggers.
 /// </summary>
 [DefaultExecutionOrder(-300)]
 public sealed class InputDeviceRouter : MonoBehaviour
@@ -22,5 +23,6 @@ public sealed class InputDeviceRouter : MonoBehaviour
     private void Update()
     {
         GameInput.RefreshLastActiveDevice();
+        GameActions.Refresh();
     }
 }

@@ -128,7 +128,7 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
-        if (PlayerInput.GamepadAttackTriggerPressedThisFrame()
+        if (GameActions.PadWorld.Attack.WasPressedThisFrame()
             && !IsModalInventoryUiBlocking()
             && DismissActivePlayerPanels())
         {
@@ -136,24 +136,24 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
-        if (GameInput.ShoulderLeftPressedThisFrame())
+        if (GameActions.PadWorld.MagicPanel.WasPressedThisFrame())
         {
             ToggleMagic();
         }
-        if (GameInput.ShoulderRightPressedThisFrame())
+        if (GameActions.PadWorld.Inventory.WasPressedThisFrame())
         {
             ToggleInventory();
         }
 
-        if (GameInput.QKeyPressedThisFrame())
+        if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.MagicPanel))
         {
             ToggleMagic();
         }
-        if (GameInput.EKeyPressedThisFrame())
+        if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Inventory))
         {
             ToggleInventory();
         }
-        if (GameInput.RKeyPressedThisFrame())
+        if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Stats))
         {
             ToggleStatsPanel();
         }
