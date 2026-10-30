@@ -831,8 +831,9 @@ public class Achievements : MonoBehaviour
 
     /// <summary>
     /// The grid of the achievements, four across, centred between top and bottom (screen pixels: the
-    /// page's title and its footer). It takes the width of the screen, and is made smaller still
-    /// when that would not fit the height between the two, so a short screen keeps it off the footer.
+    /// page's title and its footer). It takes the width of the screen, less what the player's limit on
+    /// the interface's growth takes off (UiScale.GrowthShare), and is made smaller still when that
+    /// would not fit the height between the two, so a short screen keeps it off the footer.
     /// </summary>
     public string DrawAllAchievements(bool revealAchievements, float top, float bottom)
     {
@@ -840,7 +841,8 @@ public class Achievements : MonoBehaviour
         int rows = ((int)EAchievement.Count + 3) / 4;
         float gridHeight = (rows - 1) * AchievementRowPitch + AchievementRowHeight;
         float room = bottom - top - 2 * UiScale.S(AchievementGridMinGap);
-        float scale = Mathf.Min(Screen.safeArea.width / (340 * 4 + 100), room / gridHeight);
+        // the width's scale held back with the interface's when the player keeps it from growing
+        float scale = Mathf.Min(Screen.safeArea.width / (340 * 4 + 100) * UiScale.GrowthShare, room / gridHeight);
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1.0f));
 
         float gridTop = (top + bottom - gridHeight * scale) / 2 / scale;
