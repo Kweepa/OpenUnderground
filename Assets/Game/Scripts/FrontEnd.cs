@@ -511,9 +511,10 @@ public class FrontEnd : MonoBehaviour
 
     /// <summary>
     /// Plays one of the title tracks, looping, unless one of them is playing already: coming back
-    /// from the Setup screen or from a game does not start it over.
+    /// from the Setup screen or from a game does not start it over. Setup's music tracks call it too,
+    /// when they close.
     /// </summary>
-    private static void StartTitleMusic()
+    public static void StartTitleMusic()
     {
         MusicPlayer player = MusicPlayer.Instance;
         if (player == null || (player.IsPlaying && MusicConfig.Contains(EMusicSituation.Title, player.currentTrack)))
@@ -868,6 +869,18 @@ public class FrontEnd : MonoBehaviour
             Utils.PlayClip2d(moveSelection);
     }
 
+    // Where the pointer was the last time a menu looked, so that it takes the selection only when it
+    // moves: a pointer resting on an item took it back, the frame after, from every arrow key.
+    private Vector2 lastMenuPointer = new Vector2(float.NaN, float.NaN);
+
+    /// <summary>True when the pointer has moved since the last call, or a button of it was pressed.</summary>
+    private bool PointerTakesSelection(Mouse m, Vector2 guiMouse)
+    {
+        bool moved = (guiMouse - lastMenuPointer).sqrMagnitude > 0.25f || float.IsNaN(lastMenuPointer.x);
+        lastMenuPointer = guiMouse;
+        return moved || m.leftButton.wasPressedThisFrame || m.rightButton.wasPressedThisFrame;
+    }
+
     private void UpdateMenuMouseKeyboard(int numItems)
     {
         GameInput.RefreshLastActiveDevice();
@@ -906,6 +919,8 @@ public class FrontEnd : MonoBehaviour
         float xs = Screen.width / 320.0f;
         float ys = Screen.height / 200.0f;
         Vector2 guiMouse = GuiInput.ScreenToGuiMouse(m.position.ReadValue());
+        if (!PointerTakesSelection(m, guiMouse))
+            return;
 
         for (int i = 0; i < numItems; i++)
         {
@@ -1030,6 +1045,8 @@ public class FrontEnd : MonoBehaviour
             return;
 
         Vector2 guiMouse = GuiInput.ScreenToGuiMouse(m.position.ReadValue());
+        if (!PointerTakesSelection(m, guiMouse))
+            return;
 
         for (int i = loadScroll; i < saves.Length && i < loadScroll + LoadMenuVisibleRows; i++)
         {

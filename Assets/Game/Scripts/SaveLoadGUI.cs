@@ -1,26 +1,33 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using System.IO;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 /// <summary>
-/// Runs after <see cref="PlayerPanelInput"/> so opening from Esc runs before we evaluate Esc-to-close here.
+/// The game menu in a game: opens it, pauses the game under it, and keeps its two pages of saves.
 /// </summary>
+/// <remarks>
+/// The menu itself - the frame, the tabs, the OPTIONS and CONTROLS pages - is GameMenu; this is its
+/// host in a game, holding what only a game has: the lists of saves to save over or load, the way
+/// back to the title screen, the quicksave and the pause when the window loses focus.
+/// Runs after <see cref="PlayerPanelInput"/> so opening from Esc runs before we evaluate Esc-to-close here.
+/// </remarks>
 [DefaultExecutionOrder(50)]
-public class SaveLoadGUI : MonoBehaviour
+public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
 {
     public Texture2D background;
+    [Tooltip("The picture behind the game menu: the wood of the signs.")]
+    public Texture2D menuBackground;
     public GUIStyle title;
     public GUIStyle text;
-    public GUIStyle optionsDescriptionText;
-    public GUIStyle optionsFooterText;
     public Texture2D aButton;
     public Texture2D bButton;
     public Texture2D xButton;
+    public Texture2D yButton;
     public Texture2D escapeKey;
+    public Texture2D blankKey;
     public Texture2D buttonOutline;
     public Texture2D dPadLeftRight;
     public Texture2D xButtonChargeRing;
@@ -30,22 +37,23 @@ public class SaveLoadGUI : MonoBehaviour
     public bool pauseOnFocusLoss = true;
 
     public AudioClip diskSound;
+    public AudioClip moveSound;
+    public AudioClip makeSound;
+    public AudioClip backSound;
 
     private bool visible;
     private int index;
     private Material chargeRingMatInstance;
 
-    private enum ETab
-    {
-        Save,
-        Load,
-        Options
-    }
+    // The menu, made when first needed; not serialized, so a script reload in the Editor makes it again.
+    private GameMenu menu;
 
-    private ETab tab;
+    // The tab of saves in view, SAVE or LOAD: the save list carries one row the load list does not.
+    private GameMenu.ETab pageTab = GameMenu.ETab.Save;
 
-    private bool quitConfirmOpen;
-    private bool quitConfirmInitialButtonsReleased;
+    // Yes to going back to the title, waiting for the mouse button to come up: the release must not
+    // land on the title screen's menu.
+    private bool quitPending;
     private float quitHoldXTime;
     private const float QuitHoldXDurationSeconds = 0.85f;
 
@@ -55,46 +63,6 @@ public class SaveLoadGUI : MonoBehaviour
     private const float QuickSaveHoldSeconds = 0.85f;
     private float quickSaveHoldTime;
     private bool quickSaveDoneThisHold;
-
-    private enum DeferredQuitMouseAction
-    {
-        None,
-        Cancel,
-        Confirm
-    }
-
-    private DeferredQuitMouseAction deferredQuitMouseAction;
-    private int executeDeferredQuitMouseOnFrame = -1;
-    private Rect quitConfirmCancelHitRect;
-    private Rect quitConfirmConfirmHitRect;
-    
-    // Options settings
-    private float musicVolume = 0.7f;
-    private string soundFont = "MT32";
-    private float effectsVolume = 1.0f;
-    private float mouseLookSpeed = 1.0f;
-    private bool useKeyAutomatically = true;
-    private bool autoJump = false;
-    private bool invertLook = false;
-    
-    // Options tab navigation
-    private int optionsIndex = 0;
-    private const int OPTIONS_ITEM_COUNT = 7; // music vol, soundfont, effects vol, mouse look speed, 3 checkboxes
-    private const float MinMouseLookSpeed = 0.8f;
-    private const float MaxMouseLookSpeed = 2.2f;
-    private static readonly string[] OptionsDescriptions =
-    {
-        "Adjusts the volume of in-game music.",
-        "Chooses the synthesizer sound font used for music. Different fonts emulate classic soundcards such as the MT-32.",
-        "Adjusts the volume of sound effects.",
-        "Controls how quickly the camera turns when using the mouse. Does not affect gamepad look.",
-        "Reverses up and down when looking with the mouse or gamepad.",
-        "Enabled: a locked door unlocks automatically if you have the correct key and use the door. Disabled: you must manually unlock a door by finding the correct key in your inventory and using the key.",
-        "Enabled: the player jumps automatically at the edge when running straight ahead toward a gap or a deep drop. To step off a ledge instead, hold A or D as well, or push the stick only partway.",
-    };
-    private const string OptionsApplyFooter = "Changes are only saved when you select Apply All.";
-    private string[] availableSoundFonts = new string[0];
-    private int currentSoundFontIndex = 0;
 
     // The list is whatever is on disk, newest first, so it has no fixed length any more and the
     // rows scroll. slotScroll is the first row drawn.
@@ -106,7 +74,7 @@ public class SaveLoadGUI : MonoBehaviour
     // player put it when he scrolled it himself: otherwise the wheel would be undone on the very
     // next frame, because the selection is still where it was.
     private bool slotScrollFollowsSelection = true;
-    
+
     private string saveName;
 
     /// <summary>Most characters a save made by hand will take.</summary>
@@ -119,6 +87,50 @@ public class SaveLoadGUI : MonoBehaviour
 
     /// <summary>Frame when the panel became visible; Esc opens via <see cref="PlayerPanelInput"/> then this Update sees the same Esc press — ignore Esc-to-close on that frame.</summary>
     private int visibleShownAtFrame = -1;
+
+    // The lists of saves, in reference pixels (UiScale).
+    private const float SlotRowHeight = 52f;
+    private const float SlotFont = 32f;
+    private const float SlotTextInset = 20f;
+    private const float ScrollBarWidth = 14f;
+    private const float PreviewFont = 26f;
+    // The screenshots are taken at the shape the old preview panel showed them, 570 x 332.
+    private const float ScreenshotAspect = 570f / 332f;
+
+    // The scroll bar of the list of saves, while its thumb is dragged.
+    private bool draggingThumb;
+    private float thumbGrab;
+    // a row double clicked in the list, acted on in the next Update as Enter
+    private bool rowDoubleClicked;
+
+    private GameMenu Menu
+    {
+        get
+        {
+            if (menu == null)
+            {
+                GameMenuSkin skin = new GameMenuSkin
+                {
+                    Font = text,
+                    Background = menuBackground,
+                    Wood = background,
+                    AButton = aButton,
+                    BButton = bButton,
+                    XButton = xButton,
+                    YButton = yButton,
+                    EscapeKey = escapeKey,
+                    BlankKey = blankKey,
+                    DPadLeftRight = dPadLeftRight,
+                    MoveSound = moveSound,
+                    MakeSound = makeSound,
+                    BackSound = backSound,
+                };
+                menu = new GameMenu(skin, this,
+                    new[] { GameMenu.ETab.Save, GameMenu.ETab.Load, GameMenu.ETab.Options, GameMenu.ETab.Controls }, true);
+            }
+            return menu;
+        }
+    }
 
     private void Start()
     {
@@ -139,6 +151,11 @@ public class SaveLoadGUI : MonoBehaviour
 
     private void Hide()
     {
+        // the options are saved as the menu goes, and a line says so when any changed
+        if (visible && Menu.Close())
+        {
+            Messages.Add("Options saved.");
+        }
         visible = false;
         visibleShownAtFrame = -1;
         ResetQuitToMainMenuState();
@@ -148,28 +165,15 @@ public class SaveLoadGUI : MonoBehaviour
 
     private void ResetQuitToMainMenuState()
     {
-        quitConfirmOpen = false;
-        quitConfirmInitialButtonsReleased = false;
         quitHoldXTime = 0f;
-        deferredQuitMouseAction = DeferredQuitMouseAction.None;
-        executeDeferredQuitMouseOnFrame = -1;
+        quitPending = false;
     }
 
-    private void OpenQuitConfirm()
+    /// <summary>Main Menu clicked or chosen: asked in the menu's own Yes/No box, No lit first. X held goes without asking.</summary>
+    private void AskQuitToMainMenu()
     {
-        quitConfirmOpen = true;
-        quitConfirmInitialButtonsReleased = false;
         quitHoldXTime = 0f;
-        deferredQuitMouseAction = DeferredQuitMouseAction.None;
-        executeDeferredQuitMouseOnFrame = -1;
-    }
-
-    private void CancelQuitConfirm()
-    {
-        quitConfirmOpen = false;
-        quitConfirmInitialButtonsReleased = false;
-        deferredQuitMouseAction = DeferredQuitMouseAction.None;
-        executeDeferredQuitMouseOnFrame = -1;
+        Menu.Ask("Return to the title screen? Progress not saved is lost.", () => quitPending = true);
     }
 
     private void ConfirmQuitToMainMenu()
@@ -256,12 +260,10 @@ public class SaveLoadGUI : MonoBehaviour
         index = 0;
         slotScroll = 0;
         slotScrollFollowsSelection = true;
-        tab = ETab.Save;
         ResetQuitToMainMenuState();
         PlayerObject.DisableControls(EControlMask.SaveLoad, true);
         Time.timeScale = 0.0f;
-        RefreshSaves();
-        LoadOptionsSettings();
+        Menu.Open(GameMenu.ETab.Save);
         return true;
     }
 
@@ -314,104 +316,31 @@ public class SaveLoadGUI : MonoBehaviour
             return;
         }
 
-        if (quitConfirmOpen)
+        if (quitPending)
         {
-            UpdateQuitConfirm();
+            if (!(GameInput.CurrentMouse?.leftButton.isPressed ?? false))
+            {
+                ConfirmQuitToMainMenu();
+            }
+            return;
+        }
+
+        // The small-window warning over the menu takes its keys, and the press that closes it too: B or Start
+        // closed the menu as well, and A's release chose the row behind it (fix 460).
+        if (SmallWindowWarning.BlocksInput)
+        {
+            quitHoldXTime = 0f;
+            Menu.DisarmAccept();
             return;
         }
 
         UpdateQuitHoldX();
 
-        if (!KeyboardActive())
+        // Esc/Start open via PlayerPanelInput; the same frame the press is still true here, and
+        // the menu must not close on it.
+        if (!KeyboardActive() && Time.frameCount != visibleShownAtFrame && Menu.Update())
         {
-            bool esc = GameInput.EscapePressedThisFrame();
-            // Read here, and tested by the branch that uses it. A branch taken on every frame of the
-            // save and load tabs blocks the ones after it, and the gamepad's A button is one of them.
-            float wheel = Mouse.current?.scroll.ReadValue().y ?? 0.0f;
-            // Esc/Start open via PlayerPanelInput; same frame the press is still true here — do not close immediately.
-            bool escDismiss = esc && Time.frameCount != visibleShownAtFrame;
-            bool startDismiss = (Gamepad.current?.startButton.wasPressedThisFrame ?? false)
-                && Time.frameCount != visibleShownAtFrame;
-            if (escDismiss
-                || startDismiss
-                || (Gamepad.current?.bButton.wasPressedThisFrame ?? false))
-            {
-                Hide();
-                return;
-            }
-
-            if (Gamepad.current?.leftShoulder.wasPressedThisFrame ?? false)
-            {
-                // Cycle backwards: Save -> Options -> Load
-                SetTab(tab == ETab.Save ? ETab.Options : (tab == ETab.Options ? ETab.Load : ETab.Save));
-            }
-            else if (Gamepad.current?.rightShoulder.wasPressedThisFrame ?? false)
-            {
-                // Cycle forwards: Save -> Load -> Options
-                SetTab(tab == ETab.Save ? ETab.Load : (tab == ETab.Load ? ETab.Options : ETab.Save));
-            }
-            else if ((Gamepad.current?.dpad.down.wasPressedThisFrame ?? false)
-                     || (Keyboard.current?.downArrowKey.wasPressedThisFrame ?? false))
-            {
-                if (tab == ETab.Options)
-                {
-                    optionsIndex = (optionsIndex + 1) % OPTIONS_ITEM_COUNT;
-                }
-                else
-                {
-                    MoveSlotSelection(1);
-                }
-            }
-            else if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false)
-                     || (Keyboard.current?.upArrowKey.wasPressedThisFrame ?? false))
-            {
-                if (tab == ETab.Options)
-                {
-                    optionsIndex = (optionsIndex + OPTIONS_ITEM_COUNT - 1) % OPTIONS_ITEM_COUNT;
-                }
-                else
-                {
-                    MoveSlotSelection(-1);
-                }
-            }
-            else if (tab != ETab.Options && wheel != 0.0f)
-            {
-                // The wheel scrolls the list without moving the selection, the way a list is
-                // expected to behave once it is longer than the panel. One row per notch: the
-                // value the mouse reports is not the same number on every platform, so only its
-                // sign is used.
-                if (wheel > 0.0f)
-                {
-                    slotScroll = Mathf.Max(0, slotScroll - 1);
-                    slotScrollFollowsSelection = false;
-                }
-                else if (wheel < 0.0f)
-                {
-                    slotScroll = slotScroll + 1;
-                    slotScrollFollowsSelection = false;
-                }
-            }
-            else if (tab == ETab.Options && ((Gamepad.current?.dpad.left.wasPressedThisFrame ?? false) || (Gamepad.current?.leftStick.left.wasPressedThisFrame ?? false)))
-            {
-                // Handle left input on Options tab
-                HandleOptionsLeftRight(-1);
-            }
-            else if (tab == ETab.Options && ((Gamepad.current?.dpad.right.wasPressedThisFrame ?? false) || (Gamepad.current?.leftStick.right.wasPressedThisFrame ?? false)))
-            {
-                // Handle right input on Options tab
-                HandleOptionsLeftRight(1);
-            }
-            else if (Gamepad.current?.aButton.wasReleasedThisFrame ?? false)
-            {
-                if (tab == ETab.Options)
-                {
-                    ApplyOptionsSettings();
-                }
-                else
-                {
-                    ActivatePrimarySaveOrLoad();
-                }
-            }
+            Hide();
         }
     }
 
@@ -424,7 +353,8 @@ public class SaveLoadGUI : MonoBehaviour
         }
 
         Gamepad gp = Gamepad.current;
-        if (gp == null)
+        // a page of the menu's own - the music tracks - has X for itself: it toggles a track there (fix 455)
+        if (gp == null || Menu.Asking || Menu.ShowsSubPage)
         {
             quitHoldXTime = 0f;
             return;
@@ -435,7 +365,9 @@ public class SaveLoadGUI : MonoBehaviour
             quitHoldXTime += Time.unscaledDeltaTime;
             if (quitHoldXTime >= QuitHoldXDurationSeconds)
             {
-                OpenQuitConfirm();
+                // no question: holding the button this long already says it (the user, 31 October 2026)
+                quitHoldXTime = 0f;
+                quitPending = true;
             }
         }
         else
@@ -444,103 +376,11 @@ public class SaveLoadGUI : MonoBehaviour
         }
     }
 
-    private void UpdateQuitConfirm()
-    {
-        if (deferredQuitMouseAction != DeferredQuitMouseAction.None)
-        {
-            Mouse mouse = GameInput.CurrentMouse;
-            if (mouse != null && mouse.leftButton.isPressed)
-            {
-                executeDeferredQuitMouseOnFrame = -1;
-            }
-            else
-            {
-                if (executeDeferredQuitMouseOnFrame < 0)
-                {
-                    executeDeferredQuitMouseOnFrame = Time.frameCount + 1;
-                }
-                else if (Time.frameCount >= executeDeferredQuitMouseOnFrame)
-                {
-                    DeferredQuitMouseAction action = deferredQuitMouseAction;
-                    deferredQuitMouseAction = DeferredQuitMouseAction.None;
-                    executeDeferredQuitMouseOnFrame = -1;
-                    if (action == DeferredQuitMouseAction.Confirm)
-                    {
-                        ConfirmQuitToMainMenu();
-                    }
-                    else
-                    {
-                        CancelQuitConfirm();
-                    }
-                }
-            }
-            return;
-        }
-
-        if (!quitConfirmInitialButtonsReleased)
-        {
-            Gamepad gp = GameInput.CurrentGamepad;
-            Mouse mouse = GameInput.CurrentMouse;
-            if (gp != null)
-            {
-                if (gp.aButton.isPressed || gp.aButton.wasReleasedThisFrame
-                    || gp.bButton.isPressed || gp.bButton.wasReleasedThisFrame
-                    || gp.xButton.isPressed || gp.xButton.wasReleasedThisFrame)
-                {
-                    return;
-                }
-            }
-            // Ignore the mouse-down that opened this dialog (Main Menu click) until release.
-            if (mouse != null && mouse.leftButton.isPressed)
-            {
-                return;
-            }
-            quitConfirmInitialButtonsReleased = true;
-        }
-
-        // Mouse hits use Input System + stored rects so they work even if OnGUI already used the event.
-        Mouse m = GameInput.CurrentMouse;
-        if (m != null && m.leftButton.wasPressedThisFrame)
-        {
-            Vector2 guiMouse = GuiInput.MousePositionGuiSpace;
-            if (quitConfirmCancelHitRect.Contains(guiMouse))
-            {
-                deferredQuitMouseAction = DeferredQuitMouseAction.Cancel;
-                executeDeferredQuitMouseOnFrame = -1;
-                return;
-            }
-            if (quitConfirmConfirmHitRect.Contains(guiMouse))
-            {
-                deferredQuitMouseAction = DeferredQuitMouseAction.Confirm;
-                executeDeferredQuitMouseOnFrame = -1;
-                return;
-            }
-        }
-
-        if (GameInput.CurrentKeyboard != null
-            && (GameInput.CurrentKeyboard.enterKey.wasPressedThisFrame
-                || GameInput.CurrentKeyboard.numpadEnterKey.wasPressedThisFrame))
-        {
-            ConfirmQuitToMainMenu();
-            return;
-        }
-        if (GameInput.EscapePressedThisFrame()
-            || (Gamepad.current?.bButton.wasPressedThisFrame ?? false))
-        {
-            CancelQuitConfirm();
-            return;
-        }
-        if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
-        {
-            ConfirmQuitToMainMenu();
-        }
-    }
-
     private void ActivatePrimarySaveOrLoad()
     {
-        if (tab == ETab.Save)
+        if (pageTab == GameMenu.ETab.Save)
             BeginSaveFlow();
-        else if (tab == ETab.Load)
+        else if (pageTab == GameMenu.ETab.Load)
             PerformLoadFromSelection();
     }
 
@@ -600,37 +440,9 @@ public class SaveLoadGUI : MonoBehaviour
     private void RefreshSaves()
     {
         // Every save on disk, newest first, plus the new save row when this is the save tab.
-        index = SaveUIHelper.RefreshSaves(ref saves, ref slotScreenshots, index, tab == ETab.Save);
+        index = SaveUIHelper.RefreshSaves(ref saves, ref slotScreenshots, index, pageTab == GameMenu.ETab.Save);
     }
     
-    /// <summary>
-    /// The rect of the save at <paramref name="slotIndex"/> in the list, or an empty rect when that
-    /// save is scrolled out of sight. Hit testing goes through here so that a click can never land
-    /// on a row that is not drawn.
-    /// </summary>
-    private Rect SlotRowHitRectForIndex(float x, float y, float w, float h, int slotIndex)
-    {
-        int row = slotIndex - slotScroll;
-        if (row < 0 || row >= VisibleSlotRows(h))
-        {
-            return new Rect(0, 0, 0, 0);
-        }
-
-        return SlotRowHitRect(x, y, w, row);
-    }
-
-    /// <summary>
-    /// How many rows fit between the tab titles and the button along the bottom. Worked out from
-    /// the panel rather than fixed, so a change of font size or panel art cannot push the last row
-    /// out under the button.
-    /// </summary>
-    private int VisibleSlotRows(float h)
-    {
-        float rowStep = text.fontSize + 2;
-        float available = h - (title.fontSize + 25) - (text.fontSize + 34);
-        return Mathf.Clamp(Mathf.FloorToInt(available / rowStep), 1, 64);
-    }
-
     /// <summary>Moves the selection by <paramref name="delta"/> rows, wrapping as the panel always did.</summary>
     private void MoveSlotSelection(int delta)
     {
@@ -642,64 +454,6 @@ public class SaveLoadGUI : MonoBehaviour
 
         index = ((index + delta) % saves.Length + saves.Length) % saves.Length;
         slotScrollFollowsSelection = true;
-    }
-
-    /// <summary>
-    /// Keeps the window inside the list, and the selected row inside the window whenever it was
-    /// the selection that moved.
-    /// </summary>
-    private void ClampSlotScroll(float h)
-    {
-        int rows = VisibleSlotRows(h);
-        int maxScroll = Mathf.Max(0, saves.Length - rows);
-        slotScroll = Mathf.Clamp(slotScroll, 0, maxScroll);
-
-        if (slotScrollFollowsSelection)
-        {
-            if (index < slotScroll)
-            {
-                slotScroll = index;
-            }
-            else if (index >= slotScroll + rows)
-            {
-                slotScroll = index - rows + 1;
-            }
-
-            slotScroll = Mathf.Clamp(slotScroll, 0, maxScroll);
-        }
-    }
-
-    /// <summary>
-    /// Switches tab and rebuilds the list, because the save tab carries one row the load tab does
-    /// not: the row that starts a new save.
-    /// </summary>
-    private void SetTab(ETab newTab)
-    {
-        if (tab == newTab)
-        {
-            return;
-        }
-
-        // What was selected stays selected across the move, which is what a player who went to
-        // the save tab and then realised he meant to load expects. It is carried by slot name and
-        // not by row number: the save list hides the saves the game writes and carries the new save
-        // row at the top, so the same number is a different save on the other side. A save that
-        // has no row on the other side - a quicksave or an autosave, going from load to save -
-        // falls back to the top.
-        // No test on the tab we are leaving: the options tab has a selection of its own and leaves
-        // this list and this index alone, so they still name the save that was chosen before it.
-        string wasSelected = index >= 0 && index < saves.Length && saves[index] != null
-            ? saves[index].slotName : "";
-
-        tab = newTab;
-        index = 0;
-        slotScroll = 0;
-        slotScrollFollowsSelection = true;
-        if (tab != ETab.Options)
-        {
-            RefreshSaves();
-            index = SaveUIHelper.IndexOfSlot(saves, wasSelected, 0);
-        }
     }
 
     /// <summary>
@@ -760,167 +514,6 @@ public class SaveLoadGUI : MonoBehaviour
     private Color selectColor = new Color32(255, 213, 64, 255);
     private Color unselectColor = new Color32(187, 123, 1, 255);
 
-    private static void GetTabWidths(float w, out float saveWidth, out float loadWidth, out float optionsWidth)
-    {
-        saveWidth = w * 0.30f;
-        loadWidth = w * 0.30f;
-        optionsWidth = w * 0.40f;
-    }
-
-    private Rect TabSaveHitRect(float x, float y, float w)
-    {
-        GetTabWidths(w, out float sw, out _, out _);
-        return new Rect(x + 5, y + 10, sw, title.fontSize + 10);
-    }
-
-    private Rect TabLoadHitRect(float x, float y, float w)
-    {
-        GetTabWidths(w, out float sw, out float lw, out _);
-        return new Rect(x + sw, y + 10, lw, title.fontSize + 10);
-    }
-
-    private Rect TabOptionsHitRect(float x, float y, float w)
-    {
-        GetTabWidths(w, out float sw, out float lw, out float ow);
-        return new Rect(x - 5 + sw + lw, y + 10, ow, title.fontSize + 10);
-    }
-
-    /// <summary>The rect of the i-th row ON SCREEN, counting from the top of the visible window.</summary>
-    private Rect SlotRowHitRect(float x, float y, float w, int i)
-    {
-        float rowStep = text.fontSize + 2;
-        float top = y + title.fontSize + 25 + rowStep * i;
-        return new Rect(x, top, w, text.fontSize + 4);
-    }
-
-    private Rect OptionsRowHitRect(float x, float y, float w, float h, int rowIndex)
-    {
-        float lineHeight = text.fontSize + 15;
-        float contentY = y + title.fontSize + 25 + lineHeight * rowIndex;
-        return new Rect(x + 34, contentY - 2, w - 68, lineHeight + 4);
-    }
-
-    private Rect SaveLoadPrimaryHitRect(float x, float y, float w, float h)
-    {
-        int bw = text.fontSize;
-        float bottomY = y + h - 22 - bw;
-        return new Rect(x + w / 2f - 90f, bottomY - 2, 180f, bw + 14);
-    }
-
-    private void GetOptionsBottomLayout(float x, float y, float w, float h, out float leftControlX, out float rightControlX, out int bw, out float bottomY)
-    {
-        bw = text.fontSize;
-        bottomY = y + h - 20 - bw;
-        leftControlX = x + w / 4f - 80f;
-        rightControlX = x + w / 2f + 20f;
-    }
-
-    /// <summary>Matches centered &quot;Apply All&quot; for mouse layout in <see cref="DrawOptionsTab"/>.</summary>
-    private Rect OptionsApplyHitRect(float x, float y, float w, float h)
-    {
-        GetOptionsBottomLayout(x, y, w, h, out _, out _, out int bw, out float bottomY);
-        return new Rect(x + w / 2f - 110f, bottomY - 4, 220, bw + 14);
-    }
-
-    private void UpdateMouseHover(float x, float y, float w, float h)
-    {
-        if (KeyboardActive())
-            return;
-        if (GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
-            return;
-        Vector2 mp = GuiInput.MousePositionGuiSpace;
-        // Save/Load list: selection is click-only (index); hover must not change slot or the right preview panel.
-        if (tab == ETab.Options)
-        {
-            for (int i = 0; i < OPTIONS_ITEM_COUNT; i++)
-            {
-                if (OptionsRowHitRect(x, y, w, h, i).Contains(mp))
-                    optionsIndex = i;
-            }
-        }
-    }
-
-    private void ProcessMouseClicks(float x, float y, float w, float h)
-    {
-        if (quitConfirmOpen)
-        {
-            return;
-        }
-        if (KeyboardActive())
-        {
-            return;
-        }
-        if (GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
-        {
-            return;
-        }
-
-        if (GuiInput.TryConsumeClickInRect(TabSaveHitRect(x, y, w)))
-        {
-            SetTab(ETab.Save);
-            return;
-        }
-        if (GuiInput.TryConsumeClickInRect(TabLoadHitRect(x, y, w)))
-        {
-            SetTab(ETab.Load);
-            return;
-        }
-        if (GuiInput.TryConsumeClickInRect(TabOptionsHitRect(x, y, w)))
-        {
-            SetTab(ETab.Options);
-            return;
-        }
-
-        if (tab == ETab.Save || tab == ETab.Load)
-        {
-            for (int i = 0; i < saves.Length; i++)
-            {
-                if (GuiInput.TryConsumeClickInRect(SlotRowHitRectForIndex(x, y, w, h, i)))
-                {
-                    index = i;
-                    return;
-                }
-            }
-            if (GuiInput.TryConsumeClickInRect(SaveLoadPrimaryHitRect(x, y, w, h)))
-            {
-                ActivatePrimarySaveOrLoad();
-                return;
-            }
-        }
-        else if (tab == ETab.Options)
-        {
-            // Click sound-card row to cycle fonts (ProcessMouseClicks is mouse-only).
-            if (GuiInput.TryConsumeClickInRect(OptionsRowHitRect(x, y, w, h, 1)))
-            {
-                optionsIndex = 1;
-                CycleSoundFontWithDirection(1);
-                return;
-            }
-            if (GuiInput.TryConsumeClickInRect(OptionsApplyHitRect(x, y, w, h)))
-            {
-                ApplyOptionsSettings();
-                return;
-            }
-        }
-    }
-
-    private Rect QuitToMainMenuButtonRect()
-    {
-        float bw = 200f;
-        float bh = 36f;
-        float pad = 16f;
-        Rect safe = Screen.safeArea;
-        return new Rect(safe.xMax - bw - pad, safe.yMin + pad, bw, bh);
-    }
-
-    private Rect QuitHoldHintRect(float contentWidth, float contentHeight)
-    {
-        float pad = 16f;
-        Rect safe = Screen.safeArea;
-        float bw = Mathf.Min(contentWidth, safe.width - pad * 2f);
-        return new Rect(safe.xMax - bw - pad, safe.yMin + pad, bw, contentHeight);
-    }
-
     private void DrawQuitHoldChargeRing(Rect ringRect, float fill01)
     {
         if (xButtonChargeRing == null || chargeRingMatInstance == null || Event.current.type != EventType.Repaint)
@@ -933,350 +526,102 @@ public class SaveLoadGUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Fills the inside of a button with the wood of the panel. The outline texture is hollow, which
-    /// is right on a panel, but the Main Menu button sits in the corner of the screen, over the world.
-    /// The fill is inset by one texel of the outline, under its opaque ring, so the corners it leaves
-    /// clear stay clear.
+    /// Keeps the window inside the list, and the selected row inside the window whenever it was
+    /// the selection that moved.
     /// </summary>
-    private void DrawButtonFill(Rect r)
+    private void ClampSlotScroll(int rows)
     {
-        if (background == null)
+        int maxScroll = Mathf.Max(0, saves.Length - rows);
+        slotScroll = Mathf.Clamp(slotScroll, 0, maxScroll);
+
+        if (slotScrollFollowsSelection)
         {
-            return;
-        }
-
-        float insetX = r.width / buttonOutline.width;
-        float insetY = r.height / buttonOutline.height;
-        Rect inner = new Rect(r.x + insetX, r.y + insetY, r.width - 2f * insetX, r.height - 2f * insetY);
-        // a strip from the middle of the panel's inner board, away from its frame (texture coordinates
-        // start at the bottom)
-        Rect board = new Rect(0.25f, 0.4f, 0.5f, 0.08f);
-        GUI.DrawTextureWithTexCoords(inner, background, board, true);
-    }
-
-    private void DrawQuitToMainMenuControls()
-    {
-        if (quitConfirmOpen)
-        {
-            return;
-        }
-
-        bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
-        TextAnchor prevAlign = text.alignment;
-        Color prevColor = text.normal.textColor;
-        if (mouseUi)
-        {
-            Rect r = QuitToMainMenuButtonRect();
-            GuiInput.RegisterBlockingRect(r);
-            if (buttonOutline != null)
+            if (index < slotScroll)
             {
-                DrawButtonFill(r);
-                GUI.DrawTexture(r, buttonOutline, ScaleMode.StretchToFill, true);
+                slotScroll = index;
             }
-            text.alignment = TextAnchor.MiddleCenter;
-            text.normal.textColor = selectColor;
-            GUI.Label(r, "Main Menu", text);
-            if (GuiInput.TryConsumeClickInRect(r))
+            else if (index >= slotScroll + rows)
             {
-                OpenQuitConfirm();
-            }
-        }
-        else
-        {
-            const float ringSize = 36f;
-            const float iconSize = 24f;
-            const float gap = 10f;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.normal.textColor = selectColor;
-            Vector2 labelSize = text.CalcSize(new GUIContent("Hold — Main Menu"));
-            float contentW = ringSize + gap + labelSize.x + 8f;
-            float contentH = Mathf.Max(ringSize, labelSize.y + 8f);
-            Rect r = QuitHoldHintRect(contentW, contentH);
-            GuiInput.RegisterBlockingRect(r);
-
-            float fill = Mathf.Clamp01(quitHoldXTime / QuitHoldXDurationSeconds);
-            Rect ringRect = new Rect(r.x, r.y + (r.height - ringSize) * 0.5f, ringSize, ringSize);
-            DrawQuitHoldChargeRing(ringRect, fill);
-
-            if (xButton != null)
-            {
-                float ix = ringRect.x + (ringSize - iconSize) * 0.5f;
-                float iy = ringRect.y + (ringSize - iconSize) * 0.5f;
-                GUI.DrawTexture(new Rect(ix, iy, iconSize, iconSize), xButton);
+                slotScroll = index - rows + 1;
             }
 
-            GUI.Label(
-                new Rect(ringRect.xMax + gap, r.y, r.xMax - (ringRect.xMax + gap), r.height),
-                "Hold — Main Menu",
-                text);
-        }
-        text.alignment = prevAlign;
-        text.normal.textColor = prevColor;
-    }
-
-    private void DrawQuitConfirmDialog()
-    {
-        if (!quitConfirmOpen)
-        {
-            return;
-        }
-
-        GUI.depth = (int)EGUIDepth.RepairDialog;
-
-        Texture2D tex = DataLoader.sDataLoader != null ? DataLoader.sDataLoader.invTex[6] : background;
-        if (tex == null)
-        {
-            tex = background;
-        }
-        float w = 5.5f * tex.width;
-        float h = 4.6f * tex.height;
-        Rect r = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-        GuiInput.RegisterBlockingRect(r);
-        GUI.DrawTexture(r, tex);
-
-        TextAnchor prevTitleAlign = title.alignment;
-        Color prevTitleColor = title.normal.textColor;
-        TextAnchor prevTextAlign = text.alignment;
-        Color prevTextColor = text.normal.textColor;
-
-        const float padX = 40f;
-        const float titleY = 10f;
-        const float bodyY = 60f;
-
-        int prevTitleFontSize = title.fontSize;
-        title.fontSize = Mathf.Min(title.fontSize, 40);
-        title.alignment = TextAnchor.UpperCenter;
-        title.normal.textColor = selectColor;
-        GUI.Label(new Rect(r.x + padX, r.y + titleY, w - padX * 2f, 32f), "Return to main menu?", title);
-        title.fontSize = prevTitleFontSize;
-
-        text.alignment = TextAnchor.UpperCenter;
-        text.normal.textColor = selectColor;
-        GUI.Label(new Rect(r.x + padX, r.y + bodyY, w - padX * 2f, 28f), "Unsaved progress will be lost.", text);
-
-        // One large pair of hit targets for both mouse and gamepad (icons change with last device).
-        float btnH = 44f;
-        float cancelW = 180f;
-        float quitW = 150f;
-        float yy = r.y + r.height - 24f - btnH;
-        quitConfirmCancelHitRect = new Rect(r.x + padX, yy, cancelW, btnH);
-        quitConfirmConfirmHitRect = new Rect(r.x + r.width - padX - quitW, yy, quitW, btnH);
-
-        bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
-        if (mouseUi && buttonOutline != null)
-        {
-            GUI.DrawTexture(quitConfirmCancelHitRect, buttonOutline, ScaleMode.StretchToFill, true);
-            GUI.DrawTexture(quitConfirmConfirmHitRect, buttonOutline, ScaleMode.StretchToFill, true);
-        }
-
-        const float icon = 24f;
-        float iconY = yy + (btnH - icon) * 0.5f;
-
-        text.alignment = TextAnchor.MiddleLeft;
-        text.normal.textColor = selectColor;
-        if (mouseUi)
-        {
-            if (escapeKey != null)
-            {
-                GUI.DrawTexture(new Rect(quitConfirmCancelHitRect.x + 14f, iconY, icon, icon), escapeKey);
-            }
-            GUI.Label(
-                new Rect(quitConfirmCancelHitRect.x + 14f + icon + 8f, yy, cancelW - 50f, btnH),
-                "Cancel",
-                text);
-            text.alignment = TextAnchor.MiddleCenter;
-            GUI.Label(quitConfirmConfirmHitRect, "Quit", text);
-        }
-        else
-        {
-            if (bButton != null)
-            {
-                GUI.DrawTexture(new Rect(quitConfirmCancelHitRect.x + 14f, iconY, icon, icon), bButton);
-            }
-            GUI.Label(
-                new Rect(quitConfirmCancelHitRect.x + 14f + icon + 8f, yy, cancelW - 50f, btnH),
-                "Cancel",
-                text);
-            if (aButton != null)
-            {
-                GUI.DrawTexture(new Rect(quitConfirmConfirmHitRect.x + 14f, iconY, icon, icon), aButton);
-            }
-            GUI.Label(
-                new Rect(quitConfirmConfirmHitRect.x + 14f + icon + 8f, yy, quitW - 50f, btnH),
-                "Quit",
-                text);
-        }
-
-        // OnGUI click path (backup); UpdateQuitConfirm also hit-tests these rects.
-        if (deferredQuitMouseAction == DeferredQuitMouseAction.None)
-        {
-            if (GuiInput.TryConsumeClickInRect(quitConfirmCancelHitRect))
-            {
-                deferredQuitMouseAction = DeferredQuitMouseAction.Cancel;
-                executeDeferredQuitMouseOnFrame = -1;
-            }
-            else if (GuiInput.TryConsumeClickInRect(quitConfirmConfirmHitRect))
-            {
-                deferredQuitMouseAction = DeferredQuitMouseAction.Confirm;
-                executeDeferredQuitMouseOnFrame = -1;
-            }
-        }
-
-        title.alignment = prevTitleAlign;
-        title.normal.textColor = prevTitleColor;
-        text.alignment = prevTextAlign;
-        text.normal.textColor = prevTextColor;
-
-        GuiInput.TryConsumeClickInPanel(r);
-    }
-
-    public void OnGUI()
-    {
-        GUI.depth = (int)EGUIDepth.SaveLoad;
-
-        if (visible)
-        {
-            // Block world look/use for the whole screen while this overlay is open.
-            Rect fullScreenRect = Screen.safeArea;
-            GuiInput.RegisterBlockingRect(fullScreenRect);
-
-            float w = 5.0f * background.width;
-            float h = 4.0f * background.height;
-            // the panel and the detail panel beside it are centred together: the panel alone used to
-            // sit centred on a third of the screen, which left the pair off to one side
-            float pairWidth = w + 10f + SaveUIHelper.GetSaveSlotDetailPanelRect(0f, 0f, background).width;
-            float x = (Screen.width - pairWidth) / 2;
-            float y = Screen.height / 2 - h / 2;
-            Rect panelRect = new Rect(x, y, w, h);
-            GuiInput.RegisterBlockingRect(panelRect);
-
-            Rect sidePanelRect = SaveUIHelper.GetSaveSlotDetailPanelRect(x + w + 10f, y, background);
-            if (background != null)
-            {
-                GUI.DrawTexture(sidePanelRect, background, ScaleMode.StretchToFill, true);
-                GuiInput.RegisterBlockingRect(sidePanelRect);
-            }
-
-            GUI.DrawTexture(panelRect, background);
-
-            GetTabWidths(w, out float saveWidth, out float loadWidth, out float optionsWidth);
-
-            title.alignment = TextAnchor.MiddleCenter;
-            title.normal.textColor = tab == ETab.Save ? Color.white : unselectColor;
-            GUI.Label(new Rect(x + 5, y + 15, saveWidth, title.fontSize), "Save", title);
-        
-            title.normal.textColor = tab == ETab.Load ? Color.white : unselectColor;
-            GUI.Label(new Rect(x + saveWidth, y + 15, loadWidth, title.fontSize), "Load", title);
-            
-            title.normal.textColor = tab == ETab.Options ? Color.white : unselectColor;
-            GUI.Label(new Rect(x - 5 + saveWidth + loadWidth, y + 15, optionsWidth, title.fontSize), "Options", title);
-
-            if (!quitConfirmOpen)
-            {
-                UpdateMouseHover(x, y, w, h);
-            }
-
-            if (tab == ETab.Options)
-            {
-                DrawOptionsTab(x, y, w, h);
-                DrawOptionsDetailPanel(sidePanelRect);
-            }
-            else
-            {
-                DrawSaveLoadTab(x, y, w, h);
-                if (HasSelectedSaveSlotContent())
-                {
-                    SaveUIHelper.EnsureScreenshotLoaded(slotScreenshots, saves, index);
-                    SaveUIHelper.DrawSaveSlotDetailContent(
-                        sidePanelRect,
-                        text,
-                        selectColor,
-                        saves,
-                        slotScreenshots,
-                        index);
-                }
-            }
-
-            if (quitConfirmOpen)
-            {
-                // Handle confirm clicks before full-screen consume eats the MouseDown event.
-                DrawQuitConfirmDialog();
-                GuiInput.TryConsumeClickInPanel(fullScreenRect);
-            }
-            else
-            {
-                ProcessMouseClicks(x, y, w, h);
-                DrawQuitToMainMenuControls();
-                GuiInput.TryConsumeClickInPanel(panelRect);
-                if (background != null)
-                {
-                    GuiInput.TryConsumeClickInPanel(sidePanelRect);
-                }
-                GuiInput.TryConsumeClickInPanel(fullScreenRect);
-            }
+            slotScroll = Mathf.Clamp(slotScroll, 0, maxScroll);
         }
     }
 
-    private bool HasSelectedSaveSlotContent()
+    /// <summary>
+    /// SAVE or LOAD has come into view: the list is made again, because the save tab carries one row
+    /// the load tab does not, the row that starts a new save.
+    /// </summary>
+    public void OnTabShown(GameMenu.ETab tab)
     {
-        return index >= 0
-            && index < saves.Length
-            && !string.IsNullOrEmpty(saves[index].slotName);
+        // What was selected stays selected across the move, which is what a player who went to
+        // the save tab and then realised he meant to load expects. It is carried by slot name and
+        // not by row number: the save list hides the saves the game writes and carries the new save
+        // row at the top, so the same number is a different save on the other side. A save that
+        // has no row on the other side - a quicksave or an autosave, going from load to save -
+        // falls back to the top. The options tabs leave this list and this index alone, so they
+        // still name the save that was chosen before them.
+        string wasSelected = index >= 0 && index < saves.Length && saves[index] != null
+            ? saves[index].slotName : "";
+
+        pageTab = tab;
+        index = 0;
+        slotScroll = 0;
+        slotScrollFollowsSelection = true;
+        RefreshSaves();
+        index = SaveUIHelper.IndexOfSlot(saves, wasSelected, 0);
     }
 
-    private void DrawOptionsDetailPanel(Rect panelRect)
+    public void UpdatePage(GameMenu.ETab tab, GameMenu.Nav nav)
     {
-        if (panelRect.width <= 0f)
+        if (nav.Down)
         {
-            return;
+            MoveSlotSelection(1);
         }
-
-        int idx = Mathf.Clamp(optionsIndex, 0, OPTIONS_ITEM_COUNT - 1);
-
-        const float inset = 48f;
-        const float footerHeight = 56f;
-        float contentWidth = panelRect.width - inset * 2f;
-
-        GUI.Label(
-            new Rect(panelRect.x + inset, panelRect.y + 64f, contentWidth, panelRect.height - 64f - footerHeight),
-            OptionsDescriptions[idx],
-            optionsDescriptionText);
-
-        GUI.Label(
-            new Rect(panelRect.x + inset, panelRect.yMax - footerHeight, contentWidth, footerHeight - 8f),
-            OptionsApplyFooter,
-            optionsFooterText);
+        else if (nav.Up)
+        {
+            MoveSlotSelection(-1);
+        }
+        else if (nav.Wheel != 0)
+        {
+            // The wheel scrolls the list without moving the selection, the way a list is expected
+            // to behave once it is longer than the panel. One row per notch.
+            slotScroll = Mathf.Max(0, slotScroll + nav.Wheel);
+            slotScrollFollowsSelection = false;
+        }
+        else if (nav.Accept || rowDoubleClicked)
+        {
+            rowDoubleClicked = false;
+            ActivatePrimarySaveOrLoad();
+        }
     }
 
-    private void DrawSaveLoadTab(float x, float y, float w, float h)
+    /// <summary>The list of saves on the left, with a scroll bar when it is longer than the panel, and the preview of the selected one.</summary>
+    public void DrawPage(GameMenu.ETab tab, Rect list, Rect detail)
     {
-        int rows = VisibleSlotRows(h);
-        ClampSlotScroll(h);
+        float rowsTop = list.y + 8f;
+        int rows = Mathf.Max(1, Mathf.FloorToInt((list.height - 16f) / SlotRowHeight));
+        ClampSlotScroll(rows);
+        bool scrolls = saves.Length > rows;
+        Rect bar = new Rect(list.xMax - 8f - ScrollBarWidth, rowsTop, ScrollBarWidth, rows * SlotRowHeight);
+        // the rows stop short of the bar, so the selection never lies under it
+        float rowsRight = scrolls ? bar.x - 8f : list.xMax - 8f;
 
-        // The size the rows are built on. A name of wide letters is written smaller so it stays
-        // inside the window, but the row height comes from this and does not move with it, so the
-        // list keeps its grid and the arrows stay the size they were.
-        int rowFontSize = text.fontSize;
-
-        // How far the scroll arrows sit in from the right edge of a row.
-        const float ArrowRightGap = 8.0f;
-
-        // The panel is a picture with a border, and a row runs the whole width of it - which is
-        // the hit area, and is right, since a click anywhere along a row should take it. The text
-        // is another matter: it belongs inside the border, and the scroll arrows live out on it.
-        // The same inset the options rows on this panel already use, taken off both sides so the
-        // list reads as centred.
-        const float rowTextInset = 34f;
+        // plain, whatever the source style carries: a name is not markup, and the user found the rows looking bold
+        GUIStyle rowStyle = new GUIStyle(text)
+        {
+            fontSize = Mathf.RoundToInt(SlotFont), alignment = TextAnchor.MiddleLeft, wordWrap = false,
+            fontStyle = FontStyle.Normal, richText = false,
+        };
 
         if (saves.Length == 0)
         {
-            text.alignment = TextAnchor.UpperCenter;
-            text.normal.textColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
-            Rect empty = SlotRowHitRect(x, y, w, 0);
-            empty.height = text.fontSize;
-            GUI.Label(empty, "No saved games", text);
+            rowStyle.normal.textColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+            GUI.Label(UiScale.R(list.x + 8f + SlotTextInset, rowsTop, list.width - 16f, SlotRowHeight), "No saved games", UiScale.Style(rowStyle));
         }
 
+        // Rows are clicked to be chosen; hovering does not move the selection, nor the preview.
         for (int row = 0; row < rows; ++row)
         {
             int i = slotScroll + row;
@@ -1285,318 +630,210 @@ public class SaveLoadGUI : MonoBehaviour
                 break;
             }
 
-            text.alignment = TextAnchor.UpperCenter;
-
+            Rect r = new Rect(list.x + 8f, rowsTop + row * SlotRowHeight, rowsRight - list.x - 8f, SlotRowHeight);
             bool isNewSaveRow = SaveUIHelper.IsNewSaveRow(saves, i);
             bool isSelected = index == i;
-
-            // Selected rows are bright, the rest dim, and the row that makes a new save is dimmer
-            // still: it is an action rather than a save.
             if (isSelected)
             {
-                text.normal.textColor = selectColor;
-            }
-            else if (isNewSaveRow)
-            {
-                text.normal.textColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
-            }
-            else
-            {
-                text.normal.textColor = unselectColor;
+                Color previous = GUI.color;
+                GUI.color = new Color(1f, 0.84f, 0.25f, 0.22f);
+                GUI.DrawTexture(UiScale.R(r), Texture2D.whiteTexture);
+                GUI.color = previous;
             }
 
-            Rect r = SlotRowHitRect(x, y, w, row);
-            r.height = rowFontSize;
+            // Selected rows are bright, the rest dim, and the row that makes a new save is dimmer
+            // still: it is an action rather than a save. Written from the left, as on the title screen.
+            rowStyle.normal.textColor = isSelected ? Color.white
+                : isNewSaveRow ? new Color(0.5f, 0.5f, 0.5f, 0.7f)
+                : selectColor;
+            Rect textRect = UiScale.R(r.x + SlotTextInset, r.y, r.width - 2f * SlotTextInset, r.height);
+            GUIStyle scaled = UiScale.Style(rowStyle);
+            int size = scaled.fontSize;
+            scaled.fontSize = SaveUIHelper.FitFontSize(scaled, saves[i].displayName, textRect.width, size, Mathf.Max(10, (size * 3) / 4));
+            GUI.Label(textRect, Utils.Ellipsize(saves[i].displayName, scaled, textRect.width), scaled);
+            scaled.fontSize = size;
 
-            Rect textRect = new Rect(r.x + rowTextInset, r.y, r.width - 2.0f * rowTextInset, r.height);
-            text.fontSize = SaveUIHelper.FitFontSize(text, saves[i].displayName, textRect.width,
-                rowFontSize, Mathf.Max(10, rowFontSize / 2));
-            GUI.Label(textRect, saves[i].displayName, text);
-            text.fontSize = rowFontSize;
-
-            // There is more list above or below: say so on the first and last row drawn, off to the
-            // right, where it costs no row of its own.
-            bool moreAbove = row == 0 && slotScroll > 0;
-            bool moreBelow = row == rows - 1 && i < saves.Length - 1;
-            if (moreAbove || moreBelow)
+            // read before the click is taken: taking it marks the event used
+            int clicks = Event.current != null ? Event.current.clickCount : 0;
+            if (!Menu.Asking && !draggingThumb && GuiInput.TryConsumeClickInRect(UiScale.R(r)))
             {
-                text.alignment = TextAnchor.UpperRight;
-                // The colour a selected row is written in, not the dim one, and a pixel further
-                // right: an arrow is the only thing saying the list runs on past this row, and
-                // dim against the panel art it was easy to miss. The same two arrows, in the same
-                // colour and the same place, as the load list in the main menu.
-                text.normal.textColor = selectColor;
-                // Smaller than the rows, for the same reason as the list in the main menu: the
-                // bright colour makes the same glyph read as heavier than it measures.
-                text.fontSize = Mathf.Max(8, (rowFontSize * 7) / 10);
-                Rect marker = new Rect(r.x, r.y, r.width - ArrowRightGap, r.height);
-                GUI.Label(marker, moreAbove ? "\u25b2" : "\u25bc", text);
-                text.fontSize = rowFontSize;
-            }
-        }
-
-        if (!KeyboardActive())
-        {
-            int bw = text.fontSize;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.normal.textColor = selectColor;
-            float bottomY = y + h - 20 - bw;
-            float centerX = x + w / 2 - 50;
-
-            bool showGamepadHints = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
-            if (showGamepadHints)
-            {
-                GUI.DrawTexture(new Rect(centerX, bottomY, bw, bw), aButton);
-                GUI.Label(new Rect(centerX + bw + 10, bottomY + (bw - 20) / 2, 100, 20), tab == ETab.Save ? "Save" : "Load", text);
-            }
-            else
-            {
-                Rect primaryRect = SaveLoadPrimaryHitRect(x, y, w, h);
-                if (buttonOutline != null)
+                index = i;
+                // a double click saves or loads, as Enter does (the user's, 2 November 2026)
+                if (clicks >= 2)
                 {
-                    GUI.DrawTexture(primaryRect, buttonOutline, ScaleMode.StretchToFill, true);
+                    rowDoubleClicked = true;
                 }
-                text.alignment = TextAnchor.MiddleCenter;
-                GUI.Label(primaryRect, tab == ETab.Save ? "Save" : "Load", text);
-                text.alignment = TextAnchor.MiddleLeft;
             }
         }
-    }
 
-    private void DrawOptionsTab(float x, float y, float w, float h)
-    {
-        float contentY = y + title.fontSize + 25;
-        float lineHeight = text.fontSize + 15;
-        const float labelWidth = 200f;
-        const float labelToSliderGap = 50f;
-        const float sliderRightMargin = 90f;
-        float controlX = x + labelWidth + labelToSliderGap;
-        float sliderWidth = w - labelWidth - sliderRightMargin;
-        
-        text.alignment = TextAnchor.MiddleLeft;
-        int currentItem = 0;
-        
-        // Music volume slider
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        GUI.Label(new Rect(x + 40, contentY, labelWidth, lineHeight), "Music volume", text);
-        musicVolume = GUI.HorizontalSlider(new Rect(controlX, contentY + lineHeight / 3, sliderWidth, 20), musicVolume, 0.0f, 1.0f);
-        contentY += lineHeight;
-        currentItem++;
-        
-        // Sound font field
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        GUI.Label(new Rect(x + 40, contentY, w, lineHeight), "Sound card", text);
-        
-        // Show just the filename without extension for cleaner display
-        string displayName = System.IO.Path.GetFileNameWithoutExtension(soundFont);
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        GUI.Label(new Rect(controlX, contentY, w, lineHeight), displayName, text);
-        contentY += lineHeight;
-        currentItem++;
-        
-        // Effects volume slider
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        GUI.Label(new Rect(x + 40, contentY, labelWidth, lineHeight), "Effects volume", text);
-        effectsVolume = GUI.HorizontalSlider(new Rect(controlX, contentY + lineHeight / 3, sliderWidth, 20), effectsVolume, 0.0f, 1.0f);
-        contentY += lineHeight;
-        currentItem++;
-        
-        // Mouse look rate slider
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        GUI.Label(new Rect(x + 40, contentY, labelWidth, lineHeight), "Mouse look rate", text);
-        mouseLookSpeed = GUI.HorizontalSlider(new Rect(controlX, contentY + lineHeight / 3, sliderWidth, 20), mouseLookSpeed, MinMouseLookSpeed, MaxMouseLookSpeed);
-        contentY += lineHeight;
-        currentItem++;
-        
-        float checkboxSize = 20;
-
-        // Invert look checkbox
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        invertLook = GUI.Toggle(new Rect(x + 40, contentY + lineHeight / 3, checkboxSize, checkboxSize), invertLook, "");
-        GUI.Label(new Rect(x + 60, contentY, w - 60, lineHeight), "Invert look up/down", text);
-        contentY += lineHeight;
-        currentItem++;
-        
-        // Use key automatically checkbox
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        useKeyAutomatically = GUI.Toggle(new Rect(x + 40, contentY + lineHeight / 3, checkboxSize, checkboxSize), useKeyAutomatically, "");
-        GUI.Label(new Rect(x + 60, contentY, w - 60, lineHeight), "Use key automatically", text);
-        contentY += lineHeight;
-        currentItem++;
-        
-        // Auto jump checkbox
-        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
-        autoJump = GUI.Toggle(new Rect(x + 40, contentY + lineHeight / 3, checkboxSize, checkboxSize), autoJump, "");
-        GUI.Label(new Rect(x + 60, contentY, w - 60, lineHeight), "Auto jump", text);
-
-        text.alignment = TextAnchor.MiddleLeft;
-        text.normal.textColor = selectColor;
-
-        GetOptionsBottomLayout(x, y, w, h, out float leftControlX, out float rightControlX, out int bw, out float bottomYLayout);
-
-        bool showGamepadHints = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
-        if (showGamepadHints)
+        if (scrolls)
         {
-            GUI.DrawTexture(new Rect(leftControlX, bottomYLayout, bw, bw), dPadLeftRight);
-            GUI.Label(new Rect(leftControlX + bw + 10, y + h - 15 - bw, 100, 20), "Change", text);
-            GUI.DrawTexture(new Rect(rightControlX, bottomYLayout, bw, bw), aButton);
-            GUI.Label(new Rect(rightControlX + bw + 10, y + h - 15 - bw, 120, 20), "Apply All", text);
+            // the menu's scroll bar, one for every list (the user's, 2 November 2026)
+            int before = slotScroll;
+            slotScroll = Menu.DrawScrollBar(bar, slotScroll, rows, saves.Length, ref draggingThumb, ref thumbGrab);
+            if (slotScroll != before || draggingThumb)
+            {
+                slotScrollFollowsSelection = false;
+            }
         }
         else
         {
-            Rect applyRect = OptionsApplyHitRect(x, y, w, h);
-            if (buttonOutline != null)
-            {
-                GUI.DrawTexture(applyRect, buttonOutline, ScaleMode.StretchToFill, true);
-            }
-            text.alignment = TextAnchor.MiddleCenter;
-            GUI.Label(applyRect, "Apply All", text);
-            text.alignment = TextAnchor.MiddleLeft;
+            draggingThumb = false;
         }
-    }
-    
-    private void LoadOptionsSettings()
-    {
-        // Load settings from PlayerPrefs
-        musicVolume = PlayerPrefs.GetFloat("Options_MusicVolume", 0.5f);
-        soundFont = PlayerPrefs.GetString("Options_SoundFont", "Soundfonts/MT32.sf2");
-        effectsVolume = PlayerPrefs.GetFloat("Options_EffectsVolume", PlayerInput.DefaultEffectsVolume);
-        mouseLookSpeed = PlayerPrefs.GetFloat("Options_MouseLookSpeed", PlayerInput.DefaultMouseLookSpeed);
-        mouseLookSpeed = Mathf.Clamp(mouseLookSpeed, MinMouseLookSpeed, MaxMouseLookSpeed);
-        useKeyAutomatically = PlayerPrefs.GetInt("Options_UseKeyAutomatically", 1) == 1;
-        autoJump = PlayerPrefs.GetInt("Options_AutoJump", 0) == 1;
-        invertLook = PlayerPrefs.GetInt("Options_InvertLook", 0) == 1;
-        
-        // Scan for available sound fonts
-        ScanSoundFonts();
-    }
-    
-    private void ScanSoundFonts()
-    {
-        try
-        {
-            // Always use Soundfonts subdirectory
-            string soundFontPath = System.IO.Path.Combine(Application.streamingAssetsPath, "Soundfonts");
-            
-            if (!System.IO.Directory.Exists(soundFontPath))
-            {
-                Debug.LogError($"Soundfonts directory not found at: {soundFontPath}");
-                availableSoundFonts = new string[] { soundFont };
-                currentSoundFontIndex = 0;
-                return;
-            }
-            
-            // Get all .sf2 files
-            string[] sf2Files = System.IO.Directory.GetFiles(soundFontPath, "*.sf2", System.IO.SearchOption.TopDirectoryOnly);
-            
-            // Extract filenames with Soundfonts/ prefix
-            availableSoundFonts = new string[sf2Files.Length];
-            for (int i = 0; i < sf2Files.Length; i++)
-            {
-                string fileName = System.IO.Path.GetFileName(sf2Files[i]);
-                availableSoundFonts[i] = "Soundfonts/" + fileName;
-            }
-            
-            // Sort alphabetically
-            System.Array.Sort(availableSoundFonts);
-            
-            // Find current sound font index (try with and without Soundfonts/ prefix)
-            currentSoundFontIndex = System.Array.IndexOf(availableSoundFonts, soundFont);
-            if (currentSoundFontIndex < 0)
-            {
-                // Try with Soundfonts/ prefix if not already present
-                string withPrefix = soundFont.StartsWith("Soundfonts/") ? soundFont : "Soundfonts/" + soundFont;
-                currentSoundFontIndex = System.Array.IndexOf(availableSoundFonts, withPrefix);
-            }
-            if (currentSoundFontIndex < 0)
-            {
-                // Try matching just the filename
-                string justFileName = System.IO.Path.GetFileName(soundFont);
-                for (int i = 0; i < availableSoundFonts.Length; i++)
-                {
-                    if (System.IO.Path.GetFileName(availableSoundFonts[i]) == justFileName)
-                    {
-                        currentSoundFontIndex = i;
-                        break;
-                    }
-                }
-            }
-            if (currentSoundFontIndex < 0) currentSoundFontIndex = 0;
-            
-            Debug.Log($"Found {availableSoundFonts.Length} sound fonts in {soundFontPath}");
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"Error scanning sound fonts: {ex.Message}");
-            availableSoundFonts = new string[] { soundFont };
-            currentSoundFontIndex = 0;
-        }
-    }
-    
-    private void CycleSoundFontWithDirection(int direction)
-    {
-        if (availableSoundFonts.Length <= 0)
-            return;
-        currentSoundFontIndex = (currentSoundFontIndex + direction + availableSoundFonts.Length) % availableSoundFonts.Length;
-        soundFont = availableSoundFonts[currentSoundFontIndex];
+
+        DrawPreview(detail);
     }
 
-    private void HandleOptionsLeftRight(int direction)
+    /// <summary>
+    /// The preview of the selected save, centred in its column: the character above, the screenshot
+    /// framed, and when it was saved below.
+    /// </summary>
+    private void DrawPreview(Rect detail)
     {
-        switch (optionsIndex)
+        if (!SaveUIHelper.PreviewLines(saves, index, out string character, out string when))
         {
-            case 0: // Music volume
-                musicVolume = Mathf.Clamp01(musicVolume + direction * 0.05f);
-                break;
-            case 1: // Sound font - cycle
-                CycleSoundFontWithDirection(direction);
-                break;
-            case 2: // Effects volume
-                effectsVolume = Mathf.Clamp01(effectsVolume + direction * 0.05f);
-                break;
-            case 3: // Mouse look speed
-                mouseLookSpeed = Mathf.Clamp(mouseLookSpeed + direction * 0.05f, MinMouseLookSpeed, MaxMouseLookSpeed);
-                break;
-            case 4: // Invert look checkbox - toggle on either direction
-                invertLook = !invertLook;
-                break;
-            case 5: // Use key automatically checkbox - toggle on either direction
-                useKeyAutomatically = !useKeyAutomatically;
-                break;
-            case 6: // Auto jump checkbox - toggle on either direction
-                autoJump = !autoJump;
-                break;
+            return;
+        }
+        SaveUIHelper.EnsureScreenshotLoaded(slotScreenshots, saves, index);
+
+        const float pad = 24f;
+        const float gap = 14f;
+        float lineH = PreviewFont + 10f;
+        float shotW = detail.width - 2f * pad;
+        float shotH = shotW / ScreenshotAspect;
+        float maxShotH = detail.height - 2f * pad - 2f * (lineH + gap);
+        if (shotH > maxShotH)
+        {
+            shotH = maxShotH;
+            shotW = shotH * ScreenshotAspect;
+        }
+        float blockH = lineH + gap + shotH + gap + lineH;
+        float top = detail.y + (detail.height - blockH) / 2f;
+        float left = detail.x + (detail.width - shotW) / 2f;
+
+        GUIStyle line = new GUIStyle(text) { fontSize = Mathf.RoundToInt(PreviewFont), alignment = TextAnchor.MiddleLeft, wordWrap = false };
+        line.normal.textColor = selectColor;
+        GUIStyle scaled = UiScale.Style(line);
+        Rect characterRect = UiScale.R(left, top, shotW, lineH);
+        int size = scaled.fontSize;
+        scaled.fontSize = SaveUIHelper.FitFontSize(scaled, character, characterRect.width, size, Mathf.Max(10, size / 2));
+        GUI.Label(characterRect, character, scaled);
+        scaled.fontSize = size;
+
+        Rect shot = new Rect(left, top + lineH + gap, shotW, shotH);
+        Texture2D picture = index < slotScreenshots.Length ? slotScreenshots[index] : null;
+        if (picture != null)
+        {
+            GUI.DrawTexture(UiScale.R(shot), picture, ScaleMode.StretchToFill, false);
+        }
+        else
+        {
+            Color previous = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.6f);
+            GUI.DrawTexture(UiScale.R(shot), Texture2D.whiteTexture);
+            GUI.color = previous;
+        }
+        DrawFrame(new Rect(shot.x - 2f, shot.y - 2f, shot.width + 4f, shot.height + 4f), unselectColor);
+
+        GUI.Label(UiScale.R(left, shot.yMax + gap, shotW, lineH), when, scaled);
+    }
+
+    private static void DrawFrame(Rect refRect, Color color)
+    {
+        Rect r = UiScale.R(refRect);
+        float line = Mathf.Max(1f, UiScale.S(2f));
+        Color previous = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(new Rect(r.x, r.y, r.width, line), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x, r.yMax - line, r.width, line), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x, r.y, line, r.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.xMax - line, r.y, line, r.height), Texture2D.whiteTexture);
+        GUI.color = previous;
+    }
+
+    public Hint[] PageHints(GameMenu.ETab tab, bool pad)
+    {
+        string what = tab == GameMenu.ETab.Save ? "save" : "load";
+        return pad
+            ? new[]
+            {
+                new Hint(what, HintKey.Of(aButton)),
+                new Hint("tab", HintKey.PadButton("LB"), HintKey.PadButton("RB")),
+                new Hint("close", HintKey.Of(bButton)),
+            }
+            : new[]
+            {
+                new Hint(what, HintKey.Keyboard("Enter")),
+                new Hint("tab", HintKey.Keyboard("Tab")),
+                new Hint("close", HintKey.Of(escapeKey)),
+            };
+    }
+
+    public string[] PageButtons(GameMenu.ETab tab)
+    {
+        return new[] { tab == GameMenu.ETab.Save ? "Save" : "Load" };
+    }
+
+    public bool PageButtonEnabled(GameMenu.ETab tab, int button)
+    {
+        return !KeyboardActive() && index >= 0 && index < saves.Length
+            && (tab == GameMenu.ETab.Save || HasSelectedSaveSlotContent());
+    }
+
+    public void PressPageButton(GameMenu.ETab tab, int button)
+    {
+        ActivatePrimarySaveOrLoad();
+    }
+
+    /// <summary>The way back to the title screen, at the right end of the row of buttons on every tab.</summary>
+    public string EndButton => "Main Menu";
+
+    public void PressEndButton()
+    {
+        AskQuitToMainMenu();
+    }
+
+    /// <summary>
+    /// The music tracks, from the row of AUDIO: the game's music is held while the page is open, so
+    /// that a track listened to is not cut by the next, and given back when it closes.
+    /// </summary>
+    public IGameMenuSubPage OpenPage(string key)
+    {
+        if (key != GameOptions.MusicPageKey)
+        {
+            return null;
+        }
+        Music.Listening(true);
+        return new MusicSetupPage(Menu, this, () => Music.Listening(false));
+    }
+
+    /// <summary>On the pad the button is X held: its picture, in the ring that fills while it is held.</summary>
+    public void DrawEndButtonPadIcon(Rect icon)
+    {
+        const float iconShare = 24f / 36f;
+        DrawQuitHoldChargeRing(UiScale.R(icon), Mathf.Clamp01(quitHoldXTime / QuitHoldXDurationSeconds));
+        if (xButton != null)
+        {
+            float size = icon.width * iconShare;
+            GUI.DrawTexture(UiScale.R(icon.center.x - size / 2f, icon.center.y - size / 2f, size, size), xButton);
         }
     }
-    
-    private void ApplyOptionsSettings()
+
+    public void OnGUI()
     {
-        // Save to PlayerPrefs
-        PlayerPrefs.SetFloat("Options_MusicVolume", musicVolume);
-        PlayerPrefs.SetString("Options_SoundFont", soundFont);
-        PlayerPrefs.SetFloat("Options_EffectsVolume", effectsVolume);
-        PlayerPrefs.SetFloat("Options_MouseLookSpeed", mouseLookSpeed);
-        PlayerPrefs.SetInt("Options_UseKeyAutomatically", useKeyAutomatically ? 1 : 0);
-        PlayerPrefs.SetInt("Options_AutoJump", autoJump ? 1 : 0);
-        PlayerPrefs.SetInt("Options_InvertLook", invertLook ? 1 : 0);
-        // The options with no row on this panel are written too, at the value in force: a read
-        // creates nothing, so until something writes them they are missing from the registry,
-        // which is the only place they can be changed.
-        PlayerPrefs.SetInt("Options_KeepMusicOnMap", PlayerInput.KeepMusicOnMap ? 1 : 0);
-        PlayerPrefs.SetInt("Options_AmbientSilenceMax", (int)PlayerInput.AmbientSilenceMax);
-        PlayerPrefs.SetInt("Options_ShieldSpellsSoak", PlayerInput.ShieldSpellsSoak ? 1 : 0);
-        PlayerPrefs.SetInt("Options_RewardOnlyFirstTrapCopy", PlayerInput.RewardOnlyFirstTrapCopy ? 1 : 0);
-        PlayerPrefs.SetInt("Options_AutoSave", PlayerInput.AutoSave ? 1 : 0);
-        PlayerPrefs.SetInt(UiScale.GrowthPrefsKey, UiScale.GrowthPercent);
-        PlayerPrefs.Save();
-        
-        // Apply music volume to MusicPlayer
-        if (MusicPlayer.Instance != null)
+        GUI.depth = (int)EGUIDepth.SaveLoad;
+        if (!visible)
         {
-            // Apply sound font - hot swap if changed
-            MusicPlayer.Instance.ReloadSynthesizerWithSoundFont(soundFont, musicVolume);
+            return;
         }
-        
-        Debug.Log($"Applied and saved options: Music={musicVolume:F2}, SoundFont={soundFont}, Effects={effectsVolume:F2}, MouseLookSpeed={mouseLookSpeed:F2}, UseKeyAuto={useKeyAutomatically}, AutoJump={autoJump}, InvertLook={invertLook}");
+
+        Menu.OnGUI();
+    }
+
+    private bool HasSelectedSaveSlotContent()
+    {
+        return index >= 0
+            && index < saves.Length
+            && !string.IsNullOrEmpty(saves[index].slotName);
     }
 }

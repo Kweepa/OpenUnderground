@@ -45,6 +45,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   background: {fileID: 2800000, guid: 6b1039085a2632b469dada3bd7da97c8, type: 3}
+  menuBackground: {fileID: 2800000, guid: a04e4ab93b323d84d80d303eebecf448, type: 3}
   title:
     m_Name: 
     m_Normal:
@@ -179,147 +180,18 @@ MonoBehaviour:
     m_FixedHeight: 0
     m_StretchWidth: 1
     m_StretchHeight: 0
-  optionsDescriptionText:
-    m_Name: 
-    m_Normal:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_Hover:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_Active:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_Focused:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_OnNormal:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_OnHover:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_OnActive:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_OnFocused:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 1, g: 0.8352941, b: 0.2509804, a: 1}
-    m_Border:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 0
-    m_Margin:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 0
-    m_Padding:
-      m_Left: 20
-      m_Right: 20
-      m_Top: 10
-      m_Bottom: 10
-    m_Overflow:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 0
-    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
-    m_FontSize: 30
-    m_FontStyle: 0
-    m_Alignment: 0
-    m_WordWrap: 1
-    m_RichText: 1
-    m_TextClipping: 0
-    m_ImagePosition: 0
-    m_ContentOffset: {x: 0, y: 0}
-    m_FixedWidth: 0
-    m_FixedHeight: 0
-    m_StretchWidth: 1
-    m_StretchHeight: 0
-  optionsFooterText:
-    m_Name: 
-    m_Normal:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_Hover:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_Active:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_Focused:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_OnNormal:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_OnHover:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_OnActive:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_OnFocused:
-      m_Background: {fileID: 0}
-      m_ScaledBackgrounds: []
-      m_TextColor: {r: 0.73333335, g: 0.48235294, b: 0.003921569, a: 1}
-    m_Border:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 0
-    m_Margin:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 0
-    m_Padding:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 15
-    m_Overflow:
-      m_Left: 0
-      m_Right: 0
-      m_Top: 0
-      m_Bottom: 0
-    m_Font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
-    m_FontSize: 20
-    m_FontStyle: 0
-    m_Alignment: 7
-    m_WordWrap: 1
-    m_RichText: 1
-    m_TextClipping: 0
-    m_ImagePosition: 0
-    m_ContentOffset: {x: 0, y: 0}
-    m_FixedWidth: 0
-    m_FixedHeight: 0
-    m_StretchWidth: 1
-    m_StretchHeight: 0
   aButton: {fileID: 2800000, guid: b6511337e45c0fb41bcd61af323b2ce9, type: 3}
   bButton: {fileID: 2800000, guid: 30ef8c8f932fbcc4c99ee7b9b89dffc8, type: 3}
   xButton: {fileID: 2800000, guid: fc5689391c16d3542969bd5aa2fc51cf, type: 3}
+  yButton: {fileID: 2800000, guid: 2e7b03614c7fb7347ae582cfe6aea9dc, type: 3}
   escapeKey: {fileID: 2800000, guid: ab70255189063294da9344b595a1bf48, type: 3}
+  blankKey: {fileID: 2800000, guid: d64732d1ed1e44c428f198609dffc69c, type: 3}
   buttonOutline: {fileID: 2800000, guid: 5b920924afdd46b4fb086e77688de0c9, type: 3}
   dPadLeftRight: {fileID: 2800000, guid: 91074781916a5cc45bbc2c3c73cf35e1, type: 3}
   xButtonChargeRing: {fileID: 2800000, guid: dcfc932415174ee4f94c2fb456cf78e9, type: 3}
   xButtonChargeRingMaterial: {fileID: 2100000, guid: 9d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90,
     type: 2}
   diskSound: {fileID: 8300000, guid: bb0fd4622ad10e547a93394fd2a0c765, type: 3}
+  moveSound: {fileID: 8300000, guid: a88270b24a9026049881300617bc5df3, type: 3}
+  makeSound: {fileID: 8300000, guid: 71c08b128ff975647a8eab647e29722c, type: 3}
+  backSound: {fileID: 8300000, guid: 774e45ccf82aaab46aa4537dcaed8a52, type: 3}

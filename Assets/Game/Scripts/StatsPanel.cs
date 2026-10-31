@@ -163,7 +163,12 @@ public class StatsPanel : MonoBehaviour
             bool held = v > 0.65f;
             bool edge = held && !statsAnalogTriggerWasHeld;
             statsAnalogTriggerWasHeld = held;
-            if (edge)
+            // Only while nothing but the panels has the controls, as the sleep and Track: the game menu changes its
+            // sections on the triggers, and pinned the stats behind it (fix 457). The trigger is still followed there,
+            // so one held when the menu closes does not pin them then.
+            PlayerObject player = PlayerObject.Player;
+            bool free = player != null && (player.controlsDisabled & ~(EControlMask.Inventory | EControlMask.Magic)) == 0;
+            if (edge && free)
             {
                 TogglePinnedOpen(fromGamepad: true);
             }

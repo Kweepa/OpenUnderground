@@ -362,6 +362,39 @@ public static class SaveUIHelper
         DrawSaveSlotDetailContent(panelRect, textStyle, highlightColor, saves, screenshots, index);
     }
 
+    /// <summary>
+    /// The two lines of a save's preview: the character - name, level, class, experience, depth - and
+    /// when it was saved, with the time played. False when the row is not a save.
+    /// </summary>
+    public static bool PreviewLines(SaveGameManager.SaveSlotInfo[] saves, int index, out string character, out string when)
+    {
+        character = "";
+        when = "";
+        if (saves == null || index < 0 || index >= saves.Length || string.IsNullOrEmpty(saves[index].slotName))
+        {
+            return false;
+        }
+
+        string dateTimeStr = "";
+        if (!string.IsNullOrEmpty(saves[index].savedAtIso)
+            && DateTime.TryParse(saves[index].savedAtIso, out DateTime dt))
+        {
+            dateTimeStr = dt.ToString("d MMM yyyy HH:mm");
+        }
+
+        EPlayerClass playerClass = (EPlayerClass)saves[index].playerClass;
+        int charLevel = Mathf.Max(1, saves[index].charLevel);
+        string levelOrdinal = charLevel < 4
+            ? new[] { "1st", "2nd", "3rd" }[charLevel - 1]
+            : $"{charLevel}th";
+
+        // The ordinal two fields to the left is the character's own level; this one is the
+        // depth, and it is written the same way here as on the rows of the list.
+        character = $"{saves[index].playerName} | {levelOrdinal} | {playerClass} | XP {saves[index].xp / 20} | {SaveGameManager.DungeonLevelLabel(saves[index].level)}";
+        when = $"{dateTimeStr} ({saves[index].inGameTime})";
+        return true;
+    }
+
     public static void DrawSaveSlotDetailContent(
         Rect panelRect,
         GUIStyle textStyle,
@@ -384,27 +417,8 @@ public static class SaveUIHelper
         }
 
         // Bottom info inside the right panel: date/time, level, XP
-        if (index >= 0 && index < saves.Length && !string.IsNullOrEmpty(saves[index].slotName))
+        if (PreviewLines(saves, index, out string topString, out string bottomString))
         {
-            string dateTimeStr = "";
-            if (!string.IsNullOrEmpty(saves[index].savedAtIso)
-                && DateTime.TryParse(saves[index].savedAtIso, out DateTime dt))
-            {
-                dateTimeStr = dt.ToString("d MMM yyyy HH:mm");
-            }
-
-            EPlayerClass playerClass = (EPlayerClass)saves[index].playerClass;
-            int charLevel = Mathf.Max(1, saves[index].charLevel);
-            string levelOrdinal = charLevel < 4
-                ? new[] { "1st", "2nd", "3rd" }[charLevel - 1]
-                : $"{charLevel}th";
-
-            // The ordinal two fields to the left is the character's own level; this one is the
-            // depth, and it is written the same way here as on the rows of the list.
-            string topString = $"{saves[index].playerName} | {levelOrdinal} | {playerClass} | XP {saves[index].xp / 20} | {SaveGameManager.DungeonLevelLabel(saves[index].level)}";
-            string inGameTime = saves[index].inGameTime;
-            string bottomString = $"{dateTimeStr} ({inGameTime})";
-
             Rect topLineRect = new Rect(panelRect.x + 48, panelRect.y + 34, panelRect.width - 96, 18f);
 
             // Shrink top line font size to fit (same approach as KeyboardGUI)

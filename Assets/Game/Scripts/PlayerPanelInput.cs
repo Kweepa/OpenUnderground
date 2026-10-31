@@ -53,7 +53,8 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
-        if ((PlayerObject.Player.controlsDisabled & EControlMask.SaveLoad) != 0)
+        // the game menu, and the small-window warning, which reads A, B and Start itself (fix 460)
+        if ((PlayerObject.Player.controlsDisabled & (EControlMask.SaveLoad | EControlMask.Warning)) != 0)
         {
             continuousWalkDismissTime = 0f;
             GameplayCursorPolicy.Apply(PlayerObject.Player);

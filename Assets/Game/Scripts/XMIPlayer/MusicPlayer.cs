@@ -20,6 +20,10 @@ public enum ESampleRate
 public class MusicPlayer : MonoBehaviour
 {
     private string soundFontFileName = "Soundfonts/MT32.sf2";
+
+    /// <summary>The soundfont the synthesizer was built with, so that a change of volume alone does not rebuild it.</summary>
+    public string SoundFontFileName => soundFontFileName;
+
     private float masterVolumeScale = 0.5f;
     /// <summary>Multiplies output after user volume (1 = normal, 0.5 = half for cutscenes, etc.).</summary>
     private float duckMultiplier = 1f;
