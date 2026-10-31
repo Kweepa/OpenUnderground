@@ -42,7 +42,6 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
     public AudioClip backSound;
 
     private bool visible;
-    private int index;
     private Material chargeRingMatInstance;
 
     // The menu, made when first needed; not serialized, so a script reload in the Editor makes it again.
@@ -64,16 +63,9 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
     private float quickSaveHoldTime;
     private bool quickSaveDoneThisHold;
 
-    // The list is whatever is on disk, newest first, so it has no fixed length any more and the
-    // rows scroll. slotScroll is the first row drawn.
-    private SaveGameManager.SaveSlotInfo[] saves = new SaveGameManager.SaveSlotInfo[0];
-    private Texture2D[] slotScreenshots = new Texture2D[0];
-    private int slotScroll;
-
-    // The window follows the selection when the selection is what moved, and stays where the
-    // player put it when he scrolled it himself: otherwise the wheel would be undone on the very
-    // next frame, because the selection is still where it was.
-    private bool slotScrollFollowsSelection = true;
+    // The list of saves of SAVE and LOAD, one page that is shown as either.
+    private SaveListPage page;
+    private SaveListPage Page => page ??= new SaveListPage(() => Menu, text, diskSound);
 
     private string saveName;
 
@@ -87,21 +79,6 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
 
     /// <summary>Frame when the panel became visible; Esc opens via <see cref="PlayerPanelInput"/> then this Update sees the same Esc press — ignore Esc-to-close on that frame.</summary>
     private int visibleShownAtFrame = -1;
-
-    // The lists of saves, in reference pixels (UiScale).
-    private const float SlotRowHeight = 52f;
-    private const float SlotFont = 32f;
-    private const float SlotTextInset = 20f;
-    private const float ScrollBarWidth = 14f;
-    private const float PreviewFont = 26f;
-    // The screenshots are taken at the shape the old preview panel showed them, 570 x 332.
-    private const float ScreenshotAspect = 570f / 332f;
-
-    // The scroll bar of the list of saves, while its thumb is dragged.
-    private bool draggingThumb;
-    private float thumbGrab;
-    // a row double clicked in the list, acted on in the next Update as Enter
-    private bool rowDoubleClicked;
 
     private GameMenu Menu
     {
@@ -257,9 +234,7 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
 
         visible = true;
         visibleShownAtFrame = Time.frameCount;
-        index = 0;
-        slotScroll = 0;
-        slotScrollFollowsSelection = true;
+        Page.SelectTop();
         ResetQuitToMainMenuState();
         PlayerObject.DisableControls(EControlMask.SaveLoad, true);
         Time.timeScale = 0.0f;
@@ -386,7 +361,8 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
 
     private void BeginSaveFlow()
     {
-        if (index < 0 || index >= saves.Length)
+        SaveGameManager.SaveSlotInfo selected = Page.Selected;
+        if (selected == null)
         {
             return;
         }
@@ -394,11 +370,11 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
         // The first row of the save list makes a new save; any other row overwrites the save on it,
         // and offers its name to be edited. The slot is picked now rather than in the callback:
         // the list can be refreshed while the keyboard is up.
-        bool newSave = SaveUIHelper.IsNewSaveRow(saves, index);
+        bool newSave = Page.SelectedIsNewSave;
         string slotFileName = newSave
             ? (SaveGameManager.sInstance != null ? SaveGameManager.sInstance.NextFreeManualSlot() : "Slot0")
-            : saves[index].slotName;
-        saveName = newSave ? "" : saves[index].displayName;
+            : selected.slotName;
+        saveName = newSave ? "" : selected.displayName;
 #if UNITY_EDITOR
         EditorApplication.ExecuteMenuItem("Window/General/Game");
 #endif
@@ -411,7 +387,7 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
                 {
                     SaveGameManager.sInstance.SaveGameToSlot(slotFileName, saveName);
                     Utils.PlayClip2d(diskSound);
-                    RefreshSaves();
+                    Page.Refresh();
                 }
             }
             Hide();
@@ -424,36 +400,17 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
     private void PerformLoadFromSelection()
     {
         // The list is whatever is on disk and can be empty, so the row is checked before it is read.
-        if (index < 0 || index >= saves.Length || saves[index] == null)
+        if (!Page.SelectedIsSave)
         {
             return;
         }
 
-        if (SaveGameManager.sInstance != null && !string.IsNullOrEmpty(saves[index].slotName))
+        if (SaveGameManager.sInstance != null)
         {
-            SaveGameManager.sInstance.LoadGameFromSlot(saves[index].slotName);
+            SaveGameManager.sInstance.LoadGameFromSlot(Page.Selected.slotName);
             Utils.PlayClip2d(diskSound);
         }
         Hide();
-    }
-
-    private void RefreshSaves()
-    {
-        // Every save on disk, newest first, plus the new save row when this is the save tab.
-        index = SaveUIHelper.RefreshSaves(ref saves, ref slotScreenshots, index, pageTab == GameMenu.ETab.Save);
-    }
-    
-    /// <summary>Moves the selection by <paramref name="delta"/> rows, wrapping as the panel always did.</summary>
-    private void MoveSlotSelection(int delta)
-    {
-        if (saves.Length == 0)
-        {
-            index = 0;
-            return;
-        }
-
-        index = ((index + delta) % saves.Length + saves.Length) % saves.Length;
-        slotScrollFollowsSelection = true;
     }
 
     /// <summary>
@@ -511,9 +468,6 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
         }
     }
 
-    private Color selectColor = new Color32(255, 213, 64, 255);
-    private Color unselectColor = new Color32(187, 123, 1, 255);
-
     private void DrawQuitHoldChargeRing(Rect ringRect, float fill01)
     {
         if (xButtonChargeRing == null || chargeRingMatInstance == null || Event.current.type != EventType.Repaint)
@@ -526,263 +480,70 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
     }
 
     /// <summary>
-    /// Keeps the window inside the list, and the selected row inside the window whenever it was
-    /// the selection that moved.
-    /// </summary>
-    private void ClampSlotScroll(int rows)
-    {
-        int maxScroll = Mathf.Max(0, saves.Length - rows);
-        slotScroll = Mathf.Clamp(slotScroll, 0, maxScroll);
-
-        if (slotScrollFollowsSelection)
-        {
-            if (index < slotScroll)
-            {
-                slotScroll = index;
-            }
-            else if (index >= slotScroll + rows)
-            {
-                slotScroll = index - rows + 1;
-            }
-
-            slotScroll = Mathf.Clamp(slotScroll, 0, maxScroll);
-        }
-    }
-
-    /// <summary>
     /// SAVE or LOAD has come into view: the list is made again, because the save tab carries one row
-    /// the load tab does not, the row that starts a new save.
+    /// the load tab does not, the row that starts a new save. The options tabs leave the list alone,
+    /// so it still names the save that was chosen before them.
     /// </summary>
     public void OnTabShown(GameMenu.ETab tab)
     {
-        // What was selected stays selected across the move, which is what a player who went to
-        // the save tab and then realised he meant to load expects. It is carried by slot name and
-        // not by row number: the save list hides the saves the game writes and carries the new save
-        // row at the top, so the same number is a different save on the other side. A save that
-        // has no row on the other side - a quicksave or an autosave, going from load to save -
-        // falls back to the top. The options tabs leave this list and this index alone, so they
-        // still name the save that was chosen before them.
-        string wasSelected = index >= 0 && index < saves.Length && saves[index] != null
-            ? saves[index].slotName : "";
-
         pageTab = tab;
-        index = 0;
-        slotScroll = 0;
-        slotScrollFollowsSelection = true;
-        RefreshSaves();
-        index = SaveUIHelper.IndexOfSlot(saves, wasSelected, 0);
+        Page.Show(tab == GameMenu.ETab.Save);
     }
 
     public void UpdatePage(GameMenu.ETab tab, GameMenu.Nav nav)
     {
-        if (nav.Down)
+        if (Page.Update(nav))
         {
-            MoveSlotSelection(1);
-        }
-        else if (nav.Up)
-        {
-            MoveSlotSelection(-1);
-        }
-        else if (nav.Wheel != 0)
-        {
-            // The wheel scrolls the list without moving the selection, the way a list is expected
-            // to behave once it is longer than the panel. One row per notch.
-            slotScroll = Mathf.Max(0, slotScroll + nav.Wheel);
-            slotScrollFollowsSelection = false;
-        }
-        else if (nav.Accept || rowDoubleClicked)
-        {
-            rowDoubleClicked = false;
             ActivatePrimarySaveOrLoad();
         }
     }
 
-    /// <summary>The list of saves on the left, with a scroll bar when it is longer than the panel, and the preview of the selected one.</summary>
+    /// <summary>The list of saves on the left and the preview of the selected one.</summary>
     public void DrawPage(GameMenu.ETab tab, Rect list, Rect detail)
     {
-        float rowsTop = list.y + 8f;
-        int rows = Mathf.Max(1, Mathf.FloorToInt((list.height - 16f) / SlotRowHeight));
-        ClampSlotScroll(rows);
-        bool scrolls = saves.Length > rows;
-        Rect bar = new Rect(list.xMax - 8f - ScrollBarWidth, rowsTop, ScrollBarWidth, rows * SlotRowHeight);
-        // the rows stop short of the bar, so the selection never lies under it
-        float rowsRight = scrolls ? bar.x - 8f : list.xMax - 8f;
-
-        // plain, whatever the source style carries: a name is not markup, and the user found the rows looking bold
-        GUIStyle rowStyle = new GUIStyle(text)
-        {
-            fontSize = Mathf.RoundToInt(SlotFont), alignment = TextAnchor.MiddleLeft, wordWrap = false,
-            fontStyle = FontStyle.Normal, richText = false,
-        };
-
-        if (saves.Length == 0)
-        {
-            rowStyle.normal.textColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
-            GUI.Label(UiScale.R(list.x + 8f + SlotTextInset, rowsTop, list.width - 16f, SlotRowHeight), "No saved games", UiScale.Style(rowStyle));
-        }
-
-        // Rows are clicked to be chosen; hovering does not move the selection, nor the preview.
-        for (int row = 0; row < rows; ++row)
-        {
-            int i = slotScroll + row;
-            if (i >= saves.Length)
-            {
-                break;
-            }
-
-            Rect r = new Rect(list.x + 8f, rowsTop + row * SlotRowHeight, rowsRight - list.x - 8f, SlotRowHeight);
-            bool isNewSaveRow = SaveUIHelper.IsNewSaveRow(saves, i);
-            bool isSelected = index == i;
-            if (isSelected)
-            {
-                Color previous = GUI.color;
-                GUI.color = new Color(1f, 0.84f, 0.25f, 0.22f);
-                GUI.DrawTexture(UiScale.R(r), Texture2D.whiteTexture);
-                GUI.color = previous;
-            }
-
-            // Selected rows are bright, the rest dim, and the row that makes a new save is dimmer
-            // still: it is an action rather than a save. Written from the left, as on the title screen.
-            rowStyle.normal.textColor = isSelected ? Color.white
-                : isNewSaveRow ? new Color(0.5f, 0.5f, 0.5f, 0.7f)
-                : selectColor;
-            Rect textRect = UiScale.R(r.x + SlotTextInset, r.y, r.width - 2f * SlotTextInset, r.height);
-            GUIStyle scaled = UiScale.Style(rowStyle);
-            int size = scaled.fontSize;
-            scaled.fontSize = SaveUIHelper.FitFontSize(scaled, saves[i].displayName, textRect.width, size, Mathf.Max(10, (size * 3) / 4));
-            GUI.Label(textRect, Utils.Ellipsize(saves[i].displayName, scaled, textRect.width), scaled);
-            scaled.fontSize = size;
-
-            // read before the click is taken: taking it marks the event used
-            int clicks = Event.current != null ? Event.current.clickCount : 0;
-            if (!Menu.Asking && !draggingThumb && GuiInput.TryConsumeClickInRect(UiScale.R(r)))
-            {
-                index = i;
-                // a double click saves or loads, as Enter does (the user's, 2 November 2026)
-                if (clicks >= 2)
-                {
-                    rowDoubleClicked = true;
-                }
-            }
-        }
-
-        if (scrolls)
-        {
-            // the menu's scroll bar, one for every list (the user's, 2 November 2026)
-            int before = slotScroll;
-            slotScroll = Menu.DrawScrollBar(bar, slotScroll, rows, saves.Length, ref draggingThumb, ref thumbGrab);
-            if (slotScroll != before || draggingThumb)
-            {
-                slotScrollFollowsSelection = false;
-            }
-        }
-        else
-        {
-            draggingThumb = false;
-        }
-
-        DrawPreview(detail);
-    }
-
-    /// <summary>
-    /// The preview of the selected save, centred in its column: the character above, the screenshot
-    /// framed, and when it was saved below.
-    /// </summary>
-    private void DrawPreview(Rect detail)
-    {
-        if (!SaveUIHelper.PreviewLines(saves, index, out string character, out string when))
-        {
-            return;
-        }
-        SaveUIHelper.EnsureScreenshotLoaded(slotScreenshots, saves, index);
-
-        const float pad = 24f;
-        const float gap = 14f;
-        float lineH = PreviewFont + 10f;
-        float shotW = detail.width - 2f * pad;
-        float shotH = shotW / ScreenshotAspect;
-        float maxShotH = detail.height - 2f * pad - 2f * (lineH + gap);
-        if (shotH > maxShotH)
-        {
-            shotH = maxShotH;
-            shotW = shotH * ScreenshotAspect;
-        }
-        float blockH = lineH + gap + shotH + gap + lineH;
-        float top = detail.y + (detail.height - blockH) / 2f;
-        float left = detail.x + (detail.width - shotW) / 2f;
-
-        GUIStyle line = new GUIStyle(text) { fontSize = Mathf.RoundToInt(PreviewFont), alignment = TextAnchor.MiddleLeft, wordWrap = false };
-        line.normal.textColor = selectColor;
-        GUIStyle scaled = UiScale.Style(line);
-        Rect characterRect = UiScale.R(left, top, shotW, lineH);
-        int size = scaled.fontSize;
-        scaled.fontSize = SaveUIHelper.FitFontSize(scaled, character, characterRect.width, size, Mathf.Max(10, size / 2));
-        GUI.Label(characterRect, character, scaled);
-        scaled.fontSize = size;
-
-        Rect shot = new Rect(left, top + lineH + gap, shotW, shotH);
-        Texture2D picture = index < slotScreenshots.Length ? slotScreenshots[index] : null;
-        if (picture != null)
-        {
-            GUI.DrawTexture(UiScale.R(shot), picture, ScaleMode.StretchToFill, false);
-        }
-        else
-        {
-            Color previous = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.6f);
-            GUI.DrawTexture(UiScale.R(shot), Texture2D.whiteTexture);
-            GUI.color = previous;
-        }
-        DrawFrame(new Rect(shot.x - 2f, shot.y - 2f, shot.width + 4f, shot.height + 4f), unselectColor);
-
-        GUI.Label(UiScale.R(left, shot.yMax + gap, shotW, lineH), when, scaled);
-    }
-
-    private static void DrawFrame(Rect refRect, Color color)
-    {
-        Rect r = UiScale.R(refRect);
-        float line = Mathf.Max(1f, UiScale.S(2f));
-        Color previous = GUI.color;
-        GUI.color = color;
-        GUI.DrawTexture(new Rect(r.x, r.y, r.width, line), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.x, r.yMax - line, r.width, line), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.x, r.y, line, r.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.xMax - line, r.y, line, r.height), Texture2D.whiteTexture);
-        GUI.color = previous;
+        Page.Draw(list, detail);
     }
 
     public Hint[] PageHints(GameMenu.ETab tab, bool pad)
     {
-        string what = tab == GameMenu.ETab.Save ? "save" : "load";
-        return pad
-            ? new[]
-            {
-                new Hint(what, HintKey.Of(aButton)),
-                new Hint("tab", HintKey.PadButton("LB"), HintKey.PadButton("RB")),
-                new Hint("close", HintKey.Of(bButton)),
-            }
-            : new[]
-            {
-                new Hint(what, HintKey.Keyboard("Enter")),
-                new Hint("tab", HintKey.Keyboard("Tab")),
-                new Hint("close", HintKey.Of(escapeKey)),
-            };
+        bool saving = tab == GameMenu.ETab.Save;
+        var hints = new System.Collections.Generic.List<Hint>
+        {
+            pad ? new Hint(saving ? "save" : "load", HintKey.Of(aButton)) : new Hint(saving ? "save" : "load", HintKey.Keyboard("Enter")),
+        };
+        hints.Add(pad ? new Hint("delete", HintKey.Of(yButton)) : new Hint("delete", HintKey.Keyboard("Del")));
+        hints.Add(pad ? new Hint("tab", HintKey.PadButton("LB"), HintKey.PadButton("RB")) : new Hint("tab", HintKey.Keyboard("Tab")));
+        hints.Add(pad ? new Hint("close", HintKey.Of(bButton)) : new Hint("close", HintKey.Of(escapeKey)));
+        return hints.ToArray();
     }
 
+    // Delete on LOAD too, first in the row (the user's rule of 7 November 2026): the autosaves are listed only there, so they
+    // could not be deleted at all
     public string[] PageButtons(GameMenu.ETab tab)
     {
-        return new[] { tab == GameMenu.ETab.Save ? "Save" : "Load" };
+        return new[] { "Delete", tab == GameMenu.ETab.Save ? "Save" : "Load" };
     }
 
     public bool PageButtonEnabled(GameMenu.ETab tab, int button)
     {
-        return !KeyboardActive() && index >= 0 && index < saves.Length
-            && (tab == GameMenu.ETab.Save || HasSelectedSaveSlotContent());
+        if (KeyboardActive())
+        {
+            return false;
+        }
+        // Save on any row, the new save row included; Load and Delete on a save
+        return button == 1 && tab == GameMenu.ETab.Save ? Page.Selected != null : Page.SelectedIsSave;
     }
 
     public void PressPageButton(GameMenu.ETab tab, int button)
     {
-        ActivatePrimarySaveOrLoad();
+        if (button == 0)
+        {
+            Page.AskDelete();
+        }
+        else
+        {
+            ActivatePrimarySaveOrLoad();
+        }
     }
 
     /// <summary>The way back to the title screen, at the right end of the row of buttons on every tab.</summary>
@@ -828,12 +589,5 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
         }
 
         Menu.OnGUI();
-    }
-
-    private bool HasSelectedSaveSlotContent()
-    {
-        return index >= 0
-            && index < saves.Length
-            && !string.IsNullOrEmpty(saves[index].slotName);
     }
 }

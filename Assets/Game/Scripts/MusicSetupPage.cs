@@ -131,10 +131,15 @@ public class MusicSetupPage : IGameMenuSubPage
         Keyboard keyboard = Keyboard.current;
         bool shift = keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
 
-        bool up = (pad?.dpad.up.wasPressedThisFrame ?? false) || (keyboard?.upArrowKey.wasPressedThisFrame ?? false);
-        bool down = (pad?.dpad.down.wasPressedThisFrame ?? false) || (keyboard?.downArrowKey.wasPressedThisFrame ?? false);
-        bool left = (pad?.dpad.left.wasPressedThisFrame ?? false) || (keyboard?.leftArrowKey.wasPressedThisFrame ?? false);
-        bool right = (pad?.dpad.right.wasPressedThisFrame ?? false) || (keyboard?.rightArrowKey.wasPressedThisFrame ?? false);
+        // the left stick as the d-pad, as in the rest of the menu (fix 475)
+        bool up = (pad?.dpad.up.wasPressedThisFrame ?? false) || (pad?.leftStick.up.wasPressedThisFrame ?? false)
+            || (keyboard?.upArrowKey.wasPressedThisFrame ?? false);
+        bool down = (pad?.dpad.down.wasPressedThisFrame ?? false) || (pad?.leftStick.down.wasPressedThisFrame ?? false)
+            || (keyboard?.downArrowKey.wasPressedThisFrame ?? false);
+        bool left = (pad?.dpad.left.wasPressedThisFrame ?? false) || (pad?.leftStick.left.wasPressedThisFrame ?? false)
+            || (keyboard?.leftArrowKey.wasPressedThisFrame ?? false);
+        bool right = (pad?.dpad.right.wasPressedThisFrame ?? false) || (pad?.leftStick.right.wasPressedThisFrame ?? false)
+            || (keyboard?.rightArrowKey.wasPressedThisFrame ?? false);
         bool accept = (pad?.aButton.wasPressedThisFrame ?? false)
             || (keyboard?.enterKey.wasPressedThisFrame ?? false) || (keyboard?.numpadEnterKey.wasPressedThisFrame ?? false);
         bool soundFontKey = (pad?.rightShoulder.wasPressedThisFrame ?? false) || (keyboard?.sKey.wasPressedThisFrame ?? false);

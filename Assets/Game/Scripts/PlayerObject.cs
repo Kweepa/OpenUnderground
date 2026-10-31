@@ -970,7 +970,8 @@ public class PlayerObject : MonoBehaviour
             : GameActions.PadWorld.Sprint.IsPressed();
         bool slowWalk = usingKeyboardMove && GameActions.KeysWorld.WalkQuietly.IsPressed();
 
-        bool wantsSprint = sprintModifierHeld
+        bool wantsSprint = PlayerInput.Sprint
+                          && sprintModifierHeld
                           && !slowWalk
                           && moveControl.y > sprintForwardThreshold
                           && stamina > 0f
@@ -1394,8 +1395,10 @@ public class PlayerObject : MonoBehaviour
         // conversations, cutscenes, the map and the save screen - all of which set timeScale to
         // zero - rather than banking up rolls to fire the moment play resumes. During a fight the
         // timers are held full, so the first roll after one waits a whole interval.
+        // Turned off in the options, the three automatic rolls wait as they do in a fight.
+        bool automatic = PlayerInput.AutomaticSearch;
         timeToNextSecretDoorCheck -= Time.deltaTime;
-        if (Music.IsInCombat())
+        if (Music.IsInCombat() || !automatic)
         {
             timeToNextSecretDoorCheck = SecretDoorSearch.checkInterval;
         }
@@ -1406,7 +1409,7 @@ public class PlayerObject : MonoBehaviour
         }
 
         timeToNextTrapCheck -= Time.deltaTime;
-        if (Music.IsInCombat())
+        if (Music.IsInCombat() || !automatic)
         {
             timeToNextTrapCheck = TrapSearch.checkInterval;
         }
@@ -1418,7 +1421,7 @@ public class PlayerObject : MonoBehaviour
 
         // No Track roll while fighting, and the first one after a fight waits a whole interval.
         timeToNextTrackCheck -= Time.deltaTime;
-        if (Music.IsInCombat())
+        if (Music.IsInCombat() || !automatic)
         {
             timeToNextTrackCheck = trackCheckInterval;
         }

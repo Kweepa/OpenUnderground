@@ -33,13 +33,17 @@ public static class PlayerInput
     /// and the tracks run back to back the way they used to.
     /// </summary>
     /// <remarks>
-    /// It ships at zero, so the music plays the way it always has until the player asks for the
-    /// quiet.
+    /// It ships at ten seconds, the user's choice of 31 October 2026 (it shipped at zero before, the
+    /// tracks back to back), and goes up to five minutes; a larger number kept from the old slider,
+    /// which went to 400, is read as the top.
     /// The name says Max because the option is a length rather than a switch, and because the
     /// switch it replaced held 0 or 1 under a shorter name: read as seconds, a stale 1 would mean
     /// one second of quiet, which looks like the feature is broken rather than turned off.
     /// </remarks>
-    public static float AmbientSilenceMax => PlayerPrefs.GetInt("Options_AmbientSilenceMax", 0);
+    public static float AmbientSilenceMax => Mathf.Min(PlayerPrefs.GetInt("Options_AmbientSilenceMax", DefaultAmbientSilenceMax), MaxAmbientSilence);
+
+    public const int DefaultAmbientSilenceMax = 10;
+    public const int MaxAmbientSilence = 300;
 
     /// <summary>
     /// Whether Resist Blows, Thick Skin and Iron Flesh soak 1, 2 and 3 points of every blow, cast
@@ -69,6 +73,25 @@ public static class PlayerInput
     /// unless the player turns it off. Off, only the quicksave and the saves made by hand are written.
     /// </summary>
     public static bool AutoSave => PlayerPrefs.GetInt("Options_AutoSave", 1) == 1;
+
+    /// <summary>
+    /// Whether the Search, Traps and Track skills roll by themselves every few seconds and report a
+    /// hidden door, a trapped object or the creatures nearby. On unless the player turns it off. Off,
+    /// Search and Traps roll only when the player looks, which is what the original does.
+    /// </summary>
+    public static bool AutomaticSearch => PlayerPrefs.GetInt("Options_AutomaticSearch", 1) == 1;
+
+    /// <summary>
+    /// Whether the player can sprint, with the stamina gauge under the worn spells. On unless the
+    /// player turns it off. Off, there is no sprint and no gauge, as in the original.
+    /// </summary>
+    public static bool Sprint => PlayerPrefs.GetInt("Options_Sprint", 1) == 1;
+
+    /// <summary>
+    /// Whether a pile of debris may hide a few items that a Search roll finds. On unless the player
+    /// turns it off. Off, debris holds nothing, as in the original.
+    /// </summary>
+    public static bool LootInDebris => PlayerPrefs.GetInt("Options_LootInDebris", 1) == 1;
 
     /// <summary>Movement in local stick space: x = strafe, y = forward (matches gamepad left stick).</summary>
     /// <remarks>The keyboard wins whenever one of its movement keys is down.</remarks>

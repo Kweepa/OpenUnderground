@@ -4355,7 +4355,11 @@ public class Magic : MonoBehaviour
             float wornLeft = HudRowX + RuneShelfWidth + wornIconGap;
             float psx = wornLeft - (WornIconHeight - wornIconWidth) / 2;
 
-            DrawStaminaGauge(Mathf.Round(wornLeft), UiScale.Height - PlayerPanelState.PanelMargin);
+            // no sprint, no gauge
+            if (PlayerInput.Sprint)
+            {
+                DrawStaminaGauge(Mathf.Round(wornLeft), UiScale.Height - PlayerPanelState.PanelMargin);
+            }
 
             // Only the stronger of the two protections counts (GetResistances()), so only it is shown.
             bool greaterProtectionShown = IsSpellKnownActive(ESpell.GreaterMagicProtection);
