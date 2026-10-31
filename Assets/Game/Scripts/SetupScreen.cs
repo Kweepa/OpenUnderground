@@ -37,6 +37,8 @@ public class SetupScreen : IGameMenuHost
             // the title screen's own high resolution rock (creditsbackground-transformed.png), the
             // user's choice of 31 October 2026; in a game the menu has the signs' wood
             Background = frontEnd.achievementsBackground,
+            // where it stands on the screen behind the panel, so the rock is in the same place on every page
+            BackgroundTexCoords = screenRect => FrontEnd.PageBackgroundTexCoords(screenRect, frontEnd.achievementsBackground),
             // the frame in the rock's blues, measured on the picture: its darkest tenth is black, its
             // lightest about (80, 80, 112)
             FrameDark = new Color32(8, 8, 20, 255),
@@ -66,10 +68,9 @@ public class SetupScreen : IGameMenuHost
 
     public void OnGUI()
     {
-        Rect screen = new Rect(0, 0, Screen.width, Screen.height);
         if (frontEnd.achievementsBackground != null)
         {
-            GUI.DrawTexture(screen, frontEnd.achievementsBackground, ScaleMode.ScaleAndCrop);
+            FrontEnd.DrawPageBackground(frontEnd.achievementsBackground);
         }
         menu.OnGUI();
     }

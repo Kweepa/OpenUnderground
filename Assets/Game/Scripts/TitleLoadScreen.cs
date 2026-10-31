@@ -50,10 +50,9 @@ public class TitleLoadScreen : IGameMenuHost
 
     public void OnGUI()
     {
-        Rect screen = new Rect(0, 0, Screen.width, Screen.height);
         if (frontEnd.achievementsBackground != null)
         {
-            GUI.DrawTexture(screen, frontEnd.achievementsBackground, ScaleMode.ScaleAndCrop);
+            FrontEnd.DrawPageBackground(frontEnd.achievementsBackground);
         }
         menu.OnGUI();
     }

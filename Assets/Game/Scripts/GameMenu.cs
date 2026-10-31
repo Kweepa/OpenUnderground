@@ -10,6 +10,11 @@ public sealed class GameMenuSkin
     public GUIStyle Font;
     /// <summary>The picture behind the menu, drawn to cover the panel; without it, a wall of the game's tiled.</summary>
     public Texture2D Background;
+    /// <summary>
+    /// The part of the background picture a rect of the screen shows, when the picture stands still on the screen
+    /// rather than covering the panel: on the title screen, the rock where it is behind the panel.
+    /// </summary>
+    public Func<Rect, Rect> BackgroundTexCoords;
     /// <summary>The wood panel, the last fallback when neither the picture nor the original's walls are there.</summary>
     public Texture2D Wood;
     /// <summary>The frame round the panel, a broad dark line and a thin lighter one inside it, in the background's tones.</summary>
@@ -1456,8 +1461,17 @@ public sealed class GameMenu
             // one picture, not a tile - in a game the signs' wood (woodwritingbackground.png), on the
             // title screen its rock (creditsbackground-transformed.png), both 1280x800 - so it covers
             // the panel and is cropped to its shape
-            // - drawn as it is, not darkened, the user's choice of 31 October 2026
-            GUI.DrawTexture(UiScale.R(refRect), skin.Background, ScaleMode.ScaleAndCrop);
+            // - drawn as it is, not darkened, the user's choice of 31 October 2026; on the title screen
+            // the same rock as round the panel, where it stands, only not darkened
+            Rect screen = UiScale.R(refRect);
+            if (skin.BackgroundTexCoords != null)
+            {
+                GUI.DrawTextureWithTexCoords(screen, skin.Background, skin.BackgroundTexCoords(screen));
+            }
+            else
+            {
+                GUI.DrawTexture(screen, skin.Background, ScaleMode.ScaleAndCrop);
+            }
         }
         else if (wall != null)
         {
