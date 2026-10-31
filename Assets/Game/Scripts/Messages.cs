@@ -236,7 +236,9 @@ public class Messages : MonoBehaviour
         // The virtual keyboard and conversations both write into this same message area, so
         // leave the input to them while either is up.
         bool blocked = (KeyboardGUI.sKeyboard != null && KeyboardGUI.sKeyboard.IsVisible())
-            || Conversations.runningConversation != null;
+            || Conversations.runningConversation != null
+            // nor under the game menu, whose sections Page Up and Page Down step
+            || (PlayerObject.Player != null && (PlayerObject.Player.controlsDisabled & EControlMask.SaveLoad) != 0);
 
         Keyboard keyboard = GameInput.CurrentKeyboard;
 

@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The save and options panel is now a full-screen game menu with four tabs, Save, Load, Options and Controls, its options grouped in sections and applied as soon as they change, with Reset, Reset all and Undo changes in place of Apply All. Settings that could only be changed in the registry now have a row - autosave, the music over the map, the silence between tracks, the scale of the interface above 1080p, and the remake's gameplay additions, which the Classic rules button turns back to the original's way. The title screen's Setup opens the same menu, and the music tracks are a page of it, now reachable in a game too.
+
 - The interface now follows the size of the screen: it keeps its size from 1366x768 to 1920x1080, grows evenly on larger screens with the edges of its pixel art softened, and shrinks as a whole on smaller ones such as a Steam Deck, where panels used to overlap; below 1280x720 a message says so once. Conversations fit a 768-line screen, and the list of saves on the title screen is wider and cuts long names short.
 
 - A door spiked shut, with an iron spike or the Strengthen Door spell, now shows its spikes on your side, gone when you open it: the first iron spike goes by the lock, every further one and the spell's ten anywhere along the frame. The more spikes, the more blows the door takes to break, and the blows knock them out one by one; a look or the cursor calls it a spiked door, it stays spiked after a save and load, a portcullis or a secret door can no longer be spiked, and iron spikes used with the mouse are now used up, one a door, the rest staying in hand.

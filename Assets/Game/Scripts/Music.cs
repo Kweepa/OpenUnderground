@@ -107,6 +107,8 @@ public class Music : MonoBehaviour
 
     // An incense vision is playing, and the music waits for it to end (Vision(), VisionOver()).
     private bool inVision;
+    // The music page of the game menu is open: it plays tracks of its own to be heard (Listening()).
+    private bool listening;
     
     /// <summary>Seconds before trying again when no ambient track can be played.</summary>
     private const float noTrackRetry = 10.0f;
@@ -448,6 +450,37 @@ public class Music : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// The music page of the game menu opens in a game, and closes: while it is open this component
+    /// leaves the player alone, as it does in a vision, so that a track listened to is not cut by the
+    /// next one. When it closes, an exploring state draws a new track after its usual silence, and any
+    /// other state starts its own music again.
+    /// </summary>
+    public static void Listening(bool open)
+    {
+        if (sMusic == null)
+        {
+            return;
+        }
+        sMusic.listening = open;
+        sMusic.currentPlayingTrack = "";
+        if (!open && sMusic.musicPlayer != null)
+        {
+            switch (sMusic.musicState)
+            {
+                case EMusicState.ExploringA:
+                case EMusicState.ExploringB:
+                case EMusicState.ExploringC:
+                case EMusicState.ExploringD:
+                    sMusic.exploringSilenceTimer = 0.0f;
+                    break;
+                default:
+                    sMusic.StartStateMusic(sMusic.musicState);
+                    break;
+            }
+        }
+    }
+
     public static void Dead()
     {
         sMusic.musicState = EMusicState.Death;
@@ -706,7 +739,7 @@ public class Music : MonoBehaviour
     {
         sMusic = this;
         if (musicPlayer == null) return;
-        if (inVision) return;
+        if (inVision || listening) return;
         
         switch (musicState)
         {

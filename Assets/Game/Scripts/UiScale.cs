@@ -97,20 +97,6 @@ public static class UiScale
         }
     }
 
-    /// <summary>
-    /// The scale that fits a whole 1920x1080 page on the screen, for the one page still laid out
-    /// that way (the music page of the Setup screen); everything else uses <see cref="Factor"/>.
-    /// Above 1920x1080 it is held back by <see cref="GrowthPercent"/> like the rest.
-    /// </summary>
-    public static float Fit
-    {
-        get
-        {
-            float fit = Mathf.Min(Screen.width / RefWidth, Screen.height / RefHeight);
-            return fit < 1f ? fit : Grown(fit);
-        }
-    }
-
     /// <summary>A ratio of the screen to 1920x1080 of 1 or more, as the interface takes it: capped at Max, then held back by the growth.</summary>
     private static float Grown(float ratio)
     {
