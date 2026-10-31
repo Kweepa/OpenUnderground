@@ -1009,6 +1009,30 @@ public class FrontEnd : MonoBehaviour
 
     public Rect shinyLogoRect;
 
+    /// <summary>
+    /// The texture coordinates a rect of the screen shows of a page's background picture - the rock behind
+    /// Achievements, the acknowledgements, Setup and Journey Onward - so that it stands in the same place on all
+    /// four: centred on the screen and enlarged just enough to cover it, its proportions kept, so it touches two
+    /// edges and is cut on the other two when the screen's shape differs from its own.
+    /// </summary>
+    public static Rect PageBackgroundTexCoords(Rect screenRect, Texture picture)
+    {
+        float scale = Mathf.Max(Screen.width / (float)picture.width, Screen.height / (float)picture.height);
+        float left = picture.width / 2f + (screenRect.x - Screen.width / 2f) / scale;
+        float top = picture.height / 2f + (screenRect.y - Screen.height / 2f) / scale;
+        float width = screenRect.width / scale;
+        float height = screenRect.height / scale;
+        // texture coordinates count rows from the bottom
+        return new Rect(left / picture.width, 1f - (top + height) / picture.height, width / picture.width, height / picture.height);
+    }
+
+    /// <summary>Draws a page's background picture over the whole screen, centred and covering it (see above).</summary>
+    public static void DrawPageBackground(Texture picture)
+    {
+        Rect screen = new Rect(0, 0, Screen.width, Screen.height);
+        GUI.DrawTextureWithTexCoords(screen, picture, PageBackgroundTexCoords(screen, picture));
+    }
+
     private void DrawOpeningScreenCropped(Rect frontEndRect)
     {
         float visibleVirtualHeight = OpeningScreenVirtualHeight - OpeningScreenCropTop;
@@ -1072,7 +1096,7 @@ public class FrontEnd : MonoBehaviour
         case EState.Achievements:
             foreach (Achievements ach in GameObject.FindObjectsByType<Achievements>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
-                GUI.DrawTexture(Screen.safeArea, achievementsBackground);
+                DrawPageBackground(achievementsBackground);
                 // The title and the footer at the interface scale.
                 float titleBottom = DrawPageTitle("Achievements");
                 // draw all achievements is here, between the title and the footer

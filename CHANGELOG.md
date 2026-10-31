@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The rock behind Achievements and the acknowledgements is no longer squashed, and stands in the same place on every page of the title screen.
+
 - The music can play on an external MT-32: the Munt emulator with its ROMs, or a real one behind a MIDI interface. Choose MT-32 EXT MIDI as the soundfont, and the tracks are sent exactly what the original sent a Roland MT-32, so they sound as they did on one.
 
 - On the pad, Select no longer opens the map over the sleep or repair question, where A on the map answered Yes unseen and could leave you unable to move. Left or right on the last skill of character creation no longer empties the screen, and an A pressed on the map or a rune no longer picks up an item in the inventory.
