@@ -157,6 +157,8 @@ public sealed class GameMenu
     public static readonly Color UnselectColor = new Color32(187, 123, 1, 255);
     // a little lighter than the music page's off tracks, the user's of 31 October 2026, so a disabled button still reads
     private static readonly Color DimColor = new Color32(150, 142, 132, 255);
+    /// <summary>A question about what cannot be undone, as deleting a save, is written in red (the user's, 8 November 2026).</summary>
+    public static readonly Color WarningColor = new Color32(235, 72, 56, 255);
     private static readonly Color PanelColor = new Color(0f, 0f, 0f, 0.55f);
 
     // Laid out in reference pixels (UiScale): what fits 1366x768.
@@ -211,6 +213,7 @@ public sealed class GameMenu
     private bool confirmYes;
     private string hostQuestion;
     private Action hostYes;
+    private bool hostWarning;
 
     private float selectHeld;
     private bool selectFired;
@@ -229,7 +232,7 @@ public sealed class GameMenu
     private readonly HashSet<string> labelsWarned = new HashSet<string>();
 #endif
 
-    /// <param name="tabs">The tabs shown, in order: all four in a game, OPTIONS and CONTROLS from the title.</param>
+    /// <param name="tabs">The tabs shown, in order: all four in a game, OPTIONS and CONTROLS on Setup, LOAD alone on Journey Onward.</param>
     /// <param name="dimBehind">Darken what is behind the panel: the paused game.</param>
     public GameMenu(GameMenuSkin skin, IGameMenuHost host, ETab[] tabs, bool dimBehind)
     {
@@ -282,10 +285,12 @@ public sealed class GameMenu
     /// Asks the host's own question in the menu's Yes/No box, No lit first, and calls
     /// <paramref name="onYes"/> on a yes: in a game, going back to the title screen.
     /// </summary>
-    public void Ask(string question, Action onYes)
+    /// <param name="warning">Written in red: what a yes does cannot be undone.</param>
+    public void Ask(string question, Action onYes, bool warning = false)
     {
         hostQuestion = question;
         hostYes = onYes;
+        hostWarning = warning;
         confirmYes = false;
         confirm = EConfirm.Host;
         Sound(skin.MakeSound);
@@ -619,14 +624,16 @@ public sealed class GameMenu
             return true;
         }
 
-        bool tabKey = keys?.tabKey.wasPressedThisFrame ?? false;
-        if ((pad?.leftShoulder.wasPressedThisFrame ?? false) || (tabKey && shift))
+        // with one tab, Journey Onward's, the tab keys do nothing: no sound, and the list not made again (fix 465)
+        bool tabKey = tabs.Length > 1 && (keys?.tabKey.wasPressedThisFrame ?? false);
+        bool tabPad = tabs.Length > 1 && pad != null;
+        if ((tabPad && pad.leftShoulder.wasPressedThisFrame) || (tabKey && shift))
         {
             ShowTab(tabIndex - 1);
             Sound(skin.MoveSound);
             return false;
         }
-        if ((pad?.rightShoulder.wasPressedThisFrame ?? false) || (tabKey && !shift))
+        if ((tabPad && pad.rightShoulder.wasPressedThisFrame) || (tabKey && !shift))
         {
             ShowTab(tabIndex + 1);
             Sound(skin.MoveSound);
@@ -1626,7 +1633,7 @@ public sealed class GameMenu
         Fill(box, new Color(0f, 0f, 0f, 0.92f));
         Frame(box, SelectColor);
         Text(new Rect(box.x + 40f, box.y + 30f, box.width - 80f, box.height - 120f - ButtonHeight), ConfirmQuestion(), DetailTitleFont,
-            TextAnchor.MiddleCenter, Color.white, true);
+            TextAnchor.MiddleCenter, confirm == EConfirm.Host && hostWarning ? WarningColor : Color.white, true);
         DrawChoice(yes, "Yes", confirmYes);
         DrawChoice(no, "No", !confirmYes);
     }

@@ -31,8 +31,18 @@ public class Music : MonoBehaviour
     [Tooltip("Show track name, time, and voice stats on screen")]
     public bool showMusicDebugHUD = false;
 
-    [Tooltip("Shortest silence between two ambient tracks, in seconds. The longest is the player's own Options_AmbientSilenceMax, and this is capped by it.")]
-    public float minimumSilence = 25.0f;
+    /// <summary>
+    /// The shortest silence between two ambient tracks, in seconds; the longest is the player's own
+    /// Options_AmbientSilenceMax, and this is capped by it.
+    /// </summary>
+    /// <remarks>
+    /// 5 since 31 October 2026, the user's choice, when the longest went to 10 by default: at 25 every
+    /// pause under 25 seconds came out exactly as long as the longest, nothing random about it. A
+    /// constant, not a field set in the Inspector as it was: a serialized field keeps the value an
+    /// object already had, so the Editor went on drawing every pause from 25 after the default in the
+    /// code had changed, and at a maximum of 10 each one lasted exactly 10.
+    /// </remarks>
+    private const float MinimumSilence = 5.0f;
 
     [Tooltip("The one silence after the title track has played out, in seconds. Its own number, and a shorter one: nothing has been heard in the dungeon yet at that point. Capped by the player's maximum.")]
     public float openingSilence = 10.0f;
@@ -501,7 +511,7 @@ public class Music : MonoBehaviour
     /// How long the next stretch of quiet lasts, in seconds.
     /// </summary>
     /// <remarks>
-    /// Anywhere from minimumSilence up to the longest the player allows, except for the first one
+    /// Anywhere from MinimumSilence up to the longest the player allows, except for the first one
     /// of a session, which is openingSilence and shorter than the rest. The pause between two
     /// ambient tracks is minutes long on purpose, but the same wait right after the title track
     /// has played out lands differently: nothing has been heard in the dungeon yet, so it reads
@@ -523,7 +533,7 @@ public class Music : MonoBehaviour
             return Mathf.Min(openingSilence, longest);
         }
 
-        return Random.Range(Mathf.Min(minimumSilence, longest), longest);
+        return Random.Range(Mathf.Min(MinimumSilence, longest), longest);
     }
 
     private static bool IsExploringState(EMusicState state)

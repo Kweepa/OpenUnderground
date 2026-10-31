@@ -22,7 +22,16 @@ public class SetupScreen : IGameMenuHost
     public SetupScreen(FrontEnd frontEnd)
     {
         this.frontEnd = frontEnd;
-        GameMenuSkin skin = new GameMenuSkin
+        GameMenuSkin skin = TitleSkin(frontEnd);
+        // the rock round the panel darkened, as the game is behind it in a game
+        menu = new GameMenu(skin, this, new[] { GameMenu.ETab.Options, GameMenu.ETab.Controls }, true);
+        menu.Open(GameMenu.ETab.Options);
+    }
+
+    /// <summary>The menu's look on the title screen: the title's rock, a frame in its blues, the title's font and sounds.</summary>
+    public static GameMenuSkin TitleSkin(FrontEnd frontEnd)
+    {
+        return new GameMenuSkin
         {
             Font = frontEnd.buttonLabelStyle,
             // the title screen's own high resolution rock (creditsbackground-transformed.png), the
@@ -44,9 +53,6 @@ public class SetupScreen : IGameMenuHost
             MakeSound = frontEnd.makeSelection,
             BackSound = frontEnd.backSelection,
         };
-        // the rock round the panel darkened, as the game is behind it in a game
-        menu = new GameMenu(skin, this, new[] { GameMenu.ETab.Options, GameMenu.ETab.Controls }, true);
-        menu.Open(GameMenu.ETab.Options);
     }
 
     public void Update()

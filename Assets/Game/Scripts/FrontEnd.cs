@@ -119,14 +119,8 @@ public class FrontEnd : MonoBehaviour
     // The row just under the line the small letters stand on, counted from the top of the image.
     [System.NonSerialized] private int[] baselineRow;
 
-    // The load list is whatever is on disk, newest first, so it has no fixed length and it scrolls.
-    // loadScroll is the first row drawn.
-	private SaveGameManager.SaveSlotInfo[] saves = new SaveGameManager.SaveSlotInfo[0];
-    private Texture2D[] saveScreenshots = new Texture2D[0];
-    private int loadScroll;
-
-    /// <summary>The most save rows the list shows, on a screen 1080 reference pixels tall or more.</summary>
-    private const int LOAD_MENU_MAX_ROWS = 10;
+    // Journey Onward: the game menu with its LOAD tab alone (fix 433).
+    private TitleLoadScreen titleLoad;
     private string pendingLoadSlot;
     private bool hasSaves = false;
 
@@ -436,9 +430,29 @@ public class FrontEnd : MonoBehaviour
             }
             break;
         case EState.LoadMenu:
-            palCycle = ((int)(10 * stateTime)) % openingScreen.Length;
-            UpdateFade();
-            UpdateLoadMenu();
+            titleLoad.Update();
+            if (titleLoad.ChosenSlot != null)
+            {
+                if (makeSelection != null)
+                    Utils.PlayClip2d(makeSelection);
+                pendingLoadSlot = titleLoad.ChosenSlot;
+                titleLoad = null;
+                StartCoroutine(LoadAGame());
+                state = EState.Done;
+            }
+            else if (titleLoad.Closed)
+            {
+                if (backSelection != null)
+                    Utils.PlayClip2d(backSelection);
+                titleLoad = null;
+                // saves may have been deleted, and with the last of them Journey Onward goes
+                CheckSavesExist();
+                state = EState.Menu;
+                // back on Journey Onward, or Create Character if the last save went: not on Introduction, which A by habit
+                // would play (fix 476); found by its slot, since the entries move when Journey Onward goes
+                int back = MenuIndexOfSlot(JourneyOnwardSlot);
+                menuIndex = back >= 0 ? back : Mathf.Max(0, MenuIndexOfSlot(CreateCharacterSlot));
+            }
             break;
         case EState.Introduction:
             if (cutscene != null)
@@ -690,64 +704,11 @@ public class FrontEnd : MonoBehaviour
 		}
 	}
 
-	private void RefreshSaves()
-	{
-        // Every save on disk, newest first. No new save row: this list only loads.
-        menuIndex = SaveUIHelper.RefreshSaves(ref saves, ref saveScreenshots, menuIndex, false);
-	}
-
-    /// <summary>
-    /// Opens the load list on the newest save and puts the pointer on it.
-    /// </summary>
-    /// <remarks>
-    /// The newest save is the one a player coming back to the game almost always wants, and the
-    /// list is now sorted so that it is the top row. Moving the pointer there as well means that
-    /// someone who clicks Journey Onward and keeps clicking loads that game rather than whatever
-    /// happened to be under the cursor. Only for a player on mouse and keyboard: taking the pointer
-    /// away from someone on a gamepad would be rude and pointless.
-    /// </remarks>
+    /// <summary>Journey Onward: the game menu with its LOAD tab, on the newest save.</summary>
     private void OpenLoadMenu()
     {
-        RefreshSaves();
+        titleLoad = new TitleLoadScreen(this);
         state = EState.LoadMenu;
-        menuIndex = 0;
-        loadScroll = 0;
-
-        if (saves.Length == 0 || GameInput.LastActiveDevice == GameInputDevice.Gamepad)
-        {
-            return;
-        }
-
-        WarpMouseToGui(GetLoadSlotRectGui(0).center);
-    }
-
-    /// <summary>Moves the load list selection, keeping it inside the window that is drawn.</summary>
-    private void MoveLoadSelection(int delta)
-    {
-        if (saves.Length == 0)
-        {
-            menuIndex = 0;
-            loadScroll = 0;
-            return;
-        }
-
-        menuIndex = ((menuIndex + delta) % saves.Length + saves.Length) % saves.Length;
-        ClampLoadScroll();
-    }
-
-    private void ClampLoadScroll()
-    {
-        int maxScroll = Mathf.Max(0, saves.Length - LoadMenuVisibleRows);
-        if (menuIndex < loadScroll)
-        {
-            loadScroll = menuIndex;
-        }
-        else if (menuIndex >= loadScroll + LoadMenuVisibleRows)
-        {
-            loadScroll = menuIndex - LoadMenuVisibleRows + 1;
-        }
-
-        loadScroll = Mathf.Clamp(loadScroll, 0, maxScroll);
     }
 
     private void UpdateMenu()
@@ -755,7 +716,8 @@ public class FrontEnd : MonoBehaviour
         GameInput.RefreshLastActiveDevice();
 
         int numItems = MenuItemCount();
-        if (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false)
+        // the left stick as well as the D-pad, as in the game menu and its lists
+        if ((Gamepad.current?.dpad.down.wasPressedThisFrame ?? false) || (Gamepad.current?.leftStick.down.wasPressedThisFrame ?? false))
         {
             menuIndex = (menuIndex + 1) % numItems;
             juice = Time.timeAsDouble;
@@ -764,7 +726,7 @@ public class FrontEnd : MonoBehaviour
                 Utils.PlayClip2d(moveSelection);
             }
         }
-        else if (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false)
+        else if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false) || (Gamepad.current?.leftStick.up.wasPressedThisFrame ?? false))
         {
             menuIndex = (menuIndex + numItems - 1) % numItems;
             juice = Time.timeAsDouble;
@@ -941,128 +903,6 @@ public class FrontEnd : MonoBehaviour
         }
     }
 
-    private void UpdateLoadMenu()
-    {
-        GameInput.RefreshLastActiveDevice();
-
-        if (Gamepad.current?.bButton.wasPressedThisFrame ?? false)
-        {
-            if (backSelection != null)
-            {
-                Utils.PlayClip2d(backSelection);
-            }
-            state = EState.Menu;
-            menuIndex = 0;
-        }
-        else if (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false)
-        {
-            MoveLoadSelection(1);
-            juice = Time.timeAsDouble;
-            if (moveSelection != null)
-            {
-                Utils.PlayClip2d(moveSelection);
-            }
-        }
-        else if (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false)
-        {
-            MoveLoadSelection(-1);
-            juice = Time.timeAsDouble;
-            if (moveSelection != null)
-            {
-                Utils.PlayClip2d(moveSelection);
-            }
-        }
-        else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
-        {
-            ActivateLoadMenuSelection();
-        }
-        else
-        {
-            UpdateLoadMenuMouseKeyboard();
-        }
-        
-    }
-
-    private void ActivateLoadMenuSelection()
-    {
-        if (makeSelection != null)
-            Utils.PlayClip2d(makeSelection);
-        if (menuIndex >= 0 && menuIndex < saves.Length && !string.IsNullOrEmpty(saves[menuIndex].slotName))
-        {
-            pendingLoadSlot = saves[menuIndex].slotName;
-            StartCoroutine(LoadAGame());
-            state = EState.Done;
-        }
-    }
-
-    private void UpdateLoadMenuMouseKeyboard()
-    {
-        GameInput.RefreshLastActiveDevice();
-
-        bool ignoreHover = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
-
-        Keyboard kb = Keyboard.current;
-        if (kb != null)
-        {
-            if (kb.escapeKey.wasPressedThisFrame)
-            {
-                if (backSelection != null)
-                    Utils.PlayClip2d(backSelection);
-                state = EState.Menu;
-                menuIndex = 0;
-                return;
-            }
-            if (kb.downArrowKey.wasPressedThisFrame)
-            {
-                MoveLoadSelection(1);
-                return;
-            }
-            if (kb.upArrowKey.wasPressedThisFrame)
-            {
-                MoveLoadSelection(-1);
-                return;
-            }
-            if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
-            {
-                ActivateLoadMenuSelection();
-                return;
-            }
-        }
-
-        Mouse m = Mouse.current;
-        if (m == null)
-            return;
-
-        // The wheel scrolls the list without moving the selection.
-        float wheel = m.scroll.ReadValue().y;
-        if (wheel != 0.0f && saves.Length > LoadMenuVisibleRows)
-        {
-            int maxScroll = saves.Length - LoadMenuVisibleRows;
-            loadScroll = Mathf.Clamp(loadScroll + (wheel > 0.0f ? -1 : 1), 0, maxScroll);
-        }
-
-        if (ignoreHover && !(m.leftButton.wasPressedThisFrame || m.rightButton.wasPressedThisFrame))
-            return;
-
-        Vector2 guiMouse = GuiInput.ScreenToGuiMouse(m.position.ReadValue());
-        if (!PointerTakesSelection(m, guiMouse))
-            return;
-
-        for (int i = loadScroll; i < saves.Length && i < loadScroll + LoadMenuVisibleRows; i++)
-        {
-            Rect r = GetLoadSlotRectGui(i - loadScroll);
-            if (r.Contains(guiMouse))
-            {
-                SetMenuIndex(i);
-                if (m.leftButton.wasPressedThisFrame)
-                {
-                    ActivateLoadMenuSelection();
-                }
-                return;
-            }
-        }
-    }
-
     // --- Screen layout ---------------------------------------------------------------------
 
     /// <summary>
@@ -1090,81 +930,6 @@ public class FrontEnd : MonoBehaviour
         GUI.Label(Screen.safeArea, text, header);
         return Screen.safeArea.y + header.CalcHeight(new GUIContent(text), Screen.safeArea.width);
     }
-    //
-    // The load screen is drawn at the one interface scale, UiScale.
-
-    // The block - the list, a gap, the preview - is laid out in reference pixels at fixed sizes and
-    // centred across the screen, so it keeps its shape from 1366 to 1920 wide. The room for it starts
-    // 270 from the top of a 1080 line screen, under the logo painted on the art, and the same share of
-    // a shorter or taller one, since the art is stretched to the screen: 192 at 768, below which
-    // everything scales. The list is as long as that room allows, up to ten rows, and the block is
-    // centred between the foot of the logo and the bottom of the screen, as the achievements are
-    // between their title and footer, but never higher than that start: when the interface is kept
-    // from growing on a large screen (UiScale.GrowthPercent), the room is far taller than ten rows,
-    // and a block hung from its top left the lower part of the screen empty.
-    private const float LoadBlockTopShare = 270f / 1080f;
-    // The foot of the logo, as a share of the height: row 57 of the 200-row picture, which is drawn
-    // without its top 27 rows, so (57 - 27) / 173; 187 at 1080 lines.
-    private const float LogoFootShare = (57f - 27f) / 173f;
-    // Wide enough for the longest name the game writes itself, "Autosave - Unbroken - Lvl 4", at the
-    // full size of the font, with the em kept for the scroll arrow: 506 + 44 by tools/fontmetrics.py;
-    // the rest of the width is room to spare, chosen so that the block leaves 43 each side at 1366.
-    private const float LoadListWidth = 586f;
-    private const float LoadRowHeight = 65f;
-    private const float LoadRowFontSize = 44f;
-    private const float LoadBlockGap = 30f;
-    private const float LoadBlockMinBottom = 30f;
-
-    /// <summary>
-    /// A name too long for its row is written smaller, down to this share of the row's font, and
-    /// past that cut short with an ellipsis.
-    /// </summary>
-    private const float LoadRowMinFontShare = 0.375f;
-
-    private static float LoadBlockTopNow => LoadBlockTopShare * UiScale.Height;
-
-    /// <summary>
-    /// As many rows as fit between the top of the block and LoadBlockMinBottom above the bottom of
-    /// the screen, up to LOAD_MENU_MAX_ROWS: ten at 1080 lines, eight at 768 and on a Steam Deck.
-    /// </summary>
-    private static int LoadMenuVisibleRows => Mathf.Clamp(
-        Mathf.FloorToInt((UiScale.Height - LoadBlockMinBottom - LoadBlockTopNow) / LoadRowHeight), 1, LOAD_MENU_MAX_ROWS);
-
-    /// <summary>
-    /// Where the load screen goes, in screen pixels: the list, the preview panel beside it, and
-    /// the scale their contents are drawn at.
-    /// </summary>
-    private void GetLoadMenuLayout(out float scale, out Rect list, out Rect panel)
-    {
-        scale = UiScale.Factor;
-
-        // The panel keeps its shape: its size is in the same reference pixels its insides are
-        // laid out in, scaled as one.
-        float panelW = savePanelBackground != null ? 8.0f * savePanelBackground.width : 0.0f;
-        float panelH = savePanelBackground != null ? 4.0f * savePanelBackground.height : 0.0f;
-
-        float blockW = LoadListWidth + (panelW > 0.0f ? LoadBlockGap + panelW : 0.0f);
-        float left = (UiScale.Width - blockW) / 2;
-        float listH = LoadMenuVisibleRows * LoadRowHeight;
-        float blockH = Mathf.Max(listH, panelH);
-        float foot = LogoFootShare * UiScale.Height;
-        float top = Mathf.Max(LoadBlockTopNow, foot + (UiScale.Height - foot - blockH) / 2);
-
-        list = UiScale.R(left, top, LoadListWidth, listH);
-        panel = panelW > 0.0f ? UiScale.R(left + LoadListWidth + LoadBlockGap, top, panelW, panelH) : default;
-    }
-
-    /// <summary>
-    /// The rect of a row ON SCREEN, counting from the top of the visible window rather than from
-    /// the start of the list: with the list scrolling, the two are not the same.
-    /// </summary>
-    private Rect GetLoadSlotRectGui(int row)
-    {
-        GetLoadMenuLayout(out float scale, out Rect list, out _);
-        float rowH = LoadRowHeight * scale;
-        return new Rect(list.x, list.y + row * rowH, list.width, rowH);
-    }
-
     private IEnumerator StartNewGame()
     {
         // wait a frame for initialization
@@ -1257,8 +1022,10 @@ public class FrontEnd : MonoBehaviour
 
         switch (state)
         {
-        case EState.Menu:
         case EState.LoadMenu:
+            titleLoad?.OnGUI();
+            break;
+        case EState.Menu:
             {
                 Rect frontEndRect = Screen.safeArea;
                 GuiInput.RegisterBlockingRect(frontEndRect);
@@ -1293,96 +1060,6 @@ public class FrontEnd : MonoBehaviour
                     }
                     
                     GUI.Label(new Rect(10, 0, 100, 20), DisplayVersion);
-                }
-                else if (state == EState.LoadMenu)
-                {
-                    GetLoadMenuLayout(out float uiScale, out Rect listRect, out Rect panelRect);
-
-                    int rowFontSize = (int)(LoadRowFontSize * uiScale);
-                    style.fontSize = rowFontSize;
-                    style.alignment = TextAnchor.UpperLeft;
-
-                    for (int row = 0; row < LoadMenuVisibleRows; ++row)
-                    {
-                        int i = loadScroll + row;
-                        if (i >= saves.Length)
-                        {
-                            break;
-                        }
-
-                        Rect r = new Rect(listRect.x, listRect.y + row * LoadRowHeight * uiScale,
-                            listRect.width, LoadRowHeight * uiScale);
-
-                        style.normal.textColor = menuIndex == i ? selectColor : unselectColor;
-                        style.alignment = TextAnchor.UpperLeft;
-
-                        // A name of wide letters is written smaller rather than allowed off the
-                        // end of the list. The row keeps its height either way, and the arrows
-                        // below are drawn at the full size again.
-                        string label = saves[i].displayName ?? saves[i].slotName ?? "";
-                        // One em of the row less, which is where the scroll arrow sits when there
-                        // is one: a long name stops short of it instead of running underneath. Past
-                        // the smallest size it is cut short.
-                        float labelWidth = r.width - rowFontSize;
-                        style.fontSize = SaveUIHelper.FitFontSize(style, label, labelWidth,
-                            rowFontSize, Mathf.Max(10, Mathf.RoundToInt(rowFontSize * LoadRowMinFontShare)));
-                        label = Utils.Ellipsize(label, style, labelWidth);
-                        GUI.Label(r, label, style);
-                        style.fontSize = rowFontSize;
-
-                        // There is more list above or below: say so on the first and last row drawn.
-                        bool moreAbove = row == 0 && loadScroll > 0;
-                        bool moreBelow = row == LoadMenuVisibleRows - 1 && i < saves.Length - 1;
-                        if (moreAbove || moreBelow)
-                        {
-                            style.alignment = TextAnchor.UpperRight;
-                            // The colour a selected row is written in, not the dim one: an arrow
-                            // is the only thing saying the list runs on, and dim it was easy to
-                            // miss. One pixel further right than the text, so it sits clear of a
-                            // name that has been shrunk to fit. The same two arrows, in the same
-                            // colour and the same place, as the in game save panel.
-                            style.normal.textColor = selectColor;
-                            // Smaller than the rows. The glyph is the same one it always was, but
-                            // in the bright colour it reads as heavier than it measures, and at
-                            // the row's own size it took over the list. Seven tenths puts its
-                            // weight back where it was while keeping it easy to see.
-                            style.fontSize = Mathf.Max(8, (rowFontSize * 7) / 10);
-                            GUI.Label(r, moreAbove ? "\u25b2" : "\u25bc", style);
-                            style.fontSize = rowFontSize;
-                            style.alignment = TextAnchor.UpperLeft;
-                        }
-                    }
-
-                    SaveUIHelper.EnsureScreenshotLoaded(saveScreenshots, saves, menuIndex);
-
-                    // The preview of the selected save, beside the list and starting on the same
-                    // line. Its insides - the screenshot and the two lines of text - are laid out
-                    // in reference pixels, so the whole panel is drawn through a scaled matrix
-                    // rather than stretched into a rect: everything inside keeps its place.
-                    if (savePanelBackground != null)
-                    {
-                        GuiInput.RegisterBlockingRect(panelRect);
-
-                        Matrix4x4 previousMatrix = GUI.matrix;
-                        GUI.matrix = Matrix4x4.TRS(
-                            new Vector3(panelRect.x, panelRect.y, 0.0f),
-                            Quaternion.identity,
-                            new Vector3(uiScale, uiScale, 1.0f));
-
-                        SaveUIHelper.DrawSaveSlotDetailPanel(
-                            0.0f,
-                            0.0f,
-                            savePanelBackground,
-                            savePanelText,
-                            selectColor,
-                            saves,
-                            saveScreenshots,
-                            menuIndex);
-
-                        GUI.matrix = previousMatrix;
-
-                        GuiInput.TryConsumeClickInPanel(panelRect);
-                    }
                 }
 
                 GuiInput.TryConsumeClickInPanel(frontEndRect);

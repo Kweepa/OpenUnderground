@@ -81,8 +81,10 @@ public class Debris : UUObject
     {
         bool foundItems = false;
 
-        // Only handle Use action (when player interacts with debris)
-        if (sender == null && action == EAction.Use)
+        // Only handle Use action (when player interacts with debris). Turned off in the options there
+        // is no loot and nothing to search for, so a pile is scenery like any other fixed object and a
+        // use goes to the base, as on a stalactite; what the pile was given stays in it and in the save.
+        if (sender == null && action == EAction.Use && PlayerInput.LootInDebris)
         {
             // Check if already looted
             if (looted)

@@ -21,7 +21,7 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |Left stick click (L3)|Sprint (forward only; uses stamina)|
 |A|Jump|
 
-*Auto jump* (in Options): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, push the stick only partway or to one side.
+*Automatic jumping* (in the game menu, under CONTROLS): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, push the stick only partway or to one side.
 
 ### Interaction \& combat
 
@@ -154,9 +154,9 @@ time.
 |Ctrl (hold)|Walk slowly and quietly|
 |Space|Jump|
 
-Look speed and invert options are in Options.
+Look speed and invert options are in the game menu, under CONTROLS.
 
-*Auto jump* (in Options): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, hold A or D as well.
+*Automatic jumping* (in the game menu, under CONTROLS): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, hold A or D as well.
 
 ### Interaction \& combat
 
