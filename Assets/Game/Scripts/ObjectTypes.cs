@@ -385,7 +385,7 @@ public enum EObjectType
     TeleportTrap,
     ArrowTrap,
     DoTrap,
-    PitTrap, // this is something other than pit - see the three buttons next to the door on level 3
+    PitTrap, // does nothing in the original but pass the chain on (UW.EXE 0x84803); the one in the game, by the three buttons of level 3, links nothing
     ChangeTerrainTrap,
     SpellTrap,
     CreateObjectTrap,

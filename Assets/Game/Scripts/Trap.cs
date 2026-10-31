@@ -188,27 +188,10 @@ public class Trap : UUObject
             }
             break;
         case EObjectType.PitTrap:
-            {
-                // there is one pit trap in the game, in the sw corner of level 3, by the stairs up.
-                // triggered by throwing the right hand button of the three button combination nearby.
-                // it is supposed to spawn a skeleton.
-                // test with left middle right, repeatedly.
-                UUObject templateObject = LevelLoader.GetObj(255); // 255 is the skeleton to spawn
-                if (templateObject != null)
-                {
-                    UUObject newObject = Instantiate(templateObject);
-                    newObject.name = templateObject.name;
-                    newObject.originalLevel = 0; // a copy: the template's slot stays the template's
-                    newObject.gameObject.SetActive(true);
-
-                    Tile t = LevelLoader.GetTile(2, 7); // this is a spot behind the player (unless they use telekinesis)
-                    newObject.x = 3;
-                    newObject.y = 3;
-                    newObject.WorldInitialize(t, t.x, t.y);
-                    newObject.PostLoadInitialize();
-                    CountCreatureCopy(newObject);
-                }
-            }
+            // Nothing: in the original a pit trap is an entry of the trap table that points at the
+            // chain's tail (UW.EXE 0x83d96, 0x84803), and the one in the game, #583 on level 3 by
+            // the three buttons, links nothing. The skeleton that used to be made here comes from
+            // the check variable trap's other branch, below, as in the original.
             break;
         case EObjectType.WardTrap:
         case EObjectType.TellTrap:
@@ -368,9 +351,18 @@ public class Trap : UUObject
                     }
                 }
 
+                // On a match the link fires, through the chain below. On a mismatch the original fires
+                // the NEXT object of the link instead, with no event, and skips the chain (UW.EXE
+                // 0x84042-0x840b4): the level 3 buttons' wrong presses make a skeleton that way.
                 if (cmp != value)
                 {
                     doChain = false;
+                    UUObject linked = link != 0 ? LevelLoader.GetObj(link) : null;
+                    UUObject miss = linked != null && linked.chainIndex != 0 ? LevelLoader.GetObj(linked.chainIndex) : null;
+                    if (miss != null)
+                    {
+                        miss.TryInteract(originator, this, EAction.Trigger);
+                    }
                 }
             }
             break;

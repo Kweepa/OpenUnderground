@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The three buttons by the stairs on level 3 work as in the original: the right order opens the door beside them, and a wrong press brings a skeleton at the far end of the room, as many times as it is made.
+
 - The map fills in with what your light shows as you go, as in the original: in the dark only the spot you stand on, with a torch a narrow trail, a wider one with Night Vision or Daylight, and nothing at all in the Void. Each new tile on the map pays experience that grows with the depth: the first level explored whole pays about a sixth of what it did, from the fourth down one and a half to almost three times as much, a little more than before over the whole dungeon, and the Void nothing.
 
 - A secret door not yet found no longer shows on the map as a gap in the wall.
