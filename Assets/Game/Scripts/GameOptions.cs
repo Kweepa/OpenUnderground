@@ -24,7 +24,10 @@ public enum EOptionKind
     Toggle,
     /// <summary>A number between two ends, in steps, its value written beside it.</summary>
     Slider,
-    /// <summary>One of a list of names, stepped through with left and right: the soundfont.</summary>
+    /// <summary>
+    /// One of a list of names, stepped through with left and right: the soundfont, found on disk and kept by its
+    /// name, or the names a row lists itself (<see cref="GameOption.Choices"/>), kept by their place in the list.
+    /// </summary>
     Choice,
     /// <summary>A page of its own, opened with A, Enter or a click: the music tracks. Holds no value.</summary>
     Page,
@@ -49,11 +52,13 @@ public sealed class GameOption
     public readonly bool StoredAsFloat;
     /// <summary>The value the original's rules give it, or NaN when the row has none.</summary>
     public readonly float OriginalValue;
+    /// <summary>The names of a Choice row, kept as their place in this list; null for the soundfont.</summary>
+    public readonly string[] Choices;
     private readonly Func<float, string> format;
 
     public GameOption(EOptionSection section, string key, string label, string description, EOptionKind kind,
         float defaultValue, float min = 0f, float max = 1f, float step = 1f, bool storedAsFloat = false,
-        Func<float, string> format = null, string original = null, float originalValue = float.NaN)
+        Func<float, string> format = null, string original = null, float originalValue = float.NaN, string[] choices = null)
     {
         Section = section;
         Key = key;
@@ -67,6 +72,7 @@ public sealed class GameOption
         Step = step;
         StoredAsFloat = storedAsFloat;
         OriginalValue = originalValue;
+        Choices = choices;
         this.format = format;
     }
 
@@ -181,6 +187,9 @@ public static class GameOptions
         new(EOptionSection.Input, "Options_InvertLook", "Inverted look up/down",
             "Reverses up and down when looking with the mouse or the gamepad.",
             EOptionKind.Toggle, 0f),
+        new(EOptionSection.Input, PadGlyphs.PrefsKey, "Button prompts",
+            "How the pad's buttons are shown: A, B, X, Y, LB, RB, LT, RT, Start and Select, or the PlayStation's cross, circle, square, triangle, L1, R1, L2, R2, Options and Share.\n<b>Automatic:</b> the PlayStation's while a PlayStation pad is connected.",
+            EOptionKind.Choice, 0f, choices: PadGlyphs.StyleNames),
         new(EOptionSection.Input, "Options_AutoJump", "Automatic jumping",
             "<b>Enabled:</b> you jump by yourself at the edge when running straight at a gap or a deep drop. To step off a ledge instead, hold A or D as well, or push the stick only partway.",
             EOptionKind.Toggle, 0f),
@@ -250,6 +259,8 @@ public static class GameOptions
         {
             case EOptionKind.Page:
                 return 0f;
+            case EOptionKind.Choice when o.Choices != null:
+                return Mathf.Clamp(PlayerPrefs.GetInt(o.Key, Mathf.RoundToInt(o.Default)), 0, o.Choices.Length - 1);
             case EOptionKind.Choice:
                 return Mathf.Max(0, SoundFontIndex(CurrentSoundFont));
             default:
@@ -264,7 +275,11 @@ public static class GameOptions
         {
             return "";
         }
-        return o.Kind == EOptionKind.Choice ? Path.GetFileNameWithoutExtension(CurrentSoundFont) : o.Format(Get(o));
+        if (o.Kind == EOptionKind.Choice && o.Choices != null)
+        {
+            return o.Choices[Mathf.RoundToInt(Get(o))];
+        }
+        return IsSoundFont(o) ? Path.GetFileNameWithoutExtension(CurrentSoundFont) : o.Format(Get(o));
     }
 
     public static string DefaultText(GameOption o)
@@ -273,7 +288,11 @@ public static class GameOptions
         {
             return "";
         }
-        return o.Kind == EOptionKind.Choice ? Path.GetFileNameWithoutExtension(DefaultSoundFont) : o.Format(o.Default);
+        if (o.Kind == EOptionKind.Choice && o.Choices != null)
+        {
+            return o.Choices[Mathf.RoundToInt(o.Default)];
+        }
+        return IsSoundFont(o) ? Path.GetFileNameWithoutExtension(DefaultSoundFont) : o.Format(o.Default);
     }
 
     public static bool IsDefault(GameOption o)
@@ -282,7 +301,7 @@ public static class GameOptions
         {
             return true;
         }
-        return o.Kind == EOptionKind.Choice
+        return IsSoundFont(o)
             ? SoundFontIndex(CurrentSoundFont) == SoundFontIndex(DefaultSoundFont)
             : Mathf.Abs(Get(o) - o.Default) < 0.001f;
     }
@@ -296,6 +315,10 @@ public static class GameOptions
                 return;
             case EOptionKind.Toggle:
                 PlayerPrefs.SetInt(o.Key, value != 0f ? 1 : 0);
+                break;
+            case EOptionKind.Choice when o.Choices != null:
+                // round the list, as the soundfonts go
+                PlayerPrefs.SetInt(o.Key, ((Mathf.RoundToInt(value) % o.Choices.Length) + o.Choices.Length) % o.Choices.Length);
                 break;
             case EOptionKind.Choice:
                 if (soundFonts.Length > 0)
@@ -337,6 +360,9 @@ public static class GameOptions
                 break;
         }
     }
+
+    /// <summary>The soundfont's row: a Choice whose names are the files found on disk, kept by name.</summary>
+    private static bool IsSoundFont(GameOption o) => o.Kind == EOptionKind.Choice && o.Choices == null;
 
     private static void SetSoundFont(string name)
     {
@@ -428,7 +454,7 @@ public static class GameOptions
         {
             return;
         }
-        if (o.Kind == EOptionKind.Choice)
+        if (IsSoundFont(o))
         {
             SetSoundFont(DefaultSoundFont);
         }
@@ -486,7 +512,7 @@ public static class GameOptions
         {
             foreach (GameOption o in All)
             {
-                if (o.Kind != EOptionKind.Choice && o.Kind != EOptionKind.Page)
+                if (!IsSoundFont(o) && o.Kind != EOptionKind.Page)
                 {
                     numbers[o] = Get(o);
                 }
@@ -537,7 +563,7 @@ public static class GameOptions
             {
                 continue;
             }
-            if (o.Kind == EOptionKind.Choice)
+            if (IsSoundFont(o))
             {
                 PlayerPrefs.SetString(o.Key, CurrentSoundFont);
             }

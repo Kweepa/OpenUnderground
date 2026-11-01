@@ -264,12 +264,12 @@ public class FluteGUI : MonoBehaviour
 
             if (aButtonTex != null)
             {
-                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 30, 24, 24), aButtonTex);
+                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 30, 24, 24), PadGlyphs.Face(aButtonTex));
             }
             GUI.Label(UiScale.R(r.x + 160, r.y + 30, 100, 20), "Play", UiScale.Style(tuneStyle));
             if (bButtonTex != null)
             {
-                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 60, 24, 24), bButtonTex);
+                UiScale.DrawTexture(UiScale.R(r.x + 130, r.y + 60, 24, 24), PadGlyphs.Face(bButtonTex));
             }
             GUI.Label(UiScale.R(r.x + 160, r.y + 60, 100, 20), "Stop", UiScale.Style(tuneStyle));
         }

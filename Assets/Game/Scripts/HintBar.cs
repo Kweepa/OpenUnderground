@@ -64,8 +64,10 @@ public static class HintBar
         GUIStyle label = new GUIStyle(text) { fontSize = Mathf.RoundToInt(text.fontSize * scale), alignment = TextAnchor.MiddleLeft, wordWrap = false };
         GUIStyle name = new GUIStyle(keyText) { fontSize = Mathf.RoundToInt(keyText.fontSize * scale), alignment = TextAnchor.MiddleCenter };
 
+        // a pad's buttons as the pad in use names and draws them (PadGlyphs): L1 for LB, the cross for A
+        string Shown(HintKey key) => key.Pad ? PadGlyphs.Name(key.Name) : key.Name;
         float KeyWidth(HintKey key) => key.Picture != null ? iconSize
-            : Mathf.Max(iconSize, name.CalcSize(new GUIContent(key.Name)).x + (key.Name.Length == 1 ? 0f : 0.7f * iconSize));
+            : Mathf.Max(iconSize, name.CalcSize(new GUIContent(Shown(key))).x + (Shown(key).Length == 1 ? 0f : 0.7f * iconSize));
 
         float total = -hintGap;
         foreach (Hint hint in hints)
@@ -86,11 +88,11 @@ public static class HintBar
                 Rect place = new Rect(x, iconY, KeyWidth(key), iconSize);
                 if (key.Picture != null)
                 {
-                    GUI.DrawTexture(place, key.Picture);
+                    GUI.DrawTexture(place, PadGlyphs.Face(key.Picture));
                 }
                 else if (key.Pad)
                 {
-                    GUI.Box(place, key.Name, PadKeyStyle(name));
+                    GUI.Box(place, Shown(key), PadKeyStyle(name));
                 }
                 else
                 {

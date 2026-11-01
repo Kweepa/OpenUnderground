@@ -433,13 +433,13 @@ public class RepairDialog : MonoBehaviour
 
             if (bButton != null)
             {
-                UiScale.DrawTexture(UiScale.R(bRect), bButton);
+                UiScale.DrawTexture(UiScale.R(bRect), PadGlyphs.Face(bButton));
             }
             GUI.Label(UiScale.R(bLabelRect), cancelLabel, UiScale.Style(repairDialogStyle));
 
             if (aButton != null)
             {
-                UiScale.DrawTexture(UiScale.R(aRect), aButton);
+                UiScale.DrawTexture(UiScale.R(aRect), PadGlyphs.Face(aButton));
             }
             GUI.Label(UiScale.R(aLabelRect), confirmLabel, UiScale.Style(repairDialogStyle));
 

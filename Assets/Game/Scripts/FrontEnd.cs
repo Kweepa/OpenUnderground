@@ -1081,7 +1081,7 @@ public class FrontEnd : MonoBehaviour
                 bool useGamepadIcons = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
 
                 Rect toggleIconRect = UiScale.R(UiScale.Width / 2 - 100, UiScale.Height - 50, 24, 24);
-                Texture2D toggleIcon = useGamepadIcons ? yButton : blankKeyTexture;
+                Texture2D toggleIcon = useGamepadIcons ? PadGlyphs.Face(yButton) : blankKeyTexture;
                 GUI.DrawTexture(toggleIconRect, toggleIcon);
                 if (!useGamepadIcons)
                     GUI.Label(toggleIconRect, "T", UiScale.Style(keyLetterStyle));
@@ -1090,7 +1090,7 @@ public class FrontEnd : MonoBehaviour
                 GUI.Label(toggleTextRect, label, UiScale.Style(buttonLabelStyle));
 
                 Rect backIconRect = UiScale.R(UiScale.Width - 140, UiScale.Height - 50, 24, 24);
-                Texture2D backIcon = useGamepadIcons ? bButton : escapeKeyTexture;
+                Texture2D backIcon = useGamepadIcons ? PadGlyphs.Face(bButton) : escapeKeyTexture;
                 GUI.DrawTexture(backIconRect, backIcon);
                 Rect backTextRect = UiScale.R(UiScale.Width - 100, UiScale.Height - 50, 100, 24);
                 GUI.Label(backTextRect, "Back", UiScale.Style(buttonLabelStyle));
