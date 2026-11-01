@@ -221,7 +221,10 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
         StatsPanel.sStatsPanel?.Hide();
     }
 
-    public bool TryOpenFromGame()
+    public bool TryOpenFromGame() => TryOpenFromGame(GameMenu.ETab.Save, null);
+
+    /// <summary>Opens the menu from play on a tab, and on one of its sections if given: F1 opens CONTROLS on a map.</summary>
+    public bool TryOpenFromGame(GameMenu.ETab tab, EOptionSection? section)
     {
         if (!CanOpenSaveLoadFromGameplay())
         {
@@ -238,7 +241,14 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
         ResetQuitToMainMenuState();
         PlayerObject.DisableControls(EControlMask.SaveLoad, true);
         Time.timeScale = 0.0f;
-        Menu.Open(GameMenu.ETab.Save);
+        if (section.HasValue)
+        {
+            Menu.Open(tab, section.Value);
+        }
+        else
+        {
+            Menu.Open(tab);
+        }
         return true;
     }
 
@@ -283,6 +293,10 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
             if (Gamepad.current?.startButton.wasPressedThisFrame ?? false)
             {
                 TryOpenFromGame();
+            }
+            else if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Controls))
+            {
+                TryOpenFromGame(GameMenu.ETab.Controls, ControlsMap.ForLastDevice());
             }
             else
             {

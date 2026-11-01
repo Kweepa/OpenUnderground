@@ -111,6 +111,17 @@ public class Magic : MonoBehaviour
 
     public float roamingSightMouseSensitivity = 2.0f;
 
+    /// <summary>Roaming Sight's top turn on the pad, degrees a second: 45, and 40% more (the user's, 11 November 2026).</summary>
+    private const float RoamingSightTurnRate = 45.0f * 1.4f;
+
+    // A stick's value comes through the Input System's dead zone, 0.125 to 0.925 of the travel. The curve gives half the
+    // top speed at 30% of the travel and the whole at its end; the keys' 0 and 1 are left as they are. It replaced
+    // Utils.DeadZone(), a second dead zone on top of the first, under which 30% of the travel gave 2% of the speed.
+    private static readonly float RoamingSightExponent = Mathf.Log(0.5f) / Mathf.Log((0.3f - 0.125f) / (0.925f - 0.125f));
+
+    /// <summary>A stick's or a key's value to Roaming Sight's share of its top speed (the user's, 11 November 2026).</summary>
+    private static float RoamingSightCurve(float value) => Mathf.Sign(value) * Mathf.Pow(Mathf.Abs(value), RoamingSightExponent);
+
     public static Magic sMagic;
 
     private float lerpIn;
@@ -3542,14 +3553,17 @@ public class Magic : MonoBehaviour
         Vector2 moveControl = kbMove.sqrMagnitude > 0.0001f ? kbMove : gpMove;
 
         // left/right at 75%, backward at 50% of forward speed
-        Vector3 desiredMove = 6.0f * Utils.DeadZone(moveControl.x) * c.transform.right
-            + 9.0f * (moveControl.y > 0.0f ? 1.0f : 0.5f) * Utils.DeadZone(moveControl.y) * c.transform.forward;
+        Vector3 desiredMove = 6.0f * RoamingSightCurve(moveControl.x) * c.transform.right
+            + 9.0f * (moveControl.y > 0.0f ? 1.0f : 0.5f) * RoamingSightCurve(moveControl.y) * c.transform.forward;
         vel.x = Utils.DampedApproach(vel.x, desiredMove.x, 1.0f);
         pos.x += vel.x * Time.deltaTime;
         vel.z = Utils.DampedApproach(vel.z, desiredMove.z, 1.0f);
         pos.z += vel.z * Time.deltaTime;
 
-        float targetYawVel = 45.0f * GameActions.PadWorld.Look.ReadValue<Vector2>().x;
+        // Pad look speed, as the walking view has it (fix 470); the stick on the same curve as the move, and 40% faster
+        // than the 45 degrees a second it had (the user's, 11 November 2026)
+        float targetYawVel = RoamingSightTurnRate * PlayerInput.PadLookSpeed
+            * RoamingSightCurve(GameActions.PadWorld.Look.ReadValue<Vector2>().x);
         if (PlayerInput.ShouldApplyMouseLook() && GameInput.CurrentMouse != null)
         {
             float sens = PlayerInput.MouseLookSpeed * roamingSightMouseSensitivity;

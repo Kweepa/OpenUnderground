@@ -171,6 +171,8 @@ public static class GameActions
         public readonly InputAction Sleep;
         public readonly InputAction MessagesBack;
         public readonly InputAction MessagesForward;
+        /// <summary>Opens the game menu on the control maps, the keyboard's or the pad's, whichever was used last.</summary>
+        public readonly InputAction Controls;
 
         internal KeysWorldActions(InputActionMap map)
         {
@@ -192,6 +194,7 @@ public static class GameActions
             Sleep = Button(map, "Sleep", "<Keyboard>/f10");
             MessagesBack = Button(map, "MessagesBack", "<Keyboard>/pageUp");
             MessagesForward = Button(map, "MessagesForward", "<Keyboard>/pageDown");
+            Controls = Button(map, "Controls", "<Keyboard>/f1");
         }
     }
 

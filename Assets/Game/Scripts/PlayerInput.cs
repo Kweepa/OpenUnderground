@@ -13,6 +13,18 @@ public static class PlayerInput
         Mathf.Clamp(PlayerPrefs.GetFloat("Options_MouseLookSpeed", DefaultMouseLookSpeed),
                     MinMouseLookSpeed, MaxMouseLookSpeed);
 
+    public const string PadLookSpeedKey = "Options_PadLookSpeed";
+    public const float DefaultPadLookSpeed = 1f;
+    public const float MinPadLookSpeed = 0.5f;
+    public const float MaxPadLookSpeed = 2f;
+
+    /// <summary>
+    /// How quickly the right stick turns the view, as a share of the 180 degrees a second across and 90 up and down
+    /// it has always turned at: one number, so the two keep their ratio.
+    /// </summary>
+    public static float PadLookSpeed =>
+        Mathf.Clamp(PlayerPrefs.GetFloat(PadLookSpeedKey, DefaultPadLookSpeed), MinPadLookSpeed, MaxPadLookSpeed);
+
     public const float DefaultEffectsVolume = 1f;
 
     public static float EffectsVolume =>

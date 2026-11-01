@@ -6,6 +6,8 @@ Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select
 
 If you use the **Left-handed** option, Attack and Stats swap triggers on the gamepad (see notes under each section).
 
+In the game, the CONTROLS tab of the game menu draws the same keys and buttons on a keyboard and on a pad.
+
 **[Gamepad](#gamepad)** · **[Keyboard & Mouse](#keyboard--mouse)**
 
 ---
@@ -44,6 +46,7 @@ If you use the **Left-handed** option, Attack and Stats swap triggers on the gam
 |Left trigger|Show / hide character stats, on the trigger's side|
 |Select (Back)|Open / close map (requires a map in your inventory)|
 |Start|Open Save / Load / Options (closes open panels first)|
+|Start, held|Open the game menu on the gamepad's control map|
 |Attack trigger (press)|Also closes open panels|
 |D-pad up / down|Scroll back through recent messages (hold to repeat)|
 
@@ -177,6 +180,7 @@ Look speed and invert options are in the game menu, under CONTROLS.
 |R|Show / hide character stats, on the right|
 |Tab|Open / close map (requires a map in your inventory)|
 |Esc|Close open panels; if none are open, open Save / Load / Options|
+|F1|Open the game menu on the control maps (the gamepad's, if you used the pad last)|
 |Page Up / Page Down|Scroll back through recent messages (hold to repeat)|
 
 ### Saving
