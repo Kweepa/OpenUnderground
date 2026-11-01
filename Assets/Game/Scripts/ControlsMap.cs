@@ -526,18 +526,23 @@ public sealed class ControlsMap
         padGlyph = PadSizes[0, 2];
         float top = area.y + 12f + ChipHeight + 12f;
         float bottom = area.yMax - 12f;
-        float picW = Mathf.Min(area.width * 0.36f, (bottom - top - 2 * padLine) * PadOutline.GridWidth / PadOutline.GridHeight);
+        float picW = Mathf.Min(area.width * 0.36f, (bottom - top - FootnoteMaxLines * padLine) * PadOutline.GridWidth / PadOutline.GridHeight);
         float picH = picW * PadOutline.GridHeight / PadOutline.GridWidth;
         // the footnotes' space is kept on every page, as tall as the longest, so the pad does not move between pages
         string footnote = Footnote(context);
-        List<string> foot = footnote != null ? Wrap(footnote, padFont, picW) : new List<string>();
+        float footW = picW + 2 * FootnoteOverhang;
+        List<string> foot = footnote != null ? Wrap(footnote, padFont, footW) : new List<string>();
+        if (foot.Count > FootnoteMaxLines)
+        {
+            foot.RemoveRange(FootnoteMaxLines, foot.Count - FootnoteMaxLines);
+        }
         int footLines = 0;
         foreach (EPadContext page in Enum.GetValues(typeof(EPadContext)))
         {
             string f = Footnote(page);
             if (f != null)
             {
-                footLines = Mathf.Max(footLines, Wrap(f, padFont, picW).Count);
+                footLines = Mathf.Max(footLines, Mathf.Min(FootnoteMaxLines, Wrap(f, padFont, footW).Count));
             }
         }
         float footH = footLines * padLine;
@@ -640,7 +645,7 @@ public sealed class ControlsMap
         float fy = drawn.yMax + 8f;
         foreach (string l in foot)
         {
-            menu.DrawText(new Rect(drawn.x, fy, drawn.width, padLine), l, padFont, TextAnchor.MiddleCenter, GameMenu.UnselectColor);
+            menu.DrawText(new Rect(drawn.x - FootnoteOverhang, fy, drawn.width + 2 * FootnoteOverhang, padLine), l, padFont, TextAnchor.MiddleCenter, GameMenu.UnselectColor);
             fy += padLine;
         }
         return took;
@@ -757,11 +762,20 @@ public sealed class ControlsMap
         }
     }
 
+    // The footnote under the pad: at most this many lines, the space for them kept under the pad on every page, and
+    // wider than the pad by this much each side, short of the label columns (the user's, 1 November 2026: the
+    // WALKING one says what the ledge rumble is, and grew).
+    private const int FootnoteMaxLines = 3;
+    private const float FootnoteOverhang = 40f;
+
     private static string Footnote(EPadContext context)
     {
         switch (context)
         {
-            case EPadContext.Walking: return "Attack and Stats change triggers with your character's weapon hand.";
+            case EPadContext.Walking:
+                // the ledge rumble is said here because nothing else says it, and a player took it for a fault
+                return "Attack and Stats change triggers with your character's weapon hand. "
+                    + "A rumble as you run means a ledge ahead. It can be turned off under INPUT.";
             case EPadContext.Inventory: return "With the inventory open, the left stick still walks.";
             case EPadContext.Menus: return "The menus' buttons are always the same.";
             default: return null;

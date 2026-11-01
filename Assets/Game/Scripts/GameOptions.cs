@@ -193,6 +193,9 @@ public static class GameOptions
         new(EOptionSection.Input, "Options_AutoJump", "Automatic jumping",
             "<b>Enabled:</b> you jump by yourself at the edge when running straight at a gap or a deep drop. To step off a ledge instead, hold A or D as well, or push the stick only partway.",
             EOptionKind.Toggle, 0f),
+        new(EOptionSection.Input, "Options_LedgeRumble", "Ledge rumble",
+            "<b>Enabled:</b> the pad gives a short rumble when you run at a ledge, a moment before the edge: jump, or stop. The pad's other rumbles, for blows, doors and shrines, stay on either way.",
+            EOptionKind.Toggle, 1f),
     };
 
     private static string[] soundFonts = Array.Empty<string>();

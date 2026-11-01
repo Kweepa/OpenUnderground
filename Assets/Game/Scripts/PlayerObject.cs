@@ -765,7 +765,7 @@ public class PlayerObject : MonoBehaviour
                 }
                 else
                 {
-                    if (lastGoodFloorCheckTime > Time.time - 0.1f && lastFloorCheckHit)
+                    if (lastGoodFloorCheckTime > Time.time - 0.1f && lastFloorCheckHit && PlayerInput.LedgeRumble)
                     {
                         // rumble
                         Rumble(0.0f, 1.0f, 0.1f);

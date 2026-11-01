@@ -25,6 +25,8 @@ In the game, the CONTROLS tab of the game menu draws the same keys and buttons o
 
 *Automatic jumping* (in the game menu, under CONTROLS): running straight ahead at a gap or a deep drop jumps by itself at the edge. To step off instead, push the stick only partway or to one side.
 
+*Ledge rumble* (in the game menu, under CONTROLS): the pad rumbles briefly when you run at a ledge, a moment before the edge, so you can jump or stop. The row turns off only that rumble.
+
 ### Interaction \& combat
 
 |Control|Action|
