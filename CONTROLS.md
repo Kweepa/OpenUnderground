@@ -2,7 +2,7 @@
 
 The formatted version is online: https://github.com/Kweepa/OpenUnderground/blob/main/CONTROLS.md
 
-Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select).
+Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select). In the game, *Button prompts* (in the game menu, under CONTROLS) shows a PlayStation pad's symbols and names instead, and does so by itself when one is connected.
 
 If you use the **Left-handed** option, Attack and Stats swap triggers on the gamepad (see notes under each section).
 

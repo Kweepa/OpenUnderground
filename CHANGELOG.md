@@ -2,6 +2,8 @@
 
 ## Next release
 
+- With a PlayStation pad the game shows its buttons - the cross, circle, square and triangle, L1, R1, L2, R2, Options and Share - in every prompt and on the controls map, which also draws that pad with its d-pad above the left stick. A Button prompts row can also set Xbox or PlayStation by hand.
+
 - The game menu's Controls tab now draws the keyboard and the gamepad with what every key and button does, the pad a page for each part of the game - walking, the inventory, the magic panel, the map and the menus - and the right stick's look speed can be set. F1, or holding Start on the pad, opens the menu straight on them.
 
 - Three more of the remake's additions can be turned off in the game menu's GAMEPLAY section, for the original's way: the automatic Search, Traps and Track reports, sprinting with its stamina gauge, and the items hidden in piles of debris, which are then only scenery. The music now pauses five to ten seconds between exploring tracks, and the pause can be set from zero up to five minutes. If you had already saved your options in an earlier build, your setting stays as it was, with no pause: change it in the game menu's AUDIO section. Saves, autosaves included, can be deleted from the game menu's Save and Load tabs, and Journey Onward on the title screen opens the same list of saves.

@@ -189,7 +189,7 @@ public class Gravestone : UUObject
         float aw = UiScale.S(48);
         float ah = UiScale.S(48);
         float yBorder = 0.05f * Screen.height;
-        GUI.DrawTexture(new Rect(Screen.width / 2 - aw / 2, Screen.height - yBorder - ah, aw, ah), aButton);
+        GUI.DrawTexture(new Rect(Screen.width / 2 - aw / 2, Screen.height - yBorder - ah, aw, ah), PadGlyphs.Face(aButton));
     }
 
     public override void TryInteract(UUObject originator, UUObject sender, EAction action)

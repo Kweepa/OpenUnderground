@@ -590,7 +590,7 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
         if (xButton != null)
         {
             float size = icon.width * iconShare;
-            GUI.DrawTexture(UiScale.R(icon.center.x - size / 2f, icon.center.y - size / 2f, size, size), xButton);
+            GUI.DrawTexture(UiScale.R(icon.center.x - size / 2f, icon.center.y - size / 2f, size, size), PadGlyphs.Face(xButton));
         }
     }
 

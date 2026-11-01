@@ -35,6 +35,13 @@ public sealed class ControlsMap
     private float padLine = LineHeight;
     private float padGlyph = GlyphSize;
     private const float ChipHeight = 46f;
+    // Select's and Start's leader lines rise at this angle from the horizontal before they run across (the user's 45
+    // degrees of 1 November 2026, made 40 the same day)
+    private const float UnderShoulderDegrees = 40f;
+    // the pad drawn this much lower than the middle of its space, on every page and both pads, so the leader lines reach
+    // it at a slant and none runs level across another's end; the labels stay where the pad's middle place puts them
+    // (the user's, 1 November 2026)
+    private const float PadDrop = 5f;
     private const float ScrollArrowsWidth = 40f;
     private const int NoteLines = 2;
     private const float NoteLineHeight = 28f;
@@ -536,9 +543,12 @@ public sealed class ControlsMap
         float footH = footLines * padLine;
         Rect pic = new Rect(area.center.x - picW / 2, top + (bottom - top - picH - footH) / 2, picW, picH);
 
+        // pic places the labels; drawn is where the pad, the lines' ends and the footnote are drawn
+        Rect drawn = new Rect(pic.x, pic.y + PadDrop, pic.width, pic.height);
+
         Color previous = GUI.color;
         GUI.color = GameMenu.UnselectColor;
-        GUI.DrawTexture(UiScale.R(pic), PadOutline.TextureFor(UiScale.S(pic.width)));
+        GUI.DrawTexture(UiScale.R(drawn), PadOutline.TextureFor(UiScale.S(drawn.width), PadGlyphs.PlayStation));
         GUI.color = previous;
 
         List<Callout> callouts = Callouts(context);
@@ -596,14 +606,15 @@ public sealed class ControlsMap
             Color ink = on ? Color.white : GameMenu.SelectColor;
             Rect glyph = GlyphRect(c.Control, block, left);
             Vector2 attach = new Vector2(left ? block.xMax + 6f : block.x - 6f, glyph.center.y);
-            Vector2 anchor = new Vector2(pic.x + c.Anchor.x / PadOutline.GridWidth * pic.width, pic.y + c.Anchor.y / PadOutline.GridHeight * pic.height);
+            Vector2 anchor = new Vector2(drawn.x + c.Anchor.x / PadOutline.GridWidth * drawn.width, drawn.y + c.Anchor.y / PadOutline.GridHeight * drawn.height);
             Color lineColor = on ? Color.white : GameMenu.UnselectColor;
             float lineWidth = on ? 3f : 2f;
             if (UnderShoulder(c.Control))
             {
-                // up at 45 degrees, outward, to the label's height, then straight across to it (the user's, 1 November 2026)
+                // up at UnderShoulderDegrees, outward, to the label's height, then straight across to it
                 float rise = Mathf.Abs(attach.y - anchor.y);
-                float bendX = anchor.x + (left ? -rise : rise);
+                float run = rise / Mathf.Tan(UnderShoulderDegrees * Mathf.Deg2Rad);
+                float bendX = anchor.x + (left ? -run : run);
                 bendX = left ? Mathf.Max(bendX, attach.x) : Mathf.Min(bendX, attach.x);
                 Vector2 bend = new Vector2(bendX, attach.y);
                 Line(anchor, bend, lineWidth, lineColor);
@@ -626,10 +637,10 @@ public sealed class ControlsMap
             }
         }
 
-        float fy = pic.yMax + 8f;
+        float fy = drawn.yMax + 8f;
         foreach (string l in foot)
         {
-            menu.DrawText(new Rect(pic.x, fy, pic.width, padLine), l, padFont, TextAnchor.MiddleCenter, GameMenu.UnselectColor);
+            menu.DrawText(new Rect(drawn.x, fy, drawn.width, padLine), l, padFont, TextAnchor.MiddleCenter, GameMenu.UnselectColor);
             fy += padLine;
         }
         return took;
@@ -720,7 +731,7 @@ public sealed class ControlsMap
             : control == EPadControl.North ? menu.Skin.YButton : null;
         if (picture != null)
         {
-            GUI.DrawTexture(UiScale.R(r), picture);
+            GUI.DrawTexture(UiScale.R(r), PadGlyphs.Face(picture));
             return;
         }
         string name = ChipName(control);
@@ -728,19 +739,20 @@ public sealed class ControlsMap
         menu.DrawText(r, name, ChipFont, TextAnchor.MiddleCenter, on ? Color.white : GameMenu.SelectColor);
     }
 
+    /// <summary>A button's name on its key, as the pad in use prints it (PadGlyphs.Name()).</summary>
     private static string ChipName(EPadControl control)
     {
         switch (control)
         {
-            case EPadControl.LeftTrigger: return "LT";
-            case EPadControl.LeftShoulder: return "LB";
+            case EPadControl.LeftTrigger: return PadGlyphs.Name("LT");
+            case EPadControl.LeftShoulder: return PadGlyphs.Name("LB");
             case EPadControl.LeftStick: return "LS";
             case EPadControl.DPad: return "D-pad";
-            case EPadControl.Select: return "Select";
-            case EPadControl.Start: return "Start";
+            case EPadControl.Select: return PadGlyphs.Name("Select");
+            case EPadControl.Start: return PadGlyphs.Name("Start");
             case EPadControl.RightStick: return "RS";
-            case EPadControl.RightShoulder: return "RB";
-            case EPadControl.RightTrigger: return "RT";
+            case EPadControl.RightShoulder: return PadGlyphs.Name("RB");
+            case EPadControl.RightTrigger: return PadGlyphs.Name("RT");
             default: return null;
         }
     }

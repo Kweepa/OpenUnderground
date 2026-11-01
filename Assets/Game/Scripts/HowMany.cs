@@ -460,12 +460,12 @@ public class HowMany : MonoBehaviour
                 UiScale.DrawTexture(UiScale.R(hintRightRect), buttonOutline, ScaleMode.StretchToFill, true);
             }
 
-            Texture2D leftHintIcon = mouseUi && escapeKey != null ? escapeKey : bButton;
+            Texture2D leftHintIcon = mouseUi && escapeKey != null ? escapeKey : PadGlyphs.Face(bButton);
             UiScale.DrawTexture(UiScale.R(hintCancelRect.x + 5, hintCancelRect.y + 5, 16, 16), leftHintIcon);
             GUI.Label(UiScale.R(hintCancelRect.x + 21, hintCancelRect.y, 51, 29), "Cancel", UiScale.Style(howManyButtonStyle));
             if (!mouseUi)
             {
-                UiScale.DrawTexture(UiScale.R(hintCenterRect.x + 5, hintCenterRect.y + 5, 16, 16), aButton);
+                UiScale.DrawTexture(UiScale.R(hintCenterRect.x + 5, hintCenterRect.y + 5, 16, 16), PadGlyphs.Face(aButton));
                 GUI.Label(UiScale.R(hintCenterRect.x + 21, hintCenterRect.y, 51, 29), verb[(int)howManyReason], UiScale.Style(howManyButtonStyle));
             }
             else
@@ -474,7 +474,7 @@ public class HowMany : MonoBehaviour
                 GUI.Label(UiScale.R(hintCenterRect), verb[(int)howManyReason], UiScale.Style(howManyButtonStyle));
                 howManyButtonStyle.alignment = TextAnchor.MiddleLeft;
             }
-            Texture2D rightHintIcon = mouseUi && rightMouseButton != null ? rightMouseButton : yButton;
+            Texture2D rightHintIcon = mouseUi && rightMouseButton != null ? rightMouseButton : PadGlyphs.Face(yButton);
             UiScale.DrawTexture(UiScale.R(hintRightRect.x + 5, hintRightRect.y + 5, 16, 16), rightHintIcon);
             GUI.Label(UiScale.R(hintRightRect.x + 21, hintRightRect.y, 51, 29), "All", UiScale.Style(howManyButtonStyle));
 

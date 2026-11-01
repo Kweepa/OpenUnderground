@@ -587,7 +587,7 @@ public class KeyboardGUI : MonoBehaviour
             }
             else if (xButton != null)
             {
-                UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), xButton);
+                UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), PadGlyphs.Face(xButton));
                 GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", UiScale.Style(buttonLabelStyle));
             }
         }
@@ -597,7 +597,7 @@ public class KeyboardGUI : MonoBehaviour
         {
             float buttonSize = 24;
             float buttonX = keyboardPosition.x + (panelWidth - buttonSize) / 2.0f;
-            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), bButton);
+            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), PadGlyphs.Face(bButton));
             GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
             GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Clear", UiScale.Style(buttonLabelStyle));
         }
@@ -607,7 +607,7 @@ public class KeyboardGUI : MonoBehaviour
         {
             float buttonSize = 24;
             float buttonX = keyboardPosition.x + panelWidth - PANEL_PADDING - buttonSize - 50;
-            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), yButton);
+            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), PadGlyphs.Face(yButton));
             GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
             GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Enter", UiScale.Style(buttonLabelStyle));
         }
