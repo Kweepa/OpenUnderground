@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The pad's short rumble when you run at a ledge, a warning before the edge, is now explained on the pad's controls map, and a Ledge rumble row turns it off, leaving the other rumbles alone.
+
 - With a PlayStation pad the game shows its buttons - the cross, circle, square and triangle, L1, R1, L2, R2, Options and Share - in every prompt and on the controls map, which also draws that pad with its d-pad above the left stick. A Button prompts row can also set Xbox or PlayStation by hand.
 
 - The game menu's Controls tab now draws the keyboard and the gamepad with what every key and button does, the pad a page for each part of the game - walking, the inventory, the magic panel, the map and the menus - and the right stick's look speed can be set. F1, or holding Start on the pad, opens the menu straight on them.

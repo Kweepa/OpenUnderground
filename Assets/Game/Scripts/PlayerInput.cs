@@ -35,6 +35,12 @@ public static class PlayerInput
     public static bool AutoJump => PlayerPrefs.GetInt("Options_AutoJump", 0) == 1;
 
     /// <summary>
+    /// Whether the pad gives its short rumble when the player runs at a ledge (PlayerObject.UpdateJumpIndicator()).
+    /// On unless turned off; the pad's other rumbles - blows, doors, shrines - do not depend on it.
+    /// </summary>
+    public static bool LedgeRumble => PlayerPrefs.GetInt("Options_LedgeRumble", 1) == 1;
+
+    /// <summary>
     /// Whether opening the automap leaves the music playing instead of starting the map's own
     /// track. On unless the player turns it off, the same as the silence below.
     /// </summary>
