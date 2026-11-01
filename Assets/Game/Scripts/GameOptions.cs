@@ -11,6 +11,10 @@ public enum EOptionSection
     Audio,
     General,
     Input,
+    /// <summary>The keyboard's map: no rows, drawn by ControlsMap.</summary>
+    Keyboard,
+    /// <summary>The pad's map, one page per context: no rows, drawn by ControlsMap.</summary>
+    Gamepad,
 }
 
 /// <summary>What a row of the game menu holds, and so how it is drawn and changed.</summary>
@@ -170,6 +174,10 @@ public static class GameOptions
             "How quickly the view turns with the mouse. Does not affect the gamepad.",
             EOptionKind.Slider, PlayerInput.DefaultMouseLookSpeed, PlayerInput.MinMouseLookSpeed, PlayerInput.MaxMouseLookSpeed, 0.05f,
             storedAsFloat: true, format: v => v.ToString("0.00")),
+        new(EOptionSection.Input, PlayerInput.PadLookSpeedKey, "Pad look speed",
+            "How quickly the view turns with the right stick. At 100% half a turn a second across, a quarter up and down.",
+            EOptionKind.Slider, PlayerInput.DefaultPadLookSpeed, PlayerInput.MinPadLookSpeed, PlayerInput.MaxPadLookSpeed, 0.1f,
+            storedAsFloat: true, format: Percent),
         new(EOptionSection.Input, "Options_InvertLook", "Inverted look up/down",
             "Reverses up and down when looking with the mouse or the gamepad.",
             EOptionKind.Toggle, 0f),

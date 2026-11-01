@@ -83,7 +83,8 @@ public static class GameInput
         }
 
         Keyboard kb = CurrentKeyboard;
-        if (kb != null && kb.anyKey.wasPressedThisFrame)
+        // F1 opens the map of the device used before it, so it does not count as using the keyboard
+        if (kb != null && kb.anyKey.wasPressedThisFrame && !GameActions.KeysWorld.Controls.WasPressedThisFrame())
         {
             LastActiveDevice = GameInputDevice.MouseKeyboard;
         }

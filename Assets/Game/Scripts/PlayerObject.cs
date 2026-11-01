@@ -1793,8 +1793,10 @@ public class PlayerObject : MonoBehaviour
     private static void ReadLookGamepad(out float pitchDelta, out float yawDelta)
     {
         Vector2 stick = GameActions.PadWorld.Look.ReadValue<Vector2>();
-        pitchDelta = 90.0f * Time.deltaTime * Utils.DeadZone(stick.y);
-        yawDelta = Utils.DeadZone(stick.x) * 180.0f * Time.deltaTime;
+        // the player's Pad look speed, CONTROLS > INPUT, scales both
+        float speed = PlayerInput.PadLookSpeed;
+        pitchDelta = 90.0f * speed * Time.deltaTime * Utils.DeadZone(stick.y);
+        yawDelta = Utils.DeadZone(stick.x) * 180.0f * speed * Time.deltaTime;
     }
 
     private static void ReadLookMouseKeyboard(out float pitchDelta, out float yawDelta)

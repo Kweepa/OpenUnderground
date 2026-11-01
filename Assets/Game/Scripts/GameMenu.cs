@@ -201,6 +201,7 @@ public sealed class GameMenu
     private readonly IGameMenuHost host;
     private readonly ETab[] tabs;
     private readonly bool dimBehind;
+    private readonly ControlsMap controlsMap;
 
     private int tabIndex;
     private readonly Dictionary<ETab, int> sectionOf = new Dictionary<ETab, int>();
@@ -240,6 +241,7 @@ public sealed class GameMenu
         this.host = host;
         this.tabs = tabs;
         this.dimBehind = dimBehind;
+        controlsMap = new ControlsMap(this);
     }
 
     // A is read on its release, and a menu opened with A pressed - Setup and Journey Onward on the
@@ -247,6 +249,12 @@ public sealed class GameMenu
     // the first row of OPTIONS toggled, or the newest save loaded. Until A has been up once since the
     // menu opened, its release is not a choice.
     private bool padAcceptArmed = true;
+
+    // Start held on after it opened the menu takes it to the pad's map, the way to the controls for a player with
+    // only a pad (a Steam Deck), as F1 is on the keyboard; the user's choice of 1 November 2026. How long it has been
+    // held since the menu opened, or -1 when it was not down then or has been let go.
+    private const float StartHoldSeconds = 0.5f;
+    private float startHeld = -1f;
 
     public ETab Tab => tabs[tabIndex];
 
@@ -264,8 +272,64 @@ public sealed class GameMenu
         selectFired = false;
         lastMouse = GuiInput.MousePositionGuiSpace;
         padAcceptArmed = !(Gamepad.current?.aButton.isPressed ?? false);
+        startHeld = (Gamepad.current?.startButton.isPressed ?? false) ? 0f : -1f;
         int i = Array.IndexOf(tabs, tab);
         ShowTab(i >= 0 ? i : 0);
+    }
+
+    private void UpdateStartHeld()
+    {
+        if (startHeld < 0f)
+        {
+            return;
+        }
+        if (!(Gamepad.current?.startButton.isPressed ?? false))
+        {
+            startHeld = -1f;
+            return;
+        }
+        startHeld += Time.unscaledDeltaTime;
+        if (startHeld >= StartHoldSeconds)
+        {
+            startHeld = -1f;
+            if (confirm == EConfirm.None)
+            {
+                ShowControlsMap(EOptionSection.Gamepad);
+            }
+        }
+    }
+
+    /// <summary>Goes to a map of CONTROLS, when the menu has that tab.</summary>
+    private void ShowControlsMap(EOptionSection map)
+    {
+        int i = Array.IndexOf(tabs, ETab.Controls);
+        if (i < 0)
+        {
+            return;
+        }
+        ShowTab(i);
+        ShowSection(map);
+        Sound(skin.MoveSound);
+    }
+
+    /// <summary>The menu comes up on a tab and one of its sections: F1 opens it on a control map.</summary>
+    public void Open(ETab tab, EOptionSection section)
+    {
+        Open(tab);
+        ShowSection(section);
+    }
+
+    private void ShowSection(EOptionSection section)
+    {
+        int s = Sections(Tab).IndexOf(section);
+        if (s >= 0)
+        {
+            sectionOf[Tab] = s;
+            row = 0;
+            rowScroll = 0;
+            onButtons = false;
+            button = 0;
+        }
     }
 
     /// <summary>
@@ -354,11 +418,12 @@ public sealed class GameMenu
         List<EOptionSection> list = new List<EOptionSection>();
         EOptionSection[] candidates = tab == ETab.Options
             ? new[] { EOptionSection.Gameplay, EOptionSection.Display, EOptionSection.Audio, EOptionSection.General }
-            : tab == ETab.Controls ? new[] { EOptionSection.Input } : Array.Empty<EOptionSection>();
+            : tab == ETab.Controls ? new[] { EOptionSection.Input, EOptionSection.Keyboard, EOptionSection.Gamepad }
+            : Array.Empty<EOptionSection>();
         foreach (EOptionSection s in candidates)
         {
-            // a section with no rows is not shown
-            if (GameOptions.InSection(s).Count > 0)
+            // a section with no rows is not shown, but for the maps, which have none
+            if (GameOptions.InSection(s).Count > 0 || ControlsMap.Shows(s))
             {
                 list.Add(s);
             }
@@ -402,6 +467,8 @@ public sealed class GameMenu
             case EOptionSection.Display: return "DISPLAY";
             case EOptionSection.Audio: return "AUDIO";
             case EOptionSection.Gameplay: return "GAMEPLAY";
+            case EOptionSection.Keyboard: return "KEYBOARD & MOUSE";
+            case EOptionSection.Gamepad: return "GAMEPAD";
             default: return "INPUT";
         }
     }
@@ -535,6 +602,7 @@ public sealed class GameMenu
         GameOptions.Tick();
         // the Interface scale, clicked or dragged, grows the interface once the button is let go
         GameOptions.HoldGrowth(dragging != null && dragging.Key == UiScale.GrowthPrefsKey);
+        UpdateStartHeld();
 
         Gamepad pad = Gamepad.current;
         Keyboard keys = Keyboard.current;
@@ -624,6 +692,18 @@ public sealed class GameMenu
             return true;
         }
 
+        // F1: on a control map it closes the menu, as it opened it; anywhere else it goes to the map of the
+        // device used last
+        if (!JustOpened && GameActions.KeysWorld.Controls.WasPressedThisFrame() && Array.IndexOf(tabs, ETab.Controls) >= 0)
+        {
+            if (Tab == ETab.Controls && ControlsMap.Shows(Section))
+            {
+                return true;
+            }
+            ShowControlsMap(ControlsMap.ForLastDevice());
+            return false;
+        }
+
         // with one tab, Journey Onward's, the tab keys do nothing: no sound, and the list not made again (fix 465)
         bool tabKey = tabs.Length > 1 && (keys?.tabKey.wasPressedThisFrame ?? false);
         bool tabPad = tabs.Length > 1 && pad != null;
@@ -668,6 +748,11 @@ public sealed class GameMenu
         if (onButtons && !Enabled(Buttons()[Mathf.Clamp(button, 0, Buttons().Count - 1)]))
         {
             EnterButtons(1, button);
+        }
+        if (ControlsMap.Shows(Section))
+        {
+            UpdateMap(nav);
+            return false;
         }
         if (nav.Down)
         {
@@ -736,6 +821,39 @@ public sealed class GameMenu
             rowScroll += nav.Wheel;
         }
         return false;
+    }
+
+    /// <summary>
+    /// The keys on a map of CONTROLS: the map walks its own list, and past either end of it they go to
+    /// the row of buttons, as past the rows of a section; from the buttons up or down goes back to it.
+    /// </summary>
+    private void UpdateMap(Nav nav)
+    {
+        if (onButtons)
+        {
+            if (nav.Up || nav.Down)
+            {
+                onButtons = false;
+                controlsMap.EnterFromButtons(Section, nav.Up);
+                Sound(skin.MoveSound);
+            }
+            else if (nav.Left || nav.Right)
+            {
+                int direction = nav.Left ? -1 : 1;
+                EnterButtons(direction, button + direction);
+                Sound(skin.MoveSound);
+            }
+            else if (nav.Accept)
+            {
+                List<EButton> buttons = Buttons();
+                Press(buttons[Mathf.Clamp(button, 0, buttons.Count - 1)]);
+            }
+            return;
+        }
+        if (controlsMap.Update(Section, nav) && EnterButtons(1, 0))
+        {
+            Sound(skin.MoveSound);
+        }
     }
 
     /// <summary>
@@ -901,6 +1019,11 @@ public sealed class GameMenu
     public void DrawHighlight(Rect r, bool focused) => Fill(r, focused ? LitFill : new Color(1f, 0.84f, 0.25f, 0.10f));
 
     public void DrawFrame(Rect r, Color color) => Frame(r, color);
+
+    public void DrawRect(Rect r, Color color) => Fill(r, color);
+
+    /// <summary>True when the pointer clicked in the rect, and no question is up.</summary>
+    public bool WasClicked(Rect r) => confirm == EConfirm.None && Clicked(r);
 
     public void DrawText(Rect r, string content, float size, TextAnchor anchor, Color color, bool wrap = false) =>
         Text(r, content, size, anchor, color, wrap);
@@ -1163,6 +1286,18 @@ public sealed class GameMenu
             host.DrawPage(Tab, list, detail);
             DrawHostButtons(innerX, innerW, buttonsY, pad);
             Hints(hintsRow, HintsNow(host.PageHints(Tab, pad), pad));
+        }
+        else if (ControlsMap.Shows(Section))
+        {
+            float sectionsY = tabsY + TabsHeight + 4f;
+            DrawSections(innerX, innerW, sectionsY, pad);
+            float top = sectionsY + SectionsHeight + 12f;
+            if (controlsMap.Draw(Section, new Rect(innerX, top, innerW, buttonsY - 12f - top), hoverSelects))
+            {
+                onButtons = false;
+            }
+            DrawButtons(innerX, innerW, buttonsY, pad, hoverSelects);
+            Hints(hintsRow, HintsNow(controlsMap.Hints(Section, pad), pad));
         }
         else
         {
