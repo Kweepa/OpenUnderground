@@ -343,7 +343,7 @@ public class SaveLoadGUI : MonoBehaviour, IGameMenuHost
 
         Gamepad gp = Gamepad.current;
         // a page of the menu's own - the music tracks - has X for itself: it toggles a track there (fix 455)
-        if (gp == null || Menu.Asking || Menu.ShowsSubPage)
+        if (gp == null || Menu.Asking || Menu.PadHoldsPaused || Menu.ShowsSubPage)
         {
             quitHoldXTime = 0f;
             return;

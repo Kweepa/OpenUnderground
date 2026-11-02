@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Every key and pad button of play can now be changed, on the game menu's Controls maps: pick an action, press Enter or A, then the new key or button, and the action that had it takes the old one, so nothing is ever left without a key. Keys can be combined with Ctrl, Shift or Alt, the mouse's middle and side buttons can be used, the pad has its own buttons for walking, the inventory, the magic panel and the map, and whatever is on the triggers still changes sides with a left-handed character. The tutorial and the panels' hints name the keys you chose.
+
 - The pad's short rumble when you run at a ledge, a warning before the edge, is now explained on the pad's controls map, and a Ledge rumble row turns it off, leaving the other rumbles alone.
 
 - With a PlayStation pad the game shows its buttons - the cross, circle, square and triangle, L1, R1, L2, R2, Options and Share - in every prompt and on the controls map, which also draws that pad with its d-pad above the left stick. A Button prompts row can also set Xbox or PlayStation by hand.

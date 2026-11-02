@@ -6,7 +6,7 @@ Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select
 
 If you use the **Left-handed** option, Attack and Stats swap triggers on the gamepad (see notes under each section).
 
-In the game, the CONTROLS tab of the game menu draws the same keys and buttons on a keyboard and on a pad.
+In the game, the CONTROLS tab of the game menu draws the same keys and buttons on a keyboard and on a pad, and changes them: pick an action, press Enter (A on the pad), then the new key or button. The two swap: the action that had it takes the old one. Keys can be combined with Ctrl, Shift or Alt, and the mouse's middle and side buttons can be bound too. The tables below are the defaults.
 
 **[Gamepad](#gamepad)** · **[Keyboard & Mouse](#keyboard--mouse)**
 

@@ -112,7 +112,11 @@ public class StatsPanel : MonoBehaviour
             return;
         }
 
-        onLeft = fromGamepad && PlayerData.sData != null && !PlayerData.sData.leftHanded;
+        // from the side of the trigger Stats is on, so it comes out of the hand that pulled it; off a trigger, from the
+        // off hand's side, as it always has (mod 320: the triggers can be rebound)
+        string stats = GameBindings.PadPath(GameActions.PadWorld.Stats);
+        bool offHandLeft = PlayerData.sData != null && !PlayerData.sData.leftHanded;
+        onLeft = fromGamepad && (stats == "<Gamepad>/leftTrigger" || (stats != "<Gamepad>/rightTrigger" && offHandLeft));
     }
 
     /// <summary>The panel as drawn, on its side and sliding in from it, in reference pixels (UiScale).</summary>

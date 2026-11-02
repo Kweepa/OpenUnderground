@@ -68,7 +68,9 @@ public static class GameInput
         {
             if (m.leftButton.wasPressedThisFrame || m.leftButton.wasReleasedThisFrame
                 || m.rightButton.wasPressedThisFrame || m.rightButton.wasReleasedThisFrame
-                || m.middleButton.wasPressedThisFrame || m.middleButton.wasReleasedThisFrame)
+                || m.middleButton.wasPressedThisFrame || m.middleButton.wasReleasedThisFrame
+                // the two side buttons, which a player can bind (mod 320)
+                || m.backButton.wasPressedThisFrame || m.forwardButton.wasPressedThisFrame)
             {
                 LastActiveDevice = GameInputDevice.MouseKeyboard;
                 return;

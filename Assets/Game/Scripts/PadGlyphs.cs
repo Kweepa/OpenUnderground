@@ -53,6 +53,7 @@ public static class PadGlyphs
     /// </summary>
     public static Texture2D Face(Texture2D xboxPicture)
     {
+        Remember(xboxPicture);
         if (xboxPicture == null || !PlayStation)
         {
             return xboxPicture;
@@ -87,6 +88,70 @@ public static class PadGlyphs
             case "Select": return "Share";
             default: return xboxName;
         }
+    }
+
+    // ---------------------------------------------------------------- the button an action is on (mod 320)
+
+    // the Xbox pictures of the four face buttons, by their asset names, as the components that have them pass them
+    private static readonly System.Collections.Generic.Dictionary<string, Texture2D> xboxFaces =
+        new System.Collections.Generic.Dictionary<string, Texture2D>();
+    private static GUIStyle chipStyle;
+
+    /// <summary>Keeps the face pictures a component has, so that a hint can draw whichever button an action is on.</summary>
+    public static void Remember(params Texture2D[] pictures)
+    {
+        foreach (Texture2D p in pictures)
+        {
+            if (p != null && (p.name == "aButton" || p.name == "bButton" || p.name == "xButton" || p.name == "yButton"))
+            {
+                xboxFaces[p.name] = p;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws, at a rectangle of the screen, the pad button an action is bound to now: a face button's picture in the
+    /// style in force, or for the others a dark key with the button's name. The panels' hints, which drew A, B, X
+    /// and Y before the buttons could be rebound.
+    /// </summary>
+    public static void DrawBound(Rect screen, UnityEngine.InputSystem.InputAction action)
+    {
+        string path = GameBindings.PadPath(action);
+        EPadControl face;
+        string picture;
+        switch (path)
+        {
+            case "<Gamepad>/buttonSouth": face = EPadControl.South; picture = "aButton"; break;
+            case "<Gamepad>/buttonEast": face = EPadControl.East; picture = "bButton"; break;
+            case "<Gamepad>/buttonWest": face = EPadControl.West; picture = "xButton"; break;
+            case "<Gamepad>/buttonNorth": face = EPadControl.North; picture = "yButton"; break;
+            default: face = EPadControl.Start; picture = null; break;
+        }
+        if (picture != null && PlayStation)
+        {
+            UiScale.DrawTexture(screen, Symbol(face));
+            return;
+        }
+        if (picture != null && xboxFaces.TryGetValue(picture, out Texture2D xbox))
+        {
+            UiScale.DrawTexture(screen, xbox);
+            return;
+        }
+
+        string name = GameBindings.PadName(action);
+        if (chipStyle == null)
+        {
+            chipStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, clipping = TextClipping.Overflow };
+            chipStyle.normal.textColor = Color.white;
+        }
+        chipStyle.fontSize = Mathf.Max(8, Mathf.RoundToInt(screen.height * 0.5f));
+        float width = Mathf.Max(screen.width, chipStyle.CalcSize(new GUIContent(name)).x + screen.height * 0.4f);
+        Rect key = new Rect(screen.center.x - width / 2, screen.y, width, screen.height);
+        Color previous = GUI.color;
+        GUI.color = new Color(0f, 0f, 0f, 0.8f);
+        GUI.DrawTexture(key, Texture2D.whiteTexture);
+        GUI.color = previous;
+        GUI.Label(key, name, chipStyle);
     }
 
     // ---------------------------------------------------------------- the PlayStation symbols
