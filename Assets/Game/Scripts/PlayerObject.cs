@@ -1356,12 +1356,11 @@ public class PlayerObject : MonoBehaviour
     /// their direction.
     /// </summary>
     /// <remarks>
-    /// The manual says Track "tells you when creatures are near". The original has the code for it
-    /// - using the skill calls Detect Monster with a radius of 8 and the skill's own value, one
-    /// roll per creature (UW.EXE 0x81270) - but nothing in the game reaches it, so this is an
-    /// addition with the original's numbers. The timer is ours, and so are the silence when nothing
-    /// is found, the two minutes before the same creature is reported again, and the line itself
-    /// (see Magic.ReportNearbyCreatures). With no points in Track there is no roll.
+    /// The manual says Track "tells you when creatures are near". In the original the skill is
+    /// used on demand, on F9 (see UseTrack); this check is an addition with the same numbers. The
+    /// timer is ours, and so are the silence when nothing is found, the two minutes before the same
+    /// creature is reported again, and the line itself (see Magic.ReportNearbyCreatures). With no
+    /// points in Track there is no roll.
     /// </remarks>
     private void CheckTrack()
     {
@@ -1371,7 +1370,32 @@ public class PlayerObject : MonoBehaviour
             return;
         }
 
-        Magic.sMagic.ReportNearbyCreatures(trackRadius, track, isSpell: false);
+        Magic.sMagic.ReportNearbyCreatures(trackRadius, track, track, onDemand: false);
+    }
+
+    /// <summary>
+    /// The Track skill used on demand, the original's F9: the creatures within 8 tiles, one roll
+    /// each with the player's Track, and "You detect no monster activity" when none is sensed.
+    /// </summary>
+    /// <remarks>
+    /// UW.EXE 0x7e902 registers F9 at 0x7ebb6 with argument 2; 0x812e0(2) passes Track to 0x81270,
+    /// which calls Detect Monster's 0x356ee(8, Track) at 0x812a7. There is no wait between two uses
+    /// and the roll is made even with no points in Track, as there: a creature is then sensed
+    /// with a chance of its detection nibble in 31, a goblin's 10, a ghost's 1.
+    ///
+    /// The timed report starts its interval again, and leaves out what the key showed for two
+    /// minutes, as it does after the spell; the key itself counts every creature each time.
+    /// </remarks>
+    public void UseTrack()
+    {
+        if (Magic.sMagic == null)
+        {
+            return;
+        }
+
+        timeToNextTrackCheck = trackCheckInterval;
+        int track = Skills.GetSkill(ESkill.Track);
+        Magic.sMagic.ReportNearbyCreatures(trackRadius, track, track, onDemand: true);
     }
 
     protected void Update()
@@ -1665,7 +1689,7 @@ public class PlayerObject : MonoBehaviour
     /// <summary>Seconds between two Track rolls.</summary>
     private const float trackCheckInterval = 20.0f;
 
-    /// <summary>How far Track reaches, in tiles: the original's own Track use, UW.EXE 0x812a7.</summary>
+    /// <summary>How far Track reaches, in tiles: the original's F9, UW.EXE 0x812a7.</summary>
     private const int trackRadius = 8;
 
     private float timeToNextTrackCheck = trackCheckInterval;

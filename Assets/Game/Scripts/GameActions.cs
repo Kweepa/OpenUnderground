@@ -96,6 +96,7 @@ public static class GameActions
         public readonly InputAction Quicksave;
         /// <summary>Held, not pressed: the caller times the hold.</summary>
         public readonly InputAction Sleep;
+        public readonly InputAction Track;
         public readonly InputAction MessagesBack;
         public readonly InputAction MessagesForward;
 
@@ -118,6 +119,7 @@ public static class GameActions
             Map = Button(map, "Map", "<Gamepad>/select");
             Quicksave = Button(map, "Quicksave", "<Gamepad>/rightStickPress");
             Sleep = Button(map, "Sleep", "<Gamepad>/dpad/left");
+            Track = Button(map, "Track", "<Gamepad>/dpad/right");
             MessagesBack = Button(map, "MessagesBack", "<Gamepad>/dpad/up");
             MessagesForward = Button(map, "MessagesForward", "<Gamepad>/dpad/down");
         }
@@ -144,6 +146,8 @@ public static class GameActions
         public readonly InputAction Map;
         public readonly InputAction Quicksave;
         public readonly InputAction Sleep;
+        /// <summary>The Track skill, on the original's key (UW.EXE 0x7ebb6).</summary>
+        public readonly InputAction Track;
         public readonly InputAction MessagesBack;
         public readonly InputAction MessagesForward;
         /// <summary>Opens the game menu on the control maps, the keyboard's or the pad's, whichever was used last.</summary>
@@ -167,6 +171,7 @@ public static class GameActions
             Map = Button(map, "Map", "<Keyboard>/tab");
             Quicksave = Button(map, "Quicksave", "<Keyboard>/f5");
             Sleep = Button(map, "Sleep", "<Keyboard>/f10");
+            Track = Button(map, "Track", "<Keyboard>/f9");
             MessagesBack = Button(map, "MessagesBack", "<Keyboard>/pageUp");
             MessagesForward = Button(map, "MessagesForward", "<Keyboard>/pageDown");
             Controls = Button(map, "Controls", "<Keyboard>/f1");

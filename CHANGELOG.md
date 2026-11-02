@@ -2,6 +2,8 @@
 
 ## Next release
 
+- F9, or right on the D-pad, uses the Track skill at once, as in the original: it tells you of the creatures within eight tiles and in which direction, or that there are none. Track still reports by itself every few seconds as well.
+
 - Every key and pad button of play can now be changed, on the game menu's Controls maps: pick an action, press Enter or A, then the new key or button, and the action that had it takes the old one, so nothing is ever left without a key. Keys can be combined with Ctrl, Shift or Alt, the mouse's middle and side buttons can be used, the pad has its own buttons for walking, the inventory, the magic panel and the map, and whatever is on the triggers still changes sides with a left-handed character. The tutorial and the panels' hints name the keys you chose.
 
 - The pad's short rumble when you run at a ledge, a warning before the edge, is now explained on the pad's controls map, and a Ledge rumble row turns it off, leaving the other rumbles alone.

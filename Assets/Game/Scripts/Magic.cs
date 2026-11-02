@@ -2783,8 +2783,10 @@ public class Magic : MonoBehaviour
     void CastDetectMonster()
     {
         // The spell's roll is the Track skill's with the skill at 45, which no creature can
-        // resist: UW.EXE 0x35a28 calls 0x356ee(10, 45).
-        ReportNearbyCreatures(detectMonsterRadius, 45, isSpell: true);
+        // resist: UW.EXE 0x35a28 calls 0x356ee(10, 45). What the creatures are is read with Track,
+        // or with Casting if that is higher, so a mage with no Track still learns something from it.
+        int reading = Mathf.Max(Skills.GetSkill(ESkill.Track), Skills.GetSkill(ESkill.Casting));
+        ReportNearbyCreatures(detectMonsterRadius, 45, reading, onDemand: true);
     }
 
     /// <summary>How far Detect Monster reaches, in tiles: UW.EXE 0x35a28.</summary>
@@ -2803,11 +2805,12 @@ public class Magic : MonoBehaviour
     /// </summary>
     public const int hostileCreatureDifficulty = 5;
 
-    /// <summary>Seconds before the Track skill reports the same creature again.</summary>
+    /// <summary>Seconds before the timed Track report shows the same creature again.</summary>
     public const float creatureReportDelay = 120.0f;
 
-    // Time.time each creature was last part of a report. The spell writes it and the Track skill
-    // reads it, so a creature the spell has just shown is not reported again by Track.
+    // Time.time each creature was last part of a report. Every report writes it and only the timed
+    // one reads it, so a creature just shown by the timer, the Track key or the spell is not
+    // reported again by the timer.
     private readonly Dictionary<Critter, float> lastCreatureReportTime = new Dictionary<Critter, float>();
     private readonly List<Critter> expiredCreatureReports = new List<Critter>();
 
@@ -2832,16 +2835,20 @@ public class Magic : MonoBehaviour
     /// creature's own detection byte (critterStats 0x1d, low nibble): a high byte is easy to sense.
     /// The spell passes 45, which always succeeds; the Track skill passes its value.
     /// </param>
-    /// <param name="isSpell">
-    /// The spell says "You detect no monster activity" when nothing is found, and counts every
-    /// creature. The passive Track check says nothing then, and leaves out the creatures it or the
-    /// spell reported in the last creatureReportDelay seconds, so a room of creatures that stay put
-    /// is not announced every few seconds.
+    /// <param name="reading">
+    /// The skill that tells what the creatures sensed are and whether they are hostile.
+    /// </param>
+    /// <param name="onDemand">
+    /// True for the spell and for the Track key: "You detect no monster activity" when nothing is
+    /// found, and every creature counts. The timed report says nothing then, and leaves out the
+    /// creatures any report showed in the last creatureReportDelay seconds, so a room of creatures
+    /// that stay put is not announced every few seconds.
     /// </param>
     /// <remarks>
     /// Which creatures are sensed is the original's Detect Monster (UW.EXE 0x356ee): the square
     /// area, the roll per creature, and every creature counting, friendly or not. The original's
-    /// own Track use, unreachable in UW.EXE 0x81270, calls that function with radius 8.
+    /// own Track use, the F9 key (UW.EXE 0x7ebb6 to 0x812e0 and 0x81270), calls that function with
+    /// radius 8 and the player's Track.
     ///
     /// The report is ours. The original names the direction with the most creatures, banded one,
     /// two to four, five or more (0x3569d), and a second direction if another has more than three.
@@ -2850,12 +2857,12 @@ public class Magic : MonoBehaviour
     /// "You detect many creatures ". Then each creature sensed has two rolls of its own, one
     /// independent of the other: if it is hostile, one against hostileCreatureDifficulty, and a
     /// single success makes the line say "hostile creatures"; and one against
-    /// identifyCreatureDifficulty, which names its kind. Both use the player's Track; for the spell,
-    /// the higher of Track and Casting: the spell finds the creatures, the skill reads them. The
-    /// names are from block 4: the singular with its article when one creature was sensed, else
-    /// the plurals. Hostile means the Hostile attitude only: an upset creature is not attacking.
+    /// identifyCreatureDifficulty, which names its kind. Both use reading: the roll finds the
+    /// creatures, the reading skill reads them. The names are from block 4: the singular with its
+    /// article when one creature was sensed, else the plurals. Hostile means the Hostile attitude
+    /// only: an upset creature is not attacking.
     /// </remarks>
-    public void ReportNearbyCreatures(int radius, int skill, bool isSpell)
+    public void ReportNearbyCreatures(int radius, int skill, int reading, bool onDemand)
     {
         PruneCreatureReports();
 
@@ -2864,11 +2871,6 @@ public class Magic : MonoBehaviour
         bool hostileSensed = false;
         namedKindOrder.Clear();
         string namedSingle = null;
-        // What the creatures are: Track reads them, and for the spell Casting does as well as Track,
-        // so a mage with no Track still learns something from it.
-        int reading = isSpell
-            ? Mathf.Max(Skills.GetSkill(ESkill.Track), Skills.GetSkill(ESkill.Casting))
-            : Skills.GetSkill(ESkill.Track);
 
         Vector3 playerPosition = PlayerObject.Player.transform.position;
         int playerTileX = Mathf.FloorToInt(playerPosition.x / Tile.xzScale);
@@ -2891,7 +2893,7 @@ public class Magic : MonoBehaviour
                 continue;
             }
 
-            if (!isSpell && lastCreatureReportTime.ContainsKey(critter))
+            if (!onDemand && lastCreatureReportTime.ContainsKey(critter))
             {
                 continue;
             }
@@ -2940,7 +2942,7 @@ public class Magic : MonoBehaviour
 
         if (total == 0)
         {
-            if (isSpell)
+            if (onDemand)
             {
                 Messages.Add(1, 62);
             }

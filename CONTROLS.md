@@ -70,6 +70,12 @@ time.
 |-|-|
 |D-pad left, hold|Sleep, on a bedroll if there is one in your pack|
 
+### Track
+
+|Control|Action|
+|-|-|
+|D-pad right|Use the Track skill: the creatures nearby, and in which direction|
+
 ### Inventory
 
 |Control|Action|
@@ -197,6 +203,12 @@ Look speed and invert options are in the game menu, under CONTROLS.
 |Control|Action|
 |-|-|
 |F10|Sleep, on a bedroll if there is one in your pack|
+
+### Track
+
+|Control|Action|
+|-|-|
+|F9|Use the Track skill: the creatures nearby, and in which direction|
 
 ### Inventory
 
