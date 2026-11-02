@@ -160,6 +160,7 @@ public class PlayerPanelInput : MonoBehaviour
         }
 
         UpdateSleepInput();
+        UpdateTrackInput();
 
         TryDismissPanelsFromContinuousWalk();
 
@@ -196,6 +197,22 @@ public class PlayerPanelInput : MonoBehaviour
         {
             sleepDoneThisHold = true;
             Sleeping.TryFromKey();
+        }
+    }
+
+    /// <summary>
+    /// The Track input: the key (F9) with a panel open as well as closed, as the sleep's, and the
+    /// pad's button (d-pad right) only while nothing else has the controls - the panels read the
+    /// d-pad for their cursors.
+    /// </summary>
+    private static void UpdateTrackInput()
+    {
+        const EControlMask trackKeyFree = EControlMask.Magic | EControlMask.Inventory;
+        bool key = (PlayerObject.Player.controlsDisabled & ~trackKeyFree) == 0 && PlayerInput.TrackKeyPressed();
+        bool button = PlayerObject.Player.controlsActive && PlayerInput.TrackButtonPressed();
+        if (key || button)
+        {
+            PlayerObject.Player.UseTrack();
         }
     }
 

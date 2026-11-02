@@ -193,6 +193,7 @@ public static class GameBindings
         KeyEntry(k.Map, EBindKind.Press, "Map", GameActions.KeysMap.Close);
         KeyEntry(k.Quicksave, EBindKind.Press, "Quicksave");
         KeyEntry(k.Sleep, EBindKind.Press, "Sleep");
+        KeyEntry(k.Track, EBindKind.Press, "Track");
         KeyEntry(k.MessagesBack, EBindKind.Press, "Messages back");
         KeyEntry(k.MessagesForward, EBindKind.Press, "Messages forward");
         KeyEntry(k.Controls, EBindKind.Press, "Controls");
@@ -218,6 +219,7 @@ public static class GameBindings
         PadEntry(p.Map, EBindKind.Press, withPanels | EPadPages.Map, "Map", GameActions.PadMap.Close);
         PadEntry(p.Quicksave, EBindKind.Press, withPanels, "Quicksave");
         PadEntry(p.Sleep, EBindKind.Press, walking, "Sleep");
+        PadEntry(p.Track, EBindKind.Press, walking, "Track");
         PadEntry(p.MessagesBack, EBindKind.Press, walking, "Messages back");
         PadEntry(p.MessagesForward, EBindKind.Press, walking, "Messages forward");
 

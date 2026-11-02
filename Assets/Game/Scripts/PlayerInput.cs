@@ -189,11 +189,27 @@ public static class PlayerInput
         return GameActions.KeysWorld.Sleep.WasPressedThisFrame();
     }
 
+    /// <summary>Keyboard F9 by default — use the Track skill, the original's key for it (UW.EXE 0x7ebb6).</summary>
+    public static bool TrackKeyPressed()
+    {
+        return GameActions.KeysWorld.Track.WasPressedThisFrame();
+    }
+
+    /// <summary>Gamepad D-pad right by default — use the Track skill.</summary>
+    /// <remarks>
+    /// A press, not a hold as for sleeping: the skill only reports, so using it by accident costs
+    /// nothing.
+    /// </remarks>
+    public static bool TrackButtonPressed()
+    {
+        return GameActions.PadWorld.Track.WasPressedThisFrame();
+    }
+
     /// <summary>Gamepad D-pad left held down — sleep, which wants a hold.</summary>
     /// <remarks>
-    /// During play the d-pad's left and right are the only inputs nothing else reads; up and down
-    /// scroll the message log. It answers to a hold, as the quicksave does, because sleeping is not
-    /// something to do by accident. The caller times the hold; this only says whether it is down.
+    /// During play the d-pad's up and down scroll the message log, and right uses Track. It answers
+    /// to a hold, as the quicksave does, because sleeping is not something to do by accident. The
+    /// caller times the hold; this only says whether it is down.
     /// </remarks>
     public static bool SleepButtonHeld()
     {

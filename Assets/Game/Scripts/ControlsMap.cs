@@ -93,6 +93,7 @@ public sealed class ControlsMap
         new KeyRow { Header = "GAME" },
         new KeyRow { Label = "Quicksave", EntryId = "Keys.World/Quicksave" },
         new KeyRow { Label = "Sleep", EntryId = "Keys.World/Sleep", Note = "On a bedroll, if there is one in your pack." },
+        new KeyRow { Label = "Track", EntryId = "Keys.World/Track", Note = "The creatures nearby, and in which direction." },
         new KeyRow { Label = "Controls", EntryId = "Keys.World/Controls", Note = "Open these maps: the pad's if you used the pad last." },
         new KeyRow { Header = "ALWAYS THE SAME" },
         new KeyRow { Label = "Game menu", Keys = () => new List<string> { "escape" }, Note = "With a panel open, close it first." },
@@ -1285,6 +1286,7 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadWorld.Map, "Map");
                 AddBound(lines, GameActions.PadWorld.Quicksave, "Quicksave (hold)");
                 AddBound(lines, GameActions.PadWorld.Sleep, "Sleep (hold)");
+                AddBound(lines, GameActions.PadWorld.Track, "Track");
                 AddBound(lines, GameActions.PadWorld.MessagesBack, "Messages back");
                 AddBound(lines, GameActions.PadWorld.MessagesForward, "Messages forward");
                 AddFixed(lines, EPadControl.Start, "Game menu; hold: controls", PadGlyphs.Name("Start") + " can't be changed.");
