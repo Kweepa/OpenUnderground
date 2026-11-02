@@ -336,11 +336,16 @@ public class PlayerPanelInput : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// A screen over the panels that keeps them: the how-many box, the yes/no question, and the flute and a cutscene,
+    /// under which Start closed the pack they keep open (fix 459).
+    /// </summary>
     private static bool IsModalInventoryUiBlocking()
     {
         PlayerObject player = PlayerObject.Player;
         return player != null
-            && (player.controlsDisabled & (EControlMask.HowMany | EControlMask.RepairDialog)) != 0;
+            && (player.controlsDisabled
+                & (EControlMask.HowMany | EControlMask.RepairDialog | EControlMask.Flute | EControlMask.Cutscene)) != 0;
     }
 
     private static bool AnyPlayerPanelVisible()

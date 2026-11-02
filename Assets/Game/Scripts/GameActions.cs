@@ -15,14 +15,12 @@ using UnityEngine.InputSystem;
 /// typing runes, the flute's notes, conversation replies - which reads characters and stays on IMGUI events.
 ///
 /// Every map is enabled all the time and the contexts are still decided where each action is read, by the control
-/// masks and <see cref="GameInput.LastActiveDevice"/>, exactly as before the actions existed.
+/// masks and <see cref="GameInput.LastActiveDevice"/>, exactly as before the actions existed. The bindings written
+/// here are the defaults; <see cref="GameBindings"/> rebuilds them from the player's own (mod 320), and silences the
+/// keyboard's maps while the keyboard is writing.
 /// </remarks>
 public static class GameActions
 {
-    /// <summary>Binding groups of the two triggers on the pad, which swap with the character's weapon hand.</summary>
-    public const string RightHandedGroup = "RightHanded";
-    public const string LeftHandedGroup = "LeftHanded";
-
     public static readonly InputActionAsset Asset = CreateAsset();
 
     public static readonly PadWorldActions PadWorld = new PadWorldActions(Asset.AddActionMap("Pad.World"));
@@ -34,12 +32,9 @@ public static class GameActions
     public static readonly PadMapActions PadMap = new PadMapActions(Asset.AddActionMap("Pad.Map"));
     public static readonly KeysMapActions KeysMap = new KeysMapActions(Asset.AddActionMap("Keys.Map"));
 
-    private static bool? appliedLeftHanded;
-
     static GameActions()
     {
         Asset.Enable();
-        ApplyHandedness(false);
     }
 
     private static InputActionAsset CreateAsset()
@@ -50,29 +45,12 @@ public static class GameActions
     }
 
     /// <summary>
-    /// Called once a frame, before anything reads input (<see cref="InputDeviceRouter"/>): follows the character's
-    /// weapon hand onto the triggers. A left-handed character attacks with the left trigger and pins the stats with
-    /// the right one, as <see cref="PlayerData.leftHanded"/> has always decided.
+    /// Called once a frame, before anything reads input (<see cref="InputDeviceRouter"/>): the player's own bindings,
+    /// loaded the first time and following the character's weapon hand onto the triggers (<see cref="GameBindings"/>).
     /// </summary>
     public static void Refresh()
     {
-        if (PlayerData.sData != null)
-        {
-            ApplyHandedness(PlayerData.sData.leftHanded);
-        }
-    }
-
-    private static void ApplyHandedness(bool leftHanded)
-    {
-        if (appliedLeftHanded == leftHanded)
-        {
-            return;
-        }
-
-        appliedLeftHanded = leftHanded;
-        InputBinding mask = InputBinding.MaskByGroup(leftHanded ? LeftHandedGroup : RightHandedGroup);
-        PadWorld.Attack.bindingMask = mask;
-        PadWorld.Stats.bindingMask = mask;
+        GameBindings.Refresh();
     }
 
     private static InputAction Button(InputActionMap map, string name, string binding)
@@ -131,12 +109,9 @@ public static class GameActions
             Use = Button(map, "Use", "<Gamepad>/buttonNorth");
             Cancel = Button(map, "Cancel", "<Gamepad>/buttonEast");
 
-            Attack = map.AddAction("Attack", InputActionType.Button);
-            Attack.AddBinding("<Gamepad>/rightTrigger", groups: RightHandedGroup);
-            Attack.AddBinding("<Gamepad>/leftTrigger", groups: LeftHandedGroup);
-            Stats = map.AddAction("Stats", InputActionType.Value, expectedControlLayout: "Axis");
-            Stats.AddBinding("<Gamepad>/leftTrigger", groups: RightHandedGroup);
-            Stats.AddBinding("<Gamepad>/rightTrigger", groups: LeftHandedGroup);
+            // as for a right-handed character: GameBindings mirrors the triggers for a left-handed one
+            Attack = Button(map, "Attack", "<Gamepad>/rightTrigger");
+            Stats = map.AddAction("Stats", InputActionType.Value, "<Gamepad>/leftTrigger", expectedControlLayout: "Axis");
 
             MagicPanel = Button(map, "MagicPanel", "<Gamepad>/leftShoulder");
             Inventory = Button(map, "Inventory", "<Gamepad>/rightShoulder");

@@ -42,7 +42,6 @@ public sealed class ControlsMap
     // it at a slant and none runs level across another's end; the labels stay where the pad's middle place puts them
     // (the user's, 1 November 2026)
     private const float PadDrop = 5f;
-    private const float ScrollArrowsWidth = 40f;
     private const int NoteLines = 2;
     private const float NoteLineHeight = 28f;
 
@@ -59,55 +58,122 @@ public sealed class ControlsMap
     {
         public string Header;
         public string Label;
+        /// <summary>The binding the row shows and rebinds (GameBindings), or null for a row that is always the same.</summary>
+        public string EntryId;
+        /// <summary>Keys always shown beside the binding's, or all of a fixed row's: the arrows of the four moves.</summary>
         public Func<List<string>> Keys;
         /// <summary>Written in place of the keys' names, for a run like 1 to 9.</summary>
         public string KeysText;
         public string Note;
+
+        public BindEntry Entry => EntryId != null ? GameBindings.Find(EntryId) : null;
     }
 
     private static readonly KeyRow[] KeyRows =
     {
         new KeyRow { Header = "WALKING" },
-        new KeyRow { Label = "Move forward", Keys = () => Join(Bound(GameActions.KeysWorld.Move, "Up"), Bound(GameActions.KeysWorld.MoveAlternate, "Up")) },
-        new KeyRow { Label = "Move back", Keys = () => Join(Bound(GameActions.KeysWorld.Move, "Down"), Bound(GameActions.KeysWorld.MoveAlternate, "Down")) },
-        new KeyRow { Label = "Move left", Keys = () => Join(Bound(GameActions.KeysWorld.Move, "Left"), Bound(GameActions.KeysWorld.MoveAlternate, "Left")) },
-        new KeyRow { Label = "Move right", Keys = () => Join(Bound(GameActions.KeysWorld.Move, "Right"), Bound(GameActions.KeysWorld.MoveAlternate, "Right")) },
-        new KeyRow { Label = "Sprint", Keys = () => Bound(GameActions.KeysWorld.Sprint), Note = "Hold; forward only, and it uses stamina." },
-        new KeyRow { Label = "Walk quietly", Keys = () => Bound(GameActions.KeysWorld.WalkQuietly), Note = "Hold to walk slowly and quietly." },
-        new KeyRow { Label = "Jump", Keys = () => Bound(GameActions.KeysWorld.Jump) },
-        new KeyRow { Label = "Use or pick up", Keys = () => Bound(GameActions.KeysWorld.Use), Note = "Straight into your pack; with an item on the cursor, put it there." },
-        new KeyRow { Label = "Cancel a charge", Keys = () => Bound(GameActions.KeysWorld.CancelCharge) },
-        new KeyRow { Label = "Look with the mouse", Keys = () => Bound(GameActions.KeysWorld.MouseLook), Note = "Hold, with a panel open or a spell waiting for its target." },
+        new KeyRow { Label = "Move forward", EntryId = "Keys.World/Move/Up", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Up") },
+        new KeyRow { Label = "Move back", EntryId = "Keys.World/Move/Down", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Down") },
+        new KeyRow { Label = "Move left", EntryId = "Keys.World/Move/Left", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Left") },
+        new KeyRow { Label = "Move right", EntryId = "Keys.World/Move/Right", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Right") },
+        new KeyRow { Label = "Sprint", EntryId = "Keys.World/Sprint", Note = "Hold; forward only, and it uses stamina." },
+        new KeyRow { Label = "Walk quietly", EntryId = "Keys.World/WalkQuietly", Note = "Hold to walk slowly and quietly." },
+        new KeyRow { Label = "Jump", EntryId = "Keys.World/Jump" },
+        new KeyRow { Label = "Use or pick up", EntryId = "Keys.World/Use", Note = "Straight into your pack; with an item on the cursor, put it there." },
+        new KeyRow { Label = "Cancel a charge", EntryId = "Keys.World/CancelCharge" },
+        new KeyRow { Label = "Look with the mouse", EntryId = "Keys.World/MouseLook", Note = "Hold, with a panel open or a spell waiting for its target." },
         new KeyRow { Header = "PANELS" },
-        new KeyRow { Label = "Magic panel", Keys = () => Bound(GameActions.KeysWorld.MagicPanel) },
-        new KeyRow { Label = "Cast the spell", Keys = () => Bound(GameActions.KeysWorld.Cast) },
-        new KeyRow { Label = "Inventory", Keys = () => Bound(GameActions.KeysWorld.Inventory) },
-        new KeyRow { Label = "Stats", Keys = () => Bound(GameActions.KeysWorld.Stats) },
-        new KeyRow { Label = "Map", Keys = () => Join(Bound(GameActions.KeysWorld.Map), Bound(GameActions.KeysMap.Close)) },
+        new KeyRow { Label = "Magic panel", EntryId = "Keys.World/MagicPanel" },
+        new KeyRow { Label = "Cast the spell", EntryId = "Keys.World/Cast" },
+        new KeyRow { Label = "Inventory", EntryId = "Keys.World/Inventory" },
+        new KeyRow { Label = "Stats", EntryId = "Keys.World/Stats" },
+        new KeyRow { Label = "Map", EntryId = "Keys.World/Map" },
+        new KeyRow { Label = "Messages back", EntryId = "Keys.World/MessagesBack" },
+        new KeyRow { Label = "Messages forward", EntryId = "Keys.World/MessagesForward" },
+        new KeyRow { Header = "GAME" },
+        new KeyRow { Label = "Quicksave", EntryId = "Keys.World/Quicksave" },
+        new KeyRow { Label = "Sleep", EntryId = "Keys.World/Sleep", Note = "On a bedroll, if there is one in your pack." },
+        new KeyRow { Label = "Controls", EntryId = "Keys.World/Controls", Note = "Open these maps: the pad's if you used the pad last." },
+        new KeyRow { Header = "ALWAYS THE SAME" },
+        new KeyRow { Label = "Game menu", Keys = () => new List<string> { "escape" }, Note = "With a panel open, close it first." },
         new KeyRow
         {
+            // the arrows stay the panels' cursor, as they stay a second set of walking keys (mod 320, the user's choice
+            // of one key for each action)
             Label = "Move the selection",
             Keys = () => Join(Bound(GameActions.KeysInventory.Up), Bound(GameActions.KeysInventory.Down),
                 Bound(GameActions.KeysInventory.Left), Bound(GameActions.KeysInventory.Right)),
             Note = "In the inventory and the magic panel.",
         },
-        new KeyRow { Label = "Messages back", Keys = () => Bound(GameActions.KeysWorld.MessagesBack) },
-        new KeyRow { Label = "Messages forward", Keys = () => Bound(GameActions.KeysWorld.MessagesForward) },
-        new KeyRow { Header = "GAME" },
-        new KeyRow { Label = "Quicksave", Keys = () => Bound(GameActions.KeysWorld.Quicksave) },
-        new KeyRow { Label = "Sleep", Keys = () => Bound(GameActions.KeysWorld.Sleep), Note = "On a bedroll, if there is one in your pack." },
-        new KeyRow
-        {
-            Label = "Controls",
-            Keys = () => Bound(GameActions.KeysWorld.Controls),
-            Note = "Open these maps: the pad's if you used the pad last.",
-        },
-        new KeyRow { Header = "ALWAYS THE SAME" },
-        new KeyRow { Label = "Game menu", Keys = () => new List<string> { "escape" }, Note = "With a panel open, close it first." },
         new KeyRow { Label = "Type runes", Keys = () => new List<string> { "enter" }, Note = "Then type the runes' letters; Enter again to cast." },
         new KeyRow { Label = "Reply in a conversation", Keys = () => Digits(1, 9), KeysText = "1 - 9" },
         new KeyRow { Label = "Play an instrument", Keys = () => Digits(0, 9), KeysText = "0 - 9" },
     };
+
+    /// <summary>A row's keys, as names of the drawing's keys: its binding's (a chord as ctrl+j), then the fixed ones.</summary>
+    private static List<string> RowKeys(KeyRow row)
+    {
+        List<string> keys = new List<string>();
+        BindEntry e = row.Entry;
+        if (e != null)
+        {
+            keys.Add(MapName(e.Binding));
+        }
+        if (row.Keys != null)
+        {
+            foreach (string k in row.Keys())
+            {
+                if (!keys.Contains(k))
+                {
+                    keys.Add(k);
+                }
+            }
+        }
+        return keys;
+    }
+
+    /// <summary>
+    /// A row's note, ending with the binding's default in parentheses (the user's, 2 November 2026), so that a key
+    /// moved by a swap can be found again without a reset.
+    /// </summary>
+    private static string RowNote(KeyRow row)
+    {
+        BindEntry e = row.Entry;
+        if (e == null)
+        {
+            return row.Note;
+        }
+        string d = "(default: " + GameBindings.KeyLabel(e.DefaultBinding) + ")";
+        return row.Note != null ? row.Note + " " + d : d;
+    }
+
+    /// <summary>A keyboard binding as a name of the drawing: j, ctrl+j, mouse/backButton.</summary>
+    private static string MapName(string binding)
+    {
+        GameBindings.Split(binding, out string modifier, out string key);
+        string name = GameBindings.ControlName(key);
+        if (key != null && key.StartsWith("<Mouse>/", StringComparison.Ordinal))
+        {
+            name = "mouse/" + name;
+        }
+        return modifier != null ? modifier + "+" + name : name;
+    }
+
+    /// <summary>True for a key the keyboard map draws: only those can be bound, so a binding can always be shown.</summary>
+    public static bool OnDrawing(string control)
+    {
+        foreach (Cap cap in Caps)
+        {
+            if (cap.Name == control)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>A key's or a mouse button's name, as the map writes it: for the lines that say what a rebind did.</summary>
+    public static string KeyLabel(string control, bool mouse) => KeyName(mouse ? "mouse/" + control : control);
 
     /// <summary>What the mouse does, which no action holds: it points, it is not bound.</summary>
     private static readonly string[] MouseLines =
@@ -136,6 +202,9 @@ public sealed class ControlsMap
 
     private int keySelected = 1;
     private int keyScroll;
+    private bool keyDragging;
+    private float keyGrab;
+    private const float KeyScrollBarWidth = 14f;
     /// <summary>The selection was moved by the keys or the drawing: the list scrolls it into view once.</summary>
     private bool keyFollow;
 
@@ -157,16 +226,45 @@ public sealed class ControlsMap
         public EPadControl Control;
         public string Prefix;
         public string Text;
+        /// <summary>The binding the line rebinds, or null for a line that is always the same.</summary>
+        public BindEntry Entry;
+        /// <summary>For a fixed line, why it cannot be changed.</summary>
+        public string Why;
     }
 
     private sealed class Callout
     {
         public EPadControl Control;
         public readonly List<string> Lines = new List<string>();
+        /// <summary>Each line's binding, or null where the line is fixed; and why it is.</summary>
+        public readonly List<BindEntry> Entries = new List<BindEntry>();
+        public readonly List<string> Whys = new List<string>();
         public Vector2 Anchor;
         public float Top;
         public float Height;
         public List<string> Wrapped;
+        /// <summary>The line of <see cref="Lines"/> each wrapped line comes from.</summary>
+        public List<int> WrappedOwner;
+    }
+
+    /// <summary>A place the keys stop at on a pad page: one line of one callout, since a stick holds two.</summary>
+    private struct Stop
+    {
+        public int Callout;
+        public int Line;
+    }
+
+    private static List<Stop> Stops(List<Callout> callouts)
+    {
+        List<Stop> stops = new List<Stop>();
+        for (int c = 0; c < callouts.Count; c++)
+        {
+            for (int l = 0; l < callouts[c].Lines.Count; l++)
+            {
+                stops.Add(new Stop { Callout = c, Line = l });
+            }
+        }
+        return stops;
     }
 
     private EPadContext context;
@@ -184,7 +282,12 @@ public sealed class ControlsMap
         {
             int count = Selectable().Count;
             int at = Selectable().IndexOf(keySelected);
-            if (nav.Down || nav.Up)
+            if (nav.Accept)
+            {
+                // Enter or A rebinds the row; a click only selected it (the user's, 2 November 2026)
+                Rebind(KeyRows[Mathf.Clamp(keySelected, 0, KeyRows.Length - 1)]);
+            }
+            else if (nav.Down || nav.Up)
             {
                 int next = at + (nav.Down ? 1 : -1);
                 if (next < 0 || next >= count)
@@ -193,6 +296,7 @@ public sealed class ControlsMap
                 }
                 keySelected = Selectable()[next];
                 keyFollow = true;
+                notice = null;
                 menu.PlaySound(menu.Skin.MoveSound);
             }
             else if (nav.Wheel != 0)
@@ -206,19 +310,26 @@ public sealed class ControlsMap
         {
             int n = ContextNames.Length;
             context = (EPadContext)(((int)context + (nav.Left ? -1 : 1) + n) % n);
+            notice = null;
             menu.PlaySound(menu.Skin.MoveSound);
             return false;
         }
-        int callouts = Callouts(context).Count;
-        int i = padSelected[(int)context];
-        if (nav.Down || nav.Up)
+        List<Callout> callouts = Callouts(context);
+        List<Stop> stops = Stops(callouts);
+        int i = Mathf.Clamp(padSelected[(int)context], 0, Mathf.Max(0, stops.Count - 1));
+        if (nav.Accept && stops.Count > 0)
+        {
+            Rebind(callouts[stops[i].Callout], stops[i].Line);
+        }
+        else if (nav.Down || nav.Up)
         {
             int next = i + (nav.Down ? 1 : -1);
-            if (next < 0 || next >= callouts)
+            if (next < 0 || next >= stops.Count)
             {
                 return true;
             }
             padSelected[(int)context] = next;
+            notice = null;
             menu.PlaySound(menu.Skin.MoveSound);
         }
         return false;
@@ -241,13 +352,314 @@ public sealed class ControlsMap
             }
             return;
         }
-        padSelected[(int)context] = up ? Mathf.Max(0, Callouts(context).Count - 1) : 0;
+        padSelected[(int)context] = up ? Mathf.Max(0, Stops(Callouts(context)).Count - 1) : 0;
+    }
+
+    // ---------------------------------------------------------------- rebinding (mod 320)
+
+    private BindEntry waiting;
+    private int waitFrom;
+    // a modifier pressed while waiting: bound on its own if it is let go with nothing pressed with it
+    private string pendingModifier;
+    private string notice;
+    private EBindResult noticeKind;
+    private float noticeUntil;
+
+    /// <summary>
+    /// How long a line of what was done stays: 3 seconds and 0.04 a character, so a long one is read to its end (the
+    /// user's, 11 November 2026).
+    /// </summary>
+    private static float NoticeSeconds(string text) => 3f + 0.04f * (text?.Length ?? 0);
+
+    private static readonly string[] ModifierKeys = { "leftShift", "rightShift", "leftCtrl", "rightCtrl", "leftAlt", "rightAlt" };
+
+    private static readonly string[] PadButtonNames =
+    {
+        "buttonSouth", "buttonEast", "buttonWest", "buttonNorth", "leftShoulder", "rightShoulder", "leftTrigger", "rightTrigger",
+        "select", "start", "leftStickPress", "rightStickPress", "dpad/up", "dpad/down", "dpad/left", "dpad/right",
+    };
+
+    /// <summary>True while a binding waits for its new key or button: the menu hands every key to <see cref="UpdateWait"/>.</summary>
+    public bool Waiting => waiting != null;
+
+    private bool NoticeShown => notice != null && Time.unscaledTime < noticeUntil;
+
+    /// <summary>Errors and refusals are written in red (the user's, 2 November 2026).</summary>
+    public static readonly Color RefusedColor = new Color32(235, 72, 56, 255);
+
+    // the other lines in white, which reads better than the list's colour (the user's, 2 November 2026)
+    private Color NoticeColor => noticeKind == EBindResult.Refused ? RefusedColor : Color.white;
+
+    private void Notice(string text, EBindResult kind)
+    {
+        notice = text;
+        noticeKind = kind;
+        noticeUntil = Time.unscaledTime + NoticeSeconds(text);
+        if (kind == EBindResult.Refused)
+        {
+            Ding();
+        }
+        else
+        {
+            menu.PlaySound(kind == EBindResult.Changed ? menu.Skin.MakeSound : menu.Skin.MoveSound);
+        }
+    }
+
+    /// <summary>
+    /// The sound of a refusal: the game's own, the one the inventory plays when an item cannot go where it is put
+    /// (<see cref="Inventory.fail"/>, also the magic panel's failed cast and the cancel of the how-many and repair
+    /// boxes), the user's choice of 2 November 2026 over Windows' beep. Without an inventory - the title screen's
+    /// menu - the menu's back sound.
+    /// </summary>
+    private void Ding()
+    {
+        AudioClip refusal = Inventory.sInv != null ? Inventory.sInv.fail : null;
+        menu.PlaySound(refusal != null ? refusal : menu.Skin.BackSound);
+    }
+
+    /// <summary>
+    /// The box drawn over the pad's map while it waits for a button (the user's, 2 November 2026): what to press, and
+    /// for which action. Null when there is none.
+    /// </summary>
+    public string WaitBox
+    {
+        get
+        {
+            if (waiting == null || waiting.Device != EBindDevice.Gamepad)
+            {
+                return null;
+            }
+            return (waiting.Kind == EBindKind.Stick ? "Select a new stick for:\n" : "Select a new button for:\n") + waiting.Label;
+        }
+    }
+
+    /// <summary>A row of the keyboard asked to be rebound: it waits for a key, or a fixed row says it is fixed.</summary>
+    private void Rebind(KeyRow row)
+    {
+        if (row.Entry != null)
+        {
+            BeginWait(row.Entry);
+        }
+        else
+        {
+            Notice(row.Label + " can't be changed.", EBindResult.Refused);
+        }
+    }
+
+    /// <summary>A line of the pad's map asked to be rebound: it waits for a button, or a fixed line says why.</summary>
+    private void Rebind(Callout c, int line)
+    {
+        BindEntry e = c.Entries[line];
+        if (e != null)
+        {
+            BeginWait(e);
+        }
+        else
+        {
+            Notice(c.Whys[line], EBindResult.Refused);
+        }
+    }
+
+    private void BeginWait(BindEntry e)
+    {
+        waiting = e;
+        // from the next frame: this one's Enter or A is the press that asked
+        waitFrom = Time.frameCount + 1;
+        pendingModifier = null;
+        notice = null;
+        menu.PlaySound(menu.Skin.MoveSound);
+    }
+
+    /// <summary>The menu closes or opens: a rebind left waiting is dropped.</summary>
+    public void CancelWait()
+    {
+        waiting = null;
+        notice = null;
+    }
+
+    /// <summary>What the keyboard's list says while it waits for a key; the pad's waits under a box (<see cref="WaitBox"/>).</summary>
+    private string Prompt()
+    {
+        return waiting == null ? null : $"Press the new key for {waiting.Label}. Esc, or Start or B on the pad: cancel.";
+    }
+
+    /// <summary>Every frame a binding waits: the first key or button pressed is its new one, and swaps with what held it.</summary>
+    public void UpdateWait()
+    {
+        if (waiting == null || Time.frameCount < waitFrom)
+        {
+            return;
+        }
+        Mouse mouse = Mouse.current;
+        if (GameInput.EscapePressedThisFrame())
+        {
+            // cancelled: nothing to say (the user's, 2 November 2026)
+            GameInput.ConsumeEscape();
+            EndWait(null, EBindResult.Unchanged);
+            return;
+        }
+        if (mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame))
+        {
+            if (waiting.Device == EBindDevice.Keyboard)
+            {
+                // the two buttons that point and attack: an error, as any key that cannot be bound
+                EndWait(GameBindings.Refusal(waiting, "<Mouse>/leftButton"), EBindResult.Refused);
+            }
+            else
+            {
+                // a click while the pad's box is up only cancels it
+                EndWait(null, EBindResult.Unchanged);
+            }
+            return;
+        }
+
+        if (waiting.Device == EBindDevice.Keyboard)
+        {
+            // a key is waited for, but the pad that asked for it can cancel: Start or B, as Esc (fix 454, a player
+            // with only a pad was held there)
+            foreach (Gamepad pad in Gamepad.all)
+            {
+                if (pad.startButton.wasPressedThisFrame || pad.bButton.wasPressedThisFrame)
+                {
+                    EndWait(null, EBindResult.Unchanged);
+                    return;
+                }
+            }
+        }
+
+        if (waiting.Device == EBindDevice.Gamepad)
+        {
+            foreach (Gamepad pad in Gamepad.all)
+            {
+                if (pad.startButton.wasPressedThisFrame)
+                {
+                    EndWait(null, EBindResult.Unchanged);
+                    return;
+                }
+                if (waiting.Kind == EBindKind.Stick)
+                {
+                    if (pad.leftStick.ReadValue().magnitude > 0.7f)
+                    {
+                        Finish("<Gamepad>/leftStick");
+                        return;
+                    }
+                    if (pad.rightStick.ReadValue().magnitude > 0.7f)
+                    {
+                        Finish("<Gamepad>/rightStick");
+                        return;
+                    }
+                }
+                foreach (string name in PadButtonNames)
+                {
+                    ButtonControl b = pad.TryGetChildControl<ButtonControl>(name);
+                    if (b != null && b.wasPressedThisFrame)
+                    {
+                        Finish("<Gamepad>/" + name);
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+
+        Keyboard keys = Keyboard.current;
+        if (keys == null)
+        {
+            return;
+        }
+        foreach (KeyControl key in keys.allKeys)
+        {
+            if (key == null || !key.wasPressedThisFrame)
+            {
+                continue;
+            }
+            if (Array.IndexOf(ModifierKeys, key.name) >= 0)
+            {
+                pendingModifier = pendingModifier ?? key.name;
+                continue;
+            }
+            Chord(keys, "<Keyboard>/" + key.name);
+            return;
+        }
+        if (mouse != null)
+        {
+            ButtonControl[] spare = { mouse.middleButton, mouse.backButton, mouse.forwardButton };
+            foreach (ButtonControl b in spare)
+            {
+                if (b != null && b.wasPressedThisFrame)
+                {
+                    Chord(keys, "<Mouse>/" + b.name);
+                    return;
+                }
+            }
+        }
+        if (pendingModifier != null)
+        {
+            KeyControl m = keys.TryGetChildControl<KeyControl>(pendingModifier);
+            if (m == null || m.wasReleasedThisFrame || !m.isPressed)
+            {
+                Finish("<Keyboard>/" + pendingModifier);
+            }
+        }
+    }
+
+    /// <summary>A key pressed while waiting, with the one modifier held with it, if any.</summary>
+    private void Chord(Keyboard keys, string key)
+    {
+        List<string> held = new List<string>();
+        if (keys.ctrlKey.isPressed)
+        {
+            held.Add("ctrl");
+        }
+        if (keys.shiftKey.isPressed)
+        {
+            held.Add("shift");
+        }
+        if (keys.altKey.isPressed)
+        {
+            held.Add("alt");
+        }
+        if (held.Count > 1)
+        {
+            EndWait("One modifier at a time.", EBindResult.Refused);
+            return;
+        }
+        Finish(held.Count == 1 ? held[0] + "+" + key : key);
+    }
+
+    private void Finish(string binding)
+    {
+        BindEntry e = waiting;
+        string line = GameBindings.Bind(e, binding, out EBindResult result);
+        EndWait(line, result);
+    }
+
+    private void EndWait(string line, EBindResult result)
+    {
+        waiting = null;
+        if (line != null)
+        {
+            Notice(line, result);
+        }
+        else
+        {
+            menu.PlaySound(menu.Skin.BackSound);
+        }
+        menu.DisarmAfterRebind();
     }
 
     /// <summary>The hints along the bottom, for the device used last.</summary>
     public Hint[] Hints(EOptionSection section, bool pad)
     {
         List<Hint> hints = new List<Hint>();
+        if (Waiting)
+        {
+            hints.Add(waiting.Device == EBindDevice.Gamepad
+                ? new Hint("cancel", HintKey.PadButton("Start"))
+                : new Hint("cancel", HintKey.Of(menu.Skin.EscapeKey)));
+            return hints.ToArray();
+        }
+        hints.Add(pad ? new Hint("rebind", HintKey.Of(menu.Skin.AButton)) : new Hint("rebind", HintKey.Keyboard("Enter")));
         if (pad)
         {
             if (section == EOptionSection.Gamepad)
@@ -290,7 +702,7 @@ public sealed class ControlsMap
 
         KeyRow selectedRow = KeyRows[Mathf.Clamp(keySelected, 0, KeyRows.Length - 1)];
         HashSet<string> lit = new HashSet<string>();
-        foreach (string k in selectedRow.Keys())
+        foreach (string k in RowKeys(selectedRow))
         {
             foreach (string c in Controls(k))
             {
@@ -300,9 +712,9 @@ public sealed class ControlsMap
         HashSet<string> used = new HashSet<string>();
         foreach (KeyRow row in KeyRows)
         {
-            if (row.Keys != null)
+            if (row.Header == null)
             {
-                foreach (string k in row.Keys())
+                foreach (string k in RowKeys(row))
                 {
                     foreach (string c in Controls(k))
                     {
@@ -337,12 +749,12 @@ public sealed class ControlsMap
                 size = Mathf.Max(11f, size * (r.width - 6f) / width);
             }
             menu.DrawText(r, name, size, TextAnchor.MiddleCenter, on ? Color.white : bound ? GameMenu.SelectColor : GameMenu.Dim);
-            if (bound && menu.WasClicked(r))
+            if (bound && !Waiting && menu.WasClicked(r))
             {
-                // a click on a key selects the first action it does
+                // a click on a key selects the first action it does; only Enter rebinds it (the user's, 2 November 2026)
                 for (int i = 0; i < KeyRows.Length; i++)
                 {
-                    if (KeyRows[i].Keys != null && KeyRows[i].Keys().Exists(k => Array.IndexOf(Controls(k), cap.Name) >= 0))
+                    if (KeyRows[i].Header == null && RowKeys(KeyRows[i]).Exists(k => Array.IndexOf(Controls(k), cap.Name) >= 0))
                     {
                         keySelected = i;
                         keyFollow = true;
@@ -390,7 +802,10 @@ public sealed class ControlsMap
         // the notes' space is kept whatever the row: when it came and went with the selection, the list under a
         // still pointer moved and the pointer took another row. Two lines, the user's of 1 November 2026; a note
         // that wraps to more is cut, so the notes are kept short.
-        List<string> note = selectedRow.Note != null ? Wrap(selectedRow.Note, Font, list.width - 40f) : new List<string>();
+        // while a rebind waits, and for a while after it, the notes' place says what to press or what was done
+        string noteText = Waiting ? Prompt() : NoticeShown ? notice : RowNote(selectedRow);
+        Color noteInk = Waiting ? Color.white : NoticeShown ? NoticeColor : GameMenu.UnselectColor;
+        List<string> note = noteText != null ? Wrap(noteText, Font, list.width - 40f) : new List<string>();
         if (note.Count > NoteLines)
         {
             note.RemoveRange(NoteLines, note.Count - NoteLines);
@@ -428,7 +843,9 @@ public sealed class ControlsMap
             int i = keyScroll + k;
             KeyRow row = KeyRows[i];
             float h = KeyRowHeight;
-            Rect r = new Rect(list.x + 8f, top + k * h, list.width - 16f, h);
+            // the rows stop short of the scroll bar, so that a click on it is the bar's and not a row's (the user's report
+            // of 2 November 2026: the bar could not be clicked)
+            Rect r = new Rect(list.x + 8f, top + k * h, list.width - 16f - (maxScroll > 0 ? KeyScrollBarWidth + 8f : 0f), h);
             if (row.Header != null)
             {
                 menu.DrawText(new Rect(r.x + 12f, r.y, r.width - 24f, h), "<b>" + row.Header + "</b>", Font, TextAnchor.MiddleLeft, GameMenu.UnselectColor);
@@ -436,47 +853,53 @@ public sealed class ControlsMap
             else
             {
                 bool selected = i == keySelected;
-                if (hoverSelects && menu.IsHovered(r) && !selected)
+                if (hoverSelects && !Waiting && !keyDragging && menu.IsHovered(r) && !selected)
                 {
                     keySelected = i;
                     selected = true;
                     took = true;
                 }
-                if (menu.WasClicked(r))
+                if (!Waiting && menu.WasClicked(r, out bool twice))
                 {
                     keySelected = i;
                     selected = true;
                     took = true;
+                    // a double click rebinds, as Enter does (the user's, 2 November 2026)
+                    if (twice)
+                    {
+                        Rebind(row);
+                    }
                 }
                 if (selected)
                 {
                     menu.DrawHighlight(r, true);
                 }
                 Color ink = selected ? Color.white : GameMenu.SelectColor;
-                string keys = row.KeysText ?? KeysText(row.Keys());
+                string keys = Waiting && selected ? "..." : row.KeysText ?? KeysText(RowKeys(row));
                 float keysW = Mathf.Min(menu.MeasureText(keys, Font) + 4f, r.width * 0.45f);
-                // the keys end short of the column of the scroll arrows
-                float keysX = r.xMax - ScrollArrowsWidth - keysW;
+                float keysX = r.xMax - 12f - keysW;
                 menu.DrawText(new Rect(r.x + 12f, r.y, keysX - 24f - r.x, h), row.Label, Font, TextAnchor.MiddleLeft, ink);
                 menu.DrawText(new Rect(keysX, r.y, keysW, h), keys, Font, TextAnchor.MiddleRight, ink);
             }
         }
 
-        // the arrows say there is more above or below, each on the line of the row nearest to it
-        if (keyScroll > 0)
+        // the scroll bar of the save and load lists, the menu's one (the user's, 2 November 2026)
+        if (maxScroll > 0)
         {
-            menu.DrawText(new Rect(list.xMax - 40f, top, 30f, KeyRowHeight), "▲", 22f, TextAnchor.MiddleCenter, GameMenu.SelectColor);
+            Rect bar = new Rect(list.xMax - 8f - KeyScrollBarWidth, top, KeyScrollBarWidth, visible * KeyRowHeight);
+            keyScroll = menu.DrawScrollBar(bar, keyScroll, visible, KeyRows.Length, ref keyDragging, ref keyGrab);
         }
-        if (keyScroll < maxScroll)
+        else
         {
-            menu.DrawText(new Rect(list.xMax - 40f, top + (visible - 1) * KeyRowHeight, 30f, KeyRowHeight), "▼", 22f,
-                TextAnchor.MiddleCenter, GameMenu.SelectColor);
+            keyDragging = false;
         }
 
         float ny = noteY;
-        foreach (string l in note)
+        int noteWarnFrom = !Waiting && NoticeShown ? FirstParagraphLines(noteText, Font, list.width - 40f) : int.MaxValue;
+        for (int i = 0; i < note.Count; i++)
         {
-            menu.DrawText(new Rect(list.x + 20f, ny, list.width - 40f, NoteLineHeight), l, Font, TextAnchor.MiddleLeft, GameMenu.UnselectColor);
+            menu.DrawText(new Rect(list.x + 20f, ny, list.width - 40f, NoteLineHeight), note[i], Font, TextAnchor.MiddleLeft,
+                i >= noteWarnFrom ? RefusedColor : noteInk);
             ny += NoteLineHeight;
         }
         return took;
@@ -529,7 +952,10 @@ public sealed class ControlsMap
         float picW = Mathf.Min(area.width * 0.36f, (bottom - top - FootnoteMaxLines * padLine) * PadOutline.GridWidth / PadOutline.GridHeight);
         float picH = picW * PadOutline.GridHeight / PadOutline.GridWidth;
         // the footnotes' space is kept on every page, as tall as the longest, so the pad does not move between pages
-        string footnote = Footnote(context);
+        // while a rebind waits, and for a while after it, the footnote's place says what to press or what was done
+        // the box over the map says what to press; after it, the footnote's place says what was done
+        string footnote = !Waiting && NoticeShown ? notice : Footnote(context);
+        Color footInk = !Waiting && NoticeShown ? NoticeColor : GameMenu.UnselectColor;
         float footW = picW + 2 * FootnoteOverhang;
         List<string> foot = footnote != null ? Wrap(footnote, padFont, footW) : new List<string>();
         if (foot.Count > FootnoteMaxLines)
@@ -557,7 +983,10 @@ public sealed class ControlsMap
         GUI.color = previous;
 
         List<Callout> callouts = Callouts(context);
-        int selected = Mathf.Clamp(padSelected[(int)context], 0, Mathf.Max(0, callouts.Count - 1));
+        List<Stop> stops = Stops(callouts);
+        int selectedStop = Mathf.Clamp(padSelected[(int)context], 0, Mathf.Max(0, stops.Count - 1));
+        int selected = stops.Count > 0 ? stops[selectedStop].Callout : -1;
+        int selectedLine = stops.Count > 0 ? stops[selectedStop].Line : -1;
         float leftEdge = area.x + 24f;
         float rightEdge = area.xMax - 24f;
         float columnGap = 48f;
@@ -590,18 +1019,38 @@ public sealed class ControlsMap
             float columnW = left ? pic.x - columnGap - leftEdge : rightEdge - pic.xMax - columnGap;
             float columnX = left ? leftEdge : pic.xMax + columnGap;
             Rect block = new Rect(columnX, c.Top, columnW, c.Height);
-            bool on = i == selected;
-            if (hoverSelects && menu.IsHovered(block) && !on)
+            // the line under the pointer, on a callout of two (a stick and its click)
+            int lineUnder = 0;
+            float ly = c.Top + Mathf.Max(0f, (padGlyph - padLine) / 2);
+            for (int w = 0; w < c.Wrapped.Count; w++)
             {
-                padSelected[(int)context] = i;
+                if (menu.IsHovered(new Rect(block.x, ly + w * padLine, block.width, padLine)))
+                {
+                    lineUnder = c.WrappedOwner[w];
+                }
+            }
+            int stopUnder = stops.FindIndex(st => st.Callout == i && st.Line == lineUnder);
+            bool on = i == selected;
+            if (!Waiting && hoverSelects && menu.IsHovered(block) && stopUnder >= 0 && stopUnder != selectedStop)
+            {
+                padSelected[(int)context] = stopUnder;
+                selectedStop = stopUnder;
+                selectedLine = lineUnder;
                 on = true;
                 took = true;
             }
-            if (menu.WasClicked(block))
+            if (!Waiting && stopUnder >= 0 && menu.WasClicked(block, out bool twice))
             {
-                padSelected[(int)context] = i;
+                // a click selects; a double click rebinds, as A and Enter do (the user's, 2 November 2026)
+                padSelected[(int)context] = stopUnder;
+                selectedStop = stopUnder;
+                selectedLine = lineUnder;
                 on = true;
                 took = true;
+                if (twice)
+                {
+                    Rebind(c, lineUnder);
+                }
             }
             if (on)
             {
@@ -610,6 +1059,7 @@ public sealed class ControlsMap
 
             Color ink = on ? Color.white : GameMenu.SelectColor;
             Rect glyph = GlyphRect(c.Control, block, left);
+            bool several = c.Lines.Count > 1;
             Vector2 attach = new Vector2(left ? block.xMax + 6f : block.x - 6f, glyph.center.y);
             Vector2 anchor = new Vector2(drawn.x + c.Anchor.x / PadOutline.GridWidth * drawn.width, drawn.y + c.Anchor.y / PadOutline.GridHeight * drawn.height);
             Color lineColor = on ? Color.white : GameMenu.UnselectColor;
@@ -635,17 +1085,22 @@ public sealed class ControlsMap
             float textX = left ? block.x - TextOverhang : glyph.xMax + 12f;
             float textW = left ? glyph.x - 12f - textX : block.xMax + TextOverhang - textX;
             float y = c.Top + Mathf.Max(0f, (padGlyph - padLine) / 2);
-            foreach (string l in c.Wrapped)
+            for (int w = 0; w < c.Wrapped.Count; w++)
             {
-                menu.DrawText(new Rect(textX, y, textW, padLine), l, padFont, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, ink);
+                // of a callout of two lines, the selected one in white, the other in the list's colour
+                Color lineInk = on && several && c.WrappedOwner[w] != selectedLine ? GameMenu.SelectColor : ink;
+                string l = c.Wrapped[w];
+                menu.DrawText(new Rect(textX, y, textW, padLine), l, padFont, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, lineInk);
                 y += padLine;
             }
         }
 
         float fy = drawn.yMax + 8f;
-        foreach (string l in foot)
+        int footWarnFrom = !Waiting && NoticeShown ? FirstParagraphLines(footnote, padFont, footW) : int.MaxValue;
+        for (int i = 0; i < foot.Count; i++)
         {
-            menu.DrawText(new Rect(drawn.x - FootnoteOverhang, fy, drawn.width + 2 * FootnoteOverhang, padLine), l, padFont, TextAnchor.MiddleCenter, GameMenu.UnselectColor);
+            menu.DrawText(new Rect(drawn.x - FootnoteOverhang, fy, drawn.width + 2 * FootnoteOverhang, padLine), foot[i], padFont,
+                TextAnchor.MiddleCenter, i >= footWarnFrom ? RefusedColor : footInk);
             fy += padLine;
         }
         return took;
@@ -683,9 +1138,14 @@ public sealed class ControlsMap
         {
             float textW = columnW - GlyphWidth(c.Control) - 12f + TextOverhang;
             c.Wrapped = new List<string>();
-            foreach (string l in c.Lines)
+            c.WrappedOwner = new List<int>();
+            for (int l = 0; l < c.Lines.Count; l++)
             {
-                c.Wrapped.AddRange(Wrap(l, padFont, textW));
+                foreach (string w in Wrap(c.Lines[l], padFont, textW))
+                {
+                    c.Wrapped.Add(w);
+                    c.WrappedOwner.Add(l);
+                }
             }
             c.Height = Mathf.Max(padGlyph, c.Wrapped.Count * padLine + Mathf.Max(0f, (padGlyph - padLine)));
             float anchorY = pic.y + c.Anchor.y / PadOutline.GridHeight * pic.height;
@@ -774,9 +1234,9 @@ public sealed class ControlsMap
         {
             case EPadContext.Walking:
                 // the ledge rumble is said here because nothing else says it, and a player took it for a fault
-                return "Attack and Stats change triggers with your character's weapon hand. "
+                return "The triggers change sides with your character's weapon hand. "
                     + "A rumble as you run means a ledge ahead. It can be turned off under INPUT.";
-            case EPadContext.Inventory: return "With the inventory open, the left stick still walks.";
+            case EPadContext.Inventory: return "With the inventory open, " + GameBindings.PadText(GameActions.PadWorld.Move) + " still walks.";
             case EPadContext.Menus: return "The menus' buttons are always the same.";
             default: return null;
         }
@@ -818,8 +1278,8 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadWorld.LookAt, "Look at");
                 AddBound(lines, GameActions.PadWorld.Use, "Use or pick up");
                 AddBound(lines, GameActions.PadWorld.Cancel, "Cancel a charge, drop the item");
-                AddBound(lines, GameActions.PadWorld.Attack, "Attack (weapon hand)");
-                AddBound(lines, GameActions.PadWorld.Stats, "Stats (off hand)");
+                AddBound(lines, GameActions.PadWorld.Attack, "Attack");
+                AddBound(lines, GameActions.PadWorld.Stats, "Stats");
                 AddBound(lines, GameActions.PadWorld.MagicPanel, "Magic panel");
                 AddBound(lines, GameActions.PadWorld.Inventory, "Inventory");
                 AddBound(lines, GameActions.PadWorld.Map, "Map");
@@ -827,7 +1287,7 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadWorld.Sleep, "Sleep (hold)");
                 AddBound(lines, GameActions.PadWorld.MessagesBack, "Messages back");
                 AddBound(lines, GameActions.PadWorld.MessagesForward, "Messages forward");
-                AddFixed(lines, EPadControl.Start, "Game menu; hold: controls");
+                AddFixed(lines, EPadControl.Start, "Game menu; hold: controls", PadGlyphs.Name("Start") + " can't be changed.");
                 break;
             case EPadContext.Inventory:
                 AddBound(lines, GameActions.PadInventory.Up, "Move the selection");
@@ -863,17 +1323,17 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadMap.Back, "Close (on release)");
                 break;
             default:
-                AddFixed(lines, EPadControl.South, "Choose");
-                AddFixed(lines, EPadControl.East, "Back, close");
-                AddFixed(lines, EPadControl.DPad, "Move");
-                AddFixed(lines, EPadControl.LeftShoulder, "Previous tab");
-                AddFixed(lines, EPadControl.RightShoulder, "Next tab");
-                AddFixed(lines, EPadControl.LeftTrigger, "Previous section");
-                AddFixed(lines, EPadControl.RightTrigger, "Next section");
-                AddFixed(lines, EPadControl.Start, "Game menu");
-                AddFixed(lines, EPadControl.Select, "Reset; hold: reset all");
-                AddFixed(lines, EPadControl.North, "Delete a save");
-                AddFixed(lines, EPadControl.West, "Hold: quit to the title");
+                AddFixed(lines, EPadControl.South, "Choose", MenusFixed);
+                AddFixed(lines, EPadControl.East, "Back, close", MenusFixed);
+                AddFixed(lines, EPadControl.DPad, "Move", MenusFixed);
+                AddFixed(lines, EPadControl.LeftShoulder, "Previous tab", MenusFixed);
+                AddFixed(lines, EPadControl.RightShoulder, "Next tab", MenusFixed);
+                AddFixed(lines, EPadControl.LeftTrigger, "Previous section", MenusFixed);
+                AddFixed(lines, EPadControl.RightTrigger, "Next section", MenusFixed);
+                AddFixed(lines, EPadControl.Start, "Game menu", MenusFixed);
+                AddFixed(lines, EPadControl.Select, "Reset; hold: reset all", MenusFixed);
+                AddFixed(lines, EPadControl.North, "Delete a save", MenusFixed);
+                AddFixed(lines, EPadControl.West, "Hold: quit to the title", MenusFixed);
                 break;
         }
 
@@ -892,16 +1352,22 @@ public sealed class ControlsMap
             if (!c.Lines.Contains(text))
             {
                 c.Lines.Add(text);
+                c.Entries.Add(line.Entry);
+                c.Whys.Add(line.Why);
             }
         }
         Callout dpad = callouts.Find(x => x.Control == EPadControl.DPad);
         if (dpad != null)
         {
             List<PadLine> directions = lines.FindAll(l => l.Control == EPadControl.DPad && l.Prefix != null);
-            if (directions.Count == 4 && directions.TrueForAll(l => l.Text == directions[0].Text))
+            if (directions.Count == 4 && directions.TrueForAll(l => l.Text == directions[0].Text && l.Entry == null))
             {
                 dpad.Lines.Clear();
+                dpad.Entries.Clear();
+                dpad.Whys.Clear();
                 dpad.Lines.Add(directions[0].Text);
+                dpad.Entries.Add(null);
+                dpad.Whys.Add(directions[0].Why);
             }
         }
 
@@ -953,24 +1419,35 @@ public sealed class ControlsMap
         return c.Anchor.y;
     }
 
-    private static void AddFixed(List<PadLine> lines, EPadControl control, string text)
+    private const string MenusFixed = "The menus' buttons can't be changed.";
+    private const string CursorFixed = "The d-pad's cursor can't be changed.";
+
+    private static void AddFixed(List<PadLine> lines, EPadControl control, string text, string why)
     {
-        lines.Add(new PadLine { Control = control, Text = text });
+        lines.Add(new PadLine { Control = control, Text = text, Why = why });
     }
 
-    /// <summary>A line for each pad binding of an action, with the bindings of the other hand left out.</summary>
+    /// <summary>
+    /// A line for each pad binding of an action, with the binding it rebinds (none for the panels' cursor, which is
+    /// fixed); on a trigger the hand that pulls it, whatever the action (the triggers follow the weapon hand).
+    /// </summary>
     private static void AddBound(List<PadLine> lines, InputAction action, string text)
     {
-        InputBinding? mask = action.bindingMask;
+        BindEntry entry = GameBindings.Of(action);
         foreach (InputBinding b in action.bindings)
         {
-            if (b.isComposite || (mask.HasValue && !mask.Value.Matches(b)))
+            if (b.isComposite)
             {
                 continue;
             }
             if (PadControlOf(b.effectivePath, out EPadControl control, out string prefix))
             {
-                lines.Add(new PadLine { Control = control, Prefix = prefix, Text = text });
+                string shown = text;
+                if (control == EPadControl.LeftTrigger || control == EPadControl.RightTrigger)
+                {
+                    shown += b.effectivePath == GameBindings.WeaponTrigger ? " (weapon hand)" : " (off hand)";
+                }
+                lines.Add(new PadLine { Control = control, Prefix = prefix, Text = shown, Entry = entry, Why = entry == null ? CursorFixed : null });
             }
         }
     }
@@ -1056,7 +1533,8 @@ public sealed class ControlsMap
         List<string> keys = new List<string>();
         for (int d = from; d <= to; d++)
         {
-            keys.Add("digit" + d);
+            // the Input System's names of the digit keys
+            keys.Add(d.ToString());
         }
         return keys;
     }
@@ -1064,6 +1542,18 @@ public sealed class ControlsMap
     /// <summary>The keys of the drawing a bound name stands for: Ctrl, Shift and Alt are either of two.</summary>
     private static string[] Controls(string name)
     {
+        int plus = name.IndexOf('+');
+        if (plus > 0)
+        {
+            List<string> both = new List<string>(Controls(name.Substring(0, plus)));
+            both.AddRange(Controls(name.Substring(plus + 1)));
+            return both.ToArray();
+        }
+        if (name.StartsWith("mouse/", StringComparison.Ordinal))
+        {
+            // a mouse button lights no key
+            return new string[0];
+        }
         switch (name)
         {
             case "ctrl": return new[] { "leftCtrl", "rightCtrl" };
@@ -1093,8 +1583,16 @@ public sealed class ControlsMap
     /// </summary>
     private static string KeyName(string control)
     {
+        int plus = control.IndexOf('+');
+        if (plus > 0)
+        {
+            return KeyName(control.Substring(0, plus)) + "+" + KeyName(control.Substring(plus + 1));
+        }
         switch (control)
         {
+            case "mouse/middleButton": return "Mouse 3";
+            case "mouse/backButton": return "Mouse 4";
+            case "mouse/forwardButton": return "Mouse 5";
             case "escape": return "Esc";
             case "backspace": return "Back";
             case "tab": return "Tab";
@@ -1133,10 +1631,6 @@ public sealed class ControlsMap
         {
             return key.displayName.ToUpperInvariant();
         }
-        if (control.StartsWith("digit", StringComparison.Ordinal))
-        {
-            return control.Substring(5);
-        }
         switch (control)
         {
             case "backquote": return "`";
@@ -1171,8 +1665,10 @@ public sealed class ControlsMap
         Row(0f, 2f, K("f1"), K("f2"), K("f3"), K("f4"));
         Row(0f, 6.5f, K("f5"), K("f6"), K("f7"), K("f8"));
         Row(0f, 11f, K("f9"), K("f10"), K("f11"), K("f12"));
-        Row(1.5f, 0f, K("backquote"), K("digit1"), K("digit2"), K("digit3"), K("digit4"), K("digit5"), K("digit6"), K("digit7"),
-            K("digit8"), K("digit9"), K("digit0"), K("minus"), K("equals"), K("backspace", 2f));
+        // the digits by the Input System's own names, 1 to 0: "digit1" named nothing, and a digit could not be bound (the
+        // user's report of 2 November 2026)
+        Row(1.5f, 0f, K("backquote"), K("1"), K("2"), K("3"), K("4"), K("5"), K("6"), K("7"),
+            K("8"), K("9"), K("0"), K("minus"), K("equals"), K("backspace", 2f));
         Row(2.5f, 0f, K("tab", 1.5f), K("q"), K("w"), K("e"), K("r"), K("t"), K("y"), K("u"), K("i"), K("o"), K("p"),
             K("leftBracket"), K("rightBracket"), K("backslash", 1.5f));
         Row(3.5f, 0f, K("capsLock", 1.75f), K("a"), K("s"), K("d"), K("f"), K("g"), K("h"), K("j"), K("k"), K("l"),
@@ -1191,9 +1687,27 @@ public sealed class ControlsMap
     // ---------------------------------------------------------------- text
 
     /// <summary>A text broken into lines no wider than a width, at word boundaries, measured in the menu's font.</summary>
+    /// <summary>
+    /// The lines of a line of what was done before its warning: a second paragraph, after a line break, is a warning,
+    /// drawn on a line of its own and in red (the user's, 11 November 2026).
+    /// </summary>
+    private int FirstParagraphLines(string text, float size, float width)
+    {
+        int nl = text?.IndexOf('\n') ?? -1;
+        return nl < 0 ? int.MaxValue : Wrap(text.Substring(0, nl), size, width).Count;
+    }
+
+    /// <summary>A text cut into lines of a width; a line break starts a new line.</summary>
     private List<string> Wrap(string text, float size, float width)
     {
         List<string> lines = new List<string>();
+        int nl = text.IndexOf('\n');
+        if (nl >= 0)
+        {
+            lines.AddRange(Wrap(text.Substring(0, nl), size, width));
+            lines.AddRange(Wrap(text.Substring(nl + 1), size, width));
+            return lines;
+        }
         string current = "";
         foreach (string word in text.Split(' '))
         {

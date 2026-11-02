@@ -242,6 +242,7 @@ public sealed class GameMenu
         this.tabs = tabs;
         this.dimBehind = dimBehind;
         controlsMap = new ControlsMap(this);
+        PadGlyphs.Remember(skin.AButton, skin.BButton, skin.XButton, skin.YButton);
     }
 
     // A is read on its release, and a menu opened with A pressed - Setup and Journey Onward on the
@@ -264,6 +265,7 @@ public sealed class GameMenu
     public void Open(ETab tab)
     {
         GameOptions.ScanSoundFonts();
+        controlsMap.CancelWait();
         snapshot = new GameOptions.Snapshot();
         openedFrame = Time.frameCount;
         confirm = EConfirm.None;
@@ -339,6 +341,7 @@ public sealed class GameMenu
     public bool Close()
     {
         CloseSubPage();
+        controlsMap.CancelWait();
         confirm = EConfirm.None;
         dragging = null;
         GameOptions.Save();
@@ -362,6 +365,31 @@ public sealed class GameMenu
 
     /// <summary>True while the Yes/No box is up.</summary>
     public bool Asking => confirm != EConfirm.None;
+
+    /// <summary>
+    /// While a control map waits for a new key or button, and after it until the X that was pressed for it is let
+    /// go: the host's X held to quit does not count, since that press was a binding.
+    /// </summary>
+    public bool PadHoldsPaused => controlsMap.Waiting || xHeldAfterRebind;
+
+    // the pad's X was down when a rebind took a button: its hold is not the host's quit until it is let go
+    private bool xHeldAfterRebind;
+
+    /// <summary>
+    /// A control map has just taken a key or button for a binding: the press is not also the menu's. A's release is
+    /// not a choice until A has been up once, nor Select's a Reset, nor X's hold a quit.
+    /// </summary>
+    public void DisarmAfterRebind()
+    {
+        Gamepad pad = Gamepad.current;
+        padAcceptArmed = false;
+        if (pad != null && pad.selectButton.isPressed)
+        {
+            selectHeld = Mathf.Max(selectHeld, 0.001f);
+            selectFired = true;
+        }
+        xHeldAfterRebind = pad != null && pad.xButton.isPressed;
+    }
 
     /// <summary>True on the frame the menu opened, when the key that opened it must not also close it.</summary>
     public bool JustOpened => Time.frameCount == openedFrame;
@@ -602,6 +630,13 @@ public sealed class GameMenu
         GameOptions.Tick();
         // the Interface scale, clicked or dragged, grows the interface once the button is let go
         GameOptions.HoldGrowth(dragging != null && dragging.Key == UiScale.GrowthPrefsKey);
+        xHeldAfterRebind &= Gamepad.current?.xButton.isPressed ?? false;
+        // a control map waiting for a key or button takes every key and button, Esc and Start among them
+        if (controlsMap.Waiting)
+        {
+            controlsMap.UpdateWait();
+            return false;
+        }
         UpdateStartHeld();
 
         Gamepad pad = Gamepad.current;
@@ -1025,6 +1060,16 @@ public sealed class GameMenu
     /// <summary>True when the pointer clicked in the rect, and no question is up.</summary>
     public bool WasClicked(Rect r) => confirm == EConfirm.None && Clicked(r);
 
+    /// <summary>A click on a rectangle, and whether it was the second of a double click (the control maps rebind on one).</summary>
+    public bool WasClicked(Rect r, out bool twice)
+    {
+        // read before the click is taken: taking it marks the event used
+        int count = Event.current != null ? Event.current.clickCount : 0;
+        bool clicked = WasClicked(r);
+        twice = clicked && count >= 2;
+        return clicked;
+    }
+
     public void DrawText(Rect r, string content, float size, TextAnchor anchor, Color color, bool wrap = false) =>
         Text(r, content, size, anchor, color, wrap);
 
@@ -1319,6 +1364,15 @@ public sealed class GameMenu
         if (confirm != EConfirm.None)
         {
             DrawConfirm(confirmBox, yes, no);
+        }
+        else if (controlsMap.WaitBox != null)
+        {
+            // a control map waiting for a pad button says so in a box of the question's look, without its buttons
+            Rect box = new Rect(confirmBox.x, confirmBox.y + (ButtonHeight + 40f) / 2, confirmBox.width, confirmBox.height - ButtonHeight - 40f);
+            Fill(box, new Color(0f, 0f, 0f, 0.92f));
+            Frame(box, SelectColor);
+            Text(new Rect(box.x + 40f, box.y + 20f, box.width - 80f, box.height - 40f), controlsMap.WaitBox, DetailTitleFont,
+                TextAnchor.MiddleCenter, Color.white, true);
         }
 
         GuiInput.TryConsumeClickInPanel(screen);

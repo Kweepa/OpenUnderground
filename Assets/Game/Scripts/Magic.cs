@@ -4478,18 +4478,18 @@ public class Magic : MonoBehaviour
 
                 if (activeSpellCursor >= 0 || hasRunestone[index])
                 {
-                    DrawTex(invPosition + 60, PanelTop + 484, sz, sz, PadGlyphs.Face(aButton));
+                    PadGlyphs.DrawBound(UiScale.R(invPosition + 60, PanelTop + 484, sz, sz), GameActions.PadMagic.Select);
                     GUI.Label(UiScale.R(invPosition + 90, PanelTop + 484, 100, 60),
                         activeSpellCursor >= 0 ? "Dispel" : "Select", UiScale.Style(style));
                 }
                 if (spellInProgress.Count > 1)
                 {
-                    DrawTex(invPosition + 140, PanelTop + 484, sz, sz, PadGlyphs.Face(xButton));
+                    PadGlyphs.DrawBound(UiScale.R(invPosition + 140, PanelTop + 484, sz, sz), GameActions.PadMagic.Cast);
                     GUI.Label(UiScale.R(invPosition + 170, PanelTop + 484, 100, 60), "Cast", UiScale.Style(style));
                 }
                 if (spellInProgress.Count > 0)
                 {
-                    DrawTex(invPosition + 50, PanelTop + 344, sz, sz, PadGlyphs.Face(bButton));
+                    PadGlyphs.DrawBound(UiScale.R(invPosition + 50, PanelTop + 344, sz, sz), GameActions.PadMagic.Clear);
                 }
             }
 

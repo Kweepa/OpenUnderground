@@ -838,27 +838,31 @@ public class TutorialManager : MonoBehaviour
     private string BuildStepText(ETutorialStep step)
     {
         bool mouseUi = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
-        bool leftHanded = PlayerData.sData != null && PlayerData.sData.leftHanded;
+        GameActions.KeysWorldActions keys = GameActions.KeysWorld;
+        GameActions.PadWorldActions pad = GameActions.PadWorld;
+        // the keys and buttons the player has bound now (mod 320), never the defaults written in
+        string K(UnityEngine.InputSystem.InputAction a) => GameBindings.KeyText(a);
+        string P(UnityEngine.InputSystem.InputAction a) => GameBindings.PadText(a);
 
         switch (step)
         {
         case ETutorialStep.Movement:
             if (mouseUi)
             {
-                return "Use WASD or the arrow keys to move. Press Space to jump.";
+                return $"Use {WalkKeys()} or the arrow keys to move. Press {K(keys.Jump)} to jump.";
             }
 
-            return "Use the left stick to move. Press A to jump.";
+            return $"Use {P(pad.Move)} to move. Press {P(pad.Jump)} to jump.";
         case ETutorialStep.PortablePickup:
             if (mouseUi)
             {
                 return "Click the left mouse button to examine things. "
-                       + "Move (WASD) close enough that an item name turns yellow, then hold or drag the left mouse button to pick it up, "
-                       + "or press F to put it straight into your pack.";
+                       + $"Move ({WalkKeys()}) close enough that an item name turns yellow, then hold or drag the left mouse button to pick it up, "
+                       + $"or press {K(keys.Use)} to put it straight into your pack.";
             }
 
-            return "Press X to examine things. "
-                   + "Move close enough that an item name turns yellow, then press Y to pick it up. Open the inventory with the right shoulder button.";
+            return $"Press {P(pad.LookAt)} to examine things. "
+                   + $"Move close enough that an item name turns yellow, then press {P(pad.Use)} to pick it up. Open the inventory with {P(pad.Inventory)}.";
         case ETutorialStep.PortableDropInInventory:
             return "Click an inventory slot to drop the item from your cursor into your inventory.";
         case ETutorialStep.Inventory:
@@ -866,32 +870,27 @@ public class TutorialManager : MonoBehaviour
             {
                 if (PlayerPanelState.IsEffectivelyExploringInventory)
                 {
-                    return "Press E or Esc to close your inventory.";
+                    return $"Press {K(keys.Inventory)} or Esc to close your inventory.";
                 }
 
-                return "Press E to open and close your inventory.";
+                return $"Press {K(keys.Inventory)} to open and close your inventory.";
             }
 
-            return "Press the right shoulder button to open and close your inventory.";
+            return $"Press {P(pad.Inventory)} to open and close your inventory.";
         case ETutorialStep.WeaponCharge:
             if (mouseUi)
             {
-                return "Hold the right mouse button to charge an attack, then release to swing. Press X to cancel a charge.";
+                return $"Hold the right mouse button to charge an attack, then release to swing. Press {K(keys.CancelCharge)} to cancel a charge.";
             }
 
-            if (leftHanded)
-            {
-                return "Hold the left trigger to charge an attack, then release to swing. Press B to cancel a charge.";
-            }
-
-            return "Hold the right trigger to charge an attack, then release to swing. Press B to cancel a charge.";
+            return $"Hold {P(pad.Attack)} to charge an attack, then release to swing. Press {P(pad.Cancel)} to cancel a charge.";
         case ETutorialStep.MagicPanelOpen:
             if (mouseUi)
             {
-                return "Press Q to open the magic panel.";
+                return $"Press {K(keys.MagicPanel)} to open the magic panel.";
             }
 
-            return "Press the left shoulder button to open the magic panel.";
+            return $"Press {P(pad.MagicPanel)} to open the magic panel.";
         case ETutorialStep.MagicCast:
             {
                 bool canBuildFirstCircleSpell = Magic.sMagic != null && Magic.sMagic.CanBuildFirstCircleSpell();
@@ -900,40 +899,45 @@ public class TutorialManager : MonoBehaviour
                 {
                     if (canBuildFirstCircleSpell)
                     {
-                        return "Click runes in the magic panel to build a spell, then click the spell runes to cast. " + spellExamplesText + "Press Q to close the magic panel.";
+                        return "Click runes in the magic panel to build a spell, then click the spell runes to cast. " + spellExamplesText + $"Press {K(keys.MagicPanel)} to close the magic panel.";
                     }
 
-                    return "Press Q to close the magic panel.";
+                    return $"Press {K(keys.MagicPanel)} to close the magic panel.";
                 }
 
+                GameActions.PadMagicActions magic = GameActions.PadMagic;
                 if (canBuildFirstCircleSpell)
                 {
-                    return "Use A to select runes, X to cast, and B to clear. " + spellExamplesText + "Press the left shoulder button to close the magic panel.";
+                    return $"Use {P(magic.Select)} to select runes, {P(magic.Cast)} to cast, and {P(magic.Clear)} to clear. " + spellExamplesText + $"Press {P(pad.MagicPanel)} to close the magic panel.";
                 }
 
-                return "Press the left shoulder button to close the magic panel.";
+                return $"Press {P(pad.MagicPanel)} to close the magic panel.";
             }
         case ETutorialStep.Interactable:
             if (mouseUi)
             {
-                return "Hold the left mouse button, or press F, to use switches, doors, and other interactables when you are close enough.";
+                return $"Hold the left mouse button, or press {K(keys.Use)}, to use switches, doors, and other interactables when you are close enough.";
             }
 
-            return "Press Y to use switches, doors, and other interactables when you are close enough.";
+            return $"Press {P(pad.Use)} to use switches, doors, and other interactables when you are close enough.";
         case ETutorialStep.StatsPanel:
             if (mouseUi)
             {
-                return "Press R to show and hide your character stats.";
+                return $"Press {K(keys.Stats)} to show and hide your character stats.";
             }
 
-            if (leftHanded)
-            {
-                return "Press the right trigger to show and hide your character stats.";
-            }
-
-            return "Press the left trigger to show and hide your character stats.";
+            return $"Press {P(pad.Stats)} to show and hide your character stats.";
         default:
             return "";
         }
+    }
+
+    /// <summary>The four walking keys as one word when each is a letter, as WASD; otherwise one by one.</summary>
+    private static string WalkKeys()
+    {
+        UnityEngine.InputSystem.InputAction move = GameActions.KeysWorld.Move;
+        string[] parts = { GameBindings.KeyText(move, "Up"), GameBindings.KeyText(move, "Left"), GameBindings.KeyText(move, "Down"), GameBindings.KeyText(move, "Right") };
+        bool letters = System.Array.TrueForAll(parts, x => x.Length == 1);
+        return letters ? string.Concat(parts) : string.Join(", ", parts);
     }
 }
