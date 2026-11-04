@@ -69,33 +69,50 @@ public sealed class ControlsMap
         public BindEntry Entry => EntryId != null ? GameBindings.Find(EntryId) : null;
     }
 
+    // The sections, the user's of 4 November 2026 (mod 1080): MOVEMENT, LOOKING, GAMEPLAY, PANELS, GENERAL.
     private static readonly KeyRow[] KeyRows =
     {
-        new KeyRow { Header = "WALKING" },
+        new KeyRow { Header = "MOVEMENT" },
         new KeyRow { Label = "Move forward", EntryId = "Keys.World/Move/Up", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Up") },
         new KeyRow { Label = "Move back", EntryId = "Keys.World/Move/Down", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Down") },
         new KeyRow { Label = "Move left", EntryId = "Keys.World/Move/Left", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Left") },
         new KeyRow { Label = "Move right", EntryId = "Keys.World/Move/Right", Keys = () => Bound(GameActions.KeysWorld.MoveAlternate, "Right") },
-        new KeyRow { Label = "Sprint", EntryId = "Keys.World/Sprint", Note = "Hold; forward only, and it uses stamina." },
-        new KeyRow { Label = "Walk quietly", EntryId = "Keys.World/WalkQuietly", Note = "Hold to walk slowly and quietly." },
+        new KeyRow { Label = "Turn left", EntryId = "Keys.World/TurnLeft" },
+        new KeyRow { Label = "Turn right", EntryId = "Keys.World/TurnRight" },
+        new KeyRow { Label = "Move forward quietly", EntryId = "Keys.World/WalkSlowly", Note = "Hold: forward, slowly and quietly." },
+        new KeyRow { Label = "Walk quietly modifier", EntryId = "Keys.World/WalkQuietly", Note = "Hold with a move key to walk slowly and quietly." },
+        new KeyRow { Label = "Sprint modifier", EntryId = "Keys.World/Sprint", Note = "Hold; forward only, and it uses stamina." },
         new KeyRow { Label = "Jump", EntryId = "Keys.World/Jump" },
+        new KeyRow { Label = "Standing long jump", EntryId = "Keys.World/LongJump", Note = "From standing, a leap forward; on the move, a jump." },
+        new KeyRow { Label = "Fly up", EntryId = "Keys.World/FlyUp", Note = "Hold, with Fly or Levitate." },
+        new KeyRow { Label = "Fly down", EntryId = "Keys.World/FlyDown", Note = "Hold, with Fly or Levitate." },
+        new KeyRow { Header = "LOOKING" },
+        new KeyRow { Label = "Look down", EntryId = "Keys.World/LookDown", Note = "A step a press, four at most; hold to repeat." },
+        new KeyRow { Label = "Look ahead", EntryId = "Keys.World/LookAhead" },
+        new KeyRow { Label = "Look up", EntryId = "Keys.World/LookUp", Note = "A step a press, four at most; hold to repeat." },
+        new KeyRow { Label = "Look with the mouse modifier", EntryId = "Keys.World/MouseLook", Note = "Hold, with a panel open or a spell waiting for its target." },
+        new KeyRow { Header = "GAMEPLAY" },
         new KeyRow { Label = "Use or pick up", EntryId = "Keys.World/Use", Note = "Straight into your pack; with an item on the cursor, put it there." },
         new KeyRow { Label = "Cancel a charge", EntryId = "Keys.World/CancelCharge" },
-        new KeyRow { Label = "Look with the mouse", EntryId = "Keys.World/MouseLook", Note = "Hold, with a panel open or a spell waiting for its target." },
+        new KeyRow { Label = "Sleep", EntryId = "Keys.World/Sleep", Note = "On a bedroll, if there is one in your pack." },
+        new KeyRow { Label = "Track", EntryId = "Keys.World/Track", Note = "The creatures nearby, and in which direction." },
+        new KeyRow { Label = "Type runes", Keys = () => new List<string> { "enter" }, Note = "Then type the runes' letters; Enter again to cast." },
+        // at most five answers in the original's conversations: four in a babl_menu, five in two babl_fmenu (Hewstone,
+        // Ishtass on levels 2 and 3, read in CNV.ARK); the digits up to 9 still answer, none has more to answer
+        new KeyRow { Label = "Reply in a conversation", Keys = () => Digits(1, 5), KeysText = "1 - 5" },
+        new KeyRow { Label = "Play an instrument", Keys = () => Digits(0, 9), KeysText = "0 - 9" },
         new KeyRow { Header = "PANELS" },
-        new KeyRow { Label = "Magic panel", EntryId = "Keys.World/MagicPanel" },
+        new KeyRow { Label = "Magic panel", EntryId = "Keys.World/MagicPanel", Note = "Or a right click on the rune bag in the inventory." },
         new KeyRow { Label = "Cast the spell", EntryId = "Keys.World/Cast" },
         new KeyRow { Label = "Inventory", EntryId = "Keys.World/Inventory" },
         new KeyRow { Label = "Stats", EntryId = "Keys.World/Stats" },
+        new KeyRow { Label = "Inventory and stats", EntryId = "Keys.World/CharacterPanel", Note = "The inventory, then the stats, then closed." },
         new KeyRow { Label = "Map", EntryId = "Keys.World/Map" },
         new KeyRow { Label = "Messages back", EntryId = "Keys.World/MessagesBack" },
         new KeyRow { Label = "Messages forward", EntryId = "Keys.World/MessagesForward" },
-        new KeyRow { Header = "GAME" },
+        new KeyRow { Header = "GENERAL" },
         new KeyRow { Label = "Quicksave", EntryId = "Keys.World/Quicksave" },
-        new KeyRow { Label = "Sleep", EntryId = "Keys.World/Sleep", Note = "On a bedroll, if there is one in your pack." },
-        new KeyRow { Label = "Track", EntryId = "Keys.World/Track", Note = "The creatures nearby, and in which direction." },
         new KeyRow { Label = "Controls", EntryId = "Keys.World/Controls", Note = "Open these maps: the pad's if you used the pad last." },
-        new KeyRow { Header = "ALWAYS THE SAME" },
         new KeyRow { Label = "Game menu", Keys = () => new List<string> { "escape" }, Note = "With a panel open, close it first." },
         new KeyRow
         {
@@ -106,9 +123,6 @@ public sealed class ControlsMap
                 Bound(GameActions.KeysInventory.Left), Bound(GameActions.KeysInventory.Right)),
             Note = "In the inventory and the magic panel.",
         },
-        new KeyRow { Label = "Type runes", Keys = () => new List<string> { "enter" }, Note = "Then type the runes' letters; Enter again to cast." },
-        new KeyRow { Label = "Reply in a conversation", Keys = () => Digits(1, 9), KeysText = "1 - 9" },
-        new KeyRow { Label = "Play an instrument", Keys = () => Digits(0, 9), KeysText = "0 - 9" },
     };
 
     /// <summary>A row's keys, as names of the drawing's keys: its binding's (a chord as ctrl+j), then the fixed ones.</summary>
@@ -116,7 +130,7 @@ public sealed class ControlsMap
     {
         List<string> keys = new List<string>();
         BindEntry e = row.Entry;
-        if (e != null)
+        if (e != null && !string.IsNullOrEmpty(e.Binding))
         {
             keys.Add(MapName(e.Binding));
         }
@@ -179,10 +193,9 @@ public sealed class ControlsMap
     /// <summary>What the mouse does, which no action holds: it points, it is not bound.</summary>
     private static readonly string[] MouseLines =
     {
-        "Move: look around",
-        "Left click: look at",
-        "Left button, hold or drag: use or pick up",
-        "Right button, hold and release: attack",
+        "Left button: click to look at, hold or drag to use or pick up",
+        "Right button: hold and release to attack",
+        "Right click on the rune bag: the magic panel",
         "Wheel: scroll lists",
     };
 
@@ -287,6 +300,10 @@ public sealed class ControlsMap
             {
                 // Enter or A rebinds the row; a click only selected it (the user's, 2 November 2026)
                 Rebind(KeyRows[Mathf.Clamp(keySelected, 0, KeyRows.Length - 1)]);
+            }
+            else if (Keyboard.current != null && Keyboard.current.deleteKey.wasPressedThisFrame)
+            {
+                AskUnbind(KeyRows[Mathf.Clamp(keySelected, 0, KeyRows.Length - 1)]);
             }
             else if (nav.Down || nav.Up)
             {
@@ -445,6 +462,30 @@ public sealed class ControlsMap
         {
             Notice(row.Label + " can't be changed.", EBindResult.Refused);
         }
+    }
+
+    /// <summary>
+    /// Delete on a row of the keyboard: after a Yes, the action keeps no key (the user's, 5 November 2026), as Delete on
+    /// a save asks and deletes it. Not while a row waits for its key, where Delete is a key like any other.
+    /// </summary>
+    private void AskUnbind(KeyRow row)
+    {
+        BindEntry e = row.Entry;
+        if (e == null)
+        {
+            Notice(row.Label + " can't be changed.", EBindResult.Refused);
+            return;
+        }
+        if (string.IsNullOrEmpty(e.Binding))
+        {
+            Notice(GameBindings.Unbind(e, out EBindResult none), none);
+            return;
+        }
+        menu.Ask($"Remove the key of {e.Label}?", () =>
+        {
+            string line = GameBindings.Unbind(e, out EBindResult result);
+            Notice(line, result);
+        });
     }
 
     /// <summary>A line of the pad's map asked to be rebound: it waits for a button, or a fixed line says why.</summary>
@@ -661,6 +702,10 @@ public sealed class ControlsMap
             return hints.ToArray();
         }
         hints.Add(pad ? new Hint("rebind", HintKey.Of(menu.Skin.AButton)) : new Hint("rebind", HintKey.Keyboard("Enter")));
+        if (!pad && section == EOptionSection.Keyboard)
+        {
+            hints.Add(new Hint("remove key", HintKey.Keyboard("Del")));
+        }
         if (pad)
         {
             if (section == EOptionSection.Gamepad)
@@ -778,7 +823,7 @@ public sealed class ControlsMap
             GUI.color = previous;
             float textX = mouse.xMax + 24f;
             float textW = drawing.xMax - 24f - textX;
-            // half a line above the mouse's top, so the five lines sit beside it rather than below it (the user's, 1 November 2026)
+            // half a line above the mouse's top, so its lines sit beside it rather than below it (the user's, 1 November 2026)
             float y = mouseTop - LineHeight / 2;
             foreach (string m in MouseLines)
             {
@@ -1567,6 +1612,11 @@ public sealed class ControlsMap
 
     private static string KeysText(List<string> keys)
     {
+        if (keys.Count == 0)
+        {
+            // an action with no key (mod 1080)
+            return "—";
+        }
         List<string> names = new List<string>();
         foreach (string k in keys)
         {

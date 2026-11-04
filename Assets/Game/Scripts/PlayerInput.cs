@@ -126,6 +126,11 @@ public static class PlayerInput
     public static Vector2 ReadKeyboardMove(bool withArrows, out bool hasInput)
     {
         Vector2 v = GameActions.KeysWorld.Move.ReadValue<Vector2>();
+        // Move forward quietly is forward, and PlayerObject slows it as the Walk quietly modifier does (mod 1080)
+        if (WalkSlowlyHeld())
+        {
+            v.y = 1f;
+        }
         if (withArrows)
         {
             Vector2 arrows = GameActions.KeysWorld.MoveAlternate.ReadValue<Vector2>();
@@ -139,6 +144,12 @@ public static class PlayerInput
         }
 
         return v;
+    }
+
+    /// <summary>The original's S held: forward at the slow walk (mod 1080; no key unless the player gives it one).</summary>
+    public static bool WalkSlowlyHeld()
+    {
+        return GameActions.KeysWorld.WalkSlowly.IsPressed();
     }
 
     /// <summary>True when mouse look should apply (FPS mode).</summary>

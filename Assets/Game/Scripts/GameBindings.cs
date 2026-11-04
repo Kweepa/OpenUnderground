@@ -123,9 +123,11 @@ public class KeyAloneComposite : InputBindingComposite<float>
 /// </summary>
 /// <remarks>
 /// <para>Every change is a swap: the action takes the key, and whatever held that key takes the action's old one,
-/// so no action is ever left without a key and none shares one with another (the user's rule of 2 November 2026).
-/// A key that cannot take part in a swap - Esc, Enter, the arrows, the digits, the Windows keys, Start, the
-/// d-pad that moves the panels' cursor - is refused, and the refusal says why.</para>
+/// so none shares a key with another (the user's rule of 2 November 2026). A keyboard action may have no key at all
+/// (mod 1080, the user's of 4 and 5 November 2026): Delete on its row takes its key away after a Yes, some of the
+/// original's actions start with none, and an action that gives its key to one with none is left with none, the
+/// swap's own rule. The pad keeps a button on every action. A key that cannot take part in a swap - Esc, Enter, the arrows, the Windows keys,
+/// Start, the d-pad that moves the panels' cursor - is refused, and the refusal says why.</para>
 /// <para>The keyboard is one context; the pad has one per page of its map, and a swap of two buttons runs on every
 /// page an action it moves is live on, so that no page is left with two actions on one button.</para>
 /// <para>The pad's bindings are kept as for a right-handed character and mirrored, left trigger with right, for a
@@ -180,9 +182,9 @@ public static class GameBindings
         AddMovePart("Down", "Move back");
         AddMovePart("Left", "Move left");
         AddMovePart("Right", "Move right");
-        KeyEntry(k.Sprint, EBindKind.Held, "Sprint");
-        KeyEntry(k.WalkQuietly, EBindKind.Held, "Walk quietly");
-        KeyEntry(k.MouseLook, EBindKind.Held, "Look with the mouse");
+        KeyEntry(k.Sprint, EBindKind.Held, "Sprint modifier");
+        KeyEntry(k.WalkQuietly, EBindKind.Held, "Walk quietly modifier");
+        KeyEntry(k.MouseLook, EBindKind.Held, "Look with the mouse modifier");
         KeyEntry(k.CancelCharge, EBindKind.Held, "Cancel a charge");
         KeyEntry(k.Jump, EBindKind.Press, "Jump");
         KeyEntry(k.Use, EBindKind.Press, "Use or pick up");
@@ -197,6 +199,16 @@ public static class GameBindings
         KeyEntry(k.MessagesBack, EBindKind.Press, "Messages back");
         KeyEntry(k.MessagesForward, EBindKind.Press, "Messages forward");
         KeyEntry(k.Controls, EBindKind.Press, "Controls");
+        KeyEntry(k.TurnLeft, EBindKind.Held, "Turn left");
+        KeyEntry(k.TurnRight, EBindKind.Held, "Turn right");
+        KeyEntry(k.WalkSlowly, EBindKind.Held, "Move forward quietly");
+        KeyEntry(k.LookDown, EBindKind.Press, "Look down");
+        KeyEntry(k.LookAhead, EBindKind.Press, "Look ahead");
+        KeyEntry(k.LookUp, EBindKind.Press, "Look up");
+        KeyEntry(k.FlyUp, EBindKind.Held, "Fly up");
+        KeyEntry(k.FlyDown, EBindKind.Held, "Fly down");
+        KeyEntry(k.LongJump, EBindKind.Press, "Standing long jump");
+        KeyEntry(k.CharacterPanel, EBindKind.Press, "Inventory and stats");
 
         const EPadPages walking = EPadPages.Walking;
         // the walking actions that still act with the inventory or the magic panel open: the sticks
@@ -269,8 +281,40 @@ public static class GameBindings
     {
         BindEntry e = new BindEntry(action.actionMap.name + "/" + action.name, EBindDevice.Keyboard, kind, EPadPages.None, label,
             action, follower: follower);
-        e.Default = action.bindings[0].path;
+        e.Default = KeyDefault(action);
         All.Add(e);
+    }
+
+    /// <summary>
+    /// A keyboard action's binding as GameActions writes it, in the kept form: a plain path, a chord from its
+    /// OneModifier composite ("shift+&lt;Keyboard&gt;/space"), or "" for an action that starts with no key.
+    /// </summary>
+    private static string KeyDefault(InputAction action)
+    {
+        if (action.bindings.Count == 0)
+        {
+            return "";
+        }
+        InputBinding first = action.bindings[0];
+        if (!first.isComposite)
+        {
+            return first.path ?? "";
+        }
+        string modifier = null;
+        string key = null;
+        for (int i = 1; i < action.bindings.Count && action.bindings[i].isPartOfComposite; i++)
+        {
+            InputBinding part = action.bindings[i];
+            if (string.Equals(part.name, "Modifier", StringComparison.OrdinalIgnoreCase))
+            {
+                modifier = ModifierOf(ControlName(part.path));
+            }
+            else if (string.Equals(part.name, "Binding", StringComparison.OrdinalIgnoreCase))
+            {
+                key = part.path;
+            }
+        }
+        return modifier != null && key != null ? modifier + "+" + key : key ?? "";
     }
 
     private static void PadEntry(InputAction action, EBindKind kind, EPadPages pages, string label, InputAction follower = null)
@@ -484,7 +528,7 @@ public static class GameBindings
                 problem = "unknown line '" + line + "'";
                 break;
             }
-            string refused = Refusal(e, binding);
+            string refused = Allowed(e, binding);
             if (refused != null)
             {
                 problem = line + ": " + refused;
@@ -562,11 +606,23 @@ public static class GameBindings
             {
                 InputAction move = GameActions.KeysWorld.Move;
                 Clear(move);
-                move.AddCompositeBinding("2DVector(mode=1)")
-                    .With("Up", Find("Keys.World/Move/Up").Current)
-                    .With("Down", Find("Keys.World/Move/Down").Current)
-                    .With("Left", Find("Keys.World/Move/Left").Current)
-                    .With("Right", Find("Keys.World/Move/Right").Current);
+                // a part with no key is left out of the vector (mod 1080), and with none the vector has no binding
+                List<string> parts = new List<string>();
+                foreach (string part in new[] { "Up", "Down", "Left", "Right" })
+                {
+                    if (Find("Keys.World/Move/" + part).Current.Length > 0)
+                    {
+                        parts.Add(part);
+                    }
+                }
+                if (parts.Count > 0)
+                {
+                    InputActionSetupExtensions.CompositeSyntax vector = move.AddCompositeBinding("2DVector(mode=1)");
+                    foreach (string part in parts)
+                    {
+                        vector.With(part, Find("Keys.World/Move/" + part).Current);
+                    }
+                }
             }
             foreach (BindEntry e in All)
             {
@@ -628,6 +684,11 @@ public static class GameBindings
     private static void AddKey(InputAction action, BindEntry e)
     {
         Clear(action);
+        if (string.IsNullOrEmpty(e.Current))
+        {
+            // no key (mod 1080): the action stays, with no binding
+            return;
+        }
         Split(e.Current, out string modifier, out string key);
         if (modifier != null)
         {
@@ -844,6 +905,15 @@ public static class GameBindings
         return null;
     }
 
+    /// <summary>
+    /// <see cref="Refusal"/>, but with no key allowed on the keyboard: what a swap may hand an action, and what a saved
+    /// line may say (mod 1080).
+    /// </summary>
+    private static string Allowed(BindEntry e, string binding)
+    {
+        return e.Device == EBindDevice.Keyboard && binding != null && binding.Length == 0 ? null : Refusal(e, binding);
+    }
+
     private static string PadRefusal(BindEntry e, string path)
     {
         string name = ControlName(path);
@@ -935,6 +1005,10 @@ public static class GameBindings
     /// <summary>Two keyboard bindings on the same key: plain keys that overlap (ctrl and leftCtrl), or the same chord.</summary>
     private static bool SameKey(BindEntry a, BindEntry b)
     {
+        if (string.IsNullOrEmpty(a.Current) || string.IsNullOrEmpty(b.Current))
+        {
+            return false;
+        }
         Split(a.Current, out string ma, out string ka);
         Split(b.Current, out string mb, out string kb);
         if (IsMouse(ka) != IsMouse(kb) || ma != mb)
@@ -946,6 +1020,10 @@ public static class GameBindings
 
     private static string KeyClash(BindEntry a, BindEntry b)
     {
+        if (string.IsNullOrEmpty(a.Current) || string.IsNullOrEmpty(b.Current))
+        {
+            return null;
+        }
         Split(a.Current, out string ma, out string ka);
         Split(b.Current, out string mb, out string kb);
         string na = ControlName(ka);
@@ -1015,7 +1093,7 @@ public static class GameBindings
         foreach (BindEntry m in moved)
         {
             string next = m == e ? binding : e.Device == EBindDevice.Gamepad ? (m.Current == old ? binding : old) : old;
-            string why = m == e ? null : Refusal(m, next);
+            string why = m == e ? null : Allowed(m, next);
             if (why != null)
             {
                 Restore(before);
@@ -1051,6 +1129,29 @@ public static class GameBindings
     {
         string button = PadLabel(Of(GameActions.PadWorld.Inventory).Current);
         return $"In conversations {button} picks the replies: it cannot open the inventory there.";
+    }
+
+    /// <summary>
+    /// Takes a keyboard action's key away: Delete on its row, after a Yes (the user's, 5 November 2026). Nothing else
+    /// moves; the pad's buttons are never taken away.
+    /// </summary>
+    public static string Unbind(BindEntry e, out EBindResult result)
+    {
+        EnsureLoaded();
+        if (e.Device != EBindDevice.Keyboard)
+        {
+            result = EBindResult.Refused;
+            return "Every pad button keeps an action.";
+        }
+        if (e.Current.Length == 0)
+        {
+            result = EBindResult.Unchanged;
+            return $"{e.Label} has no key already.";
+        }
+        e.Current = "";
+        Apply(EBindDevice.Keyboard);
+        result = EBindResult.Changed;
+        return $"{e.Label}: no key.";
     }
 
     private static void Restore(Dictionary<BindEntry, string> before)
@@ -1184,6 +1285,105 @@ public static class GameBindings
         }
     }
 
+    /// <summary>
+    /// The Classic keys (mod 1080): the original's keyboard from its reference card (uw1data, page 6). The card's
+    /// actions on the card's keys; the remake's own conveniences on their usual keys where the card leaves them free;
+    /// what the card takes and leaves no place for - the magic panel (Q, a right click on the rune bag instead) and
+    /// Cancel a charge (X) - with no key, and Inventory and Stats too, whose one key on the card is F7, the
+    /// character panel turned over, and Walk quietly, whose slow walk is S's (the user's answers of 4 November 2026).
+    /// Kept by physical key, like every binding.
+    /// </summary>
+    private static readonly string[,] ClassicKeys =
+    {
+        { "Keys.World/Move/Up", "<Keyboard>/w" },
+        { "Keys.World/Move/Down", "<Keyboard>/x" },
+        { "Keys.World/Move/Left", "<Keyboard>/z" },
+        { "Keys.World/Move/Right", "<Keyboard>/c" },
+        { "Keys.World/TurnLeft", "<Keyboard>/a" },
+        { "Keys.World/TurnRight", "<Keyboard>/d" },
+        { "Keys.World/WalkSlowly", "<Keyboard>/s" },
+        { "Keys.World/Sprint", "<Keyboard>/leftShift" },
+        { "Keys.World/WalkQuietly", "" },
+        { "Keys.World/MouseLook", "<Keyboard>/leftShift" },
+        { "Keys.World/CancelCharge", "" },
+        { "Keys.World/Jump", "<Keyboard>/j" },
+        { "Keys.World/LongJump", "shift+<Keyboard>/j" },
+        { "Keys.World/Use", "<Keyboard>/f" },
+        { "Keys.World/Cast", "<Keyboard>/f8" },
+        { "Keys.World/MagicPanel", "" },
+        { "Keys.World/Inventory", "" },
+        { "Keys.World/Stats", "" },
+        { "Keys.World/CharacterPanel", "<Keyboard>/f7" },
+        { "Keys.World/Map", "<Keyboard>/tab" },
+        { "Keys.World/Quicksave", "<Keyboard>/f5" },
+        { "Keys.World/Sleep", "<Keyboard>/f10" },
+        { "Keys.World/Track", "<Keyboard>/f9" },
+        { "Keys.World/MessagesBack", "<Keyboard>/pageUp" },
+        { "Keys.World/MessagesForward", "<Keyboard>/pageDown" },
+        { "Keys.World/Controls", "<Keyboard>/f1" },
+        { "Keys.World/LookDown", "<Keyboard>/1" },
+        { "Keys.World/LookAhead", "<Keyboard>/2" },
+        { "Keys.World/LookUp", "<Keyboard>/3" },
+        { "Keys.World/FlyUp", "<Keyboard>/e" },
+        { "Keys.World/FlyDown", "<Keyboard>/q" },
+    };
+
+    private static string ClassicOf(BindEntry e)
+    {
+        for (int i = 0; i < ClassicKeys.GetLength(0); i++)
+        {
+            if (ClassicKeys[i, 0] == e.Id)
+            {
+                return ClassicKeys[i, 1];
+            }
+        }
+        // an action the table does not name keeps its default
+        return e.Default;
+    }
+
+    /// <summary>True when every key is the Classic keys' one: the button that sets them is dimmed.</summary>
+    public static bool IsClassic()
+    {
+        EnsureLoaded();
+        foreach (BindEntry e in All)
+        {
+            if (e.Device == EBindDevice.Keyboard && e.Current != ClassicOf(e))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Sets the whole keyboard to the Classic keys at once, through the same checks as a swap.</summary>
+    public static void SetClassic()
+    {
+        EnsureLoaded();
+        Dictionary<BindEntry, string> before = new Dictionary<BindEntry, string>();
+        foreach (BindEntry e in All)
+        {
+            before[e] = e.Current;
+        }
+        string problem = null;
+        foreach (BindEntry e in All)
+        {
+            if (e.Device == EBindDevice.Keyboard)
+            {
+                string classic = ClassicOf(e);
+                problem = problem ?? Allowed(e, classic);
+                e.Current = classic;
+            }
+        }
+        problem = problem ?? Clash(EBindDevice.Keyboard);
+        if (problem != null)
+        {
+            Debug.LogError($"[GameBindings] the Classic keys do not check out ({problem}): left as they were.");
+            Restore(before);
+            return;
+        }
+        Apply(EBindDevice.Keyboard);
+    }
+
     private static EOptionSection SectionOf(EBindDevice d) => d == EBindDevice.Keyboard ? EOptionSection.Keyboard : EOptionSection.Gamepad;
 
     /// <summary>Every binding as it stands, kept when the menu opens so that Undo changes can go back to it.</summary>
@@ -1231,6 +1431,10 @@ public static class GameBindings
     /// <summary>A keyboard binding's name as the map writes it: "J", "Ctrl+J", "Mouse 4".</summary>
     public static string KeyLabel(string binding)
     {
+        if (string.IsNullOrEmpty(binding))
+        {
+            return "no key";
+        }
         Split(binding, out string modifier, out string key);
         string name = ControlsMap.KeyLabel(ControlName(key), IsMouse(key));
         return modifier != null ? ControlsMap.KeyLabel(modifier, false) + "+" + name : name;
@@ -1270,6 +1474,13 @@ public static class GameBindings
     {
         BindEntry e = Of(action, part);
         return e != null ? KeyLabel(e.Current) : "?";
+    }
+
+    /// <summary>True when a keyboard action has a key: false for one the player took away or that starts with none.</summary>
+    public static bool IsBound(InputAction action, string part = null)
+    {
+        BindEntry e = Of(action, part);
+        return e != null && !string.IsNullOrEmpty(e.Current);
     }
 
     /// <summary>

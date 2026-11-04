@@ -561,6 +561,73 @@ public class PlayerObject : MonoBehaviour
     // floor(10 * f * 28 / 32) - 5 is -2 at f = 12/28 (UpdateNoise()).
     private const float slowWalkFraction = 12.0f / 28.0f;
 
+    /// <summary>
+    /// The standing long jump's speed against the walk's: half the top, 16/32, against W's 28/32 (UW.EXE 0x1d1bc's
+    /// entry 6; PORTING_NOTES §284.6). About two tiles in the original's higher jump; less here, whose jump is lower
+    /// (fix 442).
+    /// </summary>
+    private const float longJumpFraction = 16.0f / 28.0f;
+
+    /// <summary>The keys' turn, the original's A and D: 116 degrees a second, from the first frame (UW.EXE 0x1d1bc, §284).</summary>
+    private const float keyTurnDegreesPerSecond = 116.0f;
+
+    /// <summary>A step of the look keys, 0x400 of the original's 0x10000 to a turn, and the four steps it stops at (UW.EXE, §284).</summary>
+    private const float lookKeyStep = 5.625f;
+    private const float lookKeyLimit = 4 * lookKeyStep;
+
+    /// <summary>The look keys repeat while held as the original's own key repeat does: every 30/256 of a second.</summary>
+    private const float lookKeyRepeat = 30.0f / 256.0f;
+
+    private float lookKeyTimer;
+
+    /// <summary>A standing long jump was pressed and the player has not left the ground yet (NormalMovement()).</summary>
+    private bool longJumpStarting;
+
+    /// <summary>
+    /// The turn keys and the look keys of mod 1080, the original's A, D and 1, 2, 3: no key unless the player gives
+    /// them one or picks the Classic keys. A look key steps the view and stops at the original's 22.5 degrees, but
+    /// leaves alone a view the mouse took further.
+    /// </summary>
+    private float ReadLookKeys(float yaw)
+    {
+        GameActions.KeysWorldActions k = GameActions.KeysWorld;
+        float turn = (k.TurnRight.IsPressed() ? 1f : 0f) - (k.TurnLeft.IsPressed() ? 1f : 0f);
+        yaw += turn * keyTurnDegreesPerSecond * Time.deltaTime;
+
+        if (k.LookAhead.WasPressedThisFrame())
+        {
+            cameraLookUp = 0f;
+        }
+        // the camera's pitch grows downwards
+        int dir = (k.LookDown.IsPressed() ? 1 : 0) - (k.LookUp.IsPressed() ? 1 : 0);
+        if (dir == 0)
+        {
+            lookKeyTimer = 0f;
+            return yaw;
+        }
+        if (k.LookDown.WasPressedThisFrame() || k.LookUp.WasPressedThisFrame())
+        {
+            lookKeyTimer = lookKeyRepeat;
+            StepLook(dir);
+            return yaw;
+        }
+        lookKeyTimer -= Time.deltaTime;
+        while (lookKeyTimer <= 0f)
+        {
+            lookKeyTimer += lookKeyRepeat;
+            StepLook(dir);
+        }
+        return yaw;
+    }
+
+    private void StepLook(int dir)
+    {
+        float next = cameraLookUp + dir * lookKeyStep;
+        cameraLookUp = dir > 0
+            ? Mathf.Max(cameraLookUp, Mathf.Min(next, lookKeyLimit))
+            : Mathf.Min(cameraLookUp, Mathf.Max(next, -lookKeyLimit));
+    }
+
     private void PlayFootstep(float volume)
     {
         AudioClip[] steps;
@@ -968,7 +1035,8 @@ public class PlayerObject : MonoBehaviour
         bool sprintModifierHeld = usingKeyboardMove
             ? GameActions.KeysWorld.Sprint.IsPressed()
             : GameActions.PadWorld.Sprint.IsPressed();
-        bool slowWalk = usingKeyboardMove && GameActions.KeysWorld.WalkQuietly.IsPressed();
+        // Move forward quietly, the original's S, walks at the same slow pace (mod 1080)
+        bool slowWalk = usingKeyboardMove && (GameActions.KeysWorld.WalkQuietly.IsPressed() || PlayerInput.WalkSlowlyHeld());
 
         bool wantsSprint = PlayerInput.Sprint
                           && sprintModifierHeld
@@ -1013,8 +1081,19 @@ public class PlayerObject : MonoBehaviour
             {
                 LimitToSlowWalk(moveSpeed);
             }
+
+            if (longJumpStarting)
+            {
+                // the frame the standing long jump leaves the ground: the jump's speed comes into force a frame after
+                // the key, and with no key held the line above would leave it straight up
+                cachedMoveDirection = longJumpFraction * transform.forward;
+            }
             
             UpdateJumpIndicator(moveControl, moveSpeed);
+        }
+        else
+        {
+            longJumpStarting = false;
         }
         
         // The speed asked for, against the walking speed of the ground or the water: what the noise is
@@ -1126,6 +1205,8 @@ public class PlayerObject : MonoBehaviour
             // push into ground to keep isGrounded accurate when walking down a slope
             yVelocity = -3.0f;
             bool jumped = false;
+            // still on the ground a frame after a standing long jump (a ceiling): it is over
+            longJumpStarting = false;
             if (allowMove && !isInWater)
             {
                 // The jump goes off when the key goes down, whatever the auto jump setting says.
@@ -1133,10 +1214,21 @@ public class PlayerObject : MonoBehaviour
                 // ahead", but it put a delay on the ordinary jump, which is the one a player
                 // makes all day. Auto jump keeps its own trigger, and no longer needs the key:
                 // running at the edge of a gap fires the jump by itself.
+                bool longJump = GameActions.KeysWorld.LongJump.WasPressedThisFrame();
                 if (IsJumpPressedSeparated()
+                    || longJump
                     || (PlayerInput.AutoJump && !slowWalk && ShouldAutoJump(moveControl, moveSpeed)))
                 {
                     jumped = true;
+                }
+                if (longJump && cachedMoveDirection.sqrMagnitude < 0.0001f)
+                {
+                    // The standing long jump, the original's Shift-J (command 6, UW.EXE 0x1d256): from standing, forward
+                    // at half the top speed at once, the jump itself the same. On the move it is the ordinary jump,
+                    // where the original does not jump at all: with Sprint on Shift, a sprint and a jump would fire it
+                    // (the user's choice, 4 November 2026).
+                    cachedMoveDirection = longJumpFraction * transform.forward;
+                    longJumpStarting = true;
                 }
             }
             if (jumped)
@@ -1314,6 +1406,18 @@ public class PlayerObject : MonoBehaviour
             // limit the xz movement for levitation
             desiredFlightVelocity.x *= 0.2f;
             desiredFlightVelocity.z *= 0.2f;
+        }
+        // Fly up and Fly down, the original's E and Q (mod 1080, fix 441): held, the climb or the descent at the
+        // flight's top, whatever the look; both held, none. The flight along the camera stays as it was (the user's,
+        // 4 November 2026); the original's slower 1.65 m/s is fix 444's.
+        if (allowMove)
+        {
+            bool up = GameActions.KeysWorld.FlyUp.IsPressed();
+            bool down = GameActions.KeysWorld.FlyDown.IsPressed();
+            if (up || down)
+            {
+                desiredFlightVelocity.y = (up ? 1.0f : 0.0f) - (down ? 1.0f : 0.0f);
+            }
         }
         flightVelocity = Utils.DampedApproach(flightVelocity, desiredFlightVelocity, 1.0f);
 
@@ -1595,6 +1699,8 @@ public class PlayerObject : MonoBehaviour
                     ResetMouseLookSmoothing();
                     ReadLookGamepad(out pitch, out yaw);
                 }
+
+                yaw = ReadLookKeys(yaw);
 
                 float invertMultiplier = PlayerPrefs.GetInt("Options_InvertLook", 0) == 1 ? -1.0f : 1.0f;
                 cameraLookUp -= pitch * invertMultiplier;

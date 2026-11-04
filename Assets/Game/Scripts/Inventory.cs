@@ -2180,6 +2180,13 @@ public class Inventory : MonoBehaviour
             return true;
         }
 
+        // the rune bag opens the magic panel (mod 1080); in a conversation it is traded like anything else
+        if (obj.type == EObjectType.RuneBag && Conversations.runningConversation == null)
+        {
+            hint = "Magic panel";
+            return true;
+        }
+
         if (obj.getClass == UUObject.EClass.Containers
             && !(Conversations.runningConversation != null && obj.type == EObjectType.RuneBag))
         {
@@ -2225,7 +2232,13 @@ public class Inventory : MonoBehaviour
             else
             {
                 UUObject obj = GetCurrentItemInternal();
-                if (obj != null && TryGetStuffSecondaryUseHint(obj, hoverPaperdoll: false, out _))
+                if (obj != null && obj.type == EObjectType.RuneBag)
+                {
+                    // a right click (Y) on the rune bag opens the magic panel (mod 1080, the user's of 4 November
+                    // 2026): its way when the key is taken away, as with the Classic keys
+                    PlayerPanelInput.OpenMagicPanel();
+                }
+                else if (obj != null && TryGetStuffSecondaryUseHint(obj, hoverPaperdoll: false, out _))
                 {
                     TryEquipSelection(currentList);
                 }
@@ -3454,7 +3467,10 @@ public class Inventory : MonoBehaviour
 
         List<UUObject> currentList = GetCurrentListInternal();
 
-        if (GameActions.PadInventory.SecondaryUse.WasReleasedThisFrame())
+        // a Y let go where the pack did not see it - in the magic panel its hold on the rune bag opened - ends the wait
+        // too, or the next hold did nothing (fix 471)
+        if (GameActions.PadInventory.SecondaryUse.WasReleasedThisFrame()
+            || (gamepadYUseAwaitingRelease && !GameActions.PadInventory.SecondaryUse.IsPressed()))
         {
             gamepadYUseAwaitingRelease = false;
             ClearGamepadStuffYUseChargeState();

@@ -153,6 +153,26 @@ public static class GameActions
         /// <summary>Opens the game menu on the control maps, the keyboard's or the pad's, whichever was used last.</summary>
         public readonly InputAction Controls;
 
+        // The original's keys of its reference card that the remake had no action for, for the Classic keys of mod
+        // 1080. Those with no key here start unbound: the player gives them one, or the Classic keys do.
+
+        /// <summary>Held: turns at the original's 116 degrees a second (A and D there, UW.EXE 0x30d9a, 0x1d1bc).</summary>
+        public readonly InputAction TurnLeft;
+        public readonly InputAction TurnRight;
+        /// <summary>Held: Move forward quietly, at the slow walk of the Walk quietly modifier, the original's S (UW.EXE 0x30d9a, throttle 50).</summary>
+        public readonly InputAction WalkSlowly;
+        /// <summary>A step of the view down, level, a step up: the original's 1, 2 and 3.</summary>
+        public readonly InputAction LookDown;
+        public readonly InputAction LookAhead;
+        public readonly InputAction LookUp;
+        /// <summary>Held, with Fly or Levitate: the climb or the descent at the flight's top speed (E and Q there).</summary>
+        public readonly InputAction FlyUp;
+        public readonly InputAction FlyDown;
+        /// <summary>From standing, a jump forward; on the move, the ordinary jump (Shift-J there, command 6).</summary>
+        public readonly InputAction LongJump;
+        /// <summary>The inventory, then the stats, then closed: the original's F7, which turns the character panel over.</summary>
+        public readonly InputAction CharacterPanel;
+
         internal KeysWorldActions(InputActionMap map)
         {
             Move = KeyVector(map, "Move", "<Keyboard>/w", "<Keyboard>/s", "<Keyboard>/a", "<Keyboard>/d");
@@ -175,6 +195,21 @@ public static class GameActions
             MessagesBack = Button(map, "MessagesBack", "<Keyboard>/pageUp");
             MessagesForward = Button(map, "MessagesForward", "<Keyboard>/pageDown");
             Controls = Button(map, "Controls", "<Keyboard>/f1");
+
+            TurnLeft = Button(map, "TurnLeft", null);
+            TurnRight = Button(map, "TurnRight", null);
+            WalkSlowly = Button(map, "WalkSlowly", null);
+            LookDown = Button(map, "LookDown", null);
+            LookAhead = Button(map, "LookAhead", null);
+            LookUp = Button(map, "LookUp", null);
+            FlyUp = Button(map, "FlyUp", "<Keyboard>/t");
+            FlyDown = Button(map, "FlyDown", "<Keyboard>/g");
+            // the card's Shift-J moved onto the remake's jump key (the user's, 4 November 2026)
+            LongJump = map.AddAction("LongJump", InputActionType.Button);
+            LongJump.AddCompositeBinding("OneModifier(modifiersOrder=1)")
+                .With("Modifier", "<Keyboard>/shift")
+                .With("Binding", "<Keyboard>/space");
+            CharacterPanel = Button(map, "CharacterPanel", "<Keyboard>/f7");
         }
     }
 

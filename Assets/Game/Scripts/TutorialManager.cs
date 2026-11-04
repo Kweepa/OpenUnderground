@@ -843,6 +843,9 @@ public class TutorialManager : MonoBehaviour
         // the keys and buttons the player has bound now (mod 320), never the defaults written in
         string K(UnityEngine.InputSystem.InputAction a) => GameBindings.KeyText(a);
         string P(UnityEngine.InputSystem.InputAction a) => GameBindings.PadText(a);
+        // a key the player took away, or the Classic keys leave without one (mod 1080): another way, or none
+        bool B(UnityEngine.InputSystem.InputAction a) => GameBindings.IsBound(a);
+        const string NoKey = "the game menu's CONTROLS tab";
 
         switch (step)
         {
@@ -868,6 +871,18 @@ public class TutorialManager : MonoBehaviour
         case ETutorialStep.Inventory:
             if (mouseUi)
             {
+                if (!B(keys.Inventory))
+                {
+                    if (PlayerPanelState.IsEffectivelyExploringInventory)
+                    {
+                        return "Press Esc to close your inventory.";
+                    }
+
+                    return B(keys.CharacterPanel)
+                        ? $"Press {K(keys.CharacterPanel)} to open your inventory; press it again for your stats, and again to close them."
+                        : $"Give the inventory a key on {NoKey}.";
+                }
+
                 if (PlayerPanelState.IsEffectivelyExploringInventory)
                 {
                     return $"Press {K(keys.Inventory)} or Esc to close your inventory.";
@@ -880,29 +895,34 @@ public class TutorialManager : MonoBehaviour
         case ETutorialStep.WeaponCharge:
             if (mouseUi)
             {
-                return $"Hold the right mouse button to charge an attack, then release to swing. Press {K(keys.CancelCharge)} to cancel a charge.";
+                return B(keys.CancelCharge)
+                    ? $"Hold the right mouse button to charge an attack, then release to swing. Press {K(keys.CancelCharge)} to cancel a charge."
+                    : "Hold the right mouse button to charge an attack, then release to swing.";
             }
 
             return $"Hold {P(pad.Attack)} to charge an attack, then release to swing. Press {P(pad.Cancel)} to cancel a charge.";
         case ETutorialStep.MagicPanelOpen:
             if (mouseUi)
             {
-                return $"Press {K(keys.MagicPanel)} to open the magic panel.";
+                return B(keys.MagicPanel)
+                    ? $"Press {K(keys.MagicPanel)} to open the magic panel."
+                    : "Right-click the rune bag in your inventory to open the magic panel.";
             }
 
             return $"Press {P(pad.MagicPanel)} to open the magic panel.";
         case ETutorialStep.MagicCast:
             {
                 bool canBuildFirstCircleSpell = Magic.sMagic != null && Magic.sMagic.CanBuildFirstCircleSpell();
+                string closeKey = B(keys.MagicPanel) ? K(keys.MagicPanel) : "Esc";
                 string spellExamplesText = "Cast In Lor for Light, Ort Jux for Magic Arrow, or Bet In Sanct for Resist Blows. ";
                 if (mouseUi)
                 {
                     if (canBuildFirstCircleSpell)
                     {
-                        return "Click runes in the magic panel to build a spell, then click the spell runes to cast. " + spellExamplesText + $"Press {K(keys.MagicPanel)} to close the magic panel.";
+                        return "Click runes in the magic panel to build a spell, then click the spell runes to cast. " + spellExamplesText + $"Press {closeKey} to close the magic panel.";
                     }
 
-                    return $"Press {K(keys.MagicPanel)} to close the magic panel.";
+                    return $"Press {closeKey} to close the magic panel.";
                 }
 
                 GameActions.PadMagicActions magic = GameActions.PadMagic;
@@ -923,6 +943,13 @@ public class TutorialManager : MonoBehaviour
         case ETutorialStep.StatsPanel:
             if (mouseUi)
             {
+                if (!B(keys.Stats))
+                {
+                    return B(keys.CharacterPanel)
+                        ? $"Press {K(keys.CharacterPanel)} with your inventory open to show your character stats, and again to hide them."
+                        : $"Give the stats a key on {NoKey}.";
+                }
+
                 return $"Press {K(keys.Stats)} to show and hide your character stats.";
             }
 
