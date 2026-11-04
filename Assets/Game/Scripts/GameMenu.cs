@@ -153,6 +153,9 @@ public sealed class GameMenu
     /// </summary>
     public const string OriginalWord = "Classic";
 
+    /// <summary>The button that sets the original's keyboard, on KEYBOARD &amp; MOUSE (mod 1080).</summary>
+    private const string ClassicKeysLabel = OriginalWord + " keys";
+
     public static readonly Color SelectColor = new Color32(255, 213, 64, 255);
     public static readonly Color UnselectColor = new Color32(187, 123, 1, 255);
     // a little lighter than the music page's off tracks, the user's of 31 October 2026, so a disabled button still reads
@@ -517,7 +520,8 @@ public sealed class GameMenu
     private List<EButton> Buttons()
     {
         List<EButton> list = new List<EButton> { EButton.Reset, EButton.ResetAll, EButton.Undo };
-        if (Section == EOptionSection.Gameplay)
+        // the classic rules on GAMEPLAY, the Classic keys on KEYBOARD & MOUSE (mod 1080)
+        if (Section == EOptionSection.Gameplay || Section == EOptionSection.Keyboard)
         {
             list.Add(EButton.Original);
         }
@@ -536,7 +540,8 @@ public sealed class GameMenu
             case EButton.ResetAll: return GameOptions.AnyChangedFromDefault(TabSections());
             case EButton.Undo: return snapshot != null && snapshot.Differs();
             case EButton.End: return true;
-            default: return GameOptions.DiffersFromOriginal(EOptionSection.Gameplay);
+            default:
+                return Section == EOptionSection.Keyboard ? !GameBindings.IsClassic() : GameOptions.DiffersFromOriginal(EOptionSection.Gameplay);
         }
     }
 
@@ -548,7 +553,7 @@ public sealed class GameMenu
             case EButton.ResetAll: return "Reset all";
             case EButton.Undo: return "Undo changes";
             case EButton.End: return host.EndButton;
-            default: return OriginalWord + " rules";
+            default: return Section == EOptionSection.Keyboard ? ClassicKeysLabel : OriginalWord + " rules";
         }
     }
 
@@ -579,7 +584,10 @@ public sealed class GameMenu
             case EConfirm.ResetAll: return $"Put every setting of {TabName(Tab)} back to its default?";
             case EConfirm.Undo: return "Put every setting back as it was when you opened the menu?";
             case EConfirm.Host: return hostQuestion;
-            default: return $"Set every GAMEPLAY setting to its {OriginalWord.ToLowerInvariant()} rule?";
+            default:
+                return Section == EOptionSection.Keyboard
+                    ? "Set every key to the original game's, as on its reference card?"
+                    : $"Set every GAMEPLAY setting to its {OriginalWord.ToLowerInvariant()} rule?";
         }
     }
 
@@ -605,7 +613,14 @@ public sealed class GameMenu
                 snapshot.Restore();
                 break;
             case EConfirm.Original:
-                GameOptions.SetOriginalRules();
+                if (Section == EOptionSection.Keyboard)
+                {
+                    GameBindings.SetClassic();
+                }
+                else
+                {
+                    GameOptions.SetOriginalRules();
+                }
                 break;
             case EConfirm.Host:
                 hostYes?.Invoke();
@@ -1736,10 +1751,14 @@ public sealed class GameMenu
     private float ButtonWidth()
     {
         float widest = Measure("Undo changes", ButtonFont);
-        foreach (EButton b in new[] { EButton.Reset, EButton.ResetAll, EButton.Original })
+        foreach (EButton b in new[] { EButton.Reset, EButton.ResetAll })
         {
             widest = Mathf.Max(widest, Measure(ButtonLabel(b), ButtonFont));
         }
+        // both labels of the Original button, written out: its ButtonLabel() reads the Section, which the SAVE and LOAD
+        // tabs, drawn with this width too, do not have
+        widest = Mathf.Max(widest, Measure(ClassicKeysLabel, ButtonFont));
+        widest = Mathf.Max(widest, Measure(OriginalWord + " rules", ButtonFont));
         if (host.EndButton != null)
         {
             widest = Mathf.Max(widest, Measure(host.EndButton, ButtonFont) + 36f);

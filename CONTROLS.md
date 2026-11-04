@@ -6,7 +6,7 @@ Button names use the Xbox layout (A / B / X / Y, LB / RB, LT / RT, Start, Select
 
 If you use the **Left-handed** option, Attack and Stats swap triggers on the gamepad (see notes under each section).
 
-In the game, the CONTROLS tab of the game menu draws the same keys and buttons on a keyboard and on a pad, and changes them: pick an action, press Enter (A on the pad), then the new key or button. The two swap: the action that had it takes the old one. Keys can be combined with Ctrl, Shift or Alt, and the mouse's middle and side buttons can be bound too. The tables below are the defaults.
+In the game, the CONTROLS tab of the game menu draws the same keys and buttons on a keyboard and on a pad, and changes them: pick an action, press Enter (A on the pad), then the new key or button. The two swap: the action that had it takes the old one. Keys can be combined with Ctrl, Shift or Alt, and the mouse's middle and side buttons can be bound too. On the keyboard, Delete on a selected action, after a Yes, leaves it with no key, and *Classic keys* sets the whole keyboard to the original game's, from its reference card. The tables below are the defaults.
 
 **[Gamepad](#gamepad)** · **[Keyboard & Mouse](#keyboard--mouse)**
 
@@ -85,6 +85,7 @@ time.
 |A (hold)|Pick up the item onto your cursor|
 |Y (hold)|Secondary use (equip, eat, and similar)|
 |Y (on paperdoll)|Unequip|
+|Y (hold), on the rune bag|Open the magic panel|
 |X (hold, then release)|Charge a throw (or repair when that applies)|
 |B|Back out of an open container|
 
@@ -164,6 +165,10 @@ time.
 |Left Shift (hold), with a panel open or a spell waiting for its target|Look with the mouse; a click aims at the crosshair|
 |Ctrl (hold)|Walk slowly and quietly|
 |Space|Jump|
+|Shift + Space|Standing long jump: from standing, a leap forward; on the move, a jump|
+|T / G (hold)|Fly up / down, with Fly or Levitate|
+
+Turn left and right, move forward quietly and look down, ahead and up have no key unless you give them one: *Classic keys* puts them on A and D, S, and 1, 2 and 3, as in the original.
 
 Look speed and invert options are in the game menu, under CONTROLS.
 
@@ -186,6 +191,7 @@ Look speed and invert options are in the game menu, under CONTROLS.
 |Q|Open / close magic panel (requires a rune bag)|
 |E|Open / close inventory|
 |R|Show / hide character stats, on the right|
+|F7|The inventory, then the stats, then closed|
 |Tab|Open / close map (requires a map in your inventory)|
 |Esc|Close open panels; if none are open, open Save / Load / Options|
 |F1|Open the game menu on the control maps (the gamepad's, if you used the pad last)|
@@ -217,6 +223,7 @@ Look speed and invert options are in the game menu, under CONTROLS.
 |Left click|Look / use (short click); drag to pick up; place a carried item|
 |Left click (hold outside the panel while carrying)|Charge a throw|
 |Right click|Secondary use (equip, eat, unequip, and similar); store into a container when carrying|
+|Right click on the rune bag|Open the magic panel|
 |F, while carrying|Put the carried item in your pack|
 |Scroll wheel|Scroll the stuff list when the pointer is over the grid|
 |Arrow keys|Move selection|

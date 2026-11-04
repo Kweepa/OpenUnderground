@@ -158,6 +158,10 @@ public class PlayerPanelInput : MonoBehaviour
         {
             ToggleStatsPanel();
         }
+        if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.CharacterPanel))
+        {
+            CycleCharacterPanel();
+        }
 
         UpdateSleepInput();
         UpdateTrackInput();
@@ -250,6 +254,44 @@ public class PlayerPanelInput : MonoBehaviour
             StatsPanel.sStatsPanel?.Hide();
             PlayerPanelState.SetPanel(EPlayerPanel.Inventory);
         }
+    }
+
+    /// <summary>
+    /// Inventory and stats, the original's F7, which turns its character panel over (mod 1080, the user's of 4
+    /// November 2026): with neither open the inventory, with the inventory the stats, with the stats closed.
+    /// </summary>
+    private static void CycleCharacterPanel()
+    {
+        if (!PlayerPanelState.ArePanelsAvailable)
+        {
+            return;
+        }
+
+        StatsPanel stats = StatsPanel.sStatsPanel;
+        if (stats != null && (PlayerPanelState.ActivePanel == EPlayerPanel.Inventory || stats.IsPinnedOpen()))
+        {
+            // opening the stats puts the inventory away (StatsPanel.TogglePinnedOpen())
+            stats.TogglePinnedOpen();
+        }
+        else
+        {
+            ToggleInventory();
+        }
+    }
+
+    /// <summary>
+    /// The magic panel from the inventory: a right click on the rune bag (mod 1080, the user's of 4 November 2026), the
+    /// way to it when its key is taken away, as with the Classic keys.
+    /// </summary>
+    public static void OpenMagicPanel()
+    {
+        if (!PlayerPanelState.ArePanelsAvailable || PlayerPanelState.ActivePanel == EPlayerPanel.Magic || !Magic.HasRuneBag())
+        {
+            return;
+        }
+
+        StatsPanel.sStatsPanel?.Hide();
+        PlayerPanelState.SetPanel(EPlayerPanel.Magic);
     }
 
     private static void ToggleStatsPanel()

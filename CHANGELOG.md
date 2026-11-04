@@ -2,6 +2,8 @@
 
 ## Next release
 
+- A new Classic keys button on the game menu's Controls page sets the keyboard to the original's: W to run and S to walk forward, A and D to turn, Z and C to step aside, X to step back, E and Q to fly up and down, 1, 2 and 3 to look down, ahead and up, F7 for the inventory and the stats, J to jump and Shift-J for the standing long jump. In the usual layout T and G fly up and down, Shift+Space is the standing long jump and F7 opens the inventory, then the stats; any key can now be cleared with Delete, and a right click on the rune bag opens the magic panel.
+
 - F9, or right on the D-pad, uses the Track skill at once, as in the original: it tells you of the creatures within eight tiles and in which direction, or that there are none. Track still reports by itself every few seconds as well.
 
 - Every key and pad button of play can now be changed, on the game menu's Controls maps: pick an action, press Enter or A, then the new key or button, and the action that had it takes the old one, so nothing is ever left without a key. Keys can be combined with Ctrl, Shift or Alt, the mouse's middle and side buttons can be used, the pad has its own buttons for walking, the inventory, the magic panel and the map, and whatever is on the triggers still changes sides with a left-handed character. The tutorial and the panels' hints name the keys you chose.
