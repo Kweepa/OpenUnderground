@@ -2,6 +2,8 @@
 
 ## Next release
 
+- A Field of view row in the game menu's DISPLAY section widens or narrows the view, from 75 to 120 degrees across, and the weapon in your hand keeps its size and place. A 16:10 or 4:3 screen now sees as wide as a widescreen, with more height above and below, where it used to see less across.
+
 - A Camera bob row in the game menu's DISPLAY section sets how much the view rises and falls as you walk, from off to twice as much as before.
 
 - A new Classic keys button on the game menu's Controls page sets the keyboard to the original's: W to run and S to walk forward, A and D to turn, Z and C to step aside, X to step back, E and Q to fly up and down, 1, 2 and 3 to look down, ahead and up, F7 for the inventory and the stats, J to jump and Shift-J for the standing long jump. In the usual layout T and G fly up and down, Shift+Space is the standing long jump and F7 opens the inventory, then the stats; any key can now be cleared with Delete, and a right click on the rune bag opens the magic panel.

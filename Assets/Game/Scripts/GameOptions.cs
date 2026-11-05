@@ -122,6 +122,10 @@ public static class GameOptions
             "<b>Enabled:</b> the game saves by itself the first time you set foot on a level.\n<b>Disabled:</b> only the quicksave and the saves you make yourself are written.",
             EOptionKind.Toggle, 1f),
 
+        new(EOptionSection.Display, PlayerInput.FieldOfViewKey, "Field of view",
+            "How wide the view is, in degrees across the screen. A screen wider than 16:9 shows more at the sides, and a 16:10 or 4:3 screen more above and below. A wide view shows more around you and stretches the edges. The weapon in your hand keeps its size and place.",
+            EOptionKind.Slider, PlayerInput.DefaultFieldOfView, PlayerInput.MinFieldOfView, PlayerInput.MaxFieldOfView, 1f,
+            format: v => Mathf.RoundToInt(v) + "\u00b0"),
         new(EOptionSection.Display, PlayerInput.CameraBobKey, "Camera bob",
             "How deep the view dips at each step as you walk. At 100% the usual bob; at Off the view stays level. Swimming and flying keep their own motion.",
             EOptionKind.Slider, PlayerInput.DefaultCameraBob, 0f, PlayerInput.MaxCameraBob, 10f,

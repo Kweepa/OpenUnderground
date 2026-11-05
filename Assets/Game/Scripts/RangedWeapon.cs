@@ -146,7 +146,7 @@ public class RangedWeapon : WeaponBase
             // Built as soon as a sling is in hand, so the copy is made while the player is busy
             // with the pack rather than on the first press, where it would be a stall.
             if (sWhirlRig == null && PlayerObject.Player != null && PlayerObject.Player.mainCamera != null
-                && transform.parent == PlayerObject.Player.mainCamera.transform)
+                && transform.parent == PlayerObject.Player.WeaponView)
             {
                 EnsureWhirlRig();
             }
@@ -278,11 +278,13 @@ public class RangedWeapon : WeaponBase
         sWhirlGraph.Evaluate();
 
         Transform cam = PlayerObject.Player.mainCamera.transform;
+        // the head's place is taken in the WeaponView's space, so the whirl keeps its picture at any field of view
+        Transform view = PlayerObject.Player.WeaponView;
         float side = PlayerData.sData.leftHanded ? 1.0f : -1.0f;
         side *= Mathf.Sign(rig.parent.lossyScale.x);
         rig.localScale = slingWhirlScale * new Vector3(side, 1.0f, 1.0f);
         rig.rotation = cam.rotation;
-        rig.position += cam.TransformPoint(slingWhirlOffset) - sWhirlHead.position;
+        rig.position += view.TransformPoint(slingWhirlOffset) - sWhirlHead.position;
     }
 
     private void StopSlingWhirl()
@@ -308,7 +310,7 @@ public class RangedWeapon : WeaponBase
     }
 
     /// <summary>
-    /// Builds the whirl once: a copy of the goblin under the camera, cut down to the sling and the
+    /// Builds the whirl once: a copy of the goblin under the camera's WeaponView, cut down to the sling and the
     /// bones that move it. The other meshes are destroyed rather than hidden - a goblin carries a
     /// dozen of them, heads, eyes, armour and a club - and so is anything that could act by
     /// itself: colliders, scripts, and the controller of its Animator, which stays only to be posed
@@ -326,7 +328,7 @@ public class RangedWeapon : WeaponBase
             return false;
         }
 
-        GameObject rig = Instantiate(slingWhirlModel, PlayerObject.Player.mainCamera.transform, false);
+        GameObject rig = Instantiate(slingWhirlModel, PlayerObject.Player.WeaponView, false);
         rig.name = "Sling whirl";
         rig.SetActive(false);
         int layer = slingRoot != null ? slingRoot.gameObject.layer : gameObject.layer;
