@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The cudgel and the three maces are held lower while you charge a blow, so the head of the maces no longer runs off the top of the screen.
+
 - The rock behind Achievements and the acknowledgements is no longer squashed, and stands in the same place on every page of the title screen.
 
 - The music can play on an external MT-32: the Munt emulator with its ROMs, or a real one behind a MIDI interface. Choose MT-32 EXT MIDI as the soundfont, and the tracks are sent exactly what the original sent a Roland MT-32, so they sound as they did on one.
