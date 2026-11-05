@@ -3589,6 +3589,8 @@ public class Magic : MonoBehaviour
         l.range = 30.0f;
         l.intensity = 1.3f;
         Camera old = PlayerObject.Player.mainCamera;
+        // the player's own eye flying off, so the player's field of view (the Field of view row)
+        c.fieldOfView = old.fieldOfView;
         old.tag = "Untagged";
         tag = "MainCamera";
         float yaw = old.transform.eulerAngles.y;

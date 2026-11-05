@@ -1075,7 +1075,8 @@ public class WeaponBase : UUObject
             col.enabled = false;
         }
 
-        transform.SetParent(PlayerObject.Player.mainCamera.transform, false);
+        // under the camera's WeaponView, which keeps the weapon's picture whatever the Field of view row sets
+        transform.SetParent(PlayerObject.Player.WeaponView, false);
         position = positions[0];
         rotation = rotations[0];
         
@@ -1141,6 +1142,9 @@ public class WeaponBase : UUObject
         enabled = false;
         gameObject.SetActive(false);
         gameObject.transform.SetParent(null);
+        // Detached keeping its world pose, it would carry PlayerObject.WeaponView's squash along the view into its own
+        // scale (and a left-handed player's mirroring), and be dropped or thrown thinner or thicker: its own size back.
+        gameObject.transform.localScale = originalScale;
     }
     
     protected override int GetQualityOffset()

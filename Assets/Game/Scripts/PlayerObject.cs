@@ -49,6 +49,37 @@ public class PlayerObject : MonoBehaviour
     public CharacterController cachedCharacterController;
 
     public Camera mainCamera;
+
+    private Transform weaponView;
+
+    /// <summary>
+    /// The held weapon's parent: a child of the camera, squashed along the view by tan(30) / tan(field / 2).
+    /// The weapons' poses were made for the camera's 60 degrees vertical; with every point's depth multiplied
+    /// by that factor, x / (k z tan(field / 2)) is x / (z tan 30), so each weapon, and the sling's whirl,
+    /// draws exactly as it does at 60 degrees whatever the Field of view row and the screen's shape.
+    /// </summary>
+    public Transform WeaponView
+    {
+        get
+        {
+            if (weaponView == null)
+            {
+                weaponView = new GameObject("WeaponView").transform;
+                weaponView.SetParent(mainCamera.transform, false);
+                UpdateWeaponView();
+            }
+            return weaponView;
+        }
+    }
+
+    private void UpdateWeaponView()
+    {
+        if (weaponView != null)
+        {
+            float depth = Mathf.Tan(30f * Mathf.Deg2Rad) / Mathf.Tan(0.5f * mainCamera.fieldOfView * Mathf.Deg2Rad);
+            weaponView.localScale = new Vector3(1f, 1f, depth);
+        }
+    }
     
     private readonly Collider[] cachedColliders = new Collider[16];
 
@@ -1750,6 +1781,10 @@ public class PlayerObject : MonoBehaviour
             cam.transform.localPosition = new Vector3(0.0f, cameraYPos - transform.position.y + cameraBobOffset, 0.0f);
         }
 
+        // the Field of view row, followed every frame so a change shows as soon as the menu closes
+        mainCamera.fieldOfView = PlayerInput.VerticalFieldOfView(mainCamera.aspect);
+        UpdateWeaponView();
+
         Vector3 cameraPos = Camera.main.transform.position;
         LevelLoader.GetLevel().pvs.CacheVisibilityFrom(new Vector2Int(Tile.GetTileX(cameraPos.x), Tile.GetTileY(cameraPos.z)));
     }
@@ -2485,6 +2520,8 @@ public class PlayerObject : MonoBehaviour
         c.clearFlags = CameraClearFlags.SolidColor;
         c.backgroundColor = Color.black;
         Camera old = mainCamera;
+        // the flight into the moongate starts from the player's view: the same field of view, or it would jump
+        c.fieldOfView = old.fieldOfView;
         c.transform.SetPositionAndRotation(old.transform.position, old.transform.rotation);
         old.tag = "Untagged";
         c.tag = "MainCamera";

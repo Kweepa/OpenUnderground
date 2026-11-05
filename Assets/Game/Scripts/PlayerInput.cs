@@ -25,6 +25,31 @@ public static class PlayerInput
     public static float PadLookSpeed =>
         Mathf.Clamp(PlayerPrefs.GetFloat(PadLookSpeedKey, DefaultPadLookSpeed), MinPadLookSpeed, MaxPadLookSpeed);
 
+    public const string FieldOfViewKey = "Options_FieldOfView";
+    public const int DefaultFieldOfView = 92;
+    public const int MinFieldOfView = 75;
+    public const int MaxFieldOfView = 120;
+
+    /// <summary>The field of view the player chose, in degrees across the screen, the way it is usually quoted.</summary>
+    public static float FieldOfView =>
+        Mathf.Clamp(PlayerPrefs.GetInt(FieldOfViewKey, DefaultFieldOfView), MinFieldOfView, MaxFieldOfView);
+
+    /// <summary>
+    /// The camera's vertical field for FieldOfView on a screen of this width over height. From 16:9 to 4:3 the width is
+    /// the one chosen and a narrower screen sees more height: at 92, 60.4 degrees vertical on 16:9, 65.8 on 16:10, 75.7
+    /// on 4:3. A screen wider than 16:9 keeps 16:9's height and sees more at the sides; one narrower than 4:3 keeps
+    /// 4:3's height and sees less across, so a window squeezed tall never turns into a fisheye.
+    /// </summary>
+    /// <remarks>
+    /// Before this setting the vertical field was 60 on every screen, so a 16:10 screen saw 85 degrees across and a 4:3
+    /// one 75, against 91 on 16:9.
+    /// </remarks>
+    public static float VerticalFieldOfView(float aspect)
+    {
+        float kept = Mathf.Clamp(aspect, 4f / 3f, 16f / 9f);
+        return 2f * Mathf.Rad2Deg * Mathf.Atan(Mathf.Tan(0.5f * FieldOfView * Mathf.Deg2Rad) / kept);
+    }
+
     public const string CameraBobKey = "Options_CameraBob";
     public const int DefaultCameraBob = 100;
     public const int MaxCameraBob = 200;
