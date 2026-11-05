@@ -41,7 +41,7 @@ public sealed class GameOption
     public readonly string Key;
     public readonly string Label;
     public readonly string Description;
-    /// <summary>What the original game does, for a row that changes how the game plays; null otherwise.</summary>
+    /// <summary>What the original game does, written after "Classic:" in the detail panel; null where there is nothing to say.</summary>
     public readonly string Original;
     public readonly EOptionKind Kind;
     public readonly float Default;
@@ -122,6 +122,12 @@ public static class GameOptions
             "<b>Enabled:</b> the game saves by itself the first time you set foot on a level.\n<b>Disabled:</b> only the quicksave and the saves you make yourself are written.",
             EOptionKind.Toggle, 1f),
 
+        new(EOptionSection.Display, PlayerInput.CameraBobKey, "Camera bob",
+            "How deep the view dips at each step as you walk. At 100% the usual bob; at Off the view stays level. Swimming and flying keep their own motion.",
+            EOptionKind.Slider, PlayerInput.DefaultCameraBob, 0f, PlayerInput.MaxCameraBob, 10f,
+            format: v => v <= 0f ? "Off" : Mathf.RoundToInt(v) + "%",
+            // no originalValue: GAMEPLAY's Classic button would set it, and this is a matter of taste
+            original: "about 200%, the view dipping twice as deep at each step."),
         new(EOptionSection.Display, UiScale.GrowthPrefsKey, "Interface scale above 1080p",
             "How much the panels and the text grow on a screen larger than 1920x1080. At 0% they keep the size they have at 1920x1080; at 100% they grow with the screen, up to twice that size. Smaller screens are not affected.",
             EOptionKind.Slider, UiScale.DefaultGrowthPercent, 0f, 100f, 10f, format: v => Mathf.RoundToInt(v) + "%"),
