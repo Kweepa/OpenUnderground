@@ -25,6 +25,17 @@ public static class PlayerInput
     public static float PadLookSpeed =>
         Mathf.Clamp(PlayerPrefs.GetFloat(PadLookSpeedKey, DefaultPadLookSpeed), MinPadLookSpeed, MaxPadLookSpeed);
 
+    public const string CameraBobKey = "Options_CameraBob";
+    public const int DefaultCameraBob = 100;
+    public const int MaxCameraBob = 200;
+
+    /// <summary>
+    /// How deep the view dips at each step when walking, as a share of PlayerObject.cameraBobAmplitude:
+    /// 1 the remake's usual bob, 0 none, 2 at most. The water's and the flight's bobs do not depend on it.
+    /// </summary>
+    public static float CameraBob =>
+        Mathf.Clamp(PlayerPrefs.GetInt(CameraBobKey, DefaultCameraBob), 0, MaxCameraBob) / 100f;
+
     public const float DefaultEffectsVolume = 1f;
 
     public static float EffectsVolume =>

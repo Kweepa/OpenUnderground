@@ -1732,12 +1732,14 @@ public class PlayerObject : MonoBehaviour
                 && cachedCharacterController.isGrounded
                 && cachedMoveDirection.sqrMagnitude > 0.0001f;
             float bobBlendTarget = bobbing ? 1.0f : 0.0f;
+            // the ease in and out keeps the time it takes at the prefab's amplitude, whatever the Camera bob row sets
             float bobBlendSpeed = cameraBobReturnSpeed / Mathf.Max(cameraBobAmplitude, 0.0001f);
             cameraBobBlend = Mathf.MoveTowards(cameraBobBlend, bobBlendTarget, bobBlendSpeed * Time.deltaTime);
             if (cameraBobBlend > 0.0f)
             {
                 float phase = timeBetweenSteps / footstepStride;
-                cameraBobOffset = cameraBobBlend * -cameraBobAmplitude * Mathf.Abs(Mathf.Cos(phase * Mathf.PI));
+                float bobAmplitude = cameraBobAmplitude * PlayerInput.CameraBob;
+                cameraBobOffset = cameraBobBlend * -bobAmplitude * Mathf.Abs(Mathf.Cos(phase * Mathf.PI));
             }
             else
             {
