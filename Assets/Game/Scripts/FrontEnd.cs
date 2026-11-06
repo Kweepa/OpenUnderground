@@ -864,7 +864,7 @@ public class FrontEnd : MonoBehaviour
                 SetMenuIndex((menuIndex + numItems - 1) % numItems);
                 return;
             }
-            if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
+            if (GameInput.EnterPressedThisFrame())
             {
                 ActivateMenuSelection(debugSkipCreateCharacter: false);
                 return;

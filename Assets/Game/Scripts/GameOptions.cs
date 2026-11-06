@@ -33,6 +33,15 @@ public enum EOptionKind
     Page,
 }
 
+/// <summary>Where a row's value is kept.</summary>
+public enum EOptionStore
+{
+    /// <summary>A number in the PlayerPrefs key of the row, which the rest of the game reads.</summary>
+    Prefs,
+    /// <summary>The screen's own state, read and set by <see cref="ScreenOptions"/>: the monitor, the display mode and the resolution.</summary>
+    Screen,
+}
+
 /// <summary>One setting of the game menu: where it is shown, what it says, and how it is kept.</summary>
 public sealed class GameOption
 {
@@ -52,13 +61,15 @@ public sealed class GameOption
     public readonly bool StoredAsFloat;
     /// <summary>The value the original's rules give it, or NaN when the row has none.</summary>
     public readonly float OriginalValue;
-    /// <summary>The names of a Choice row, kept as their place in this list; null for the soundfont.</summary>
+    /// <summary>The names of a Choice row, kept as their place in this list; null for the soundfont and the screen's rows.</summary>
     public readonly string[] Choices;
+    public readonly EOptionStore Store;
     private readonly Func<float, string> format;
 
     public GameOption(EOptionSection section, string key, string label, string description, EOptionKind kind,
         float defaultValue, float min = 0f, float max = 1f, float step = 1f, bool storedAsFloat = false,
-        Func<float, string> format = null, string original = null, float originalValue = float.NaN, string[] choices = null)
+        Func<float, string> format = null, string original = null, float originalValue = float.NaN, string[] choices = null,
+        EOptionStore store = EOptionStore.Prefs)
     {
         Section = section;
         Key = key;
@@ -73,6 +84,7 @@ public sealed class GameOption
         StoredAsFloat = storedAsFloat;
         OriginalValue = originalValue;
         Choices = choices;
+        Store = store;
         this.format = format;
     }
 
@@ -99,7 +111,8 @@ public sealed class GameOption
 /// keys every time; only the music and the interface's growth keep a copy, and they are told here.
 /// The keys are saved to disk when the menu closes.
 /// The soundfont is a name, not a number, and is the one Choice; its value is its place in the
-/// list of soundfonts found on disk.
+/// list of soundfonts found on disk. The monitor, the display mode and the resolution are the screen's
+/// state, not keys: <see cref="ScreenOptions"/> reads and sets them, and asks before keeping a change.
 /// </remarks>
 public static class GameOptions
 {
@@ -122,6 +135,15 @@ public static class GameOptions
             "<b>Enabled:</b> the game saves by itself the first time you set foot on a level.\n<b>Disabled:</b> only the quicksave and the saves you make yourself are written.",
             EOptionKind.Toggle, 1f),
 
+        new(EOptionSection.Display, ScreenOptions.MonitorKey, "Monitor",
+            "Which monitor the game is shown on. Choosing another moves the game there, at that monitor's own size in Fullscreen. A, Enter or a click opens the list.\nAfter a change the game asks whether to keep it, and goes back by itself after 10 seconds.",
+            EOptionKind.Choice, 0f, store: EOptionStore.Screen),
+        new(EOptionSection.Display, ScreenOptions.ModeKey, "Display mode",
+            "<b>Fullscreen (borderless):</b> the game covers the desktop at Windows' own size; Alt-Tab is instant.\n<b>Fullscreen (exclusive):</b> the monitor itself switches to the size chosen, up to its largest; another shape shows black bands, is zoomed or stretched as the monitor's settings say. Alt-Tab takes a moment.\n<b>Windowed:</b> the game in a window, which can be moved, and resized by its edges.\nAlt-Enter switches between Windowed and the last Fullscreen; A, Enter or a click opens the list. After a change the game asks whether to keep it, and goes back by itself after 10 seconds.",
+            EOptionKind.Choice, 0f, choices: ScreenOptions.ModeNames, store: EOptionStore.Screen),
+        new(EOptionSection.Display, ScreenOptions.ResolutionKey, "Resolution",
+            "The size the game is drawn at, and its shape. <b>desktop</b>: Windows' own size, the one of Fullscreen (borderless). <b>native</b>: the monitor's largest size, the sharpest; a smaller one is softer and lighter on the graphics card. <b>scaled</b>: the interface is drawn smaller to fit. <b>last</b>: the size you last dragged the window to. A, Enter or a click opens the list.\nEach mode remembers its own size. After a change the game asks whether to keep it, and goes back by itself after 10 seconds.",
+            EOptionKind.Choice, 0f, store: EOptionStore.Screen),
         new(EOptionSection.Display, PlayerInput.FieldOfViewKey, "Field of view",
             "How wide the view is, in degrees across the screen. A screen wider than 16:9 shows more at the sides, and a 16:10 or 4:3 screen more above and below. A wide view shows more around you and stretches the edges. The weapon in your hand keeps its size and place.",
             EOptionKind.Slider, PlayerInput.DefaultFieldOfView, PlayerInput.MinFieldOfView, PlayerInput.MaxFieldOfView, 1f,
@@ -268,6 +290,10 @@ public static class GameOptions
     /// <summary>The value of a row: a number, or for the soundfont its place in the list.</summary>
     public static float Get(GameOption o)
     {
+        if (o.Store == EOptionStore.Screen)
+        {
+            return ScreenOptions.Get(o);
+        }
         switch (o.Kind)
         {
             case EOptionKind.Page:
@@ -284,6 +310,10 @@ public static class GameOptions
     /// <summary>What the row shows as its value: the number formatted, or the soundfont's name.</summary>
     public static string ValueText(GameOption o)
     {
+        if (o.Store == EOptionStore.Screen)
+        {
+            return ScreenOptions.ValueText(o);
+        }
         if (o.Kind == EOptionKind.Page)
         {
             return "";
@@ -297,6 +327,10 @@ public static class GameOptions
 
     public static string DefaultText(GameOption o)
     {
+        if (o.Store == EOptionStore.Screen)
+        {
+            return ScreenOptions.DefaultText(o);
+        }
         if (o.Kind == EOptionKind.Page)
         {
             return "";
@@ -310,6 +344,10 @@ public static class GameOptions
 
     public static bool IsDefault(GameOption o)
     {
+        if (o.Store == EOptionStore.Screen)
+        {
+            return ScreenOptions.IsDefault(o);
+        }
         if (o.Kind == EOptionKind.Page)
         {
             return true;
@@ -322,6 +360,11 @@ public static class GameOptions
     /// <summary>Writes a value, clamped and snapped to the row's steps, and puts it into effect.</summary>
     public static void Set(GameOption o, float value)
     {
+        if (o.Store == EOptionStore.Screen)
+        {
+            ScreenOptions.Set(o, value);
+            return;
+        }
         switch (o.Kind)
         {
             case EOptionKind.Page:
@@ -358,6 +401,11 @@ public static class GameOptions
     /// <summary>Left or right on a row: a step of a slider, the next soundfont, or a toggle flipped.</summary>
     public static void Step(GameOption o, int direction)
     {
+        if (o.Store == EOptionStore.Screen)
+        {
+            ScreenOptions.Step(o, direction);
+            return;
+        }
         switch (o.Kind)
         {
             case EOptionKind.Page:
@@ -374,8 +422,30 @@ public static class GameOptions
         }
     }
 
+    /// <summary>False where left or right would do nothing: the ends of the monitor and resolution lists, which do not wrap round.</summary>
+    public static bool CanStep(GameOption o, int direction) =>
+        o.Kind != EOptionKind.Page && (o.Store != EOptionStore.Screen || ScreenOptions.CanStep(o, direction));
+
+    /// <summary>A row whose values open as a drop-down list on A, Enter or a click: the monitor and the resolution.</summary>
+    public static bool HasList(GameOption o) => o.Store == EOptionStore.Screen && ScreenOptions.HasList(o);
+
+    /// <summary>The drop-down's entries, in the row's order; the row's value is the place of the one in force.</summary>
+    public static List<string> ListTexts(GameOption o) => HasList(o) ? ScreenOptions.ListTexts(o) : new List<string>();
+
+    /// <summary>An entry chosen in the drop-down, put into effect at once.</summary>
+    public static void Choose(GameOption o, int index)
+    {
+        if (HasList(o))
+        {
+            ScreenOptions.Choose(o, index);
+        }
+    }
+
+    /// <summary>A row whose value is long (the screen's: "1920x1080 16:9 (native)"), drawn in a wider column.</summary>
+    public static bool WideValue(GameOption o) => o.Store == EOptionStore.Screen;
+
     /// <summary>The soundfont's row: a Choice whose names are the files found on disk, kept by name.</summary>
-    private static bool IsSoundFont(GameOption o) => o.Kind == EOptionKind.Choice && o.Choices == null;
+    private static bool IsSoundFont(GameOption o) => o.Kind == EOptionKind.Choice && o.Choices == null && o.Store == EOptionStore.Prefs;
 
     private static void SetSoundFont(string name)
     {
@@ -442,6 +512,7 @@ public static class GameOptions
     /// <summary>Called every frame the menu is open: puts a new soundfont into effect once the list is still.</summary>
     public static void Tick()
     {
+        ScreenOptions.Tick();
         if (soundFontAppliesAt >= 0f && Time.unscaledTime >= soundFontAppliesAt)
         {
             soundFontAppliesAt = -1f;
@@ -466,6 +537,11 @@ public static class GameOptions
     {
         if (o.Kind == EOptionKind.Page)
         {
+            return;
+        }
+        if (o.Store == EOptionStore.Screen)
+        {
+            ScreenOptions.Reset(o);
             return;
         }
         if (IsSoundFont(o))
@@ -526,12 +602,13 @@ public static class GameOptions
         private readonly Dictionary<GameOption, float> numbers = new Dictionary<GameOption, float>();
         private readonly string soundFont;
         private readonly GameBindings.Snapshot bindings = new GameBindings.Snapshot();
+        private readonly ScreenOptions.Saved screen = ScreenOptions.Capture();
 
         public Snapshot()
         {
             foreach (GameOption o in All)
             {
-                if (!IsSoundFont(o) && o.Kind != EOptionKind.Page)
+                if (!IsSoundFont(o) && o.Kind != EOptionKind.Page && o.Store == EOptionStore.Prefs)
                 {
                     numbers[o] = Get(o);
                 }
@@ -548,7 +625,7 @@ public static class GameOptions
                     return true;
                 }
             }
-            return CurrentSoundFont != soundFont || bindings.Differs();
+            return CurrentSoundFont != soundFont || bindings.Differs() || !screen.Equals(ScreenOptions.Capture());
         }
 
         public void Restore()
@@ -567,6 +644,8 @@ public static class GameOptions
                 SetSoundFont(soundFont);
             }
             bindings.Restore();
+            // at once, and not asked about: the screen as it was when the menu opened
+            ScreenOptions.Restore(screen);
         }
     }
 
@@ -579,7 +658,8 @@ public static class GameOptions
         HoldGrowth(false);
         foreach (GameOption o in All)
         {
-            if (o.Kind == EOptionKind.Page)
+            // the screen's rows are no keys: Unity keeps the mode and size, ScreenOptions the sizes remembered
+            if (o.Kind == EOptionKind.Page || o.Store == EOptionStore.Screen)
             {
                 continue;
             }

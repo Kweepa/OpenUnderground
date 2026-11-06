@@ -3977,6 +3977,11 @@ public class Magic : MonoBehaviour
         }
 
         KeyCode k = e.keyCode;
+        if ((k == KeyCode.Return || k == KeyCode.KeypadEnter) && e.alt)
+        {
+            // Alt-Enter is the fullscreen switch: it neither starts typing nor casts (mod 740)
+            return;
+        }
         if (!typingRunes)
         {
             if ((k == KeyCode.Return || k == KeyCode.KeypadEnter) && CanStartTypingRunes())

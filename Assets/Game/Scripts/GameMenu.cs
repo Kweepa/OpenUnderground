@@ -136,6 +136,8 @@ public sealed class GameMenu
         Original,
         /// <summary>A question of the host's, asked through <see cref="Ask"/>.</summary>
         Host,
+        /// <summary>Keep the monitor, display mode and resolution just put into effect? Goes back by itself (ScreenOptions).</summary>
+        Display,
     }
 
     private enum EButton
@@ -183,6 +185,13 @@ public sealed class GameMenu
     private const float ButtonHeight = 52f;
     private const float ButtonFont = 28f;
     private const float ValueWidth = 300f;
+    // the screen's rows write a size, its shape and a note, "1280x800 16:10 (native, scaled)"
+    private const float WideValueWidth = 440f;
+    // a value too long for its column is drawn smaller, down to this, rather than cut
+    private const float MinValueFont = 20f;
+    private const float DropdownRowHeight = 44f;
+    // the list opens downwards when this many entries fit below the row, or more than above it
+    private const int DropdownMinBelow = 6;
     private const float SliderWidth = 180f;
     private const float BoxSize = 32f;
     // A wall of the game's own, from W64.TR of the original's data, tiled at BackgroundTexel
@@ -229,6 +238,13 @@ public sealed class GameMenu
     private Vector2 lastMouse;
     private GameOption dragging;
 
+    // the drop-down list of a row with many values (the monitor, the resolution): the row, the entry the keys
+    // are on, the first entry shown, and the row's value cell as last drawn, which it hangs from
+    private GameOption dropdown;
+    private int dropdownCursor;
+    private int dropdownScroll;
+    private Rect dropdownAnchor;
+
     private readonly Dictionary<long, GUIStyle> styles = new Dictionary<long, GUIStyle>();
     private float stylesFactor;
 
@@ -268,10 +284,12 @@ public sealed class GameMenu
     public void Open(ETab tab)
     {
         GameOptions.ScanSoundFonts();
+        ScreenOptions.Scan();
         controlsMap.CancelWait();
         snapshot = new GameOptions.Snapshot();
         openedFrame = Time.frameCount;
         confirm = EConfirm.None;
+        dropdown = null;
         dragging = null;
         selectHeld = 0f;
         selectFired = false;
@@ -345,7 +363,10 @@ public sealed class GameMenu
     {
         CloseSubPage();
         controlsMap.CancelWait();
+        // closed by the host, not by the menu's own keys, which wait for the answer: a display change not kept goes back
+        ScreenOptions.Cancel();
         confirm = EConfirm.None;
+        dropdown = null;
         dragging = null;
         GameOptions.Save();
         return snapshot != null && snapshot.Differs();
@@ -584,6 +605,7 @@ public sealed class GameMenu
             case EConfirm.ResetAll: return $"Put every setting of {TabName(Tab)} back to its default?";
             case EConfirm.Undo: return "Put every setting back as it was when you opened the menu?";
             case EConfirm.Host: return hostQuestion;
+            case EConfirm.Display: return $"Keep this display? It goes back in {ScreenOptions.ConfirmSecondsLeft} s.";
             default:
                 return Section == EOptionSection.Keyboard
                     ? "Set every key to the original game's, as on its reference card?"
@@ -595,6 +617,19 @@ public sealed class GameMenu
     {
         EConfirm what = confirm;
         confirm = EConfirm.None;
+        if (what == EConfirm.Display)
+        {
+            if (yes)
+            {
+                ScreenOptions.Keep();
+            }
+            else
+            {
+                ScreenOptions.Revert();
+            }
+            Sound(yes ? skin.MakeSound : skin.BackSound);
+            return;
+        }
         if (!yes)
         {
             Sound(skin.BackSound);
@@ -645,6 +680,17 @@ public sealed class GameMenu
         GameOptions.Tick();
         // the Interface scale, clicked or dragged, grows the interface once the button is let go
         GameOptions.HoldGrowth(dragging != null && dragging.Key == UiScale.GrowthPrefsKey);
+        // a monitor, display mode or resolution just put into effect: keep it, or it goes back by itself
+        if (confirm == EConfirm.None && ScreenOptions.AwaitingConfirm)
+        {
+            confirm = EConfirm.Display;
+            confirmYes = false;
+            Sound(skin.MakeSound);
+        }
+        else if (confirm == EConfirm.Display && ScreenOptions.ConfirmTimedOut)
+        {
+            Answer(false);
+        }
         xHeldAfterRebind &= Gamepad.current?.xButton.isPressed ?? false;
         // a control map waiting for a key or button takes every key and button, Esc and Start among them
         if (controlsMap.Waiting)
@@ -669,8 +715,8 @@ public sealed class GameMenu
                 || (keys?.leftArrowKey.wasPressedThisFrame ?? false),
             Right = (pad?.dpad.right.wasPressedThisFrame ?? false) || (pad?.leftStick.right.wasPressedThisFrame ?? false)
                 || (keys?.rightArrowKey.wasPressedThisFrame ?? false),
-            Accept = (padAcceptArmed && (pad?.aButton.wasReleasedThisFrame ?? false))
-                || (keys?.enterKey.wasPressedThisFrame ?? false) || (keys?.numpadEnterKey.wasPressedThisFrame ?? false),
+            // Alt-Enter is the fullscreen switch, not Enter: it must not open a drop-down or choose in one
+            Accept = (padAcceptArmed && (pad?.aButton.wasReleasedThisFrame ?? false)) || GameInput.EnterPressedThisFrame(),
         };
         float wheel = Mouse.current?.scroll.ReadValue().y ?? 0f;
         nav.Wheel = wheel > 0f ? -1 : wheel < 0f ? 1 : 0;
@@ -718,6 +764,12 @@ public sealed class GameMenu
             return false;
         }
 
+        if (dropdown != null)
+        {
+            UpdateDropdown(nav, back || (pad?.startButton.wasPressedThisFrame ?? false));
+            return false;
+        }
+
         if (subPage != null)
         {
             if (back)
@@ -731,7 +783,7 @@ public sealed class GameMenu
             }
             if (!JustOpened && (pad?.startButton.wasPressedThisFrame ?? false))
             {
-                return true;
+                return CanClose();
             }
             subPage.Update();
             return false;
@@ -739,7 +791,7 @@ public sealed class GameMenu
 
         if (!JustOpened && (back || (pad?.startButton.wasPressedThisFrame ?? false)))
         {
-            return true;
+            return CanClose();
         }
 
         // F1: on a control map it closes the menu, as it opened it; anywhere else it goes to the map of the
@@ -748,7 +800,7 @@ public sealed class GameMenu
         {
             if (Tab == ETab.Controls && ControlsMap.Shows(Section))
             {
-                return true;
+                return CanClose();
             }
             ShowControlsMap(ControlsMap.ForLastDevice());
             return false;
@@ -843,7 +895,7 @@ public sealed class GameMenu
                 EnterButtons(direction, button + direction);
                 Sound(skin.MoveSound);
             }
-            else if (row < rows.Count)
+            else if (row < rows.Count && GameOptions.CanStep(rows[row], direction))
             {
                 GameOptions.Step(rows[row], direction);
                 Sound(skin.MoveSound);
@@ -860,7 +912,11 @@ public sealed class GameMenu
             {
                 OpenSubPage(rows[row].Key);
             }
-            else if (row < rows.Count && rows[row].Kind != EOptionKind.Slider)
+            else if (row < rows.Count && GameOptions.HasList(rows[row]))
+            {
+                OpenDropdown(rows[row]);
+            }
+            else if (row < rows.Count && rows[row].Kind != EOptionKind.Slider && GameOptions.CanStep(rows[row], 1))
             {
                 GameOptions.Step(rows[row], 1);
                 Sound(skin.MoveSound);
@@ -872,6 +928,156 @@ public sealed class GameMenu
         }
         return false;
     }
+
+    private void OpenDropdown(GameOption o)
+    {
+        dropdown = o;
+        dropdownCursor = Mathf.Max(0, Mathf.RoundToInt(GameOptions.Get(o)));
+        // centred on the value in force at the first drawing
+        dropdownScroll = -1;
+        Sound(skin.MakeSound);
+    }
+
+    private void ChooseFromDropdown(int index)
+    {
+        GameOption o = dropdown;
+        dropdown = null;
+        if (o == null || index == Mathf.RoundToInt(GameOptions.Get(o)))
+        {
+            Sound(skin.BackSound);
+            return;
+        }
+        GameOptions.Choose(o, index);
+        Sound(skin.MakeSound);
+    }
+
+    /// <summary>The keys while a drop-down is open: up and down, the wheel, A or Enter to choose, B, Esc or Start to leave it.</summary>
+    private void UpdateDropdown(Nav nav, bool back)
+    {
+        int count = GameOptions.ListTexts(dropdown).Count;
+        if (back || count == 0)
+        {
+            dropdown = null;
+            Sound(skin.BackSound);
+            return;
+        }
+        int step = nav.Up ? -1 : nav.Down ? 1 : nav.Wheel;
+        if (step != 0)
+        {
+            int next = Mathf.Clamp(dropdownCursor + step, 0, count - 1);
+            if (next != dropdownCursor)
+            {
+                dropdownCursor = next;
+                Sound(skin.MoveSound);
+            }
+        }
+        else if (nav.Accept)
+        {
+            ChooseFromDropdown(dropdownCursor);
+        }
+    }
+
+    /// <summary>
+    /// Where the drop-down goes: under its row, or over it when more entries fit there and too few below;
+    /// as many entries as fit between the tabs and the hints, the rest reached by scrolling.
+    /// </summary>
+    private void DropdownLayout(int count, out Rect box, out int visible)
+    {
+        float top = Margin + 14f + TabsHeight;
+        float bottom = UiScale.Height - Margin - 12f - HintsHeight - 8f;
+        int below = Mathf.FloorToInt((bottom - dropdownAnchor.yMax) / DropdownRowHeight);
+        int above = Mathf.FloorToInt((dropdownAnchor.y - top) / DropdownRowHeight);
+        bool down = below >= Mathf.Min(count, DropdownMinBelow) || below >= above;
+        visible = Mathf.Clamp(down ? below : above, 1, Mathf.Max(1, count));
+        float h = visible * DropdownRowHeight;
+        box = down
+            ? new Rect(dropdownAnchor.x, dropdownAnchor.yMax, dropdownAnchor.width, h)
+            : new Rect(dropdownAnchor.x, dropdownAnchor.y - h, dropdownAnchor.width, h);
+    }
+
+    /// <summary>The drop-down takes the clicks first, being drawn over everything: an entry chooses, anywhere else closes it.</summary>
+    private void DropdownClicks()
+    {
+        if (dropdown == null || confirm != EConfirm.None)
+        {
+            return;
+        }
+        List<string> items = GameOptions.ListTexts(dropdown);
+        DropdownLayout(items.Count, out Rect box, out int visible);
+        int first = Mathf.Max(0, dropdownScroll);
+        for (int k = 0; k < visible && first + k < items.Count; k++)
+        {
+            if (Clicked(new Rect(box.x, box.y + k * DropdownRowHeight, box.width, DropdownRowHeight)))
+            {
+                ChooseFromDropdown(first + k);
+                return;
+            }
+        }
+        if (GuiInput.IsLeftMouseDownGui)
+        {
+            Event.current.Use();
+            dropdown = null;
+            Sound(skin.BackSound);
+        }
+    }
+
+    private void DrawDropdown(bool hoverMoves)
+    {
+        List<string> items = GameOptions.ListTexts(dropdown);
+        if (items.Count == 0)
+        {
+            dropdown = null;
+            return;
+        }
+        dropdownCursor = Mathf.Clamp(dropdownCursor, 0, items.Count - 1);
+        DropdownLayout(items.Count, out Rect box, out int visible);
+        if (dropdownScroll < 0)
+        {
+            dropdownScroll = dropdownCursor - visible / 2;
+        }
+        if (dropdownCursor < dropdownScroll)
+        {
+            dropdownScroll = dropdownCursor;
+        }
+        else if (dropdownCursor >= dropdownScroll + visible)
+        {
+            dropdownScroll = dropdownCursor - visible + 1;
+        }
+        dropdownScroll = Mathf.Clamp(dropdownScroll, 0, Mathf.Max(0, items.Count - visible));
+
+        Fill(box, new Color(0f, 0f, 0f, 0.92f));
+        int current = Mathf.RoundToInt(GameOptions.Get(dropdown));
+        for (int k = 0; k < visible && dropdownScroll + k < items.Count; k++)
+        {
+            int i = dropdownScroll + k;
+            Rect r = new Rect(box.x, box.y + k * DropdownRowHeight, box.width, DropdownRowHeight);
+            if (hoverMoves && Hover(r))
+            {
+                dropdownCursor = i;
+            }
+            if (i == dropdownCursor)
+            {
+                Fill(r, LitFill);
+            }
+            Rect text = new Rect(r.x + 14f, r.y, r.width - 40f, r.height);
+            Text(text, items[i], FittingFont(items[i], text.width), TextAnchor.MiddleLeft, i == current ? Color.white : SelectColor);
+        }
+        if (dropdownScroll > 0)
+        {
+            Text(new Rect(box.xMax - 30f, box.y, 26f, DropdownRowHeight), "▲", 20f, TextAnchor.MiddleCenter, SelectColor);
+        }
+        if (dropdownScroll + visible < items.Count)
+        {
+            Text(new Rect(box.xMax - 30f, box.yMax - DropdownRowHeight, 26f, DropdownRowHeight), "▼", 20f, TextAnchor.MiddleCenter, SelectColor);
+        }
+        Frame(box, SelectColor);
+    }
+
+    /// <summary>
+    /// True when the menu may close on the player's key. A monitor, display mode or resolution still waiting for
+    /// its second is put into effect instead, and the menu stays open for the box that asks to keep it.
+    /// </summary>
+    private bool CanClose() => !ScreenOptions.ApplyPendingNow();
 
     /// <summary>
     /// The keys on a map of CONTROLS: the map walks its own list, and past either end of it they go to
@@ -1313,13 +1519,15 @@ public sealed class GameMenu
                 Event.current.Use();
             }
         }
+        bool dropdownWasOpen = dropdown != null;
+        DropdownClicks();
 
         DrawTabs(innerX, innerW, tabsY, pad);
 
         float hintsY = H - Margin - 12f - HintsHeight;
         Rect hintsRow = new Rect(innerX, hintsY, innerW, HintsHeight);
         float buttonsY = hintsY - 8f - ButtonHeight;
-        bool hoverSelects = mouse && mouseMoved && confirm == EConfirm.None;
+        bool hoverSelects = mouse && mouseMoved && confirm == EConfirm.None && dropdown == null && !dropdownWasOpen;
 
         if (subPage != null)
         {
@@ -1376,6 +1584,10 @@ public sealed class GameMenu
             Hints(hintsRow, HintsNow(OptionHints(pad), pad));
         }
 
+        if (dropdown != null && confirm == EConfirm.None)
+        {
+            DrawDropdown(mouse && mouseMoved);
+        }
         if (confirm != EConfirm.None)
         {
             DrawConfirm(confirmBox, yes, no);
@@ -1500,7 +1712,6 @@ public sealed class GameMenu
 
         float valueX = list.xMax - 20f - ValueWidth;
         float labelX = list.x + 40f;
-        float labelW = valueX - 16f - labelX;
 
         for (int r = 0; r < visible && rowScroll + r < rows.Count; r++)
         {
@@ -1526,13 +1737,19 @@ public sealed class GameMenu
                 Fill(new Rect(list.x + 20f, rect.center.y - 5f, 10f, 10f), SelectColor);
             }
 
-            // a toggle's box is narrow, so its label may run on up to it
-            float rowLabelW = o.Kind == EOptionKind.Toggle ? valueX + ValueWidth - BoxSize - 16f - labelX : labelW;
+            // a toggle's box is narrow, so its label may run on up to it; a wide value takes room from the label
+            float valueW = GameOptions.WideValue(o) ? WideValueWidth : ValueWidth;
+            float rowValueX = list.xMax - 20f - valueW;
+            float rowLabelW = o.Kind == EOptionKind.Toggle ? valueX + ValueWidth - BoxSize - 16f - labelX : rowValueX - 16f - labelX;
             Color labelColor = selected ? Color.white : SelectColor;
             Text(new Rect(labelX, rect.y, rowLabelW, rect.height), o.Label, RowFont, TextAnchor.MiddleLeft, labelColor);
             WarnIfTooWide(o.Label, rowLabelW);
 
-            Rect value = new Rect(valueX, rect.y, ValueWidth, rect.height);
+            Rect value = new Rect(rowValueX, rect.y, valueW, rect.height);
+            if (o == dropdown)
+            {
+                dropdownAnchor = value;
+            }
             switch (o.Kind)
             {
                 case EOptionKind.Toggle:
@@ -1646,15 +1863,33 @@ public sealed class GameMenu
     {
         string name = GameOptions.ValueText(o);
         Color color = selected ? Color.white : SelectColor;
+        if (GameOptions.HasList(o))
+        {
+            DrawListRow(o, rect, value, name, color);
+            return;
+        }
         if (selected)
         {
             Rect left = new Rect(value.x, rect.y, 36f, rect.height);
             Rect right = new Rect(value.xMax - 36f, rect.y, 36f, rect.height);
-            Text(left, "◀", 24f, TextAnchor.MiddleCenter, Hover(left) ? Color.white : SelectColor);
-            Text(right, "▶", 24f, TextAnchor.MiddleCenter, Hover(right) ? Color.white : SelectColor);
-            Text(new Rect(left.xMax, rect.y, right.x - left.xMax, rect.height), name, RowFont, TextAnchor.MiddleCenter, color);
+            // an arrow that would go nowhere, at an end of the resolution list, is dimmed
+            bool canLeft = GameOptions.CanStep(o, -1);
+            bool canRight = GameOptions.CanStep(o, 1);
+            Text(left, "◀", 24f, TextAnchor.MiddleCenter, !canLeft ? DimColor : Hover(left) ? Color.white : SelectColor);
+            Text(right, "▶", 24f, TextAnchor.MiddleCenter, !canRight ? DimColor : Hover(right) ? Color.white : SelectColor);
+            Rect middle = new Rect(left.xMax, rect.y, right.x - left.xMax, rect.height);
+            Text(middle, name, FittingFont(name, middle.width), TextAnchor.MiddleCenter, color);
+            if (confirm == EConfirm.None && dropdown == null && GameOptions.HasList(o) && Clicked(middle))
+            {
+                OpenDropdown(o);
+                return;
+            }
             if (confirm == EConfirm.None)
             {
+                if (!canLeft && Clicked(left) || !canRight && Clicked(right))
+                {
+                    return;
+                }
                 if (Clicked(left))
                 {
                     GameOptions.Step(o, -1);
@@ -1671,12 +1906,51 @@ public sealed class GameMenu
         }
         else
         {
-            Text(value, name, RowFont, TextAnchor.MiddleRight, color);
+            Text(value, name, FittingFont(name, value.width), TextAnchor.MiddleRight, color);
         }
         if (confirm == EConfirm.None && Clicked(rect))
         {
             Select(o);
         }
+    }
+
+    /// <summary>
+    /// A row whose values open as a drop-down: the value and a ▼ at the right, the sign of the list; a click on
+    /// the value opens it. Left and right on the pad and the keyboard still step through the values.
+    /// </summary>
+    private void DrawListRow(GameOption o, Rect rect, Rect value, string name, Color color)
+    {
+        bool open = dropdown == o;
+        Rect arrow = new Rect(value.xMax - 36f, rect.y, 36f, rect.height);
+        Rect text = new Rect(value.x, rect.y, value.width - 44f, rect.height);
+        Text(text, name, FittingFont(name, text.width), TextAnchor.MiddleRight, color);
+        Text(arrow, open ? "▲" : "▼", 22f, TextAnchor.MiddleCenter, open || Hover(value) ? Color.white : color);
+        if (confirm != EConfirm.None || dropdown != null)
+        {
+            return;
+        }
+        if (Clicked(value))
+        {
+            Select(o);
+            // the anchor of this row now: the drop-down is drawn later in this same pass, and its first drawing centres it
+            dropdownAnchor = value;
+            OpenDropdown(o);
+        }
+        else if (Clicked(rect))
+        {
+            Select(o);
+        }
+    }
+
+    /// <summary>The row's font, or a smaller one down to <see cref="MinValueFont"/> for a value that would not fit its width.</summary>
+    private float FittingFont(string content, float width)
+    {
+        float size = RowFont;
+        while (size > MinValueFont && Measure(content, size) > width)
+        {
+            size -= 2f;
+        }
+        return size;
     }
 
     private void Select(GameOption o)
@@ -1923,9 +2197,21 @@ public sealed class GameMenu
     {
         bool sections = Sections(Tab).Count > 1;
         List<Hint> hints = new List<Hint>();
+        if (dropdown != null)
+        {
+            hints.Add(new Hint("choose", pad ? HintKey.Of(skin.AButton) : HintKey.Keyboard("Enter")));
+            hints.Add(new Hint("back", pad ? HintKey.Of(skin.BButton) : HintKey.Of(skin.EscapeKey)));
+            return hints.ToArray();
+        }
+        List<GameOption> rows = Rows;
+        bool listRow = !onButtons && row >= 0 && row < rows.Count && GameOptions.HasList(rows[row]);
         if (pad)
         {
             hints.Add(new Hint("change", HintKey.Of(skin.DPadLeftRight)));
+            if (listRow)
+            {
+                hints.Add(new Hint("list", HintKey.Of(skin.AButton)));
+            }
             hints.Add(new Hint("tab", HintKey.PadButton("LB"), HintKey.PadButton("RB")));
             if (sections)
             {

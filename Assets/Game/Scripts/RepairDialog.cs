@@ -252,9 +252,7 @@ public class RepairDialog : MonoBehaviour
 
             repairDialogHold = 2;
 
-            if (GameInput.CurrentKeyboard != null
-                     && (GameInput.CurrentKeyboard.enterKey.wasPressedThisFrame
-                         || GameInput.CurrentKeyboard.numpadEnterKey.wasPressedThisFrame))
+            if (GameInput.EnterPressedThisFrame())
             {
                 ConfirmRepair();
             }

@@ -10,6 +10,13 @@ public static class GameInput
     public static GameInputDevice LastActiveDevice { get; private set; } = GameInputDevice.MouseKeyboard;
 
     public static Keyboard CurrentKeyboard => Keyboard.current;
+
+    /// <summary>Alt held: Alt-Enter is the fullscreen switch (Unity's own), never an Enter for the game.</summary>
+    public static bool AltHeld => Keyboard.current is { } k && (k.leftAltKey.isPressed || k.rightAltKey.isPressed);
+
+    /// <summary>Enter or the keypad's Enter pressed this frame, Alt-Enter not counting (mod 740).</summary>
+    public static bool EnterPressedThisFrame() =>
+        Keyboard.current is { } k && !AltHeld && (k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame);
     public static Gamepad CurrentGamepad => Gamepad.current;
     public static Mouse CurrentMouse => Mouse.current;
 

@@ -4,6 +4,9 @@ using System.IO;
 public static class GameDataPath
 {
     private const string PLAYER_PREFS_KEY = "GameDataRootPath";
+
+    /// <summary>True once the original game's folder has been saved: every run but the first one of an install.</summary>
+    public static bool HasSavedPath => PlayerPrefs.HasKey(PLAYER_PREFS_KEY);
     
     /// <summary>
     /// Gets the root game data directory path from PlayerPrefs.
