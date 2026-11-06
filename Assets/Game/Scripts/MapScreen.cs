@@ -1094,7 +1094,7 @@ public class MapScreen : MonoBehaviour
                 }
                 
                 // Still allow physical keyboard input
-                if (Event.current.isKey && Event.current.keyCode == KeyCode.Return)
+                if (Event.current.isKey && Event.current.keyCode == KeyCode.Return && !Event.current.alt)
                 {
                     if (KeyboardGUI.sKeyboard == null || !KeyboardGUI.sKeyboard.IsVisible())
                     {

@@ -423,7 +423,8 @@ public class KeyboardGUI : MonoBehaviour
             // Handle physical keyboard input (Event.current is only valid in OnGUI)
             if (Event.current.isKey && Event.current.type == EventType.KeyDown)
             {
-                if (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
+                // Alt-Enter is the fullscreen switch, not an Enter (mod 740)
+                if ((Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter) && !Event.current.alt)
                 {
                     // Confirm (handles empty string cancellation internally)
                     Confirm();

@@ -90,7 +90,8 @@ public class SmallWindowWarning : MonoBehaviour
                     closingHeld = false;
                 }
             }
-            if (!shownThisRun && WindowIsSmall && PlaceToShow())
+            // not over the game menu's question on a new window size, which would run out behind it
+            if (!shownThisRun && WindowIsSmall && !ScreenOptions.Busy && PlaceToShow())
             {
                 Open();
             }
@@ -104,8 +105,7 @@ public class SmallWindowWarning : MonoBehaviour
         }
 
         if (GameInput.CurrentKeyboard != null
-            && (GameInput.CurrentKeyboard.enterKey.wasPressedThisFrame
-                || GameInput.CurrentKeyboard.numpadEnterKey.wasPressedThisFrame
+            && (GameInput.EnterPressedThisFrame()
                 || GameInput.CurrentKeyboard.spaceKey.wasPressedThisFrame
                 || GameInput.CurrentKeyboard.escapeKey.wasPressedThisFrame))
         {

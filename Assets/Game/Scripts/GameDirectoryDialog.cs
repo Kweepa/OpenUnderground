@@ -481,7 +481,7 @@ public class GameDirectoryDialog : MonoBehaviour
         GUI.enabled = true;
         
         // Handle Enter key in text field
-        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return)
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return && !Event.current.alt)
         {
             if (GUI.GetNameOfFocusedControl() == "pathInput")
             {
