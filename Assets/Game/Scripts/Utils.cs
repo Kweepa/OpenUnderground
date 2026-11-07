@@ -173,6 +173,42 @@ public class Utils
         }
     }
 
+    /// <summary>
+    /// The original drew its 320 x 200 pictures on a 4:3 monitor, so each pixel was 1.2 times taller than wide.
+    /// </summary>
+    public const float OriginalPixelAspect = 1.2f;
+
+    /// <summary>
+    /// Where a picture of the original goes on screen: centred in the safe area and as large as fits, at the shape
+    /// it had on the original's monitor (<see cref="OriginalPixelAspect"/>), so a 320 x 200 frame shows at 4:3. The
+    /// rest of the screen is left for black bands (<see cref="DrawBlack"/>).
+    /// </summary>
+    public static Rect FitOriginalPicture(int width, int height)
+    {
+        Rect area = Screen.safeArea;
+        float aspect = width / (height * OriginalPixelAspect);
+        float w = area.width;
+        float h = area.height;
+        if (w > h * aspect)
+        {
+            w = Mathf.Round(h * aspect);
+        }
+        else
+        {
+            h = Mathf.Round(w / aspect);
+        }
+        return new Rect(Mathf.Round(area.x + (area.width - w) / 2), Mathf.Round(area.y + (area.height - h) / 2), w, h);
+    }
+
+    /// <summary>Black over the whole screen: the bands round a picture placed by <see cref="FitOriginalPicture"/>.</summary>
+    public static void DrawBlack()
+    {
+        Color old = GUI.color;
+        GUI.color = Color.black;
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = old;
+    }
+
     public static void RetintImages(Texture2D[] imageList, int[] indices, Color multiplier)
     {
         foreach (int i in indices)

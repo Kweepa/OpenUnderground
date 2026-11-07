@@ -138,11 +138,14 @@ public class Logos : MonoBehaviour
 
         switch (state)
         {
+        // At the original's 4:3 with black bands, as the title cutscene after them, not stretched to the screen.
         case EState.Logo1:
-            GUI.DrawTexture(Screen.safeArea, originLogo);
+            Utils.DrawBlack();
+            GUI.DrawTexture(Utils.FitOriginalPicture(originLogo.width, originLogo.height), originLogo);
             break;
         case EState.Logo2:
-            GUI.DrawTexture(Screen.safeArea, blueSkyLogo);
+            Utils.DrawBlack();
+            GUI.DrawTexture(Utils.FitOriginalPicture(blueSkyLogo.width, blueSkyLogo.height), blueSkyLogo);
             break;
         }
         Utils.DrawFade(fadeAlpha);

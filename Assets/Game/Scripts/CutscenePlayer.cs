@@ -104,10 +104,13 @@ public class CutEvent
     public string cutName;
 }
 
+// Every type now shows its picture whole at the original's 4:3, with black bands (CutscenePlayer.OnGUI()), so
+// Spill and Fill draw alike; they were the screen's width at 80:54 from the top, and the whole screen.
 public enum CutsceneFitType
 {
     Spill,
     Fill,
+    // the part of the frame inside the original's view window, cut out by ReadCutsFile()
     Corner
 }
 
@@ -782,45 +785,41 @@ public class CutscenePlayer : MonoBehaviour
         style.font = font;
         style.normal.textColor = Color.white;
         style.fontSize = UiScale.Font(40);
-        style.alignment = TextAnchor.UpperCenter;
+        style.alignment = TextAnchor.MiddleCenter;
         style.wordWrap = true;
 
-        int y = 0;
-        int w = Screen.width;
-        int h = Screen.height;
-        if (fitType == CutsceneFitType.Spill)
-        {
-            h = 54 * w / 80;
-        }
-        else if (fitType == CutsceneFitType.Corner)
-        {
-            h = 54 * w / 80;
-            y = Screen.height - h;
-        }
+        // The whole picture at the shape it had on the original's 4:3 monitor, as large as the screen allows, black
+        // round it: a 320 x 200 frame at 4:3, Corner's cut-out at its own 168 : 131. It was the screen's width at
+        // 80:54, which cut the bottom on an ultrawide screen and Corner's top on a widescreen, or stretched (Fill).
+        Texture2D t = outputImages[frameNum];
+        Rect picture = Utils.FitOriginalPicture(t.width, t.height);
+        Utils.DrawBlack();
 
-        // display
+        // display, clipped to the picture so that the blur does not spill into the bands
+        GUI.BeginGroup(picture);
         {
-            Rect rect = new Rect(0, y, w, h);
+            Rect rect = new Rect(0, 0, picture.width, picture.height);
 
-            Texture2D t = outputImages[frameNum];
             GUI.DrawTexture(rect, t);
             if (blur)
             {
+                // one pixel of the frame each way
                 GUI.color = new Color(1.0f, 1.0f, 1.0f, 0.25f);
-                float onePixelX = Screen.width / (float) t.width;
-                float onePixelY = 1.2f * onePixelX;
+                float onePixelX = picture.width / t.width;
+                float onePixelY = picture.height / t.height;
                 rect.x = -onePixelX;
                 GUI.DrawTexture(rect, t);
                 rect.x = onePixelX;
                 GUI.DrawTexture(rect, t);
                 rect.x = 0.0f;
-                rect.y -= onePixelY;
+                rect.y = -onePixelY;
                 GUI.DrawTexture(rect, t);
-                rect.y += 2.0f * onePixelY;
+                rect.y = onePixelY;
                 GUI.DrawTexture(rect, t);
                 GUI.color = Color.white;
             }
         }
+        GUI.EndGroup();
 
         // fade in/out
         Utils.DrawFade(fadeAlpha);
@@ -843,17 +842,22 @@ public class CutscenePlayer : MonoBehaviour
                 }
             }
 
-            float xBorder = 0.1f * Screen.width;
-            float yBorder = 0.05f * Screen.height;
-            GUI.Label(new Rect(xBorder, Screen.height - yBorder - 2 * style.fontSize, Screen.width - 2 * xBorder, 3 * style.fontSize), subtitle, style);
+            // In the strip under the picture that every animation with subtitles keeps black, rows 153-199 of the
+            // frame (UW/CUTS), where the original wrote them: rows 154 to 196, centred. Three lines fit there
+            // down to a 1280 x 720 window, and no subtitle needs more.
+            float xBorder = 0.1f * picture.width;
+            float top = picture.y + picture.height * (154f / 200f);
+            float bottom = picture.y + picture.height * (196f / 200f);
+            GUI.Label(new Rect(picture.x + xBorder, top, picture.width - 2 * xBorder, bottom - top), subtitle, style);
         }
 
         if (waitForA && aButton != null && GameInput.LastActiveDevice == GameInputDevice.Gamepad)
         {
+            // at the foot of the picture, as it was at the foot of the screen
             float aw = UiScale.S(48);
             float ah = UiScale.S(48);
-            float yBorder = 0.05f * Screen.height;
-            GUI.DrawTexture(new Rect(Screen.width / 2 - aw / 2, Screen.height - yBorder - ah, aw, ah), PadGlyphs.Face(aButton));
+            float yBorder = 0.05f * picture.height;
+            GUI.DrawTexture(new Rect(picture.center.x - aw / 2, picture.yMax - yBorder - ah, aw, ah), PadGlyphs.Face(aButton));
         }
 
         if (debugShowFrames)
