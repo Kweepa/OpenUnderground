@@ -306,10 +306,7 @@ public class PlayerObject : MonoBehaviour
         if (GetComponent<PlayerPanelInput>() == null)
             gameObject.AddComponent<PlayerPanelInput>();
 
-        // try to update at the rate of the monitor to prevent tearing
-        QualitySettings.vSyncCount = 1;
-        // this is ignored when using vSyncCount
-        Application.targetFrameRate = 60;
+        // V-Sync is set once for the whole run, before the first scene: VSync.Apply()
 
         // If loadedLevel is 0 (not yet set), default to level 1 starting position
         int levelIndex = LevelLoader.sLevelLoader.loadedLevel;
