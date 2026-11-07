@@ -3,7 +3,6 @@ using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 using System.IO;
 using System.Collections;
-using System.Diagnostics;
 using System;
 using System.Globalization;
 using DiscUtils.Iso9660;
@@ -342,7 +341,7 @@ public class GameDirectoryDialog : MonoBehaviour
             GUI.FocusControl("pathInput");
         }
         
-        // Browse button (opens Windows Explorer) - aligned with input field
+        // Browse button (the system's Open dialog) - aligned with input field
         Rect browseRect = new Rect(dialogX + dialogWidth - 60 - browseButtonWidth, inputSectionY + 70, browseButtonWidth, 60);
         bool browseSelected = selectedControl == ESelectedControl.Browse;
         DrawButtonWithBox(browseRect, "Browse", browseSelected);
@@ -454,24 +453,35 @@ public class GameDirectoryDialog : MonoBehaviour
         GUI.color = originalColor;
     }
     
+    /// <summary>
+    /// The system's Open dialog, the one the Setup screen's music page uses, showing the two files that mark the game's
+    /// folder: game.gog in a GOG installation, UW.EXE in a copy of the files. The folder of the file picked goes in the
+    /// field and is validated, which also unpacks game.gog. It used to start explorer.exe and ask for the path to be
+    /// pasted, which did nothing under Proton.
+    /// </summary>
     private void BrowseForFolder()
     {
-        // On Windows, try to open Explorer
-        try
+        if (!NativeFileDialog.IsAvailable)
         {
-            string startPath = string.IsNullOrEmpty(inputPath) ? Environment.GetFolderPath(Environment.SpecialFolder.MyComputer) : inputPath;
-            if (!Directory.Exists(startPath))
-            {
-                startPath = Environment.GetFolderPath(Environment.SpecialFolder.MyComputer);
-            }
-            
-            Process.Start("explorer.exe", startPath);
-            statusMessage = "Please navigate to the game directory in Explorer and copy the path, then paste it above.";
+            statusMessage = "Type the path of the game's folder above.";
+            return;
         }
-        catch (Exception ex)
+
+        string start = !string.IsNullOrEmpty(inputPath) && Directory.Exists(inputPath) ? inputPath : null;
+        string file = NativeFileDialog.OpenFile("Find game.gog or UW.EXE in the game's folder", "Game files",
+            new[] { "game.gog", "UW.EXE" }, start, out string error);
+        if (error != null)
         {
-            statusMessage = StatusMessageTwoLines("Could not open file browser:", ex.Message);
+            statusMessage = StatusMessageTwoLines("Could not open file browser:", error);
+            return;
         }
+        if (file == null)
+        {
+            return;
+        }
+
+        inputPath = Path.GetDirectoryName(file);
+        ValidateInputPath();
     }
     
     private void ValidateInputPath()
