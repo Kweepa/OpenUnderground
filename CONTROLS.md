@@ -151,6 +151,14 @@ time.
 |B|Clear|
 |X|Cancel (when allowed)|
 
+**Cutscenes**
+
+|Control|Action|
+|-|-|
+|A|Advance, where the A prompt shows; the startup logos and the title screen go to the next|
+|B (hold)|Fast forward, ten times speed|
+|Start|Leave: the startup logos and the title screen (straight to the title menu), the introduction, the dreams and the two scenes of level 7|
+
 ---
 
 ## KEYBOARD \& MOUSE
@@ -295,9 +303,11 @@ Look speed and invert options are in the game menu, under CONTROLS.
 |-|-|
 |Left click|Advance|
 |Right click (hold)|Fast forward, ten times speed|
+|Esc|Leave: the startup logos and the title screen, the introduction, the dreams and the two scenes of level 7|
 
-The title screen that follows the two startup logos also ends on a left click or A, like the logos
-themselves. Other cutscenes have no outright skip, only the fast forward.
+The title screen that follows the two startup logos also ends on a left click, Enter or Space, like the
+logos themselves, and Esc skips them all, straight to the title menu. Other cutscenes have no outright
+skip, only the fast forward.
 
 
 

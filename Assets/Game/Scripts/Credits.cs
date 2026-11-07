@@ -429,12 +429,21 @@ public class Credits : MonoBehaviour
     {
         pageTime -= Time.deltaTime;
 
-        if ((GameInput.CurrentGamepad?.dpad.left.wasPressedThisFrame ?? false) && page > 0)
+        Keyboard keys = GameInput.CurrentKeyboard;
+        // the arrows turn the pages as the d-pad does; Enter and Space go on as the left click does
+        bool previous = (GameInput.CurrentGamepad?.dpad.left.wasPressedThisFrame ?? false)
+            || (keys?.leftArrowKey.wasPressedThisFrame ?? false);
+        bool next = (GameInput.CurrentGamepad?.dpad.right.wasPressedThisFrame ?? false)
+            || (keys?.rightArrowKey.wasPressedThisFrame ?? false);
+        bool onward = (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)
+            || GameInput.EnterPressedThisFrame() || (keys?.spaceKey.wasPressedThisFrame ?? false);
+
+        if (previous && page > 0)
         {
             --page;
             WriteCreditsOnTexture(creds[page]);
         }
-        else if ((GameInput.CurrentGamepad?.dpad.right.wasPressedThisFrame ?? false) && page < creds.Length - 1)
+        else if (next && page < creds.Length - 1)
         {
             ++page;
             WriteCreditsOnTexture(creds[page]);
@@ -446,7 +455,7 @@ public class Credits : MonoBehaviour
             Utils.PlayClip2d(turnBack);
             enabled = false;
         }
-        else if (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)
+        else if (onward)
         {
             // Anywhere on the screen. Past the last page it goes back to the menu, as the timer does.
             if (page < creds.Length - 1)

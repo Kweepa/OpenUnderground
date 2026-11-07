@@ -1821,7 +1821,8 @@ public class Conversations : MonoBehaviour
             {
                 bool gpConfirm = GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false;
                 bool mouseConfirm = (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)
-                    || (GameInput.CurrentMouse?.rightButton.wasPressedThisFrame ?? false);
+                    || (GameInput.CurrentMouse?.rightButton.wasPressedThisFrame ?? false)
+                    || AnyKeyEndsConversation();
 
                 if (gpConfirm || mouseConfirm)
                 {
@@ -2047,6 +2048,62 @@ public class Conversations : MonoBehaviour
 
     private const float GambitPanelWidth = 842f;
     private const float GambitLineGap = 2f;
+
+    /// <summary>
+    /// A key pressed this frame that ends a conversation: any key, as the original's reference card says ("click either
+    /// mouse-button or press any key"), on the press as a click, but Shift, Ctrl, Alt and the Windows keys alone, Print
+    /// Screen, the function keys (F12 is Steam's screenshot key), the lock keys and Pause, and anything with Alt held
+    /// (Alt-Enter, Alt-Tab), so a screenshot or a switch of window does not end it.
+    /// </summary>
+    private static bool AnyKeyEndsConversation()
+    {
+        Keyboard kb = GameInput.CurrentKeyboard;
+        if (kb == null || !kb.anyKey.wasPressedThisFrame || GameInput.AltHeld)
+        {
+            return false;
+        }
+        foreach (KeyControl k in kb.allKeys)
+        {
+            if (k == null || !k.wasPressedThisFrame)
+            {
+                continue;
+            }
+            switch (k.keyCode)
+            {
+            // Key is also the project's door key class: the Input System's is named in full
+            case UnityEngine.InputSystem.Key.LeftShift:
+            case UnityEngine.InputSystem.Key.RightShift:
+            case UnityEngine.InputSystem.Key.LeftCtrl:
+            case UnityEngine.InputSystem.Key.RightCtrl:
+            case UnityEngine.InputSystem.Key.LeftAlt:
+            case UnityEngine.InputSystem.Key.RightAlt:
+            case UnityEngine.InputSystem.Key.LeftMeta:
+            case UnityEngine.InputSystem.Key.RightMeta:
+            case UnityEngine.InputSystem.Key.ContextMenu:
+            case UnityEngine.InputSystem.Key.PrintScreen:
+            // the function keys, F12 being Steam's screenshot key, and the lock keys: none is a way to answer
+            case UnityEngine.InputSystem.Key.F1:
+            case UnityEngine.InputSystem.Key.F2:
+            case UnityEngine.InputSystem.Key.F3:
+            case UnityEngine.InputSystem.Key.F4:
+            case UnityEngine.InputSystem.Key.F5:
+            case UnityEngine.InputSystem.Key.F6:
+            case UnityEngine.InputSystem.Key.F7:
+            case UnityEngine.InputSystem.Key.F8:
+            case UnityEngine.InputSystem.Key.F9:
+            case UnityEngine.InputSystem.Key.F10:
+            case UnityEngine.InputSystem.Key.F11:
+            case UnityEngine.InputSystem.Key.F12:
+            case UnityEngine.InputSystem.Key.CapsLock:
+            case UnityEngine.InputSystem.Key.NumLock:
+            case UnityEngine.InputSystem.Key.ScrollLock:
+            case UnityEngine.InputSystem.Key.Pause:
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
 
     private void TrySelectGambitByNumberKeys()
     {

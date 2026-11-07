@@ -640,6 +640,7 @@ public class FrontEnd : MonoBehaviour
                 {
                     new Hint("next page", HintKey.Of(leftMouseButtonTexture)),
                     new Hint("previous page", HintKey.Of(rightMouseButtonTexture)),
+                    new Hint("pages", HintKey.Keyboard("←"), HintKey.Keyboard("→")),
                     new Hint("back", HintKey.Of(escapeKeyTexture)),
                 };
         }

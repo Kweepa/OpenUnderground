@@ -100,6 +100,14 @@ public sealed class ControlsMap
         // at most five answers in the original's conversations: four in a babl_menu, five in two babl_fmenu (Hewstone,
         // Ishtass on levels 2 and 3, read in CNV.ARK); the digits up to 9 still answer, none has more to answer
         new KeyRow { Label = "Reply in a conversation", Keys = () => Digits(1, 5), KeysText = "1 - 5" },
+        // the how-many box's keys (mod 1140): fixed, as the conversation's digits
+        new KeyRow
+        {
+            Label = "Choose how many",
+            Keys = () => Join(Digits(0, 9), new List<string> { "leftArrow", "rightArrow", "home", "end" }),
+            KeysText = "0 - 9, ← →, Home, End",
+            Note = "Type the number or step it; Home for one, End for all; Enter takes them.",
+        },
         new KeyRow { Label = "Play an instrument", Keys = () => Digits(0, 9), KeysText = "0 - 9" },
         new KeyRow { Header = "PANELS" },
         new KeyRow { Label = "Magic panel", EntryId = "Keys.World/MagicPanel", Note = "Or a right click on the rune bag in the inventory." },
