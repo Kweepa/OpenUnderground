@@ -1,6 +1,6 @@
 # Changelog
 
-## Current release
+## Next release
 
 - Browse in the game folder dialog now opens the system's Open dialog, also on Linux and the Steam Deck: pick game.gog or UW.EXE in the game's folder.
 
