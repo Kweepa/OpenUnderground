@@ -5,7 +5,8 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
-/// The system's Open dialog, for picking files from anywhere on disk: Windows, and Wine under Proton,
+/// The system's Open dialog, for picking files from anywhere on disk (the Setup screen's music, the game's folder by one
+/// of its files): Windows, and Wine under Proton,
 /// which is how the game runs on Linux and on a Steam Deck. Elsewhere it is not available.
 /// </summary>
 /// <remarks>
@@ -85,6 +86,22 @@ public static class NativeFileDialog
     /// <param name="error">Why nothing came back, when it was not a cancel.</param>
     public static string[] OpenFiles(string title, string filterName, string[] extensions, string initialFolder, out string error)
     {
+        return Open(title, filterName, Array.ConvertAll(extensions, e => "*" + e), initialFolder, true, out error);
+    }
+
+    /// <summary>
+    /// Opens the dialog for one file and returns it, null if it was cancelled.
+    /// </summary>
+    /// <param name="patterns">What the filter shows: whole names such as "game.gog", or "*.ext".</param>
+    public static string OpenFile(string title, string filterName, string[] patterns, string initialFolder, out string error)
+    {
+        string[] files = Open(title, filterName, patterns, initialFolder, false, out error);
+        return files.Length > 0 ? files[0] : null;
+    }
+
+    private static string[] Open(string title, string filterName, string[] patternList, string initialFolder, bool multiple,
+        out string error)
+    {
         error = null;
 
         // The owner is the game's window, which is the foreground one when the player asks for the
@@ -96,7 +113,7 @@ public static class NativeFileDialog
             owner = GetActiveWindow();
         }
 
-        string patterns = string.Join(";", Array.ConvertAll(extensions, e => "*" + e));
+        string patterns = string.Join(";", patternList);
         IntPtr buffer = Marshal.AllocHGlobal(bufferChars * 2);
         try
         {
@@ -111,7 +128,7 @@ public static class NativeFileDialog
                 nMaxFile = bufferChars,
                 lpstrInitialDir = initialFolder,
                 lpstrTitle = title,
-                Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_NOCHANGEDIR
+                Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | (multiple ? OFN_ALLOWMULTISELECT : 0)
             };
 
             if (!GetOpenFileName(ref ofn))
@@ -185,6 +202,12 @@ public static class NativeFileDialog
     {
         error = "no file dialog on this platform";
         return Array.Empty<string>();
+    }
+
+    public static string OpenFile(string title, string filterName, string[] patterns, string initialFolder, out string error)
+    {
+        error = "no file dialog on this platform";
+        return null;
     }
 #endif
 }
