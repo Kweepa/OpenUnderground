@@ -73,6 +73,19 @@ public class Interaction : MonoBehaviour
         return (disabled & ~ignoredForWorldInteraction) != 0;
     }
 
+    // The screens above that take the keys and the pad for themselves while they are open: the game menu, the map, a
+    // conversation, the how-many box and the repair dialog. They are let through above for the mouse, which their
+    // rectangles keep out of the world; the Use key and the pad's X, Y and B have nothing like them, and used to act
+    // on the world behind (Y in the game menu used the lever in front, X on the map looked as well as erasing a note).
+    private const EControlMask PanelsOwningKeysAndPad =
+        EControlMask.Conversation
+        | EControlMask.HowMany
+        | EControlMask.RepairDialog
+        | EControlMask.Map
+        | EControlMask.SaveLoad;
+
+    private static bool KeysAndPadOwnedByAPanel(EControlMask disabled) => (disabled & PanelsOwningKeysAndPad) != 0;
+
     protected void Start()
     {
         sInt = this;
@@ -201,7 +214,9 @@ public class Interaction : MonoBehaviour
             return;
         }
 
-        if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Use))
+        bool keysAndPadOwned = KeysAndPadOwnedByAPanel(PlayerObject.Player.controlsDisabled);
+
+        if (!keysAndPadOwned && GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Use))
         {
             UseFromKeyboard();
         }
@@ -232,7 +247,10 @@ public class Interaction : MonoBehaviour
             return;
         }
 
-        UpdateGamepadInteraction(cachedHasMaterialHit, cachedObjectHit);
+        if (!keysAndPadOwned)
+        {
+            UpdateGamepadInteraction(cachedHasMaterialHit, cachedObjectHit);
+        }
         UpdateMouseKeyboardInteraction(cachedHasMaterialHit, cachedObjectHit);
     }
 

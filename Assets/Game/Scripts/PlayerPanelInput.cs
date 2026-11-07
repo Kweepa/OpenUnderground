@@ -81,14 +81,18 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
+        // Esc closes the repair dialog or the flute, which read it after this script (it runs first): it must not also
+        // close the inventory behind them, as it did. The how-many box consumes its Esc itself.
+        bool escapeForADialog = (PlayerObject.Player.controlsDisabled & (EControlMask.RepairDialog | EControlMask.Flute)) != 0;
+
         // Esc puts a spell waiting for its target away first; the next one closes the panels.
-        if (GameInput.EscapePressedThisFrame() && Magic.sMagic != null && Magic.sMagic.TryCancelMousePrimedSpell())
+        if (!escapeForADialog && GameInput.EscapePressedThisFrame() && Magic.sMagic != null && Magic.sMagic.TryCancelMousePrimedSpell())
         {
             GameplayCursorPolicy.Apply(PlayerObject.Player);
             return;
         }
 
-        if (GameInput.EscapePressedThisFrame() && DismissActivePlayerPanels())
+        if (!escapeForADialog && GameInput.EscapePressedThisFrame() && DismissActivePlayerPanels())
         {
             GameplayCursorPolicy.Apply(PlayerObject.Player);
             return;
@@ -325,6 +329,12 @@ public class PlayerPanelInput : MonoBehaviour
             return false;
         }
         if (MapScreen.IsMapScreenVisible())
+        {
+            return false;
+        }
+        // A cutscene or the flute over the panel owns the clicks: the right button held to hurry the anvil's
+        // cutscene used to close the inventory behind it.
+        if ((PlayerObject.Player.controlsDisabled & (EControlMask.Cutscene | EControlMask.Flute)) != 0)
         {
             return false;
         }
