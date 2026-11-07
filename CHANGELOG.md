@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The title screens and character creation no longer run the graphics card flat out: they keep to the screen's refresh rate, as the game does.
+
 ## Release UUBuild2Nov2026.zip
 
 - The three buttons by the stairs on level 3 work as in the original: the right order opens the door beside them, and a wrong press brings a skeleton at the far end of the room, as many times as it is made.
