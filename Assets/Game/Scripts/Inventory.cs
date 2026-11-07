@@ -124,6 +124,11 @@ public class Inventory : MonoBehaviour
     // the small-window warning too, modal: its press does not reach the pack (SmallWindowWarning.BlocksInput)
     private const EControlMask InventoryModalUiMask = EControlMask.HowMany | EControlMask.RepairDialog | EControlMask.Warning;
 
+    // Screens whose left clicks are their own: a click there does not throw the item on the mouse cursor. The game
+    // menu, the map, a cutscene and the flute used to count as "outside the panel", and the click threw it.
+    private const EControlMask CursorThrowOwnClicksMask =
+        EControlMask.RepairDialog | EControlMask.SaveLoad | EControlMask.Map | EControlMask.Cutscene | EControlMask.Flute;
+
     private static bool IsInventoryModalUiBlocking(PlayerObject player) =>
         player != null && (player.controlsDisabled & InventoryModalUiMask) != 0;
 
@@ -4264,7 +4269,7 @@ public class Inventory : MonoBehaviour
             && mouseCursorCarriedPortable != null
             && Conversations.runningConversation == null)
         {
-            if ((PlayerObject.Player.controlsDisabled & EControlMask.RepairDialog) != 0)
+            if ((PlayerObject.Player.controlsDisabled & CursorThrowOwnClicksMask) != 0)
             {
                 mouseOutsideThrowItem = null;
                 mouseOutsideThrowChargeTime = 0f;
@@ -4632,7 +4637,10 @@ public class Inventory : MonoBehaviour
                     CancelPendingThrowCloseInventory();
                 }
 
-                if (closeInventoryOnSuccess && !ItemStillInHandAfterThrowSuccess(itemToThrow))
+                // An item let go on an anvil is not thrown but offered for repair: the inventory stays open behind
+                // the question, so that No or Esc comes back to it. It used to close here, and the question then
+                // only held its picture in view until it was answered.
+                if (closeInventoryOnSuccess && !ItemStillInHandAfterThrowSuccess(itemToThrow) && !RepairDialog.IsActive())
                 {
                     HidePanel();
                 }

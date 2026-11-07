@@ -2,6 +2,8 @@
 
 ## Next release
 
+- With the game menu, the map, a conversation or a dialog open, the pad's buttons and the Use key no longer act on what is in front of you, and a click there no longer throws the item on the cursor. Esc on the repair dialog or the flute now closes only that, not the inventory too.
+
 - Cutscenes are now shown whole at the original's proportions, with black bands where the screen is another shape: the map and the death's skull no longer lose their top on a widescreen, the intro no longer loses its bottom on an ultrawide, and the logos and the title are no longer stretched.
 
 - Monitor, Display mode (borderless or exclusive fullscreen, or windowed) and Resolution rows in the game menu's DISPLAY section, each size with its aspect ratio; a new display is kept only if you confirm it within 10 seconds, and each mode remembers its own size. A first start now fills the main monitor, instead of opening a 1920x1080 window that could run off a smaller one, and Alt-Enter only switches fullscreen, no longer also choosing a menu entry or starting to type runes.
