@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 public enum EHowManyReason
 {
@@ -47,6 +49,14 @@ public class HowMany : MonoBehaviour
     /// <summary>The frame the dialog opened on: a click of that frame is the one that opened it.</summary>
     private int openedFrame;
 
+    /// <summary>
+    /// The count as typed on the keyboard since the last digit, Backspace or step: the original's way, "type in a number
+    /// from the keyboard, then press ENTER" (its manual, on the candles of level 1). False until the first digit,
+    /// which replaces the count shown.
+    /// </summary>
+    private bool countTyped;
+    private int typedCount;
+
     public EHowManyReason howManyReason;
 
     /// <summary>Set when Pickup dialog opened from right-hold/drag on world object; <see cref="UUObject.PickUpSome"/> uses hand-only path.</summary>
@@ -61,6 +71,7 @@ public class HowMany : MonoBehaviour
     {
         sHowMany.howManyReason = reason;
         sHowMany.howMany = 1;
+        sHowMany.countTyped = false;
         sHowMany.howManyItem = obj;
         sHowMany.initialButtonsReleased = false;
         sHowMany.quantityRepeatDirection = 0;
@@ -167,6 +178,7 @@ public class HowMany : MonoBehaviour
 
     private void ApplyQuantityStep(int direction)
     {
+        countTyped = false;
         if (direction < 0 && howMany > 1)
         {
             --howMany;
@@ -219,11 +231,11 @@ public class HowMany : MonoBehaviour
 
     private int ReadQuantityRepeatDirection()
     {
-        if (GameInput.CurrentGamepad?.dpad.left.isPressed ?? false)
+        if ((GameInput.CurrentGamepad?.dpad.left.isPressed ?? false) || (GameInput.CurrentKeyboard?.leftArrowKey.isPressed ?? false))
         {
             return -1;
         }
-        if (GameInput.CurrentGamepad?.dpad.right.isPressed ?? false)
+        if ((GameInput.CurrentGamepad?.dpad.right.isPressed ?? false) || (GameInput.CurrentKeyboard?.rightArrowKey.isPressed ?? false))
         {
             return 1;
         }
@@ -244,6 +256,77 @@ public class HowMany : MonoBehaviour
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// The keyboard's keys besides the arrows and Esc: the digits type the count, Backspace takes its last digit off,
+    /// Home makes it 1 and End the whole stack, Enter takes it. The count stays between 1 and the stack.
+    /// </summary>
+    private void UpdateCountKeys()
+    {
+        Keyboard kb = GameInput.CurrentKeyboard;
+        if (kb == null)
+        {
+            return;
+        }
+
+        int before = howMany;
+        int digit = TypedDigit(kb);
+        if (GameInput.EnterPressedThisFrame())
+        {
+            SubmitHowMany(false);
+            return;
+        }
+        if (digit >= 0)
+        {
+            int count = countTyped ? typedCount : 0;
+            // past the stack it stops at the stack, which also keeps it from overflowing
+            typedCount = count > (howManyItem.quantity - digit) / 10 ? howManyItem.quantity : count * 10 + digit;
+            countTyped = true;
+            howMany = Mathf.Clamp(typedCount, 1, howManyItem.quantity);
+        }
+        else if (kb.backspaceKey.wasPressedThisFrame)
+        {
+            typedCount = (countTyped ? typedCount : howMany) / 10;
+            countTyped = true;
+            howMany = Mathf.Max(1, typedCount);
+        }
+        else if (kb.homeKey.wasPressedThisFrame)
+        {
+            countTyped = false;
+            howMany = 1;
+        }
+        else if (kb.endKey.wasPressedThisFrame)
+        {
+            countTyped = false;
+            howMany = howManyItem.quantity;
+        }
+
+        if (howMany > before)
+        {
+            Utils.PlayClip2d(moreItems);
+        }
+        else if (howMany < before)
+        {
+            Utils.PlayClip2d(lessItems);
+        }
+    }
+
+    /// <summary>The digit pressed this frame on the top row or the keypad, -1 for none.</summary>
+    private static int TypedDigit(Keyboard kb)
+    {
+        KeyControl[] row = { kb.digit0Key, kb.digit1Key, kb.digit2Key, kb.digit3Key, kb.digit4Key,
+            kb.digit5Key, kb.digit6Key, kb.digit7Key, kb.digit8Key, kb.digit9Key };
+        KeyControl[] pad = { kb.numpad0Key, kb.numpad1Key, kb.numpad2Key, kb.numpad3Key, kb.numpad4Key,
+            kb.numpad5Key, kb.numpad6Key, kb.numpad7Key, kb.numpad8Key, kb.numpad9Key };
+        for (int i = 0; i < 10; ++i)
+        {
+            if (row[i].wasPressedThisFrame || pad[i].wasPressedThisFrame)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void RefreshCachedArrowRects()
@@ -317,6 +400,7 @@ public class HowMany : MonoBehaviour
                     int speed = (int)(30 * x);
                     if (Time.frameCount % (31 - speed) == 0)
                     {
+                        countTyped = false;
                         ++howMany;
                         Utils.PlayClip2d(moreItems);
                     }
@@ -326,6 +410,7 @@ public class HowMany : MonoBehaviour
                     int speed = (int)(30 * -x);
                     if (Time.frameCount % (31 - speed) == 0)
                     {
+                        countTyped = false;
                         --howMany;
                         Utils.PlayClip2d(lessItems);
                     }
@@ -354,6 +439,9 @@ public class HowMany : MonoBehaviour
                 }
                 else if (GameInput.CurrentMouse?.rightButton.wasPressedThisFrame ?? false)
                     SubmitHowMany(true);
+                // a key of the frame that opened the box (the F of a pick-up) is not one for the box
+                else if (Time.frameCount > openedFrame)
+                    UpdateCountKeys();
             }
         }
 

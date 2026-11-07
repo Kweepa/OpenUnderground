@@ -2,6 +2,8 @@
 
 ## Next release
 
+- More screens now answer the keyboard: any key ends a conversation, the how-many box takes a typed number and Enter (the arrows step it, Home takes one, End the whole stack), character creation moves with the arrows and Enter, the arrows turn the credits pages, and Esc skips the logos straight to the title menu.
+
 - With the game menu, the map, a conversation or a dialog open, the pad's buttons and the Use key no longer act on what is in front of you, and a click there no longer throws the item on the cursor. Esc on the repair dialog or the flute now closes only that, not the inventory too.
 
 - Cutscenes are now shown whole at the original's proportions, with black bands where the screen is another shape: the map and the death's skull no longer lose their top on a widescreen, the intro no longer loses its bottom on an ultrawide, and the logos and the title are no longer stretched.

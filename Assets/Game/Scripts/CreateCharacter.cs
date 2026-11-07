@@ -32,6 +32,8 @@ public class CreateCharacter : MonoBehaviour
     private int skillRollIndex;
     private int skillChoiceIndex;
     private bool keepChar = true;
+    // the frame the name was confirmed and Keep this character? asked
+    private int keepAskedFrame = -10;
     private float fadeAlpha;
     public static bool wasCancelled = false;
     
@@ -266,16 +268,31 @@ public class CreateCharacter : MonoBehaviour
         bool cancelPressedThisFrame =
             (Gamepad.current?.bButton.wasPressedThisFrame ?? false)
             || (Keyboard.current?.escapeKey.wasPressedThisFrame ?? false);
+        // The keyboard moves as the d-pad and Enter chooses as A: the original's cursor keys and ENTER (its manual,
+        // Creating your character). Alt-Enter is the fullscreen switch, not a choice.
+        Gamepad pad = Gamepad.current;
+        Keyboard keys = Keyboard.current;
+        // the left stick as the d-pad, as on the title menu (fix 475)
+        bool up = (pad?.dpad.up.wasPressedThisFrame ?? false) || (pad?.leftStick.up.wasPressedThisFrame ?? false)
+            || (keys?.upArrowKey.wasPressedThisFrame ?? false);
+        bool down = (pad?.dpad.down.wasPressedThisFrame ?? false) || (pad?.leftStick.down.wasPressedThisFrame ?? false)
+            || (keys?.downArrowKey.wasPressedThisFrame ?? false);
+        bool left = (pad?.dpad.left.wasPressedThisFrame ?? false) || (pad?.leftStick.left.wasPressedThisFrame ?? false)
+            || (keys?.leftArrowKey.wasPressedThisFrame ?? false);
+        bool right = (pad?.dpad.right.wasPressedThisFrame ?? false) || (pad?.leftStick.right.wasPressedThisFrame ?? false)
+            || (keys?.rightArrowKey.wasPressedThisFrame ?? false);
+        bool accept = (pad?.aButton.wasPressedThisFrame ?? false) || GameInput.EnterPressedThisFrame();
+        pointerTakesSelection = PointerTakesSelection();
 
         switch (rollState)
         {
         case ERollState.Sex:
-            if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false) || (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false))
+            if (up || down)
             {
                 PlayerData.sData.female = !PlayerData.sData.female;
                 Utils.PlayClip2d(moveSelection);
             }
-            else if ((Gamepad.current?.aButton.wasPressedThisFrame) ?? false)
+            else if (accept)
             {
                 Utils.PlayClip2d(makeSelection);
                 ++rollState;
@@ -288,12 +305,12 @@ public class CreateCharacter : MonoBehaviour
             }
             break;
         case ERollState.Handedness:
-            if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false) || (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false))
+            if (up || down)
             {
                 PlayerData.sData.leftHanded = !PlayerData.sData.leftHanded;
                 Utils.PlayClip2d(moveSelection);
             }
-            else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
+            else if (accept)
             {
                 Utils.PlayClip2d(makeSelection);
                 ++rollState;
@@ -305,7 +322,7 @@ public class CreateCharacter : MonoBehaviour
             }
             break;
         case ERollState.Class:
-            if (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false)
+            if (up)
             {
                 PlayerData.sData.playerClass -= 2;
                 if (PlayerData.sData.playerClass < EPlayerClass.Fighter)
@@ -314,7 +331,7 @@ public class CreateCharacter : MonoBehaviour
                 }
                 Utils.PlayClip2d(moveSelection);
             }
-            else if (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false)
+            else if (down)
             {
                 PlayerData.sData.playerClass += 2;
                 if (PlayerData.sData.playerClass > EPlayerClass.Shepherd)
@@ -323,13 +340,12 @@ public class CreateCharacter : MonoBehaviour
                 }
                 Utils.PlayClip2d(moveSelection);
             }
-            else if ((Gamepad.current?.dpad.left.wasPressedThisFrame ?? false)
-                     || (Gamepad.current?.dpad.right.wasPressedThisFrame ?? false))
+            else if (left || right)
             {
                 PlayerData.sData.playerClass = (EPlayerClass)((int)PlayerData.sData.playerClass ^ 1);
                 Utils.PlayClip2d(moveSelection);
             }
-            else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
+            else if (accept)
             {
                 PlayerObject.LoadSkills();
 
@@ -349,17 +365,17 @@ public class CreateCharacter : MonoBehaviour
                 PlayerObject.ClassData data = PlayerObject.classData[(int)PlayerData.sData.playerClass]; 
                 byte[] skills = data.skills[skillRollIndex];
             
-                if (Gamepad.current?.dpad.left.wasPressedThisFrame ?? false)
+                if (left)
                 {
                     Utils.PlayClip2d(moveSelection);
                     skillChoiceIndex ^= 1;
                 }
-                else if (Gamepad.current?.dpad.right.wasPressedThisFrame ?? false)
+                else if (right)
                 {
                     Utils.PlayClip2d(moveSelection);
                     skillChoiceIndex ^= 1;
                 }
-                else if (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false)
+                else if (up)
                 {
                     Utils.PlayClip2d(moveSelection);
                     skillChoiceIndex -= 2;
@@ -368,7 +384,7 @@ public class CreateCharacter : MonoBehaviour
                         skillChoiceIndex += skills.Length;
                     }
                 }
-                else if (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false)
+                else if (down)
                 {
                     Utils.PlayClip2d(moveSelection);
                     skillChoiceIndex += 2;
@@ -377,7 +393,7 @@ public class CreateCharacter : MonoBehaviour
                         skillChoiceIndex -= skills.Length;
                     }
                 }
-                else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
+                else if (accept)
                 {
                     Utils.PlayClip2d(diceRoll);
                     byte chosenSkill = skills[skillChoiceIndex];
@@ -404,19 +420,17 @@ public class CreateCharacter : MonoBehaviour
             }
             break;
         case ERollState.Portrait:
-            if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false)
-                || (Gamepad.current?.dpad.left.wasPressedThisFrame ?? false))
+            if (up || left)
             {
                 Utils.PlayClip2d(moveSelection);
                 PlayerData.sData.portrait = (PlayerData.sData.portrait + 4) % 5;
             }
-            else if ((Gamepad.current?.dpad.down.wasPressedThisFrame ?? false)
-                     || (Gamepad.current?.dpad.right.wasPressedThisFrame ?? false))
+            else if (down || right)
             {
                 Utils.PlayClip2d(moveSelection);
                 PlayerData.sData.portrait = (PlayerData.sData.portrait + 1) % 5;
             }
-            else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
+            else if (accept)
             {
                 Utils.PlayClip2d(makeSelection);
                 ++rollState;
@@ -433,12 +447,12 @@ public class CreateCharacter : MonoBehaviour
             }
             break;
         case ERollState.Difficulty:
-            if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false) || (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false))
+            if (up || down)
             {
                 Utils.PlayClip2d(moveSelection);
                 PlayerData.sData.easy = !PlayerData.sData.easy;
             }
-            else if (Gamepad.current?.aButton.wasPressedThisFrame ?? false)
+            else if (accept)
             {
                 Utils.PlayClip2d(makeSelection);
                 ++rollState;
@@ -455,12 +469,14 @@ public class CreateCharacter : MonoBehaviour
         case ERollState.Name:
             break;
         case ERollState.Keep:
-            if ((Gamepad.current?.dpad.up.wasPressedThisFrame ?? false) || (Gamepad.current?.dpad.down.wasPressedThisFrame ?? false))
+            if (up || down)
             {
                 Utils.PlayClip2d(moveSelection);
                 keepChar = !keepChar;
             }
-            if ((Gamepad.current?.aButton.wasPressedThisFrame ?? false))
+            // not the Enter that confirmed the name: the on-screen keyboard takes it from IMGUI, which may come a frame
+            // before the Input System reports it here (fix 468)
+            if (accept && Time.frameCount > keepAskedFrame + 1)
             {
                 if (keepChar)
                 {
@@ -589,6 +605,41 @@ public class CreateCharacter : MonoBehaviour
         return new Rect(screenX(x), screenY(y), screenX(67), screenY(16));
     }
 
+    // Set by Update() for the frame: the pointer moved, or one of its buttons went down, with the mouse and keyboard in use.
+    // Only then does the button under it take the selection, so a pointer resting on a button does not take it back,
+    // the frame after, from every arrow key (as FrontEnd.PointerTakesSelection() on the title menu).
+    private bool pointerTakesSelection;
+    private Vector2 lastPointer = new Vector2(float.NaN, float.NaN);
+
+    private bool PointerTakesSelection()
+    {
+        Mouse m = Mouse.current;
+        if (m == null || GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+        {
+            return false;
+        }
+        Vector2 now = m.position.ReadValue();
+        bool moved = (now - lastPointer).sqrMagnitude > 0.25f || float.IsNaN(lastPointer.x);
+        lastPointer = now;
+        return moved || m.leftButton.wasPressedThisFrame || m.rightButton.wasPressedThisFrame;
+    }
+
+    /// <summary>
+    /// True when the pointer is in rect and takes the selection this frame. The selection is then lit and
+    /// described whatever moved it last, the pointer or the arrows; Enter and A take it, a click takes the button
+    /// it is on.
+    /// </summary>
+    private bool PointerSelects(Rect rect, Vector2 mouseGui) => pointerTakesSelection && rect.Contains(mouseGui);
+
+    private void PointerSelect<T>(ref T selection, T value)
+    {
+        if (!System.Collections.Generic.EqualityComparer<T>.Default.Equals(selection, value))
+        {
+            selection = value;
+            Utils.PlayClip2d(moveSelection);
+        }
+    }
+
     private void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.CreateCharacter;
@@ -602,7 +653,6 @@ public class CreateCharacter : MonoBehaviour
         GuiInput.RegisterBlockingRect(Screen.safeArea);
         GUI.DrawTexture(Screen.safeArea, background, ScaleMode.StretchToFill, false);
 
-        bool allowHover = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard;
         Vector2 mouseGui = Event.current != null ? Event.current.mousePosition : Vector2.zero;
 
         switch (rollState)
@@ -611,50 +661,39 @@ public class CreateCharacter : MonoBehaviour
             GuiLabel(200, 75, "Choose character sex:", labelStyle);
             // Display last played sex first
             string lastCharacterSex = PlayerPrefs.GetString("LastCharacterSex", "male");
-            if (lastCharacterSex == "female")
-            {
-                bool hoverTop = allowHover && ButtonRect(207, 93).Contains(mouseGui);
-                bool hoverBot = allowHover && ButtonRect(207, 113).Contains(mouseGui);
-                GuiButton(207, 93, "Female", allowHover ? hoverTop : PlayerData.sData.female);
-                GuiButton(207, 113, "Male", allowHover ? hoverBot : !PlayerData.sData.female);
-            }
-            else
-            {
-                bool hoverTop = allowHover && ButtonRect(207, 93).Contains(mouseGui);
-                bool hoverBot = allowHover && ButtonRect(207, 113).Contains(mouseGui);
-                GuiButton(207, 93, "Male", allowHover ? hoverTop : !PlayerData.sData.female);
-                GuiButton(207, 113, "Female", allowHover ? hoverBot : PlayerData.sData.female);
-            }
+            bool femaleOnTop = lastCharacterSex == "female";
+            if (PointerSelects(ButtonRect(207, 93), mouseGui))
+                PointerSelect(ref PlayerData.sData.female, femaleOnTop);
+            else if (PointerSelects(ButtonRect(207, 113), mouseGui))
+                PointerSelect(ref PlayerData.sData.female, !femaleOnTop);
+            GuiButton(207, 93, femaleOnTop ? "Female" : "Male", PlayerData.sData.female == femaleOnTop);
+            GuiButton(207, 113, femaleOnTop ? "Male" : "Female", PlayerData.sData.female != femaleOnTop);
             GuiLabel(170, 160, 140, 40, "Gender has no effect on your character\u2019s strength or abilities.", descriptionStyle);
             break;
         case ERollState.Handedness:
             GuiLabel(200, 75, "Select handedness:", labelStyle);
-            bool hoverHandLeft = allowHover && ButtonRect(207, 93).Contains(mouseGui);
-            bool hoverHandRight = allowHover && ButtonRect(207, 113).Contains(mouseGui);
-            GuiButton(207, 93, "Left", allowHover ? hoverHandLeft : PlayerData.sData.leftHanded);
-            GuiButton(207, 113, "Right", allowHover ? hoverHandRight : !PlayerData.sData.leftHanded);
+            if (PointerSelects(ButtonRect(207, 93), mouseGui))
+                PointerSelect(ref PlayerData.sData.leftHanded, true);
+            else if (PointerSelects(ButtonRect(207, 113), mouseGui))
+                PointerSelect(ref PlayerData.sData.leftHanded, false);
+            GuiButton(207, 93, "Left", PlayerData.sData.leftHanded);
+            GuiButton(207, 113, "Right", !PlayerData.sData.leftHanded);
             GuiLabel(170, 160, 140, 40, "Determines which hand you use to hold your primary weapon, and which is your shield-hand.", descriptionStyle);
             break;
         case ERollState.Class:
             GuiLabel(200, 15, "Pick a class:", labelStyle);
-            int hoveredClassIndex = -1;
+            for (int i = 0; i < 8; ++i)
+            {
+                if (PointerSelects(ButtonRect(170 + 74 * (i & 1), 32 + 20 * (i / 2)), mouseGui))
+                    PointerSelect(ref PlayerData.sData.playerClass, (EPlayerClass)i);
+            }
             for (int i = 0; i < 8; ++i)
             {
                 int x = 170 + 74 * (i & 1);
                 int y = 32 + 20 * (i / 2);
-                bool hovered = allowHover && ButtonRect(x, y).Contains(mouseGui);
-                if (hovered)
-                    hoveredClassIndex = i;
-                GuiButton(x, y, ((EPlayerClass)i).ToString(), allowHover ? hovered : i == (int)PlayerData.sData.playerClass);
+                GuiButton(x, y, ((EPlayerClass)i).ToString(), i == (int)PlayerData.sData.playerClass);
             }
-            if (!allowHover)
-            {
-                GuiLabel(170, 130, 140, 60, classDescriptions[(int)PlayerData.sData.playerClass].Replace(" - ", "\u2014").Replace("'", "\u2019"), descriptionStyle);
-            }
-            else if (hoveredClassIndex >= 0)
-            {
-                GuiLabel(170, 130, 140, 60, classDescriptions[hoveredClassIndex].Replace(" - ", "\u2014").Replace("'", "\u2019"), descriptionStyle);
-            }
+            GuiLabel(170, 130, 140, 60, classDescriptions[(int)PlayerData.sData.playerClass].Replace(" - ", "\u2014").Replace("'", "\u2019"), descriptionStyle);
             break;
         case ERollState.Skills:
             GuiLabel(200, 20, "Pick a skill:", labelStyle);
@@ -668,24 +707,18 @@ public class CreateCharacter : MonoBehaviour
             // Ensure skills array is valid
             if (skills != null && skills.Length > 0)
             {
-                int hoveredSkillChoiceIndex = -1;
+                for (int i = 0; i < skills.Length; ++i)
+                {
+                    if (PointerSelects(ButtonRect(170 + 74 * (i & 1), 37 + 20 * (i / 2)), mouseGui))
+                        PointerSelect(ref skillChoiceIndex, i);
+                }
                 for (int i = 0; i < skills.Length; ++i)
                 {
                     int x = 170 + 74 * (i & 1);
                     int y = 37 + 20 * (i / 2);
-                    bool hovered = allowHover && ButtonRect(x, y).Contains(mouseGui);
-                    if (hovered)
-                        hoveredSkillChoiceIndex = i;
-                    GuiButton(x, y, ((ESkill)skills[i]).ToString(), allowHover ? hovered : i == skillChoiceIndex);
+                    GuiButton(x, y, ((ESkill)skills[i]).ToString(), i == skillChoiceIndex);
                 }
-                if (!allowHover)
-                {
-                    GuiLabel(170, 160, 140, 40, skillDescriptions[skills[skillChoiceIndex]], descriptionStyle);
-                }
-                else if (hoveredSkillChoiceIndex >= 0)
-                {
-                    GuiLabel(170, 160, 140, 40, skillDescriptions[skills[hoveredSkillChoiceIndex]], descriptionStyle);
-                }
+                GuiLabel(170, 160, 140, 40, skillDescriptions[skills[skillChoiceIndex]], descriptionStyle);
             }
             break;
         case ERollState.Portrait:
@@ -701,23 +734,19 @@ public class CreateCharacter : MonoBehaviour
                 GUI.DrawTexture(new Rect(screenX(217), screenY(20 + 35 * i), screenX(texWidth), screenY(tex.height)), tex);
             }
             
-            // Second pass: draw highlight on top of one portrait (hover only for kb/m; selection for gamepad)
-            int borderIndex = PlayerData.sData.portrait;
-            if (allowHover)
+            // Second pass: draw highlight on top of the selected portrait, which the pointer takes as it moves
+            for (int hi = 0; hi < 5; ++hi)
             {
-                borderIndex = -1;
-                for (int hi = 0; hi < 5; ++hi)
+                Texture2D ht = headsTex[(PlayerData.sData.female ? 5 : 0) + hi];
+                int tw = ht.width * 5 / 6;
+                Rect portraitR = new Rect(screenX(217), screenY(20 + 35 * hi), screenX(tw), screenY(ht.height));
+                if (PointerSelects(portraitR, mouseGui))
                 {
-                    Texture2D ht = headsTex[(PlayerData.sData.female ? 5 : 0) + hi];
-                    int tw = ht.width * 5 / 6;
-                    Rect portraitR = new Rect(screenX(217), screenY(20 + 35 * hi), screenX(tw), screenY(ht.height));
-                    if (portraitR.Contains(mouseGui))
-                    {
-                        borderIndex = hi;
-                        break;
-                    }
+                    PointerSelect(ref PlayerData.sData.portrait, hi);
+                    break;
                 }
             }
+            int borderIndex = PlayerData.sData.portrait;
             if (borderIndex >= 0 && borderIndex < 5)
             {
                 int borderThickness = 2;
@@ -744,10 +773,12 @@ public class CreateCharacter : MonoBehaviour
             break;
         case ERollState.Difficulty:
             GuiLabel(200, 75, "Choose difficulty:", labelStyle);
-            bool hoverStandard = allowHover && ButtonRect(207, 93).Contains(mouseGui);
-            bool hoverEasy = allowHover && ButtonRect(207, 113).Contains(mouseGui);
-            GuiButton(207, 93, "Standard", allowHover ? hoverStandard : !PlayerData.sData.easy);
-            GuiButton(207, 113, "Easy", allowHover ? hoverEasy : PlayerData.sData.easy);
+            if (PointerSelects(ButtonRect(207, 93), mouseGui))
+                PointerSelect(ref PlayerData.sData.easy, false);
+            else if (PointerSelects(ButtonRect(207, 113), mouseGui))
+                PointerSelect(ref PlayerData.sData.easy, true);
+            GuiButton(207, 93, "Standard", !PlayerData.sData.easy);
+            GuiButton(207, 113, "Easy", PlayerData.sData.easy);
             GuiLabel(170, 160, 140, 60, "In easy mode, monsters and hostile characters are less dangerous and are easier to defeat than in standard mode.", descriptionStyle);
             break;
         case ERollState.Name:
@@ -761,6 +792,7 @@ public class CreateCharacter : MonoBehaviour
                         PlayerData.sData.playerName = result;
                         Utils.PlayClip2d(makeSelection);
                         keepChar = true;
+                        keepAskedFrame = Time.frameCount;
                         ++rollState;
                     },
                     null,
@@ -773,8 +805,12 @@ public class CreateCharacter : MonoBehaviour
             break;
         case ERollState.Keep:
             GuiLabel(200, 75, "Keep this character?", labelStyle);
-            GuiButton(207, 93, "Yes", allowHover ? ButtonRect(207, 93).Contains(mouseGui) : keepChar);
-            GuiButton(207, 113, "No", allowHover ? ButtonRect(207, 113).Contains(mouseGui) : !keepChar);
+            if (PointerSelects(ButtonRect(207, 93), mouseGui))
+                PointerSelect(ref keepChar, true);
+            else if (PointerSelects(ButtonRect(207, 113), mouseGui))
+                PointerSelect(ref keepChar, false);
+            GuiButton(207, 93, "Yes", keepChar);
+            GuiButton(207, 113, "No", !keepChar);
             break;
         case ERollState.Done:
             GuiLabel(200, 85, PlayerData.sData.playerName, labelStyle);

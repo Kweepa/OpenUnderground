@@ -46,8 +46,40 @@ public class Logos : MonoBehaviour
         fadeAlpha = Math.Clamp(fadeAlpha, 0.0f, 1.0f);
     }
 
+    /// <summary>A left click, A, Enter or Space: the logo or the title cutscene on screen ends, and the next one comes.</summary>
+    private static bool NextPressed()
+    {
+        Keyboard keys = GameInput.CurrentKeyboard;
+        return (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
+            || (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)
+            || GameInput.EnterPressedThisFrame()
+            || (keys?.spaceKey.wasPressedThisFrame ?? false);
+    }
+
+    /// <summary>
+    /// Esc or Start: the logos and the title cutscene are all skipped, straight to the title menu, as the original's
+    /// reference card says ("Press ESC to bypass the titles").
+    /// </summary>
+    private static bool SkipAllPressed()
+    {
+        return GameInput.EscapePressedThisFrame() || (GameInput.CurrentGamepad?.startButton.wasPressedThisFrame ?? false);
+    }
+
     public void Update()
     {
+        if ((state is EState.Logo1 or EState.Logo2 or EState.Title) && SkipAllPressed())
+        {
+            // CutscenePlayer.OnDestroy() gives back the clock and the controls, as for the title cutscene's own skip below
+            if (cutscene != null)
+            {
+                Destroy(cutscene.gameObject);
+                cutscene = null;
+            }
+            state = EState.Done;
+            SceneManager.LoadScene("World");
+            return;
+        }
+
         switch (state)
         {
         case EState.Start:
@@ -78,8 +110,7 @@ public class Logos : MonoBehaviour
                 FadeOut();
             }
 
-            if (fadeAlpha >= 1.0f || (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
-                || (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false))
+            if (fadeAlpha >= 1.0f || NextPressed())
             {
                 state = EState.Logo2;
                 blueSkyLogo = GraphicsLoader.ReadBYT("../Data/pres2.byt", 5);
@@ -94,8 +125,7 @@ public class Logos : MonoBehaviour
                 FadeOut();
             }
 
-            if (fadeAlpha >= 1.0f || (GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
-                || (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false))
+            if (fadeAlpha >= 1.0f || NextPressed())
             {
                 state = EState.Title;
                 cutscene = Instantiate(titleCutscene);
@@ -104,16 +134,14 @@ public class Logos : MonoBehaviour
 
             break;
         case EState.Title:
-            // The two logos above end on a left click or A. This one is a cutscene, and
+            // The two logos above end on a left click or A (and Enter or Space). This one is a cutscene, and
             // CutscenePlayer offers no skip - only a 10x fast forward while you hold the right
             // button, and only after the first half second - so the same click that got you past
             // the logos does nothing here and the startup stops feeling responsive halfway
             // through. Accept the same gesture, and leave the fast forward where it is.
             // Only the title cutscene: this is handled here rather than in CutscenePlayer so that
             // the intro, the credits, the endings and the death scenes are untouched.
-            if (cutscene != null
-                && ((GameInput.CurrentGamepad?.aButton.wasPressedThisFrame ?? false)
-                    || (GameInput.CurrentMouse?.leftButton.wasPressedThisFrame ?? false)))
+            if (cutscene != null && NextPressed())
             {
                 // CutscenePlayer.OnDestroy() gives back the clock and the controls. Cleared as well
                 // as destroyed, because Destroy is deferred to the end of the frame and the test
