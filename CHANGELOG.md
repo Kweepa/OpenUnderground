@@ -2,6 +2,8 @@
 
 ## Current release
 
+- The Made with Unity screen at start-up can be cut short with any key, a click or a pad button.
+
 - The title screens and character creation no longer run the graphics card flat out: they keep to the screen's refresh rate, as the game does.
 
 ## Release UUBuild2Nov2026.zip

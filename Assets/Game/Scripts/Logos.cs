@@ -51,6 +51,11 @@ public class Logos : MonoBehaviour
         switch (state)
         {
         case EState.Start:
+            // Unity's splash first, begun by SplashSkip: the logos and the music wait for it
+            if (!UnityEngine.Rendering.SplashScreen.isFinished)
+            {
+                break;
+            }
             state = EState.Logo1;
             StringLoader.LoadStrings();
             originLogo = GraphicsLoader.ReadBYT("../Data/pres1.byt", 5);
