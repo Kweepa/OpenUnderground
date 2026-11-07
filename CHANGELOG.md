@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The on-screen keyboard has an Enter key, so the pad and the mouse can confirm a name, a save or a note from the keys, and a full stop and a dash beside it; Delete clears the text. A click outside the keyboard no longer confirms what you typed, except on the map, where the note goes where you click.
+
 - More screens now answer the keyboard: any key ends a conversation, the how-many box takes a typed number and Enter (the arrows step it, Home takes one, End the whole stack), character creation moves with the arrows and Enter, the arrows turn the credits pages, and Esc skips the logos straight to the title menu.
 
 - With the game menu, the map, a conversation or a dialog open, the pad's buttons and the Use key no longer act on what is in front of you, and a click there no longer throws the item on the cursor. Esc on the repair dialog or the flute now closes only that, not the inventory too.
