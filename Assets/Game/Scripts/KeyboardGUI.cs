@@ -13,6 +13,9 @@ public class KeyboardGUI : MonoBehaviour
     public Texture2D yButton;
     public Texture2D xButton;
     public Texture2D mouseRightButtonHint;
+    public Texture2D mouseLeftButtonHint;
+    /// <summary>The game's blank keyboard key, on which the Del and Enter hints write their names.</summary>
+    public Texture2D blankKey;
     public Color keyColor = new Color(0.2f, 0.2f, 0.2f);
     public Color selectedKeyColor = new Color(0.4f, 0.4f, 0.4f);
     public Color textColor = Color.white;
@@ -46,26 +49,29 @@ public class KeyboardGUI : MonoBehaviour
     private bool allowCancel;
     private bool waitingForXRelease;
     private bool waitingOneFrameForX;
+    private bool waitingForAReleaseToConfirm;
+    private bool waitingOneFrameForA;
     private float previousTimeScale = 1.0f;
     private float textEntryCursorBlinkAnchorUnscaled;
     
     // Public property to get current text
     public string CurrentText => currentText;
     
-    // Key layout data - 4 rows x 10 columns
-    private readonly string[,] keys = new string[4, 10]
+    // Key layout data - 4 rows x 11 columns. The eleventh is Back, the dash and Enter, which is one
+    // key two rows high, so that the pad's cursor and the mouse have a key that confirms.
+    private readonly string[,] keys = new string[4, COLUMNS]
     {
-        { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
-        { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
-        { "a", "s", "d", "f", "g", "h", "j", "k", "l", "\u2019" },
-        { "Shift", "Space", "z", "x", "c", "v", "b", "n", "m", "Del" }
+        { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Back" },
+        { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "-" },
+        { "a", "s", "d", "f", "g", "h", "j", "k", "l", "\u2019", "Enter" },
+        { "Shift", "Space", "z", "x", "c", "v", "b", "n", "m", ".", "Enter" }
     };
-    private readonly string[,] keysShifted = new string[4, 10]
+    private readonly string[,] keysShifted = new string[4, COLUMNS]
     {
-        { "!", "@", "#", "$", "?", "-", "+", "*", "(", ")" },
-        { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P" },
-        { "A", "S", "D", "F", "G", "H", "J", "K", "L", "\"" },
-        { "Shift", "Space", "Z", "X", "C", "V", "B", "N", "M", "Del" }
+        { "!", "@", "#", "$", "?", "%", "+", "*", "(", ")", "Back" },
+        { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "_" },
+        { "A", "S", "D", "F", "G", "H", "J", "K", "L", "\"", "Enter" },
+        { "Shift", "Space", "Z", "X", "C", "V", "B", "N", "M", ",", "Enter" }
     };
     
     // Rendering helpers
@@ -77,6 +83,14 @@ public class KeyboardGUI : MonoBehaviour
     private const int KEY_SPACING = 5;
     private const int PANEL_PADDING = 20;
     private const int TEXT_FIELD_HEIGHT = 40;
+    private const int COLUMNS = 11;
+    private const int HINT_SIZE = 24;
+    private const int HINT_GAP = 16; // above and below the row of hints
+
+    /// <summary>The panel's size in reference pixels (UiScale), for whoever places it.</summary>
+    public const float PanelWidth = PANEL_PADDING * 2 + (KEY_WIDTH + KEY_SPACING) * COLUMNS - KEY_SPACING;
+    public const float PanelHeight = PANEL_PADDING * 2 + TEXT_FIELD_HEIGHT + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING
+        + HINT_GAP + HINT_SIZE + HINT_GAP;
     private const string TextEntryCursor = "\u2020"; // dagger †
     private const float TextEntryCursorBlinkHz = 2f; // 0.5s on / 0.5s off
     private const float TextEntryCursorIdleBeforeBlinkSeconds = 0.5f;
@@ -163,11 +177,12 @@ public class KeyboardGUI : MonoBehaviour
         waitingOneFrame = false;
         waitingForXRelease = false;
         waitingOneFrameForX = false;
+        waitingForAReleaseToConfirm = false;
+        waitingOneFrameForA = false;
         
         // Calculate panel dimensions
-        float panelWidth = (KEY_WIDTH + KEY_SPACING) * 10 - KEY_SPACING + PANEL_PADDING * 2;
-        float buttonAreaHeight = 30;
-        float panelHeight = TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10; // Extra 10 pixels
+        float panelWidth = PanelWidth;
+        float panelHeight = PanelHeight;
         
         // The panel is laid out in reference pixels (UiScale); the position comes in screen pixels.
         if (position.HasValue)
@@ -198,6 +213,8 @@ public class KeyboardGUI : MonoBehaviour
         waitingOneFrame = false;
         waitingForXRelease = false;
         waitingOneFrameForX = false;
+        waitingForAReleaseToConfirm = false;
+        waitingOneFrameForA = false;
         Time.timeScale = previousTimeScale;
         PlayerObject.DisableControls(EControlMask.Keyboard, false);
     }
@@ -235,9 +252,8 @@ public class KeyboardGUI : MonoBehaviour
             if (rightStick.magnitude > 0.1f) // Dead zone
             {
                 float moveSpeed = 0.3f * UiScale.Width * Time.unscaledDeltaTime; // Use unscaled time since game is paused
-                float panelWidth = (KEY_WIDTH + KEY_SPACING) * 10 - KEY_SPACING + PANEL_PADDING * 2;
-                float buttonAreaHeight = 30;
-                float panelHeight = TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10;
+                float panelWidth = PanelWidth;
+                float panelHeight = PanelHeight;
                 
                 keyboardPosition.x += rightStick.x * moveSpeed;
                 keyboardPosition.y -= rightStick.y * moveSpeed; // Invert Y for screen coordinates
@@ -251,25 +267,42 @@ public class KeyboardGUI : MonoBehaviour
             // Navigation - d-pad only (left stick is used for conversation chat scroll elsewhere)
             if (GameInput.CurrentGamepad?.dpad.left.wasPressedThisFrame ?? false)
             {
-                cursorX = (cursorX - 1 + 10) % 10;
+                cursorX = (cursorX - 1 + COLUMNS) % COLUMNS;
             }
             else if (GameInput.CurrentGamepad.dpad.right.wasPressedThisFrame)
             {
-                cursorX = (cursorX + 1) % 10;
+                cursorX = (cursorX + 1) % COLUMNS;
             }
             else if (GameInput.CurrentGamepad.dpad.up.wasPressedThisFrame)
             {
-                cursorY = (cursorY - 1 + 4) % 4;
+                cursorY = StepRow(-1);
             }
             else if (GameInput.CurrentGamepad.dpad.down.wasPressedThisFrame)
             {
-                cursorY = (cursorY + 1) % 4;
+                cursorY = StepRow(1);
             }
             
             // Key selection
             if (GameInput.CurrentGamepad.aButton.wasPressedThisFrame)
             {
-                HandleKeyPress();
+                HandleKeyPress(true);
+            }
+
+            // A on Enter confirms once released, and a frame later, as Y does, so that the press
+            // does not reach the screen the keyboard returns to.
+            if (waitingForAReleaseToConfirm && !GameInput.CurrentGamepad.aButton.isPressed)
+            {
+                waitingForAReleaseToConfirm = false;
+                waitingOneFrameForA = true;
+            }
+            else if (waitingOneFrameForA)
+            {
+                waitingOneFrameForA = false;
+                if (HasText())
+                {
+                    Confirm();
+                    return;
+                }
             }
             
             // X button: Cancel when cancel is allowed (otherwise does nothing)
@@ -334,7 +367,45 @@ public class KeyboardGUI : MonoBehaviour
         }
     }
     
-    private void HandleKeyPress()
+    /// <summary>
+    /// Enter is one key two rows high: stepping up or down off it skips its other half, so it is
+    /// left in one press, like any key.
+    /// </summary>
+    private int StepRow(int step)
+    {
+        int row = cursorY;
+        do
+        {
+            row = (row + step + 4) % 4;
+        }
+        while (IsEnterCell(cursorY, cursorX) && IsEnterCell(row, cursorX));
+        return row;
+    }
+
+    private bool IsEnterCell(int row, int col)
+    {
+        return keys[row, col] == "Enter";
+    }
+
+    private bool HasText()
+    {
+        return !string.IsNullOrEmpty(currentText?.Trim());
+    }
+
+    /// <summary>A key's place in reference pixels; Enter's two cells give the same, two rows high.</summary>
+    private Rect KeyRect(int row, int col)
+    {
+        float keysTop = keyboardPosition.y + PANEL_PADDING + TEXT_FIELD_HEIGHT + PANEL_PADDING;
+        float x = keyboardPosition.x + PANEL_PADDING + (KEY_WIDTH + KEY_SPACING) * col;
+        if (IsEnterCell(row, col))
+        {
+            return new Rect(x, keysTop + (KEY_HEIGHT + KEY_SPACING) * 2, KEY_WIDTH, KEY_HEIGHT * 2 + KEY_SPACING);
+        }
+        return new Rect(x, keysTop + (KEY_HEIGHT + KEY_SPACING) * row, KEY_WIDTH, KEY_HEIGHT);
+    }
+
+    /// <param name="fromPad">A pressed on the pad, rather than a click: Enter then waits for A's release.</param>
+    private void HandleKeyPress(bool fromPad)
     {
         string key = shiftActive ? keysShifted[cursorY, cursorX] : keys[cursorY, cursorX];
         
@@ -352,9 +423,24 @@ public class KeyboardGUI : MonoBehaviour
 
             ResetTextEntryCursorBlink();
         }
-        else if (key == "Del")
+        else if (key == "Back")
         {
             DeleteLastCharacter();
+        }
+        else if (key == "Enter")
+        {
+            // greyed while there is nothing to confirm
+            if (HasText())
+            {
+                if (fromPad)
+                {
+                    waitingForAReleaseToConfirm = true;
+                }
+                else
+                {
+                    Confirm();
+                }
+            }
         }
         else
         {
@@ -365,7 +451,7 @@ public class KeyboardGUI : MonoBehaviour
             }
 
             ResetTextEntryCursorBlink();
-            if (shiftActive && key != "Shift" && key != "Space" && key != "Del")
+            if (shiftActive && key != "Shift" && key != "Space" && key != "Back")
             {
                 shiftActive = false; // Shift deactivates after one use
             }
@@ -430,9 +516,16 @@ public class KeyboardGUI : MonoBehaviour
                     Confirm();
                     Event.current.Use();
                 }
-                else if (Event.current.keyCode == KeyCode.Backspace || Event.current.keyCode == KeyCode.Delete)
+                else if (Event.current.keyCode == KeyCode.Backspace)
                 {
                     DeleteLastCharacter();
+                    Event.current.Use();
+                }
+                else if (Event.current.keyCode == KeyCode.Delete)
+                {
+                    // Delete clears the whole text, as the pad's B does
+                    currentText = "";
+                    ResetTextEntryCursorBlink();
                     Event.current.Use();
                 }
                 else if (Event.current.keyCode == KeyCode.Escape && allowCancel)
@@ -455,9 +548,8 @@ public class KeyboardGUI : MonoBehaviour
         
         GUI.depth = (int)EGUIDepth.Keyboard;
         
-        float panelWidth = (KEY_WIDTH + KEY_SPACING) * 10 - KEY_SPACING + PANEL_PADDING * 2;
-        float buttonAreaHeight = 30;
-        float panelHeight = TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10; // Extra 10 pixels
+        float panelWidth = PanelWidth;
+        float panelHeight = PanelHeight;
         Rect panelRect = new Rect(keyboardPosition.x, keyboardPosition.y, panelWidth, panelHeight);
         GuiInput.RegisterBlockingRect(UiScale.R(panelRect));
 
@@ -526,11 +618,15 @@ public class KeyboardGUI : MonoBehaviour
         // Draw keys
         for (int row = 0; row < 4; row++)
         {
-            float currentX = keyboardPosition.x + PANEL_PADDING;
-            
-            for (int col = 0; col < 10; col++)
+            for (int col = 0; col < COLUMNS; col++)
             {
-                bool isSelected = (row == cursorY && col == cursorX);
+                // Enter is drawn once, from its upper cell, and lit from either
+                if (row > 0 && IsEnterCell(row, col) && IsEnterCell(row - 1, col))
+                {
+                    continue;
+                }
+                Rect keyRect = KeyRect(row, col);
+                bool isSelected = col == cursorX && (row == cursorY || (IsEnterCell(row, col) && IsEnterCell(cursorY, col)));
                 bool isShiftKey = (keys[row, col] == "Shift");
                 bool isShiftActive = isShiftKey && shiftActive && !allowCancel;
                 
@@ -542,75 +638,48 @@ public class KeyboardGUI : MonoBehaviour
                 }
                 
                 Color txtColor = isSelected ? selectedTextColor : textColor;
+                if (IsEnterCell(row, col) && !HasText())
+                {
+                    txtColor.a *= 0.4f; // greyed: nothing to confirm
+                }
                 
                 // Draw key background
                 GUI.color = bgColor;
-                UiScale.DrawTexture(UiScale.R(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), keyBackgroundTex);
+                UiScale.DrawTexture(UiScale.R(keyRect), keyBackgroundTex);
                 GUI.color = Color.white;
                 
                 // Draw cursor if selected
                 if (isSelected && cursor != null)
                 {
-                    UiScale.DrawTexture(UiScale.R(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), cursor);
+                    UiScale.DrawTexture(UiScale.R(keyRect), cursor);
                 }
                 
                 // Draw key label - use shifted array when shift is active
                 string displayKey = shiftActive ? keysShifted[row, col] : keys[row, col];
                 
-                // Larger font for everything except Shift, Space, and Del
-                int keyFontSize = (displayKey == "Shift" || displayKey == "Space" || displayKey == "Del") ? 14 : 24;
+                // Larger font for everything except the keys named by a word
+                int keyFontSize = (displayKey == "Shift" || displayKey == "Space" || displayKey == "Back" || displayKey == "Enter") ? 14 : 24;
                 GUIStyle keyStyle = new GUIStyle { font = font, normal = { textColor = txtColor }, fontSize = keyFontSize, alignment = TextAnchor.MiddleCenter };
-                GUI.Label(UiScale.R(currentX, currentY, KEY_WIDTH, KEY_HEIGHT), displayKey, UiScale.Style(keyStyle));
-                
-                currentX += KEY_WIDTH + KEY_SPACING;
+                GUI.Label(UiScale.R(keyRect), displayKey, UiScale.Style(keyStyle));
             }
-            
-            currentY += KEY_HEIGHT + KEY_SPACING;
         }
         
-        // Draw button prompts at bottom (within extended background)
-        currentY += KEY_SPACING;
-        float buttonY = currentY;
-        
-        // Cancel affordance (bottom left, only when cancel is allowed): gamepad X + label; mouse/kb = right-mouse texture + label (same layout as X)
+        // The hints under the keys, in three places: Cancel, Clear, Enter. The pad's buttons, or the
+        // mouse's and the keyboard's keys. Only pictures: the keys and the buttons do the work, so no
+        // hint is a place to click.
+        float hintY = KeyRect(3, 0).yMax + HINT_GAP;
+        float hintWidth = (panelWidth - PANEL_PADDING * 2) / 3f;
+        bool mouseHints = UseMouseKeyboardUi();
         if (allowCancel)
         {
-            float buttonSize = 24;
-            float buttonX = keyboardPosition.x + PANEL_PADDING;
-            GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
-            if (UseMouseKeyboardUi())
-            {
-                if (mouseRightButtonHint != null)
-                {
-                    UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), mouseRightButtonHint);
-                    GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", UiScale.Style(buttonLabelStyle));
-                }
-            }
-            else if (xButton != null)
-            {
-                UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), PadGlyphs.Face(xButton));
-                GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Cancel", UiScale.Style(buttonLabelStyle));
-            }
+            DrawHint(0, hintY, hintWidth, "Cancel", mouseHints ? mouseRightButtonHint : xButton, null);
         }
-        
-        // B button + Clear label (center bottom) — gamepad hint only; mouse/KB users still have LMB hitbox below
-        if (!UseMouseKeyboardUi() && bButton != null && !string.IsNullOrEmpty(currentText?.Trim()))
+        if (HasText())
         {
-            float buttonSize = 24;
-            float buttonX = keyboardPosition.x + (panelWidth - buttonSize) / 2.0f;
-            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), PadGlyphs.Face(bButton));
-            GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
-            GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Clear", UiScale.Style(buttonLabelStyle));
-        }
-        
-        // Y button + Enter label (bottom right) — gamepad hint only
-        if (!UseMouseKeyboardUi() && yButton != null && !string.IsNullOrEmpty(currentText?.Trim()))
-        {
-            float buttonSize = 24;
-            float buttonX = keyboardPosition.x + panelWidth - PANEL_PADDING - buttonSize - 50;
-            UiScale.DrawTexture(UiScale.R(buttonX, buttonY, buttonSize, buttonSize), PadGlyphs.Face(yButton));
-            GUIStyle buttonLabelStyle = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 14 };
-            GUI.Label(UiScale.R(buttonX + buttonSize + 5, buttonY + 2, 100, buttonSize), "Enter", UiScale.Style(buttonLabelStyle));
+            DrawHint(1, hintY, hintWidth, "Clear", mouseHints ? null : bButton, mouseHints ? "Del" : null);
+            // On the map a click outside the keyboard confirms the note where the quill is
+            Texture2D enterPicture = !mouseHints ? yButton : isMapScreenKeyboard ? mouseLeftButtonHint : null;
+            DrawHint(2, hintY, hintWidth, "Enter", enterPicture, mouseHints && !isMapScreenKeyboard ? "Enter" : null);
         }
 
         if (GuiInput.IsLeftMouseDownGui)
@@ -618,6 +687,16 @@ public class KeyboardGUI : MonoBehaviour
             string trimmedText = currentText?.Trim() ?? "";
             if (!panelRect.Contains(UiScale.ToRef(Event.current.mousePosition)))
             {
+                // A click outside the panel: on the map it confirms the note where the quill is, or
+                // cancels an empty one; anywhere else it does nothing, as outside a dialog, and goes
+                // no further.
+                if (!isMapScreenKeyboard)
+                {
+                    Event.current.Use();
+                    GuiInput.MarkPrimaryClickConsumed();
+                    return;
+                }
+
                 if (!string.IsNullOrEmpty(trimmedText))
                 {
                     MarkMapPrimaryClickHandled();
@@ -635,71 +714,50 @@ public class KeyboardGUI : MonoBehaviour
                 }
             }
 
-            float cy = keyboardPosition.y + PANEL_PADDING + TEXT_FIELD_HEIGHT + PANEL_PADDING;
             for (int row = 0; row < 4; row++)
             {
-                float cx = keyboardPosition.x + PANEL_PADDING;
-                for (int col = 0; col < 10; col++)
+                for (int col = 0; col < COLUMNS; col++)
                 {
-                    Rect keyRect = new Rect(cx, cy, KEY_WIDTH, KEY_HEIGHT);
-                    if (keyRect.Contains(UiScale.ToRef(Event.current.mousePosition)))
+                    if (KeyRect(row, col).Contains(UiScale.ToRef(Event.current.mousePosition)))
                     {
                         cursorX = col;
                         cursorY = row;
-                        HandleKeyPress();
+                        HandleKeyPress(false);
                         MarkMapPrimaryClickHandled();
                         Event.current.Use();
                         return;
                     }
-                    cx += KEY_WIDTH + KEY_SPACING;
-                }
-                cy += KEY_HEIGHT + KEY_SPACING;
-            }
-
-            float buttonSize = 24;
-            float buttonAreaY = keyboardPosition.y + PANEL_PADDING + TEXT_FIELD_HEIGHT + PANEL_PADDING
-                + (KEY_HEIGHT + KEY_SPACING) * 4 + KEY_SPACING;
-
-            if (allowCancel)
-            {
-                float cancelHitW;
-                if (UseMouseKeyboardUi())
-                    cancelHitW = mouseRightButtonHint != null ? buttonSize + 90f : 0f;
-                else
-                    cancelHitW = xButton != null ? buttonSize + 90f : 0f;
-
-                if (cancelHitW > 0f
-                    && GuiInput.TryConsumeClickInRect(UiScale.R(keyboardPosition.x + PANEL_PADDING, buttonAreaY, cancelHitW, buttonSize + 8)))
-                {
-                    MarkMapPrimaryClickHandled();
-                    Cancel();
-                    return;
-                }
-            }
-
-            if (bButton != null && !string.IsNullOrEmpty(currentText?.Trim()))
-            {
-                float bx = keyboardPosition.x + (panelWidth - buttonSize) / 2.0f;
-                if (GuiInput.TryConsumeClickInRect(UiScale.R(bx, buttonAreaY, 120, buttonSize + 8)))
-                {
-                    MarkMapPrimaryClickHandled();
-                    currentText = "";
-                    ResetTextEntryCursorBlink();
-                    return;
-                }
-            }
-
-            if (yButton != null && !string.IsNullOrEmpty(currentText?.Trim()))
-            {
-                float yx = keyboardPosition.x + panelWidth - PANEL_PADDING - buttonSize - 50;
-                if (GuiInput.TryConsumeClickInRect(UiScale.R(yx, buttonAreaY, 130, buttonSize + 8)))
-                {
-                    MarkMapPrimaryClickHandled();
-                    Confirm();
                 }
             }
 
             GuiInput.TryConsumeClickInPanel(UiScale.R(panelRect));
         }
+    }
+
+    /// <summary>
+    /// One hint in the third of the hint row given by place (0 left, 1 middle, 2 right): a picture,
+    /// or a keyboard key's name on the blank key, and what it does. Nothing if the picture is missing.
+    /// </summary>
+    private void DrawHint(int place, float y, float width, string what, Texture2D picture, string keyName)
+    {
+        HintKey key;
+        if (picture != null)
+        {
+            key = HintKey.Of(picture);
+        }
+        else if (keyName != null && blankKey != null)
+        {
+            key = HintKey.Keyboard(keyName);
+        }
+        else
+        {
+            return;
+        }
+        GUIStyle text = new GUIStyle { font = font, fontSize = 14 };
+        text.normal.textColor = textColor;
+        GUIStyle keyText = new GUIStyle { font = font, fontSize = 12 };
+        keyText.normal.textColor = Color.white;
+        Rect row = new Rect(keyboardPosition.x + PANEL_PADDING + width * place, y, width, HINT_SIZE);
+        HintBar.Draw(UiScale.R(row), UiScale.Factor, text, keyText, blankKey, new[] { new Hint(what, key) });
     }
 }

@@ -1031,9 +1031,9 @@ public class MapScreen : MonoBehaviour
                     float screenCenterX = Screen.width / 2.0f;
                     float screenCenterY = Screen.height / 2.0f;
                     
-                    // Calculate keyboard panel dimensions (approximate, will be clamped anyway)
-                    float panelWidth = (40 + 5) * 10 - 5 + 20 * 2; // KEY_WIDTH + KEY_SPACING * 10 - KEY_SPACING + PANEL_PADDING * 2
-                    float panelHeight = 40 + 20 * 2 + (40 + 5) * 4 - 5 + 30 + 10; // TEXT_FIELD_HEIGHT + PANEL_PADDING * 2 + (KEY_HEIGHT + KEY_SPACING) * 4 - KEY_SPACING + buttonAreaHeight + 10
+                    // Keyboard panel dimensions, in reference pixels
+                    float panelWidth = KeyboardGUI.PanelWidth;
+                    float panelHeight = KeyboardGUI.PanelHeight;
                     
                     // Position keyboard on opposite side of quill from center
                     float keyboardX, keyboardY;
