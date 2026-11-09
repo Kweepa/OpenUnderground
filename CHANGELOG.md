@@ -2,6 +2,8 @@
 
 ## Next release
 
+- On the pad, holding up in the inventory stops at the top row instead of running on into the body slots, and an item picked up with A to move it stays picked up when you go up to the body slots and back.
+
 - On the map, the pad's quill moves at the same speed at any frame rate and on any screen, as fast as the stick is tilted; the d-pad's left and right jump from note to note. A note is picked anywhere on its text, with the mouse too; picked up, it drops onto the quill's tip instead of leaping to put its start under it, and a cancel puts it back where it was, without closing the map on Esc.
 
 - The on-screen keyboard has an Enter key, so the pad and the mouse can confirm a name, a save or a note from the keys, and a full stop and a dash beside it; Delete clears the text. A click outside the keyboard no longer confirms what you typed, except on the map, where the note goes where you click.

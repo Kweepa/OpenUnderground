@@ -2592,8 +2592,9 @@ public class Inventory : MonoBehaviour
                 Utils.PlayClip2d(moveCursor);
                 equipSlot = invSlots[equipSlot].goDown;
             }
-            else
+            else if (InvMoveDownPressedThisFrame())
             {
+                // Into the list only on a fresh press, as out of it.
                 Utils.PlayClip2d(moveCursor);
                 currentArea = EInventoryArea.Stuff;
             }
@@ -3624,10 +3625,12 @@ public class Inventory : MonoBehaviour
                     
                     Utils.PlayClip2d(moveCursor);
                 }
-                else
+                else if (InvMoveUpPressedThisFrame())
                 {
+                    // Out of the list only on a fresh press: a held Up stops at the top row instead
+                    // of running on through the paperdoll. An item picked up with A stays picked up,
+                    // and is there again when the cursor comes back down.
                     currentArea = EInventoryArea.Paperdoll;
-                    usingItem = null;
                     equipSlot = (int)EInvSlot.Feet;
                     
                     Utils.PlayClip2d(moveCursor);
@@ -5799,6 +5802,16 @@ public class Inventory : MonoBehaviour
                         UiScale.DrawTexture(
                             UiScale.R(UiScale.Width - invPosition + 3 * invSlots[equipSlot].cx + 72,
                                 PanelTop + 3.6f * invSlots[equipSlot].cy, 48, 58), cursor);
+                    }
+
+                    // An item picked up with A in the list stays picked up here, so its picture
+                    // stays beside the cursor, as in the list.
+                    if (usingItem != null && mouseCursorCarriedPortable == null)
+                    {
+                        Texture2D tex = usingItem.GetInventoryTex();
+                        float x = UiScale.Width - invPosition + 3 * invSlots[equipSlot].cx;
+                        float y = PanelTop + 3.6f * invSlots[equipSlot].cy;
+                        UiScale.DrawTexture(UiScale.R(x + 32, y - 1, 2 * tex.width, 2.4f * tex.height), tex);
                     }
                     break;
                 case EInventoryArea.CarryWeight:
