@@ -1372,6 +1372,8 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadMap.QuillY, "Move the quill");
                 AddBound(lines, GameActions.PadMap.Select, "Place or edit a note");
                 AddBound(lines, GameActions.PadMap.EraseNote, "Erase the note");
+                AddBound(lines, GameActions.PadMap.PreviousNote, "Previous note");
+                AddBound(lines, GameActions.PadMap.NextNote, "Next note");
                 AddBound(lines, GameActions.PadMap.PreviousPage, "Previous page");
                 AddBound(lines, GameActions.PadMap.NextPage, "Next page");
                 AddBound(lines, GameActions.PadMap.Close, "Close");

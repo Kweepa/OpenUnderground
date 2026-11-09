@@ -132,6 +132,12 @@ public static class HintBar
         GUI.DrawTextureWithTexCoords(new Rect(place.xMax - cap, place.y, cap, place.height), key, new Rect(1f - capShare, 0f, capShare, 1f));
     }
 
+    /// <summary>A pad control the game has no picture of, by its name on the grey key, for a hint drawn outside a row (the map's legend).</summary>
+    public static void DrawPadKey(Rect place, string name, GUIStyle text)
+    {
+        GUI.Box(place, PadGlyphs.Name(name), PadKeyStyle(text));
+    }
+
     /// <summary>The grey pad key, cut into nine so that it stretches to any width.</summary>
     private static GUIStyle PadKeyStyle(GUIStyle text)
     {

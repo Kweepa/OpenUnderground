@@ -230,6 +230,8 @@ public class KeyboardGUI : MonoBehaviour
 
         if (allowCancel && GameInput.EscapePressedThisFrame())
         {
+            // the press is the keyboard's: what is behind it must not take it as well, now or next frame
+            GameInput.ConsumeEscapeThroughNextFrame();
             Cancel();
             return;
         }
@@ -531,6 +533,7 @@ public class KeyboardGUI : MonoBehaviour
                 else if (Event.current.keyCode == KeyCode.Escape && allowCancel)
                 {
                     // Allow Escape to cancel when cancel is allowed
+                    GameInput.ConsumeEscapeThroughNextFrame();
                     Cancel();
                     Event.current.Use();
                 }
