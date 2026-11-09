@@ -413,7 +413,7 @@ public static class GameBindings
     /// <summary>
     /// True in a conversation and while an instrument is played, where the digits always reply and play: an action
     /// the player bound to a digit is silent there (the user's, 2 November 2026: the digits are bound like any key,
-    /// and stay fixed only in those two places, as the arrows do in the panels).
+    /// and stay fixed only in those two places).
     /// </summary>
     private static bool DigitsAnswer()
     {
@@ -491,8 +491,6 @@ public static class GameBindings
     {
         yield return GameActions.KeysWorld.Move.actionMap;
         yield return GameActions.KeysMap.Close.actionMap;
-        yield return GameActions.KeysInventory.Up.actionMap;
-        yield return GameActions.KeysMagic.Up.actionMap;
     }
 
     private static void EnsureLoaded()
@@ -877,7 +875,7 @@ public static class GameBindings
                 case "downArrow":
                 case "leftArrow":
                 case "rightArrow":
-                    return "The arrows always walk, and move the panels' cursor.";
+                    return "The arrows always walk.";
                 case "leftMeta":
                 case "rightMeta":
                     return "The Windows keys belong to Windows.";

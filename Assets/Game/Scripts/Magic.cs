@@ -1210,11 +1210,6 @@ public class Magic : MonoBehaviour
     }
 
     /// <summary>The rune cursor's d-pad, or its arrow key unless the keyboard is typing runes.</summary>
-    private static bool CursorPressedThisFrame(InputAction pad, InputAction key)
-    {
-        return pad.WasPressedThisFrame() || GameInput.KeyPressedThisFrame(key);
-    }
-
     public void RestoreMana(int mana)
     {
         if (!PlayerData.sData.dead)
@@ -1339,10 +1334,11 @@ public class Magic : MonoBehaviour
             }
 
             int column = index % 4;
-            bool padLeft = CursorPressedThisFrame(GameActions.PadMagic.Left, GameActions.KeysMagic.Left);
-            bool padRight = CursorPressedThisFrame(GameActions.PadMagic.Right, GameActions.KeysMagic.Right);
-            bool padUp = CursorPressedThisFrame(GameActions.PadMagic.Up, GameActions.KeysMagic.Up);
-            bool padDown = CursorPressedThisFrame(GameActions.PadMagic.Down, GameActions.KeysMagic.Down);
+            // the d-pad only: on the keyboard the cursor could not be seen, nor used (mod 1180)
+            bool padLeft = GameActions.PadMagic.Left.WasPressedThisFrame();
+            bool padRight = GameActions.PadMagic.Right.WasPressedThisFrame();
+            bool padUp = GameActions.PadMagic.Up.WasPressedThisFrame();
+            bool padDown = GameActions.PadMagic.Down.WasPressedThisFrame();
             // The active spells are stacked upwards below the panel, the last one on top, so the
             // cursor steps down onto the top one and back up onto the runes.
             if (activeSpellCursor >= 0)

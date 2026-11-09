@@ -151,15 +151,15 @@ public static class PlayerInput
     /// <remarks>The keyboard wins whenever one of its movement keys is down.</remarks>
     public static Vector2 ReadMoveVector()
     {
-        Vector2 keys = ReadKeyboardMove(withArrows: true, out bool keysHeld);
+        Vector2 keys = ReadKeyboardMove(out bool keysHeld);
         return keysHeld ? keys : GameActions.PadWorld.Move.ReadValue<Vector2>();
     }
 
     /// <summary>
     /// The keyboard's movement keys as one vector, each axis -1, 0 or 1 and normalised on the diagonal: W, S, A and
-    /// D, plus the arrows unless a panel has them for its cursor.
+    /// D, plus the arrows.
     /// </summary>
-    public static Vector2 ReadKeyboardMove(bool withArrows, out bool hasInput)
+    public static Vector2 ReadKeyboardMove(out bool hasInput)
     {
         Vector2 v = GameActions.KeysWorld.Move.ReadValue<Vector2>();
         // Move forward quietly is forward, and PlayerObject slows it as the Walk quietly modifier does (mod 1080)
@@ -167,11 +167,8 @@ public static class PlayerInput
         {
             v.y = 1f;
         }
-        if (withArrows)
-        {
-            Vector2 arrows = GameActions.KeysWorld.MoveAlternate.ReadValue<Vector2>();
-            v = new Vector2(Mathf.Clamp(v.x + arrows.x, -1f, 1f), Mathf.Clamp(v.y + arrows.y, -1f, 1f));
-        }
+        Vector2 arrows = GameActions.KeysWorld.MoveAlternate.ReadValue<Vector2>();
+        v = new Vector2(Mathf.Clamp(v.x + arrows.x, -1f, 1f), Mathf.Clamp(v.y + arrows.y, -1f, 1f));
 
         hasInput = v.x != 0f || v.y != 0f;
         if (v.sqrMagnitude > 1f)

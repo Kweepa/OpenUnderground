@@ -2402,28 +2402,28 @@ public class Inventory : MonoBehaviour
     private float invMoveNextFireDown = -1f;
 
     private static bool InvMoveLeftHeld()
-        => GameActions.PadInventory.Left.IsPressed() || GameActions.KeysInventory.Left.IsPressed();
+        => GameActions.PadInventory.Left.IsPressed();
 
     private static bool InvMoveLeftPressedThisFrame()
-        => GameActions.PadInventory.Left.WasPressedThisFrame() || GameActions.KeysInventory.Left.WasPressedThisFrame();
+        => GameActions.PadInventory.Left.WasPressedThisFrame();
 
     private static bool InvMoveRightHeld()
-        => GameActions.PadInventory.Right.IsPressed() || GameActions.KeysInventory.Right.IsPressed();
+        => GameActions.PadInventory.Right.IsPressed();
 
     private static bool InvMoveRightPressedThisFrame()
-        => GameActions.PadInventory.Right.WasPressedThisFrame() || GameActions.KeysInventory.Right.WasPressedThisFrame();
+        => GameActions.PadInventory.Right.WasPressedThisFrame();
 
     private static bool InvMoveUpHeld()
-        => GameActions.PadInventory.Up.IsPressed() || GameActions.KeysInventory.Up.IsPressed();
+        => GameActions.PadInventory.Up.IsPressed();
 
     private static bool InvMoveUpPressedThisFrame()
-        => GameActions.PadInventory.Up.WasPressedThisFrame() || GameActions.KeysInventory.Up.WasPressedThisFrame();
+        => GameActions.PadInventory.Up.WasPressedThisFrame();
 
     private static bool InvMoveDownHeld()
-        => GameActions.PadInventory.Down.IsPressed() || GameActions.KeysInventory.Down.IsPressed();
+        => GameActions.PadInventory.Down.IsPressed();
 
     private static bool InvMoveDownPressedThisFrame()
-        => GameActions.PadInventory.Down.WasPressedThisFrame() || GameActions.KeysInventory.Down.WasPressedThisFrame();
+        => GameActions.PadInventory.Down.WasPressedThisFrame();
 
     private bool ShouldInventoryMoveRepeat(ref float nextFireUnscaledTime, bool held, bool pressedThisFrame)
     {

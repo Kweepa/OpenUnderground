@@ -1056,7 +1056,7 @@ public class PlayerObject : MonoBehaviour
             moveSpeed *= 2.0f;
         }
 
-        // While magic/stats/inventory panels are up, keyboard arrows stay for panel UI; WASD (and gamepad stick) still move.
+        // With a panel up the keyboard still walks, the arrows too, and so does the pad's left stick.
         bool allowMove = controlsActive || (controlsDisabled & ~(EControlMask.Magic | EControlMask.Inventory)) == 0;
         bool usingKeyboardMove = false;
         Vector2 moveControl = allowMove ? ReadMoveVectorConsideringPanels(out usingKeyboardMove) : Vector2.zero;
@@ -1837,16 +1837,17 @@ public class PlayerObject : MonoBehaviour
 
     private float timeToNextTrackCheck = trackCheckInterval;
 
-    private static bool PlayerPanelsWantWasdOnlyMovement()
+    private static bool PlayerPanelsTakeThePad()
     {
-        // Magic/inventory use arrow keys for UI; stats does not — full keyboard move is fine when stats alone is up.
+        // The inventory and the magic panel take the pad's d-pad and A for their cursor; the stats panel does not.
+        // The keyboard is not taken: the arrows walk with any panel open (mod 1180).
         return PlayerPanelState.IsEffectivelyExploringInventory
             || PlayerPanelState.IsEffectivelyExploringMagic;
     }
 
     private Vector2 ReadMoveVectorConsideringPanels(out bool usingKeyboardMove)
     {
-        if (!PlayerPanelsWantWasdOnlyMovement())
+        if (!PlayerPanelsTakeThePad())
         {
             return ReadMoveVectorSeparated(out usingKeyboardMove);
         }
@@ -1857,14 +1858,7 @@ public class PlayerObject : MonoBehaviour
             return ReadMoveVectorGamepad();
         }
 
-        usingKeyboardMove = false;
-        Vector2 wasd = ReadMoveVectorWasdOnly(out bool wasdHas);
-        if (wasdHas)
-        {
-            usingKeyboardMove = true;
-        }
-
-        return wasd;
+        return PlayerInput.ReadKeyboardMove(out usingKeyboardMove);
     }
 
     /// <summary>
@@ -1916,13 +1910,8 @@ public class PlayerObject : MonoBehaviour
 
     private Vector2 ReadMoveVectorSeparated(out bool usingKeyboard)
     {
-        Vector2 kb = PlayerInput.ReadKeyboardMove(withArrows: true, out usingKeyboard);
+        Vector2 kb = PlayerInput.ReadKeyboardMove(out usingKeyboard);
         return usingKeyboard ? kb : ReadMoveVectorGamepad();
-    }
-
-    private static Vector2 ReadMoveVectorWasdOnly(out bool hasInput)
-    {
-        return PlayerInput.ReadKeyboardMove(withArrows: false, out hasInput);
     }
 
     private static Vector2 ReadMoveVectorGamepad()
@@ -1933,7 +1922,7 @@ public class PlayerObject : MonoBehaviour
     private static bool IsJumpPressedSeparated()
     {
         bool kbJump = GameActions.KeysWorld.Jump.WasPressedThisFrame();
-        bool gpJump = !PlayerPanelsWantWasdOnlyMovement() && GameActions.PadWorld.Jump.WasPressedThisFrame();
+        bool gpJump = !PlayerPanelsTakeThePad() && GameActions.PadWorld.Jump.WasPressedThisFrame();
         return gpJump || kbJump;
     }
 

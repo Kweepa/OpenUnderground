@@ -26,9 +26,7 @@ public static class GameActions
     public static readonly PadWorldActions PadWorld = new PadWorldActions(Asset.AddActionMap("Pad.World"));
     public static readonly KeysWorldActions KeysWorld = new KeysWorldActions(Asset.AddActionMap("Keys.World"));
     public static readonly PadInventoryActions PadInventory = new PadInventoryActions(Asset.AddActionMap("Pad.Inventory"));
-    public static readonly CursorActions KeysInventory = new CursorActions(Asset.AddActionMap("Keys.Inventory"), keyboard: true);
     public static readonly PadMagicActions PadMagic = new PadMagicActions(Asset.AddActionMap("Pad.Magic"));
-    public static readonly CursorActions KeysMagic = new CursorActions(Asset.AddActionMap("Keys.Magic"), keyboard: true);
     public static readonly PadMapActions PadMap = new PadMapActions(Asset.AddActionMap("Pad.Map"));
     public static readonly KeysMapActions KeysMap = new KeysMapActions(Asset.AddActionMap("Keys.Map"));
 
@@ -128,9 +126,9 @@ public static class GameActions
     /// <summary>Walking about: the keyboard. The mouse is read directly (see the remarks above).</summary>
     public sealed class KeysWorldActions
     {
-        /// <summary>W, S, A, D. The only movement keys while the magic or inventory panel is open.</summary>
+        /// <summary>W, S, A, D.</summary>
         public readonly InputAction Move;
-        /// <summary>The arrows, which belong to the panels' cursors while a panel is open.</summary>
+        /// <summary>The arrows, a second set of walking keys, with a panel open too: no panel's cursor moves on them.</summary>
         public readonly InputAction MoveAlternate;
         public readonly InputAction Sprint;
         public readonly InputAction WalkQuietly;
@@ -213,7 +211,10 @@ public static class GameActions
         }
     }
 
-    /// <summary>A cursor moved a cell at a time: the d-pad on the pad, the arrows on the keyboard.</summary>
+    /// <summary>
+    /// A panel's cursor moved a cell at a time with the d-pad. The pad only: on the keyboard the panels are used
+    /// with the mouse, and the arrows walk.
+    /// </summary>
     public class CursorActions
     {
         public readonly InputAction Up;
@@ -221,16 +222,16 @@ public static class GameActions
         public readonly InputAction Left;
         public readonly InputAction Right;
 
-        internal CursorActions(InputActionMap map, bool keyboard)
+        internal CursorActions(InputActionMap map)
         {
-            Up = Button(map, "Up", keyboard ? "<Keyboard>/upArrow" : "<Gamepad>/dpad/up");
-            Down = Button(map, "Down", keyboard ? "<Keyboard>/downArrow" : "<Gamepad>/dpad/down");
-            Left = Button(map, "Left", keyboard ? "<Keyboard>/leftArrow" : "<Gamepad>/dpad/left");
-            Right = Button(map, "Right", keyboard ? "<Keyboard>/rightArrow" : "<Gamepad>/dpad/right");
+            Up = Button(map, "Up", "<Gamepad>/dpad/up");
+            Down = Button(map, "Down", "<Gamepad>/dpad/down");
+            Left = Button(map, "Left", "<Gamepad>/dpad/left");
+            Right = Button(map, "Right", "<Gamepad>/dpad/right");
         }
     }
 
-    /// <summary>The inventory panel and the barter tray on the pad. The keyboard only moves the cursor there.</summary>
+    /// <summary>The inventory panel and the barter tray on the pad.</summary>
     public sealed class PadInventoryActions : CursorActions
     {
         /// <summary>Tapped, looks at the item or uses it; held, picks it up. The caller tells the two apart.</summary>
@@ -241,7 +242,7 @@ public static class GameActions
         public readonly InputAction Throw;
         public readonly InputAction Back;
 
-        internal PadInventoryActions(InputActionMap map) : base(map, keyboard: false)
+        internal PadInventoryActions(InputActionMap map) : base(map)
         {
             Select = Button(map, "Select", "<Gamepad>/buttonSouth");
             SecondaryUse = Button(map, "SecondaryUse", "<Gamepad>/buttonNorth");
@@ -250,7 +251,7 @@ public static class GameActions
         }
     }
 
-    /// <summary>The magic panel on the pad. The keyboard moves the cursor with the arrows and casts with Cast.</summary>
+    /// <summary>The magic panel on the pad. The keyboard casts with Cast.</summary>
     public sealed class PadMagicActions : CursorActions
     {
         /// <summary>Lays the rune under the cursor, or dispels the active spell under it.</summary>
@@ -258,7 +259,7 @@ public static class GameActions
         public readonly InputAction Clear;
         public readonly InputAction Cast;
 
-        internal PadMagicActions(InputActionMap map) : base(map, keyboard: false)
+        internal PadMagicActions(InputActionMap map) : base(map)
         {
             Select = Button(map, "Select", "<Gamepad>/buttonSouth");
             Clear = Button(map, "Clear", "<Gamepad>/buttonEast");
