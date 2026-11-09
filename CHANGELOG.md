@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The arrow keys walk with the inventory or the magic panel open, as W, A, S and D do, instead of moving a selection there that could not be seen.
+
 - On the pad, holding up in the inventory stops at the top row instead of running on into the body slots, and an item picked up with A to move it stays picked up when you go up to the body slots and back.
 
 - On the map, the pad's quill moves at the same speed at any frame rate and on any screen, as fast as the stick is tilted; the d-pad's left and right jump from note to note. A note is picked anywhere on its text, with the mouse too; picked up, it drops onto the quill's tip instead of leaping to put its start under it, and a cancel puts it back where it was, without closing the map on Esc.

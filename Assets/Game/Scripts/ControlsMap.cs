@@ -122,15 +122,6 @@ public sealed class ControlsMap
         new KeyRow { Label = "Quicksave", EntryId = "Keys.World/Quicksave" },
         new KeyRow { Label = "Controls", EntryId = "Keys.World/Controls", Note = "Open these maps: the pad's if you used the pad last." },
         new KeyRow { Label = "Game menu", Keys = () => new List<string> { "escape" }, Note = "With a panel open, close it first." },
-        new KeyRow
-        {
-            // the arrows stay the panels' cursor, as they stay a second set of walking keys (mod 320, the user's choice
-            // of one key for each action)
-            Label = "Move the selection",
-            Keys = () => Join(Bound(GameActions.KeysInventory.Up), Bound(GameActions.KeysInventory.Down),
-                Bound(GameActions.KeysInventory.Left), Bound(GameActions.KeysInventory.Right)),
-            Note = "In the inventory and the magic panel.",
-        },
     };
 
     /// <summary>A row's keys, as names of the drawing's keys: its binding's (a chord as ctrl+j), then the fixed ones.</summary>

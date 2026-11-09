@@ -236,7 +236,6 @@ Look speed and invert options are in the game menu, under CONTROLS.
 |Right click on the rune bag|Open the magic panel|
 |F, while carrying|Put the carried item in your pack|
 |Scroll wheel|Scroll the stuff list when the pointer is over the grid|
-|Arrow keys|Move selection|
 
 ### Magic panel
 
