@@ -63,3 +63,4 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 56aa71cf12da0e7428d12efac92c85d5, type: 3}
   - {fileID: 2800000, guid: c7063c7e6dd950744ac6ca7c0855a957, type: 3}
   - {fileID: 2800000, guid: ab70255189063294da9344b595a1bf48, type: 3}
+  dPadLeftRightIcon: {fileID: 2800000, guid: 91074781916a5cc45bbc2c3c73cf35e1, type: 3}

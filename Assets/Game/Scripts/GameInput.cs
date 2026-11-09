@@ -109,6 +109,7 @@ public static class GameInput
     }
 
     private static int escapeConsumedFrame = -1;
+    private static int escapeAlsoConsumedFrame = -1;
 
     /// <summary>
     /// Called by a dialog that has just closed itself on Esc, so that the readers after it in the same
@@ -120,9 +121,20 @@ public static class GameInput
         escapeConsumedFrame = Time.frameCount;
     }
 
+    /// <summary>
+    /// As <see cref="ConsumeEscape"/>, and for the next frame too: the on-screen keyboard can take Esc from IMGUI's
+    /// key event, which may come a frame before the Input System reports the press; then the press, reported once
+    /// the keyboard has gone, closed the map behind a note being written.
+    /// </summary>
+    public static void ConsumeEscapeThroughNextFrame()
+    {
+        escapeConsumedFrame = Time.frameCount;
+        escapeAlsoConsumedFrame = Time.frameCount + 1;
+    }
+
     public static bool EscapePressedThisFrame()
     {
-        if (escapeConsumedFrame == Time.frameCount)
+        if (escapeConsumedFrame == Time.frameCount || escapeAlsoConsumedFrame == Time.frameCount)
             return false;
 
         foreach (InputDevice d in InputSystem.devices)

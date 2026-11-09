@@ -278,6 +278,9 @@ public static class GameActions
         /// <summary>Places a note, edits the one under the quill, or presses the close button.</summary>
         public readonly InputAction Select;
         public readonly InputAction EraseNote;
+        /// <summary>Moves the quill to the previous or next note of the page, in reading order.</summary>
+        public readonly InputAction PreviousNote;
+        public readonly InputAction NextNote;
         public readonly InputAction PreviousPage;
         public readonly InputAction NextPage;
         public readonly InputAction Close;
@@ -290,6 +293,8 @@ public static class GameActions
             QuillY = map.AddAction("QuillY", InputActionType.Value, "<Gamepad>/leftStick/y", expectedControlLayout: "Axis");
             Select = Button(map, "Select", "<Gamepad>/buttonSouth");
             EraseNote = Button(map, "EraseNote", "<Gamepad>/buttonWest");
+            PreviousNote = Button(map, "PreviousNote", "<Gamepad>/dpad/left");
+            NextNote = Button(map, "NextNote", "<Gamepad>/dpad/right");
             PreviousPage = Button(map, "PreviousPage", "<Gamepad>/dpad/up");
             NextPage = Button(map, "NextPage", "<Gamepad>/dpad/down");
             Close = Button(map, "Close", "<Gamepad>/select");

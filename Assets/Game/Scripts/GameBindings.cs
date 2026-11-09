@@ -253,6 +253,8 @@ public static class GameBindings
         All.Add(quill);
         PadEntry(map.Select, EBindKind.Press, EPadPages.Map, "Place or edit a note");
         PadEntry(map.EraseNote, EBindKind.Press, EPadPages.Map, "Erase the note");
+        PadEntry(map.PreviousNote, EBindKind.Press, EPadPages.Map, "Previous note");
+        PadEntry(map.NextNote, EBindKind.Press, EPadPages.Map, "Next note");
         PadEntry(map.PreviousPage, EBindKind.Press, EPadPages.Map, "Previous page");
         PadEntry(map.NextPage, EBindKind.Press, EPadPages.Map, "Next page");
         PadEntry(map.Back, EBindKind.Press, EPadPages.Map, "Close (on release)");

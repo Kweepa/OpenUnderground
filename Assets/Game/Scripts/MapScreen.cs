@@ -539,12 +539,26 @@ public class MapScreen : MonoBehaviour
 
     public Texture2D[] legendIcons;
     public Texture2D[] mouseLegendIcons;
+    /// <summary>The d-pad's left and right, for the pad legend's Next note.</summary>
+    public Texture2D dPadLeftRightIcon;
 
     private int quillX;
     private int quillY;
+    // what the stick moved the quill by and the whole pixels have not taken yet, so a light touch still moves it
+    private float quillRestX, quillRestY;
+    // where the quill took hold of the note being written, in map pixels from its start, so the note does not jump to the quill
+    private float grabX, grabY;
+    // every note drawn on the page, with the screen rectangle of its text: the whole text selects it
+    private readonly Dictionary<MapNote, Rect> noteRects = new Dictionary<MapNote, Rect>();
+
+    // The pad's quill: at full tilt it crosses the screen's width in this many seconds, whatever the frame rate
+    // and the resolution; nothing below the dead zone, and beyond it the speed is the tilt's share of the full one.
+    private const float QuillCrossSeconds = 1.5f;
+    private const float QuillDeadZone = 0.15f;
     private MapNote currentNote;
     private MapNote highlightedNote;
     private string initialNoteText; // Track initial note text when editing starts
+    private float initialNoteX, initialNoteY; // and its place, which a cancel gives back
     private bool isNewNote; // Track if currentNote is a newly created note
 
     private MapPage[] mapPages = new MapPage[21];
@@ -576,6 +590,107 @@ public class MapScreen : MonoBehaviour
             return;
         mapPage.notes.Remove(highlightedNote);
         highlightedNote = null;
+    }
+
+    /// <summary>
+    /// How far the pad's stick moves the quill in this frame, in screen pixels: by time, not by frame, and
+    /// in proportion to the screen, so it feels the same at any frame rate and on any monitor.
+    /// </summary>
+    private static Vector2 QuillStep(Vector2 stick, float deltaTime)
+    {
+        float tilt = stick.magnitude;
+        if (tilt <= QuillDeadZone)
+        {
+            return Vector2.zero;
+        }
+        // 30% of the tilt is 30% of the speed (the user's, 9 November 2026)
+        float speed = Mathf.Min(1f, tilt) * Screen.width / QuillCrossSeconds;
+        // a stall of the game is not a leap of the quill
+        return stick / tilt * speed * Mathf.Min(deltaTime, 0.1f);
+    }
+
+    /// <summary>
+    /// Where a note's text is on the screen, a little margin around it, as the last drawing measured it; before
+    /// that, a small box at its start.
+    /// </summary>
+    private Rect NoteRect(MapNote note)
+    {
+        if (noteRects.TryGetValue(note, out Rect r))
+        {
+            return r;
+        }
+        return new Rect(note.x * Screen.width / 320.0f, note.y * Screen.height / 200.0f, 8.0f * Screen.width / 320.0f,
+            4.0f * Screen.height / 200.0f);
+    }
+
+    /// <summary>The note whose text the quill is on; of two, the one whose middle is nearer.</summary>
+    private MapNote NoteUnderQuill()
+    {
+        MapNote best = null;
+        float bestDistance = float.MaxValue;
+        Vector2 quill = new Vector2(quillX, quillY);
+        foreach (MapNote note in mapPage.notes)
+        {
+            Rect r = NoteRect(note);
+            if (r.Contains(quill))
+            {
+                float distance = (r.center - quill).sqrMagnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = note;
+                }
+            }
+        }
+        return best;
+    }
+
+    // a note's line, for the reading order: the height of its text in map pixels
+    private const float NoteLineHeight = 5.0f;
+
+    /// <summary>Top to bottom by line, then left to right.</summary>
+    private static int ReadingOrder(MapNote a, MapNote b)
+    {
+        int line = Mathf.RoundToInt(a.y / NoteLineHeight).CompareTo(Mathf.RoundToInt(b.y / NoteLineHeight));
+        return line != 0 ? line : a.x.CompareTo(b.x);
+    }
+
+    /// <summary>
+    /// The pad's d-pad left and right: the quill to the middle of the previous or next note of the page in
+    /// reading order, from the note it is on, or from where it is; round from the last to the first.
+    /// </summary>
+    private void JumpToNote(int direction)
+    {
+        List<MapNote> notes = new List<MapNote>(mapPage.notes);
+        if (notes.Count == 0)
+        {
+            return;
+        }
+        notes.Sort(ReadingOrder);
+
+        int index;
+        MapNote from = NoteUnderQuill();
+        if (from != null)
+        {
+            index = (notes.IndexOf(from) + direction + notes.Count) % notes.Count;
+        }
+        else
+        {
+            MapNote here = new MapNote { x = quillX * 320.0f / Screen.width, y = quillY * 200.0f / Screen.height };
+            index = direction > 0
+                ? notes.FindIndex(n => ReadingOrder(n, here) > 0)
+                : notes.FindLastIndex(n => ReadingOrder(n, here) < 0);
+            if (index < 0)
+            {
+                index = direction > 0 ? 0 : notes.Count - 1;
+            }
+        }
+
+        Rect r = NoteRect(notes[index]);
+        quillX = Mathf.RoundToInt(r.center.x);
+        quillY = Mathf.RoundToInt(r.center.y);
+        quillRestX = 0f;
+        quillRestY = 0f;
     }
 
     private Rect MapLevelCornerRectUp()
@@ -637,10 +752,17 @@ public class MapScreen : MonoBehaviour
         {
             currentNote = highlightedNote;
             initialNoteText = currentNote.note;
+            initialNoteX = currentNote.x;
+            initialNoteY = currentNote.y;
             isNewNote = false;
             highlightedNote = null;
-            quillX = (int)currentNote.x * Screen.width / 320;
-            quillY = (int)currentNote.y * Screen.height / 200;
+            // The note comes off the page onto the quill, and shows it: it keeps its place across, and drops so that
+            // the top of its text (drawn 10 pixels above its y) sits on the quill's tip, and one screen pixel more,
+            // so that it always moves; never upward (the user's, 9 November 2026). From there it moves only as far
+            // as the quill moves.
+            grabX = quillX * 320.0f / Screen.width - currentNote.x;
+            grabY = Mathf.Min(quillY * 200.0f / Screen.height - currentNote.y, -10.0f * 200.0f / Screen.height)
+                - 200.0f / Screen.height;
 #if UNITY_EDITOR
             EditorApplication.ExecuteMenuItem("Window/General/Game");
 #endif
@@ -657,6 +779,8 @@ public class MapScreen : MonoBehaviour
             else
             {
                 currentNote = new MapNote();
+                grabX = 0f;
+                grabY = 0f;
                 initialNoteText = "";
                 isNewNote = true;
                 mapPage.notes.Add(currentNote);
@@ -763,6 +887,8 @@ public class MapScreen : MonoBehaviour
             float yScale = Screen.height / 200.0f;
             quillX = (int) (xScale * (32 + PlayerObject.Player.transform.position.x));
             quillY = Screen.height - (int) (yScale * (9 + PlayerObject.Player.transform.position.z));
+            quillRestX = 0f;
+            quillRestY = 0f;
         }
         else if (visible
                  && !MapKeyboardOverlayActive()
@@ -791,46 +917,31 @@ public class MapScreen : MonoBehaviour
             }
             else
             {
-                float stickX = GameActions.PadMap.QuillX.ReadValue<float>();
-                float stickY = GameActions.PadMap.QuillY.ReadValue<float>();
-
-                float signX = stickX >= 0 ? 1.0f : -1.0f;
-                float signY = stickY >= 0 ? 1.0f : -1.0f;
-                float curvedX = signX * Mathf.Pow(Mathf.Abs(stickX), 1.5f);
-                float curvedY = signY * Mathf.Pow(Mathf.Abs(stickY), 1.5f);
-
-                quillX += (int)(20.0f * curvedX);
-                quillY -= (int)(20.0f * curvedY);
-                quillX = Mathf.Clamp(quillX, 0, Screen.width);
-                quillY = Mathf.Clamp(quillY, 0, Screen.height);
+                Vector2 stick = new Vector2(GameActions.PadMap.QuillX.ReadValue<float>(), GameActions.PadMap.QuillY.ReadValue<float>());
+                Vector2 step = QuillStep(stick, Time.unscaledDeltaTime);
+                quillRestX += step.x;
+                quillRestY -= step.y;
+                int dx = (int)quillRestX;
+                int dy = (int)quillRestY;
+                quillRestX -= dx;
+                quillRestY -= dy;
+                quillX = Mathf.Clamp(quillX + dx, 0, Screen.width);
+                quillY = Mathf.Clamp(quillY + dy, 0, Screen.height);
             }
 
-            highlightedNote = null;
-            if (currentNote == null)
+            if (currentNote == null && !MapKeyboardOverlayActive())
             {
-                float bestDistance = 500.0f;
-                foreach (MapNote note in mapPage.notes)
+                if (GameActions.PadMap.NextNote.WasPressedThisFrame())
                 {
-                    float quillPX = quillX * 320.0f / Screen.width;
-                    float quillPY = quillY * 200.0f / Screen.height; 
-                    if (note != currentNote)
-                    {
-                        float x = note.x + 4;
-                        float y = note.y + 2;
-                        float dx = quillPX - x;
-                        float dy = quillPY - y;
-                        if (dx * dx < 16 && dy * dy < 4)
-                        {
-                            float distance = dx * dx + dy * dy;
-                            if (distance < bestDistance)
-                            {
-                                bestDistance = distance;
-                                highlightedNote = note;
-                            }
-                        }
-                    }
+                    JumpToNote(1);
+                }
+                else if (GameActions.PadMap.PreviousNote.WasPressedThisFrame())
+                {
+                    JumpToNote(-1);
                 }
             }
+
+            highlightedNote = currentNote == null ? NoteUnderQuill() : null;
 
             bool keyboardActive = MapKeyboardOverlayActive();
 
@@ -858,8 +969,8 @@ public class MapScreen : MonoBehaviour
             }
             if (currentNote != null)
             {
-                currentNote.x = quillX * 320.0f / Screen.width;
-                currentNote.y = quillY * 200.0f / Screen.height;
+                currentNote.x = quillX * 320.0f / Screen.width - grabX;
+                currentNote.y = quillY * 200.0f / Screen.height - grabY;
             }
             else if (GameActions.PadMap.PreviousPage.WasPressedThisFrame() && selectedPage > 1)
             {
@@ -953,6 +1064,70 @@ public class MapScreen : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// The pad's legend from the buttons the map's actions are on now, in the style of the pad in use: it drew the
+    /// prefab's Xbox pictures whatever the bindings and the prompts (fix 473). A d-pad pair still on its two directions
+    /// keeps its picture.
+    /// </summary>
+    private void DrawPadLegend(GUIStyle labelStyle)
+    {
+        PadGlyphs.Remember(legendIcons ?? new Texture2D[0]);
+        GameActions.PadMapActions m = GameActions.PadMap;
+        Texture2D pages = legendIcons != null && legendIcons.Length == 4 ? legendIcons[2] : null;
+        int line = 0;
+        DrawPadLegendLine(line++, "Make note", null, labelStyle, m.Select);
+        DrawPadLegendLine(line++, "Erase note", null, labelStyle, m.EraseNote);
+        DrawPadLegendLine(line++, "Next note", DPadPair(m.PreviousNote, m.NextNote, "left", "right", dPadLeftRightIcon), labelStyle,
+            m.PreviousNote, m.NextNote);
+        DrawPadLegendLine(line++, "Change level", DPadPair(m.PreviousPage, m.NextPage, "up", "down", pages), labelStyle,
+            m.PreviousPage, m.NextPage);
+        DrawPadLegendLine(line, "Close map", null, labelStyle, m.Back);
+    }
+
+    /// <summary>The d-pad's picture for two actions still on its two opposite directions, or null.</summary>
+    private static Texture2D DPadPair(UnityEngine.InputSystem.InputAction first, UnityEngine.InputSystem.InputAction second,
+        string firstDirection, string secondDirection, Texture2D picture)
+    {
+        return GameBindings.PadPath(first) == "<Gamepad>/dpad/" + firstDirection
+            && GameBindings.PadPath(second) == "<Gamepad>/dpad/" + secondDirection ? picture : null;
+    }
+
+    /// <summary>A line of the pad's legend: a picture, or the buttons of its actions drawn as the pack draws them.</summary>
+    private void DrawPadLegendLine(int line, string label, Texture2D picture, GUIStyle labelStyle,
+        params UnityEngine.InputSystem.InputAction[] actions)
+    {
+        float w = 32.0f * Screen.width / 320;
+        float x = Screen.width - w;
+        float k = labelStyle.fontSize;
+        float y = 0.6f * Screen.height + 1.2f * k * line;
+        if (picture != null)
+        {
+            GUI.DrawTexture(new Rect(x - 1.2f * k, y, k, k), picture);
+        }
+        else
+        {
+            for (int i = 0; i < actions.Length; ++i)
+            {
+                PadGlyphs.DrawBound(new Rect(x - 1.2f * k * (actions.Length - i), y, k, k), actions[i]);
+            }
+        }
+        GUI.Label(new Rect(x, y - k / 6, w, k), label, labelStyle);
+    }
+
+    /// <summary>One line of the legend whose control has no picture: its name on the grey pad key, where the pictures go.</summary>
+    private void DrawPadKeyLegend(string control, string label, GUIStyle labelStyle)
+    {
+        float w = 32.0f * Screen.width / 320;
+        float x = Screen.width - w;
+        float k = labelStyle.fontSize;
+        float y = 0.6f * Screen.height;
+        GUIStyle name = new GUIStyle(labelStyle) { alignment = TextAnchor.MiddleCenter };
+        name.normal.textColor = Color.white;
+        float keyWidth = Mathf.Max(k, name.CalcSize(new GUIContent(control)).x + 0.7f * k);
+        HintBar.DrawPadKey(new Rect(x - 0.2f * k - keyWidth, y, keyWidth, k), control, name);
+        GUI.Label(new Rect(x, y - k / 6, w, k), label, labelStyle);
+    }
+
     public void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Map;
@@ -996,12 +1171,29 @@ public class MapScreen : MonoBehaviour
                 {
                     DrawLegend(mouseLegendIcons, new [] { "Make note", "Erase note", "Close map" }, style);
                 }
+                else if (currentNote != null)
+                {
+                    // writing a note: the quill's stick moves it, the left one unless it was rebound
+                    string quill = GameBindings.PadPath(GameActions.PadMap.QuillX) ?? "";
+                    DrawPadKeyLegend(quill.Contains("rightStick") ? "RS" : "LS", "Move the note", style);
+                }
                 else
                 {
-                    DrawLegend(legendIcons, new [] { "Make note", "Erase note", "Change level", "Close map" }, style);
+                    DrawPadLegend(style);
                 }
             }
             
+            // each note's text measured where it is drawn, so that the whole of it selects the note
+            noteRects.Clear();
+            float noteMargin = 0.3f * style.fontSize;
+            foreach (var note in mapPage.notes)
+            {
+                Vector2 size = style.CalcSize(new GUIContent(note.note));
+                Rect text = new Rect(note.x * Screen.width / 320.0f, note.y * Screen.height / 200.0f - 10.0f,
+                    Mathf.Max(size.x, 8.0f * Screen.width / 320.0f), size.y);
+                noteRects[note] = new Rect(text.x - noteMargin, text.y - noteMargin, text.width + 2 * noteMargin, text.height + 2 * noteMargin);
+            }
+
             foreach (var note in mapPage.notes)
             {
                 if (note != currentNote)
@@ -1080,8 +1272,10 @@ public class MapScreen : MonoBehaviour
                         }
                         else
                         {
-                            // Restore existing note to initial text
+                            // Restore existing note to initial text, and to its place
                             currentNote.note = initialNoteText;
+                            currentNote.x = initialNoteX;
+                            currentNote.y = initialNoteY;
                         }
                         currentNote = null;
                     }, new Vector2(keyboardX, keyboardY), "Note:", true, true); // isMapScreenKeyboard = true, allowCancel = true
