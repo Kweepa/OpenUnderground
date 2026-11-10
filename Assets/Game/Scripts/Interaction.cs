@@ -268,7 +268,9 @@ public class Interaction : MonoBehaviour
             DoUse();
         }
 
-        if (GameActions.PadWorld.Cancel.WasPressedThisFrame())
+        // a press that put a readied spell away does only that (Magic runs first)
+        if (GameActions.PadWorld.Cancel.WasPressedThisFrame()
+            && !(Magic.sMagic != null && Magic.sMagic.PadPrimedSpellCancelledThisFrame))
         {
             Inventory.sInv.usingItem = null;
             Inventory.sInv.mouseCursorCarriedPortable = null;

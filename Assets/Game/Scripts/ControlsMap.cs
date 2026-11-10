@@ -1322,8 +1322,8 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadWorld.Jump, "Jump");
                 AddBound(lines, GameActions.PadWorld.LookAt, "Look at");
                 AddBound(lines, GameActions.PadWorld.Use, "Use or pick up");
-                AddBound(lines, GameActions.PadWorld.Cancel, "Cancel a charge, drop the item");
-                AddBound(lines, GameActions.PadWorld.Attack, "Attack");
+                AddBound(lines, GameActions.PadWorld.Cancel, "Cancel a charge or a spell, drop the item");
+                AddBound(lines, GameActions.PadWorld.Attack, "Attack, or cast a readied spell");
                 AddBound(lines, GameActions.PadWorld.Stats, "Stats");
                 AddBound(lines, GameActions.PadWorld.MagicPanel, "Magic panel");
                 AddBound(lines, GameActions.PadWorld.Inventory, "Inventory");
@@ -1343,7 +1343,8 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadInventory.Select, "Look or use; hold: pick up");
                 AddBound(lines, GameActions.PadInventory.SecondaryUse, "Equip, eat, unequip (hold)");
                 AddBound(lines, GameActions.PadInventory.Throw, "Throw (hold and let go)");
-                AddBound(lines, GameActions.PadInventory.Back, "Back");
+                AddBound(lines, GameActions.PadInventory.Back, "Back, or cancel a readied spell");
+                AddBound(lines, GameActions.PadWorld.Attack, "Close the inventory and attack, or cast a readied spell");
                 AddBound(lines, GameActions.PadWorld.Move, "Move");
                 AddBound(lines, GameActions.PadWorld.Inventory, "Close the inventory");
                 break;

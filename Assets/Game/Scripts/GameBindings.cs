@@ -222,8 +222,8 @@ public static class GameBindings
         PadEntry(p.Jump, EBindKind.Press, walking, "Jump");
         PadEntry(p.LookAt, EBindKind.Press, walking, "Look at");
         PadEntry(p.Use, EBindKind.Press, walking, "Use or pick up");
-        PadEntry(p.Cancel, EBindKind.Press, walking, "Cancel a charge, drop the item");
-        PadEntry(p.Attack, EBindKind.Press, withPanels, "Attack");
+        PadEntry(p.Cancel, EBindKind.Press, walking, "Cancel a charge or a spell, drop the item");
+        PadEntry(p.Attack, EBindKind.Press, withPanels, "Attack, or cast a readied spell");
         PadEntry(p.Stats, EBindKind.Press, withPanels, "Stats");
         PadEntry(p.MagicPanel, EBindKind.Press, withPanels, "Magic panel");
         PadEntry(p.Inventory, EBindKind.Press, withPanels, "Inventory");
@@ -239,7 +239,7 @@ public static class GameBindings
         PadEntry(inv.Select, EBindKind.Press, EPadPages.Inventory, "Look or use; hold: pick up");
         PadEntry(inv.SecondaryUse, EBindKind.Press, EPadPages.Inventory, "Equip, eat, unequip");
         PadEntry(inv.Throw, EBindKind.Press, EPadPages.Inventory, "Throw");
-        PadEntry(inv.Back, EBindKind.Press, EPadPages.Inventory, "Back");
+        PadEntry(inv.Back, EBindKind.Press, EPadPages.Inventory, "Back, or cancel a readied spell");
 
         GameActions.PadMagicActions magic = GameActions.PadMagic;
         PadEntry(magic.Select, EBindKind.Press, EPadPages.Magic, "Lay the rune, or dispel");

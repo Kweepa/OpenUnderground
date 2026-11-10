@@ -2382,6 +2382,40 @@ public class Inventory : MonoBehaviour
     }
 
     private float aPressedTime;
+
+    /// <summary>
+    /// The pack was opened by the game with a pad button still down - the magic panel's cast button, when Name
+    /// Enchantment opens the pack to wait for an item (mod 800) - so the pack's buttons are ignored until all are
+    /// up: the held cast button would otherwise be a held Throw here, and throw the selected item when let go.
+    /// </summary>
+    private bool padButtonsDownWhenOpened;
+
+    /// <summary>The pack is opening with pad buttons that may be down: they act only once they are let go.</summary>
+    public void IgnorePadButtonsHeldNow()
+    {
+        padButtonsDownWhenOpened = true;
+    }
+
+    /// <summary>True while a button that was down when the game opened the pack, or any other of its buttons, is still down.</summary>
+    private bool PadButtonsStillDownSinceOpened()
+    {
+        if (!padButtonsDownWhenOpened)
+        {
+            return false;
+        }
+
+        GameActions.PadInventoryActions pad = GameActions.PadInventory;
+        // the frame of the release counts too, or a let-go Select would read as a tap
+        if (pad.Select.IsPressed() || pad.SecondaryUse.IsPressed() || pad.Throw.IsPressed() || pad.Back.IsPressed()
+            || pad.Select.WasReleasedThisFrame() || pad.SecondaryUse.WasReleasedThisFrame()
+            || pad.Throw.WasReleasedThisFrame() || pad.Back.WasReleasedThisFrame())
+        {
+            return true;
+        }
+
+        padButtonsDownWhenOpened = false;
+        return false;
+    }
     public UUObject usingItem;
 
     private enum EInventoryArea
@@ -2605,7 +2639,11 @@ public class Inventory : MonoBehaviour
         }
         else if (GameActions.PadInventory.Select.WasReleasedThisFrame() && aPressedTime < 0.2f)
         {
-            RunPaperdollShortPrimaryReleaseAtSlot(equipSlot);
+            // Name Enchantment readied on the pad names the item worn there (mod 800)
+            if (!(Magic.sMagic != null && Magic.sMagic.TryFinalizePadPrimedSpellOnItem(invSlotContents[equipSlot])))
+            {
+                RunPaperdollShortPrimaryReleaseAtSlot(equipSlot);
+            }
         }
     }
 
@@ -3280,6 +3318,12 @@ public class Inventory : MonoBehaviour
     }
 
     /// <summary>Gamepad A short release / mouse LMB release — open container, combine, drop, or same as A on item (<see cref="UUObject.TryInventoryUse"/>).</summary>
+    /// <summary>True while Name Enchantment, readied on the pad, waits for the item the select button picks (mod 800).</summary>
+    private static bool PadSpellTakesAnItem()
+    {
+        return Magic.sMagic != null && Magic.sMagic.PadPrimedSpellTakesAnItem && Conversations.runningConversation == null;
+    }
+
     private void RunStuffShortPrimaryRelease()
     {
         if (mouseCursorCarriedPortable != null)
@@ -3569,10 +3613,19 @@ public class Inventory : MonoBehaviour
 
         if (GameActions.PadInventory.Select.WasReleasedThisFrame() && aPressedTime < 0.2f)
         {
-            RunStuffShortPrimaryRelease();
+            // Name Enchantment readied on the pad names the item picked (mod 800); a bag opens, so that what is in it can
+            // be named (fix 463, the user's answer z of 11 November 2026)
+            UUObject picked = GetCurrentItemInternal();
+            bool bag = picked != null && picked.getClass == UUObject.EClass.Containers;
+            if (bag || !(Magic.sMagic != null && Magic.sMagic.TryFinalizePadPrimedSpellOnItem(picked)))
+            {
+                RunStuffShortPrimaryRelease();
+            }
         }
         else if (GameActions.PadInventory.Back.WasPressedThisFrame() && stack.Count > 0)
         {
+            // in a bag Back leaves it, a readied spell waiting on (Magic.PadCancelPressedThisFrame() leaves it be)
+            padBackLeftBagFrame = Time.frameCount;
             BackOutOfContainer();
         }
         else if (aPressedTime >= 0.2f)
@@ -4104,26 +4157,31 @@ public class Inventory : MonoBehaviour
 
         PlayerObject.DisableControls(EControlMask.Inventory, exploringInventory);
 
+        bool padButtonsHeldFromBefore = PadButtonsStillDownSinceOpened();
+
         if (exploringInventory)
         {
             if (!IsInventoryModalUiBlocking(PlayerObject.Player))
             {
                 SyncInventoryMoveRepeatIdleDirections();
-                UpdateGamepadStuffYUseChargeState();
-                switch (currentArea)
+                if (!padButtonsHeldFromBefore)
                 {
-                case EInventoryArea.Stuff:
-                    UpdateStuff();
-                    break;
-                case EInventoryArea.Paperdoll:
-                    UpdatePaperdoll();
-                    break;
-                case EInventoryArea.Trading:
-                    UpdateTrading();
-                    break;
-                case EInventoryArea.CarryWeight:
-                    UpdateCarryWeight();
-                    break;
+                    UpdateGamepadStuffYUseChargeState();
+                    switch (currentArea)
+                    {
+                    case EInventoryArea.Stuff:
+                        UpdateStuff();
+                        break;
+                    case EInventoryArea.Paperdoll:
+                        UpdatePaperdoll();
+                        break;
+                    case EInventoryArea.Trading:
+                        UpdateTrading();
+                        break;
+                    case EInventoryArea.CarryWeight:
+                        UpdateCarryWeight();
+                        break;
+                    }
                 }
 
                 float invMousePx = lerpIn * InvSlide;
@@ -4226,7 +4284,7 @@ public class Inventory : MonoBehaviour
 
         // not under the pack's own how-many box and yes/no question, which take the pad's buttons (fix 459)
         if (exploringInventory && currentArea == EInventoryArea.Stuff && Conversations.runningConversation == null
-            && !IsInventoryModalUiBlocking(PlayerObject.Player))
+            && !IsInventoryModalUiBlocking(PlayerObject.Player) && !padButtonsHeldFromBefore)
         {
             if (GameActions.PadInventory.Throw.WasPressedThisFrame())
             {
@@ -4335,7 +4393,8 @@ public class Inventory : MonoBehaviour
         float lerpTarget = (holdTime > 0.0f ? 1.0f : 0.0f);
         lerpIn = Utils.DampedApproachUnscaledTime(lerpIn, lerpTarget, 0.2f);
 
-        aPressedTime = GameActions.PadInventory.Select.IsPressed() ? aPressedTime + Time.unscaledDeltaTime : 0.0f;
+        aPressedTime = GameActions.PadInventory.Select.IsPressed() && !padButtonsHeldFromBefore
+            ? aPressedTime + Time.unscaledDeltaTime : 0.0f;
     }
 
     private float throwTime;
@@ -4452,9 +4511,38 @@ public class Inventory : MonoBehaviour
         return null;
     }
 
+    private int padBackLeftBagFrame = -10;
+
+    /// <summary>
+    /// True when the pad's Back, in the pack, leaves a bag rather than putting a readied spell away: inside one, or on
+    /// the frame it has just left one.
+    /// </summary>
+    public bool PadBackLeavesABag => currentArea == EInventoryArea.Stuff && (stack.Count > 0 || padBackLeftBagFrame == Time.frameCount);
+
     public List<UUObject> FindObjectInInventory(UUObject target)
     {
         return FindObjectInInventoryRecursive(inventory, target);
+    }
+
+    /// <summary>True when the object is in the pack, its bags included, or worn on the paperdoll.</summary>
+    public bool Carries(UUObject target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+        if (FindObjectInInventoryRecursive(inventory, target) != null)
+        {
+            return true;
+        }
+        foreach (UUObject worn in invSlotContents)
+        {
+            if (worn != null && (worn == target || FindObjectInInventoryRecursive(worn.contents, target) != null))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public UUObject FindObjectInInventoryRecursive(List<UUObject> contents, EObjectType type)
@@ -6058,7 +6146,9 @@ public class Inventory : MonoBehaviour
                             UUObject currentItem = GetCurrentItem();
                             bool hideLightSourceHintDuringTrade = Conversations.runningConversation != null
                                 && currentItem is LightSource;
-                            string lookText = currentItem.GetLookText();
+                            // a bag opens while the spell waits (fix 463)
+                            bool names = PadSpellTakesAnItem() && currentItem.getClass != UUObject.EClass.Containers;
+                            string lookText = names ? "Identify" : currentItem.GetLookText();
                             if (!string.IsNullOrEmpty(lookText) && !hideLightSourceHintDuringTrade)
                             {
                                 PadGlyphs.DrawBound(UiScale.R(x + 80, y + 48, 24, 24), GameActions.PadInventory.Select);
@@ -6096,7 +6186,15 @@ public class Inventory : MonoBehaviour
                                 GUI.Label(UiScale.R(x + 110, y, 100, 20), useText, UiScale.Style(descriptionStyle));
                             }
                         }
-                        if (stack.Count > 0)
+                        // with a spell readied on the pad the cancel button puts it away, and only that (mod 800)
+                        // Back is Cancel only at the pack's top and outside a barter, where a readied spell waits (fix 473)
+                        if (Magic.sMagic != null && Magic.sMagic.HasPadPrimedSpellAwaitingAim && stack.Count == 0
+                            && Conversations.runningConversation == null)
+                        {
+                            PadGlyphs.DrawBound(UiScale.R(x + 120, y + 24, 24, 24), GameActions.PadInventory.Back);
+                            GUI.Label(UiScale.R(x + 150, y + 24, 100, 20), "Cancel", UiScale.Style(descriptionStyle));
+                        }
+                        else if (stack.Count > 0)
                         {
                             PadGlyphs.DrawBound(UiScale.R(x + 120, y + 24, 24, 24), GameActions.PadInventory.Back);
                             GUI.Label(UiScale.R(x + 150, y + 24, 100, 20), "Close", UiScale.Style(descriptionStyle));
@@ -6124,7 +6222,12 @@ public class Inventory : MonoBehaviour
                         float x = UiScale.Width - invPosition + 20;
                         float y = PanelTop + 560;
                         UUObject pdObj = invSlotContents[equipSlot];
-                        if (pdObj is LightSource && Conversations.runningConversation == null)
+                        if (PadSpellTakesAnItem())
+                        {
+                            PadGlyphs.DrawBound(UiScale.R(x + 80, y + 48, 24, 24), GameActions.PadInventory.Select);
+                            GUI.Label(UiScale.R(x + 110, y + 48, 100, 20), "Identify", UiScale.Style(descriptionStyle));
+                        }
+                        else if (pdObj is LightSource && Conversations.runningConversation == null)
                         {
                             string lookText = pdObj.GetLookText();
                             if (!string.IsNullOrEmpty(lookText))
@@ -6136,6 +6239,12 @@ public class Inventory : MonoBehaviour
 
                         PadGlyphs.DrawBound(UiScale.R(x + 80, y, 24, 24), GameActions.PadInventory.SecondaryUse);
                         GUI.Label(UiScale.R(x + 110, y, 100, 20), "Unequip", UiScale.Style(descriptionStyle));
+                        // Back puts a readied spell away here too (fix 473)
+                        if (Magic.sMagic != null && Magic.sMagic.HasPadPrimedSpellAwaitingAim && Conversations.runningConversation == null)
+                        {
+                            PadGlyphs.DrawBound(UiScale.R(x + 80, y + 24, 24, 24), GameActions.PadInventory.Back);
+                            GUI.Label(UiScale.R(x + 110, y + 24, 100, 20), "Cancel", UiScale.Style(descriptionStyle));
+                        }
                     }
                 }
                 if (mouseInventoryUi && inventoryPointerHover && hoverPaperdoll && hoverDesc != null && holdTime > 1.8f

@@ -241,8 +241,58 @@ public class Magic : MonoBehaviour
 
     public bool SuppressWorldMousePrimaryUntilPrimaryReleased => suppressWorldMousePrimaryUntilReleased;
 
+    /// <summary>
+    /// True when the spell waiting for its target was readied on the pad: the attack trigger casts it at the
+    /// crosshair and the cancel button puts it away (<see cref="UpdatePadPrimedSpellAiming"/>). Set when it is
+    /// readied, from the device in use; a spell readied on one device is put away on the other.
+    /// </summary>
+    private bool primedOnPad;
+
+    /// <summary>The frame the pad's cancel button put a waiting spell away, so it does nothing else that frame.</summary>
+    private int padPrimedCancelFrame = -1;
+
     /// <summary>True while a mouse-primed spell awaits aim confirm (magic panel may be closed).</summary>
-    public bool HasMousePrimedSpellAwaitingAim => mousePrimedSpellIndex >= 0;
+    public bool HasMousePrimedSpellAwaitingAim => mousePrimedSpellIndex >= 0 && !primedOnPad;
+
+    /// <summary>True while a spell readied on the pad waits for the attack trigger, or for an item.</summary>
+    public bool HasPadPrimedSpellAwaitingAim => mousePrimedSpellIndex >= 0 && primedOnPad;
+
+    /// <summary>True while Name Enchantment, readied on the pad, waits: the pack's select button names the item picked.</summary>
+    public bool PadPrimedSpellTakesAnItem => HasPadPrimedSpellAwaitingAim && spells[mousePrimedSpellIndex].runes == "OWY";
+
+    /// <summary>True on the frame the pad's cancel button put a waiting spell away.</summary>
+    public bool PadPrimedSpellCancelledThisFrame => padPrimedCancelFrame == Time.frameCount;
+
+    /// <summary>
+    /// True when the pad's cancel button, pressed this frame, is about to put a readied spell away in LateUpdate():
+    /// for a reader that runs before it, so the press does nothing else.
+    /// </summary>
+    public bool PadCancelPutsSpellAwayThisFrame =>
+        HasPadPrimedSpellAwaitingAim
+        && GameInput.LastActiveDevice == GameInputDevice.Gamepad
+        && !ShouldPauseMousePrimedSpellAimingForModalUi()
+        && PadCancelPressedThisFrame();
+
+    /// <summary>
+    /// The button that puts a readied spell away on the pad: the inventory's Back with the inventory open, the
+    /// walking Cancel with no panel - each page's own, so a rebound button does what its page says. The magic
+    /// panel's Clear keeps clearing the runes, and the spell waits.
+    /// </summary>
+    private static bool PadCancelPressedThisFrame()
+    {
+        if (PlayerPanelState.IsEffectivelyExploringInventory)
+        {
+            // in a bag Back leaves the bag first (fix 463)
+            return GameActions.PadInventory.Back.WasPressedThisFrame() && !(Inventory.sInv != null && Inventory.sInv.PadBackLeavesABag);
+        }
+
+        if (PlayerPanelState.IsEffectivelyExploringMagic)
+        {
+            return false;
+        }
+
+        return GameActions.PadWorld.Cancel.WasPressedThisFrame();
+    }
 
     /// <summary>True when the player owns the runes for a first-circle spell and has at least 3 mana.</summary>
     public bool CanBuildFirstCircleSpell()
@@ -1246,7 +1296,8 @@ public class Magic : MonoBehaviour
             }
         }
 
-        if (mousePrimedSpellIndex >= 0 && GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+        // a spell readied with the mouse is aimed with the mouse, one readied on the pad with the pad
+        if (mousePrimedSpellIndex >= 0 && primedOnPad != (GameInput.LastActiveDevice == GameInputDevice.Gamepad))
         {
             ClearMousePrimedSpellIfAny();
         }
@@ -1541,6 +1592,7 @@ public class Magic : MonoBehaviour
         mousePrimedSpellIndex = -1;
         mousePrimedSpellWasCritical = false;
         mousePrimedWand = null;
+        primedOnPad = false;
         suppressMousePrimedAimUntilPrimaryReleased = false;
         suppressMousePrimedCancelUntilSecondaryReleased = false;
         suppressWorldMousePrimaryUntilReleased = false;
@@ -1650,6 +1702,7 @@ public class Magic : MonoBehaviour
         mousePrimedSpellIndex = spellIndex;
         mousePrimedSpellWasCritical = criticalSuccess;
         mousePrimedWand = wandOrNull;
+        primedOnPad = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
         suppressMousePrimedAimUntilPrimaryReleased = true;
         if (wandOrNull != null)
         {
@@ -1659,10 +1712,14 @@ public class Magic : MonoBehaviour
         Utils.PlayClip2d(primeSpellSound);
     }
 
-    /// <summary>Returns true when the spell is deferred for mouse aim (no mana spent yet).</summary>
+    /// <summary>
+    /// Returns true when the spell is deferred for mouse aim (no mana spent yet). On the pad only Name
+    /// Enchantment waits, for an item in the pack or the crosshair; every other spell goes off at once at the
+    /// crosshair, which the pad aims at anyway.
+    /// </summary>
     private bool TryBeginMousePrimedSpellAfterRuneSuccess(int spellIndex, bool criticalSuccess)
     {
-        if (GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+        if (GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard && spells[spellIndex].runes != "OWY")
         {
             return false;
         }
@@ -1677,10 +1734,13 @@ public class Magic : MonoBehaviour
         return true;
     }
 
-    /// <summary>Prime a wand spell for mouse aim (charge not consumed until aim confirm).</summary>
+    /// <summary>
+    /// Prime a wand spell for aim (charge not consumed until aim confirm): with the mouse a click aims it, on the
+    /// pad the attack trigger casts it at the crosshair (mod 800). A missile wand stays ready for the next shot.
+    /// </summary>
     public bool TryBeginMousePrimedSpellFromWand(Wand wand)
     {
-        if (wand == null || GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+        if (wand == null)
         {
             return false;
         }
@@ -1710,16 +1770,21 @@ public class Magic : MonoBehaviour
 
         bool crit = mousePrimedSpellWasCritical;
         Wand primedWand = mousePrimedWand;
-        bool keepWandPrimed = primedWand != null && SpellKeepsWandPrimedAfterAimConfirm(spells[i].runes);
+        // what the mouse needs guarded after its click, the pad does not: its press is not a click
+        bool onPad = primedOnPad;
+        // a wand destroyed since it was readied compares as null, and must not fall through to the runes' path (fix 462)
+        bool fromWand = !ReferenceEquals(primedWand, null);
+        bool keepWandPrimed = fromWand && SpellKeepsWandPrimedAfterAimConfirm(spells[i].runes);
         if (!keepWandPrimed)
         {
             mousePrimedSpellIndex = -1;
             mousePrimedSpellWasCritical = false;
             mousePrimedWand = null;
+            primedOnPad = false;
             SoftwareCursorOverlay.DefaultTextureOverride = null;
         }
 
-        if (primedWand != null)
+        if (fromWand)
         {
             if (!primedWand || primedWand.ChargesRemaining <= 0)
             {
@@ -1731,7 +1796,7 @@ public class Magic : MonoBehaviour
             }
 
             timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
-            if (nameEnchantInventoryItem != null && Inventory.sInv != null)
+            if (!onPad && nameEnchantInventoryItem != null && Inventory.sInv != null)
             {
                 Inventory.sInv.SuppressInventoryMousePrimaryShortReleaseOnce();
             }
@@ -1742,7 +1807,8 @@ public class Magic : MonoBehaviour
             }
             if (keepWandPrimed)
             {
-                if (!primedWand)
+                // the last charge spent: the wand snaps at the end of the frame (Object.Destroy), so it is still here
+                if (!primedWand || primedWand.ChargesRemaining <= 0)
                 {
                     ClearMousePrimedSpellIfAny();
                 }
@@ -1751,13 +1817,13 @@ public class Magic : MonoBehaviour
                     suppressMousePrimedAimUntilPrimaryReleased = true;
                 }
             }
-            suppressWorldMousePrimaryUntilReleased = true;
+            suppressWorldMousePrimaryUntilReleased = !onPad;
             return;
         }
 
         if (MissileHasNoRoom(i, worldAimDirection))
         {
-            suppressWorldMousePrimaryUntilReleased = true;
+            suppressWorldMousePrimaryUntilReleased = !onPad;
             return;
         }
 
@@ -1768,13 +1834,13 @@ public class Magic : MonoBehaviour
 
         castSpells[i] = true;
         timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
-        if (nameEnchantInventoryItem != null && Inventory.sInv != null)
+        if (!onPad && nameEnchantInventoryItem != null && Inventory.sInv != null)
         {
             Inventory.sInv.SuppressInventoryMousePrimaryShortReleaseOnce();
         }
 
         Cast(i, false, worldAimDirection, nameEnchantInventoryItem);
-        suppressWorldMousePrimaryUntilReleased = true;
+        suppressWorldMousePrimaryUntilReleased = !onPad;
     }
 
     private static bool ShouldPauseMousePrimedSpellAimingForModalUi()
@@ -1785,7 +1851,9 @@ public class Magic : MonoBehaviour
         }
 
         if (PlayerObject.Player != null
-            && (PlayerObject.Player.controlsDisabled & (EControlMask.HowMany | EControlMask.RepairDialog)) != 0)
+            && (PlayerObject.Player.controlsDisabled & (EControlMask.HowMany | EControlMask.RepairDialog | EControlMask.Cutscene
+                | EControlMask.Flute | EControlMask.Resting | EControlMask.RoamingSight | EControlMask.EnterMoongate
+                | EControlMask.Warning)) != 0)
         {
             return true;
         }
@@ -1811,10 +1879,73 @@ public class Magic : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// A spell readied on the pad (mod 800): the attack trigger casts it at the crosshair, the cancel button puts it
+    /// away. The mouse's click and right click, with the pad's buttons; the right stick turns the view meanwhile, with
+    /// the pack open or closed. A missile wand stays ready for the next shot, as with the mouse
+    /// (<see cref="SpellKeepsWandPrimedAfterAimConfirm"/>). Name Enchantment takes an item in the pack too, through
+    /// <see cref="TryFinalizePadPrimedSpellOnItem"/>.
+    /// </summary>
+    private void UpdatePadPrimedSpellAiming()
+    {
+        if (GameInput.LastActiveDevice != GameInputDevice.Gamepad)
+        {
+            return;
+        }
+
+        // before the cancel: on the map, in a dialog or a conversation the button is theirs
+        if (ShouldPauseMousePrimedSpellAimingForModalUi())
+        {
+            return;
+        }
+
+        if (PadCancelPressedThisFrame())
+        {
+            ClearMousePrimedSpellIfAny();
+            padPrimedCancelFrame = Time.frameCount;
+            return;
+        }
+
+        if (GameActions.PadWorld.Attack.WasPressedThisFrame())
+        {
+            // no direction: the spell takes the crosshair, as one cast at once on the pad does
+            FinalizeMousePrimedSpell(null, null);
+        }
+    }
+
+    /// <summary>
+    /// Names <paramref name="item"/>, picked in the pack on the pad, with the Name Enchantment waiting there. False,
+    /// and nothing done, when no such spell waits: the button then does what it always does.
+    /// </summary>
+    public bool TryFinalizePadPrimedSpellOnItem(UUObject item)
+    {
+        if (item == null || !PadPrimedSpellTakesAnItem || ShouldPauseMousePrimedSpellAimingForModalUi())
+        {
+            return false;
+        }
+
+        FinalizeMousePrimedSpell(null, item);
+        return true;
+    }
+
     private void UpdateMousePrimedSpellAiming()
     {
         if (mousePrimedSpellIndex < 0)
         {
+            return;
+        }
+
+        // a readied wand that has left the pack - thrown, traded, dropped - is put away: it fired from where it lay (fix 461)
+        if (!ReferenceEquals(mousePrimedWand, null)
+            && (!mousePrimedWand || Inventory.sInv == null || !Inventory.sInv.Carries(mousePrimedWand)))
+        {
+            ClearMousePrimedSpellIfAny();
+            return;
+        }
+
+        if (primedOnPad)
+        {
+            UpdatePadPrimedSpellAiming();
             return;
         }
 
@@ -2202,6 +2333,16 @@ public class Magic : MonoBehaviour
                 if (result >= Skills.ESkillTestResult.Success)
                 {
                     HidePanel();
+
+                    // On the pad Name Enchantment waits with the pack open, where the select button picks
+                    // the item to name; the attack trigger names what the crosshair is on (mod 800).
+                    if (PadPrimedSpellTakesAnItem && PlayerPanelState.ArePanelsAvailable)
+                    {
+                        StatsPanel.sStatsPanel?.Hide();
+                        // the cast button is still down: in the pack it would be a held Throw
+                        Inventory.sInv?.IgnorePadButtonsHeldNow();
+                        PlayerPanelState.SetPanel(EPlayerPanel.Inventory);
+                    }
                 }
             }
             break;
@@ -4584,6 +4725,7 @@ public class Magic : MonoBehaviour
 
         mousePrimedSpellIndex = -1;
         mousePrimedSpellWasCritical = false;
+        primedOnPad = false;
         SoftwareCursorOverlay.DefaultTextureOverride = null;
         if (data.hasMousePrimedSpell
             && data.mousePrimedSpellListIndex >= 0
@@ -4592,6 +4734,8 @@ public class Magic : MonoBehaviour
         {
             mousePrimedSpellIndex = data.mousePrimedSpellListIndex;
             mousePrimedSpellWasCritical = data.mousePrimedSpellWasCritical;
+            // aimed with the device in use now, or Update() would put it away at once
+            primedOnPad = GameInput.LastActiveDevice == GameInputDevice.Gamepad;
             ApplyPrimedSpellCursorTexture();
         }
 

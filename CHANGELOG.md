@@ -2,6 +2,8 @@
 
 ## Next release
 
+- On the pad, a wand used from the inventory with Y now waits, ready, and the attack trigger fires it at the crosshair while the right stick aims, a wand of missiles shot after shot until B puts it away; before, each shot was a held Y with the thumb off the stick. Name Enchantment and its wand can now name an item picked with A in the inventory, which on the pad worked only on things lying in the world.
+
 - The arrow keys walk with the inventory or the magic panel open, as W, A, S and D do, instead of moving a selection there that could not be seen.
 
 - On the pad, holding up in the inventory stops at the top row instead of running on into the body slots, and an item picked up with A to move it stays picked up when you go up to the body slots and back.

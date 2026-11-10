@@ -71,7 +71,9 @@ public static class GameplayCursorPolicy
         bool unlockForMagicInventoryPanels =
             (mouseKeyboardUi && PlayerPanelState.IsEffectivelyExploringMagic)
             || (mouseKeyboardUi && PlayerPanelState.IsEffectivelyExploringInventory)
-            || (StatsPanel.sStatsPanel != null && StatsPanel.sStatsPanel.ShouldDismissWithEscape())
+            // not for a spell readied on the pad, whose circle is drawn on the crosshair only while the cursor is locked (fix 473)
+            || (StatsPanel.sStatsPanel != null && StatsPanel.sStatsPanel.ShouldDismissWithEscape()
+                && !(Magic.sMagic != null && Magic.sMagic.HasPadPrimedSpellAwaitingAim))
             || (Magic.sMagic != null && Magic.sMagic.HasMousePrimedSpellAwaitingAim);
         EControlMask cursorFreeMask = CursorFreeUiMask;
         if (!mouseKeyboardUi)
