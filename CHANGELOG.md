@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Name Enchantment cast on an item in the inventory now shows the same rising runes and white mist as an item named in the world.
+
 - On the pad, a wand used from the inventory with Y now waits, ready, and the attack trigger fires it at the crosshair while the right stick aims, a wand of missiles shot after shot until B puts it away; before, each shot was a held Y with the thumb off the stick. Name Enchantment and its wand can now name an item picked with A in the inventory, which on the pad worked only on things lying in the world.
 
 - The arrow keys walk with the inventory or the magic panel open, as W, A, S and D do, instead of moving a selection there that could not be seen.
