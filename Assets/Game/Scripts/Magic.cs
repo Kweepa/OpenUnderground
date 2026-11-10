@@ -3347,6 +3347,11 @@ public class Magic : MonoBehaviour
         if (inventoryItem != null)
         {
             inventoryItem.NameEnchantment(spawnParticleEffect: false);
+            // the effect the world shows, drawn over the item in the pack instead (mod 1190)
+            if (!string.IsNullOrEmpty(inventoryItem.enchantmentName) && Inventory.sInv != null)
+            {
+                Inventory.sInv.ShowNameEnchantmentRunes(inventoryItem);
+            }
             return true;
         }
 

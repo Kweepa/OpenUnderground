@@ -5536,6 +5536,15 @@ public class Inventory : MonoBehaviour
     public Texture2D crackPatch;
     public float crackPatchHeight = 30.0f;
 
+    /// <summary>
+    /// The runes of the world's Name Enchantment effect (runes_tiled.png) white on a transparent ground, with the sheet's
+    /// brightness as alpha: the world draws them additively on black, the interface can only lay them over (mod 1190).
+    /// </summary>
+    public Texture2D nameEnchantmentRunes;
+
+    /// <summary>The mist of the same effect, its Glow (smoke001.png): four puffs, 2 by 2.</summary>
+    public Texture2D nameEnchantmentMist;
+
     private Rect gr;
 
     private void DrawTex(float x, float y, float w, float h, Texture tex)
@@ -5605,6 +5614,167 @@ public class Inventory : MonoBehaviour
         }
 
         DrawChargeRingFill(ringRect, Mathf.Clamp01(gamepadYUseChargeNormalized));
+    }
+
+    // ---------------------------------------------------------------- the runes of Name Enchantment (mod 1190)
+
+    /// <summary>One item named in the pack, and when: its runes are worked out from the seed on every frame.</summary>
+    private sealed class NamingRunes
+    {
+        public UUObject Item;
+        public float Start;
+        public int Seed;
+    }
+
+    private readonly List<NamingRunes> namingRunes = new List<NamingRunes>();
+
+    // The world's effect, EF_Name_Enchantment_sm: 30 runes a second for a second, each living 1.5 to 2.5 s, rising from a
+    // ring around the item and shrinking to nothing; its sheet holds 24 runes, 8 by 4. Here half as many (the user's,
+    // 10 November 2026): over a cell the world's number crowds it.
+    private const int NamingRuneCount = 15;
+
+    // Its Glow: 20 puffs at once, in a box about the item, each living 1.5 to 2.5 s and fading out, turned at random,
+    // drifting a little (its noise), lavender white. Here larger against the cell, as the runes are, and fainter, since
+    // the world adds them up and the interface lays them over each other; and fading in over half a second (the user's,
+    // 10 November 2026), where the world's starts at full.
+    private const int NamingMistCount = 20;
+    private const float NamingMistAlpha = 0.245f;
+    private const float NamingMistFadeInSeconds = 0.5f;
+    private static readonly Color NamingMistColour = new Color(0.67f, 0.64f, 1f);
+    private const float NamingRunesEmitSeconds = 1f;
+    private const float NamingRuneLifeMin = 1.5f;
+    private const float NamingRuneLifeMax = 2.5f;
+    private const int NamingRuneSheetColumns = 8;
+    private const int NamingRuneSheetRows = 4;
+    private const int NamingRuneSheetCount = 24;
+
+    /// <summary>
+    /// Shows the runes the world shows for Name Enchantment over <paramref name="item"/>, named in the pack: drawn over its
+    /// cell or its slot on the paperdoll, while it is in view, for as long as the world's effect lasts.
+    /// </summary>
+    public void ShowNameEnchantmentRunes(UUObject item)
+    {
+        if (item == null || nameEnchantmentRunes == null)
+        {
+            return;
+        }
+
+        namingRunes.RemoveAll(r => r.Item == item);
+        namingRunes.Add(new NamingRunes { Item = item, Start = Time.unscaledTime, Seed = Random.Range(int.MinValue, int.MaxValue) });
+    }
+
+    /// <summary>Where <paramref name="item"/> is drawn in the open pack, in reference pixels: its cell, or its paperdoll slot.</summary>
+    private bool TryGetNamingRunesRect(UUObject item, float invPosition, List<UUObject> itemsToDisplay, out Rect rect)
+    {
+        float panelLeft = UiScale.Width - invPosition;
+        int listIndex = itemsToDisplay.IndexOf(item);
+        if (listIndex >= viewIndex && listIndex < viewIndex + 16)
+        {
+            int p = listIndex - viewIndex;
+            rect = new Rect(panelLeft + ix + dx * (p % 4), iy + dy * (p / 4), 48, 58);
+            return true;
+        }
+
+        for (int i = 0; i < invSlotContents.Length; i++)
+        {
+            if (invSlotContents[i] == item)
+            {
+                rect = PaperdollSlotHitRect(panelLeft, i);
+                return true;
+            }
+        }
+
+        rect = default;
+        return false;
+    }
+
+    /// <summary>
+    /// The runes of every item named in the pack that are still alive, over the item where it is drawn now. The same
+    /// numbers as the world's effect, in the cell's measure: the ring is the cell's width, the runes rise about one
+    /// and a half cells in their life.
+    /// </summary>
+    private void DrawNameEnchantmentRunes(float invPosition, List<UUObject> itemsToDisplay)
+    {
+        if (namingRunes.Count == 0)
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        namingRunes.RemoveAll(r => r.Item == null || now - r.Start > NamingRunesEmitSeconds + NamingRuneLifeMax);
+        if (Event.current.type != EventType.Repaint || nameEnchantmentRunes == null)
+        {
+            return;
+        }
+
+        Color previous = GUI.color;
+        foreach (NamingRunes effect in namingRunes)
+        {
+            if (!TryGetNamingRunesRect(effect.Item, invPosition, itemsToDisplay, out Rect cell))
+            {
+                continue;
+            }
+
+            System.Random rng = new System.Random(effect.Seed);
+            float age = now - effect.Start;
+
+            // the mist first, under the runes
+            for (int k = 0; k < NamingMistCount; k++)
+            {
+                float life = Mathf.Lerp(NamingRuneLifeMin, NamingRuneLifeMax, (float)rng.NextDouble());
+                float size = Mathf.Lerp(0.4f, 1.4f, (float)rng.NextDouble()) * cell.width;
+                float x0 = cell.center.x + 0.3f * cell.width * (2f * (float)rng.NextDouble() - 1f);
+                float y0 = cell.center.y + 0.3f * cell.width * (2f * (float)rng.NextDouble() - 1f);
+                float driftX = 0.1f * cell.width * (2f * (float)rng.NextDouble() - 1f);
+                float driftY = 0.1f * cell.width * (2f * (float)rng.NextDouble() - 1f);
+                float turn = 360f * (float)rng.NextDouble();
+                int frame = rng.Next(4);
+
+                float t = age / life;
+                if (nameEnchantmentMist == null || t >= 1f)
+                {
+                    continue;
+                }
+
+                float x = x0 + driftX * age;
+                float y = y0 + driftY * age;
+                Rect uv = new Rect(0.5f * (frame % 2), 0.5f * (frame / 2), 0.5f, 0.5f);
+                Rect r = UiScale.R(x - 0.5f * size, y - 0.5f * size, size, size);
+                Matrix4x4 matrix = GUI.matrix;
+                GUIUtility.RotateAroundPivot(turn, r.center);
+                float fadeIn = Mathf.Clamp01(age / NamingMistFadeInSeconds);
+                GUI.color = new Color(NamingMistColour.r, NamingMistColour.g, NamingMistColour.b, NamingMistAlpha * fadeIn * (1f - t));
+                GUI.DrawTextureWithTexCoords(r, nameEnchantmentMist, uv);
+                GUI.matrix = matrix;
+            }
+
+            for (int k = 0; k < NamingRuneCount; k++)
+            {
+                // drawn for every rune, used or not, so each keeps its numbers from frame to frame
+                float born = k * NamingRunesEmitSeconds / NamingRuneCount;
+                float life = Mathf.Lerp(NamingRuneLifeMin, NamingRuneLifeMax, (float)rng.NextDouble());
+                float angle = (float)(rng.NextDouble() * 2.0 * Mathf.PI);
+                float size = Mathf.Lerp(0.43f, 1f, (float)rng.NextDouble()) * 0.5f * cell.width;
+                int frame = rng.Next(NamingRuneSheetCount);
+
+                float t = (age - born) / life;
+                if (t < 0f || t >= 1f)
+                {
+                    continue;
+                }
+
+                float s = size * (1f - t);
+                float x = cell.center.x + 0.45f * cell.width * Mathf.Cos(angle);
+                float y = cell.y + 0.75f * cell.height + 0.12f * cell.height * Mathf.Sin(angle) - 0.6f * cell.height * (age - born);
+                int column = frame % NamingRuneSheetColumns;
+                int row = frame / NamingRuneSheetColumns;
+                Rect uv = new Rect((float)column / NamingRuneSheetColumns, 1f - (float)(row + 1) / NamingRuneSheetRows,
+                    1f / NamingRuneSheetColumns, 1f / NamingRuneSheetRows);
+                GUI.color = Color.white;
+                GUI.DrawTextureWithTexCoords(UiScale.R(x - 0.5f * s, y - 0.5f * s, s, s), nameEnchantmentRunes, uv);
+            }
+        }
+        GUI.color = previous;
     }
 
     protected void OnGUI()
@@ -5777,6 +5947,8 @@ public class Inventory : MonoBehaviour
                     }
                 }
             }
+
+            DrawNameEnchantmentRunes(invPosition, itemsToDisplay);
 
             // attack and defence ratings
             {

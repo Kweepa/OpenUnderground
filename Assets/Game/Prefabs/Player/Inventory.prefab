@@ -309,6 +309,8 @@ MonoBehaviour:
   carryY: 200
   crackPatch: {fileID: 2800000, guid: d6f1a5d91378b8d4cb446bbe5b4cd81e, type: 3}
   crackPatchHeight: 13
+  nameEnchantmentRunes: {fileID: 2800000, guid: 56308acdde934b0da506b2176ccae828, type: 3}
+  nameEnchantmentMist: {fileID: 2800000, guid: 40ce5c24c61f0634f984026b7b0b6e7f, type: 3}
   y1: 56
   ddx: 63
   ddy: 65
