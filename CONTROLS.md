@@ -49,7 +49,7 @@ In the game, the CONTROLS tab of the game menu draws the same keys and buttons o
 |Select (Back)|Open / close map (requires a map in your inventory)|
 |Start|Open Save / Load / Options (closes open panels first)|
 |Start, held|Open the game menu on the gamepad's control map|
-|Attack trigger (press)|Also closes open panels|
+|Attack trigger (press)|Also closes open panels, unless a spell is ready (see below)|
 |D-pad up / down|Scroll back through recent messages (hold to repeat)|
 
 *Message history:* the d-pad is shared with the panels, the map and the quantity prompt, so it
@@ -100,6 +100,17 @@ time.
 |D-pad down, from the bottom row|Move onto the active spells; up past the top one goes back to the runes|
 |A, on an active spell|Dispel it|
 |LB|Close the magic panel|
+
+### Wands and spells that wait for a target
+
+|Control|Action|
+|-|-|
+|Y (hold), on a wand in the inventory|Ready it: the spell's circle appears on the crosshair, with the inventory open or closed|
+|Right trigger, with a spell ready|Cast it at the crosshair; a wand of missiles stays ready for the next shot|
+|B, with a spell ready|Put it away; inside a bag of the inventory B leaves the bag first, and in the magic panel it clears the runes|
+|A, with Name Enchantment ready|Name the item selected in the inventory or on the paperdoll; on a bag, open it|
+
+*Name Enchantment* cast from the runes waits with the inventory open, so an item in your pack can be named; the right trigger names what the crosshair is on instead. Other spells cast from the runes go off at once, at the crosshair.
 
 ### Map
 

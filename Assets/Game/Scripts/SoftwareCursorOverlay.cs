@@ -213,12 +213,14 @@ public class SoftwareCursorOverlay : MonoBehaviour
 
     /// <summary>
     /// With the cursor locked over a primed spell (left Shift, see <see cref="PlayerInput.PanelMouseLookHeld"/>),
-    /// the spell's pointer stays on screen, drawn over the centre crosshair, so the aim still reads as a spell.
+    /// the spell's pointer stays on screen, drawn over the centre crosshair, so the aim still reads as a spell. On
+    /// the pad, the same for a spell readied there, which the crosshair aims (mod 800).
     /// </summary>
     private static void TryDrawLockedOverrideAtCentre(bool allowDefaultTextureOverride)
     {
         Texture2D tex = allowDefaultTextureOverride ? DefaultTextureOverride : null;
-        if (tex == null || GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard)
+        bool padSpell = Magic.sMagic != null && Magic.sMagic.HasPadPrimedSpellAwaitingAim;
+        if (tex == null || (GameInput.LastActiveDevice != GameInputDevice.MouseKeyboard && !padSpell))
         {
             return;
         }

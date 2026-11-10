@@ -323,9 +323,9 @@ public class WeaponBase : UUObject
         }
         // With a spell waiting for its target, the right click puts the spell away (Magic) and does
         // not raise the weapon as well.
-        if (usingKeyboardMouse
-            && Magic.sMagic != null
-            && Magic.sMagic.HasMousePrimedSpellAwaitingAim
+        // On the pad the trigger casts it (mod 800), and does not raise the weapon either.
+        if (Magic.sMagic != null
+            && (usingKeyboardMouse ? Magic.sMagic.HasMousePrimedSpellAwaitingAim : Magic.sMagic.HasPadPrimedSpellAwaitingAim)
             && attackHeld
             && state != EState.Prepare)
         {

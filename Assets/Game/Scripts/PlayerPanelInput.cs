@@ -133,8 +133,10 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
+        // with a spell readied on the pad the trigger casts it, and the pack stays open (mod 800)
         if (GameActions.PadWorld.Attack.WasPressedThisFrame()
             && !IsModalInventoryUiBlocking()
+            && !(Magic.sMagic != null && Magic.sMagic.HasPadPrimedSpellAwaitingAim)
             && DismissActivePlayerPanels())
         {
             GameplayCursorPolicy.Apply(PlayerObject.Player);
