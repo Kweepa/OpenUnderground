@@ -29,15 +29,13 @@ public abstract class Lockable : UUObject
         if (Locked(out UUObject lockObj))
         {
             lockObj.flags &= ~(1 << 0);
-            lockObj.TryChainInteraction(EAction.Unlock);
             Utils.PlayClip(unlockClip, transform.position);
-            
-            // find the chained trigger (it looks different, but this is how locks work)
-            Trigger trigger = LevelLoader.GetObj(lockObj.chainIndex) as Trigger;
-            if (trigger != null)
-            {
-                trigger.TryInteract(null, null, EAction.Trigger);
-            }
+
+            // The original's unlock sends event 6 down the door's own list (UW.EXE 0x38481), which
+            // only an unlock trigger answers, and the game has none: the trigger that follows a
+            // lock is an open trigger, for the opening (Door.Open()). Nothing goes down the lock's
+            // own link either, which holds the key's id plus 512, not an object: it used to reach
+            // whatever object had that index, a secret door or a create object trap among them.
         }
     }
 

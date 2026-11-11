@@ -900,6 +900,11 @@ public partial class Conversation
                 int value = mem[Arg(1)];
                 int questFlag = mem[Arg(2)];
                 PlayerData.SetQuestFlagFromConversation(conversationIndex, questFlag, value);
+                // Sseetharee frees the prisoner after a trade struck in the lizardmen's tongue.
+                if (conversationIndex == (int)EWhoAmI.Sseetharee && questFlag == (int)EQuestFlag.MurgoFreed && value != 0)
+                {
+                    PlayerData.sData.freedMurgoByTrade = true;
+                }
                 result = 0;
             }
             break;
@@ -1249,9 +1254,11 @@ public partial class Conversation
             break;
         case "set_attitude":
             {
-                // presumably sets hostility?
-                Critter.EAttitude attitude = (Critter.EAttitude)Arg(1); 
-                int whoami = Arg(2);
+                // Both arguments through the script's variables, as every call passes them
+                // (UW.EXE 0x699a1): the attitude, 0 hostile to 3 friendly, and the whoami of the
+                // creature that takes it.
+                Critter.EAttitude attitude = (Critter.EAttitude)mem[Arg(1)];
+                int whoami = mem[Arg(2)];
                 // find the npc that has this whoami - slow, but during conversation, so not a big deal
                 foreach (Critter crit in UnityEngine.Object.FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
                 {

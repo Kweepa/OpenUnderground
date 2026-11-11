@@ -161,7 +161,7 @@ public class Trap : UUObject
                     initialTile.movingPlatform.Advance();
                     break;
                 case 5:
-                    DoAlertTrap();
+                    DoAlertTrap(originator);
                     break;
                 case 24:
                     DoBullfrogTrap(sender);
@@ -281,25 +281,8 @@ public class Trap : UUObject
                 int var = PlayerData.sData.globalVars[z];
                 if (z == 0)
                 {
-                    switch (angle)
-                    {
-                    case 0:
-                    case 2:
-                    case 3:
-                    case 4:
-                    case 6:
-                        // set
-                        var |= (1 << value);
-                        break;
-                    case 1:
-                        // clear
-                        var &= ~(1 << value);
-                        break;
-                    case 5:
-                        // toggle
-                        var ^= (1 << value);
-                        break;
-                    }
+                    SetQuestFlagBit(value, angle);
+                    break;
                 }
                 else
                 {
@@ -607,9 +590,52 @@ public class Trap : UUObject
         Conversations.StartConversation(doorCritter);
     }
 
-    void DoAlertTrap()
+    /// <summary>
+    /// The do trap of quality 5: the original's theft check, run for the trap's owner race as if the
+    /// player had taken something of theirs (UW.EXE 0x84b0f -> 0x74329 -> 0x7193c). Level 1 has two,
+    /// behind the open triggers of two goblin doors. The original counts from the door's tile, with
+    /// the player's own place inside his tile carried onto it, not from the trap, which lies on a
+    /// solid tile beside the door.
+    /// </summary>
+    void DoAlertTrap(UUObject originator)
     {
-        TryStolen();
+        Door door = originator as Door;
+        if (door == null)
+        {
+            TryStolen();
+            return;
+        }
+
+        Vector3 playerPos = PlayerObject.Player.transform.position;
+        Vector3 within = new Vector3(playerPos.x - Tile.xzScale * Tile.GetTileX(playerPos.x), 0.0f,
+            playerPos.z - Tile.xzScale * Tile.GetTileY(playerPos.z));
+        // Looked at from the creatures' eyes at the player's own eye: 0x7193c hands the check the
+        // player object, whose height the line of sight aims at.
+        Vector3 point = new Vector3(Tile.xzScale * door.initialTile.x, PlayerObject.Player.mainCamera.transform.position.y,
+            Tile.xzScale * door.initialTile.y) + within;
+        Critter.TheftCheck(ownerIndex & 63, point);
+    }
+
+    /// <summary>
+    /// A set variable trap whose variable is 0 works on the quest flags: bit value of the 32 flags is
+    /// cleared with heading 1, toggled with 5 and set with any other (UW.EXE 0x83ea4, the set at
+    /// 0x83f3d). Level 3's #577, behind the open trigger of the prisoner's cell, sets flag 7, which
+    /// his conversation reads; it is the only such trap in the game.
+    /// </summary>
+    private static void SetQuestFlagBit(int bit, int heading)
+    {
+        if (bit < 0 || bit >= 32)
+        {
+            return;
+        }
+
+        int[] flags = PlayerData.sData.questFlags;
+        flags[bit] = heading switch
+        {
+            1 => 0,
+            5 => flags[bit] == 0 ? 1 : 0,
+            _ => 1
+        };
     }
 
     public override Tile GetTargetTile()

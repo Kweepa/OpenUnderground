@@ -131,6 +131,9 @@ public class PlayerData : MonoBehaviour
     public int numRepairs;
     public bool navreyKilled;
     public bool releasedArial;
+    // Sseetharee's talk freed the prisoner, which the player can reach only in the lizardmen's
+    // tongue; opening his cell by hand frees him too, but proves nothing.
+    public bool freedMurgoByTrade;
     public bool[] hadConversation = new bool[320];
     public bool[] openedChest = new bool[5];
     public int numFishCaught;
