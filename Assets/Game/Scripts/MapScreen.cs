@@ -849,10 +849,19 @@ public class MapScreen : MonoBehaviour
             return;
         }
         
-        bool mapDisabled = (PlayerObject.Player.controlsDisabled & (EControlMask.Conversation | EControlMask.Cutscene | EControlMask.Flute | EControlMask.RoamingSight | EControlMask.EnterMoongate | EControlMask.HowMany | EControlMask.SaveLoad)) > 0;
-        if (mapDisabled)
+        // The screens that close the map, and those it may not open over: the yes/no question and the sleep (they read
+        // the pad and the keys behind it), the on-screen keyboard (the map's own notes write on it, so it does not
+        // close the map) and the small-window warning (fix 466).
+        const EControlMask closesMap = EControlMask.Conversation | EControlMask.Cutscene | EControlMask.Flute
+            | EControlMask.RoamingSight | EControlMask.EnterMoongate | EControlMask.HowMany | EControlMask.SaveLoad
+            | EControlMask.RepairDialog | EControlMask.Resting;
+        EControlMask disabled = PlayerObject.Player.controlsDisabled;
+        bool mapDisabled = (disabled & (closesMap | EControlMask.Keyboard | EControlMask.Warning)) != 0;
+        if ((disabled & closesMap) != 0 && visible)
         {
-            visible = false;
+            // a real close, the Map mask given back: hidden, it kept the player from walking and from the game menu.
+            // The clock is the new screen's.
+            CloseMapInternal(restoreTime: false);
         }
         
         Map map = Inventory.sInv != null
@@ -1002,7 +1011,7 @@ public class MapScreen : MonoBehaviour
         sMapScreen.CloseMapInternal();
     }
 
-    private void CloseMapInternal()
+    private void CloseMapInternal(bool restoreTime = true)
     {
         if (!visible)
             return;
@@ -1020,7 +1029,10 @@ public class MapScreen : MonoBehaviour
         highlightedNote = null;
 
         PlayerObject.DisableControls(EControlMask.Map, false);
-        Time.timeScale = 1.0f;
+        if (restoreTime)
+        {
+            Time.timeScale = 1.0f;
+        }
         visible = false;
 
         Music.ExitMapScreen();

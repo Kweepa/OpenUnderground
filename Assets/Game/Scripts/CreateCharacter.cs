@@ -365,15 +365,15 @@ public class CreateCharacter : MonoBehaviour
                 PlayerObject.ClassData data = PlayerObject.classData[(int)PlayerData.sData.playerClass]; 
                 byte[] skills = data.skills[skillRollIndex];
             
-                if (left)
+                if (left || right)
                 {
-                    Utils.PlayClip2d(moveSelection);
-                    skillChoiceIndex ^= 1;
-                }
-                else if (right)
-                {
-                    Utils.PlayClip2d(moveSelection);
-                    skillChoiceIndex ^= 1;
+                    // across the row, when the row has a second choice: the last one of an odd count is alone, and
+                    // went out of range (fix 467)
+                    if ((skillChoiceIndex ^ 1) < skills.Length)
+                    {
+                        Utils.PlayClip2d(moveSelection);
+                        skillChoiceIndex ^= 1;
+                    }
                 }
                 else if (up)
                 {
