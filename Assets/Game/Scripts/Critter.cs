@@ -1122,8 +1122,6 @@ public class Critter : UUObject
         return dx * dx + dy * dy > homeZone * homeZone;
     }
 
-    private float theftDetectionRange => Tile.xzScale * Mathf.Sqrt(stats.TheftDetectionRange);
-
     private int baseDefence => stats.Defence;
 
     private int treasureProb => stats.treasureLoot >> 4;
@@ -6795,34 +6793,129 @@ public class Critter : UUObject
     /// </summary>
     public bool Bleeds => Utils.MapRemainsToParticleType(stats.Remains, blood) is EParticleType.BloodSplat or EParticleType.PoisonSplat;
 
-    protected override void StolenFrom(UUObject item, int ownerRace)
+    /// <summary>
+    /// The original's theft check (UW.EXE 0x7193c, its area walk 0x34d67 and the callback 0x71727):
+    /// a creature of the owner's race takes the theft personally when it is within its own radius
+    /// and can see the place. Run when the player takes an owned object, and by the do trap of
+    /// quality 5 when a goblin door of level 1 is opened.
+    /// </summary>
+    /// <remarks>
+    /// The original walks the 16 x 16 tiles from 7 before the point's tile to 8 after it, column by
+    /// column, and stops after 20 creatures. For each creature of the race (critterStats byte 9 ==
+    /// owner &amp; 31): one deaf to the pack alarm (object byte 0xa bit 7) only when the owner has bit
+    /// 5, a rule that follows honourDeafToPackAlarm, off, as the pack alarm does; the knights (race
+    /// 13) not once quest variable 32 is 3 or more (0x7179b); the distance in whole tiles, each axis
+    /// cut toward zero, squared, at most the square of the high nibble of critterStats byte 0x1e (9
+    /// tiles for a green goblin, 7 for a gray one); a line of sight from its eye to the point
+    /// (0x17671), over walls and floors only, so a door does not stop it here.
+    /// Then its attitude goes one step down, never below hostile (0x718eb), and the scroll says so
+    /// by the new attitude, a creature already hostile included (block 1, 225-227).
+    ///
+    /// Ours: the creature turns to the player for half a second (theftDetectedTimer) and growls
+    /// when it turns hostile, and nothing is noticed under Freeze Time.
+    /// </remarks>
+    /// <param name="owner">The object's owner field, six bits.</param>
+    /// <param name="point">Where the theft is seen: its x and z for the distance, the whole point
+    /// for the line of sight.</param>
+    public static void TheftCheck(int owner, Vector3 point)
     {
-        if (!Magic.sMagic.IsSpellActive(Magic.ESpell.FreezeTime))
+        if (owner == 0 || Magic.sMagic.IsSpellActive(Magic.ESpell.FreezeTime))
         {
-            if (Vector3.Distance(item.transform.position, transform.position) < theftDetectionRange)
+            return;
+        }
+
+        int ownerRace = owner & 31;
+        int tileX = Tile.GetTileX(point.x);
+        int tileY = Tile.GetTileY(point.z);
+        List<Critter> reached = new List<Critter>();
+        foreach (Critter critter in FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            Vector2Int tile = TileOf(critter.transform.position);
+            if (critter.hp <= 0
+                || critter.race != ownerRace
+                || tile.x < tileX - 7 || tile.x > tileX + 8
+                || tile.y < tileY - 7 || tile.y > tileY + 8
+                || (critter.OutOfPackAlarm && (owner & 32) == 0)
+                || (owner == 32 && !critter.OutOfPackAlarm)
+                || (ownerRace == 13 && PlayerData.sData.questFlags[(int)EQuestFlag.KnightOfCrux] >= 3))
             {
-                if (race == ownerRace)
-                {
-                    // Set timer to interrupt wander state
-                    theftDetectedTimer = 0.5f;
+                continue;
+            }
 
-                    if (attitude != EAttitude.Hostile)
-                    {
-                        string preHostilityName = GetLookName();
-                        --attitude;
-                        string msg = $"{preHostilityName}{StringLoader.GetString(1, 225 + (int)attitude)}";
-                        msg = char.ToUpper(msg[0]) + msg.Substring(1);
-                        Messages.Add(msg);
-
-                        if (attitude == EAttitude.Hostile)
-                        {
-                            PlayAlertSound();
-                        }
-                    }
-                }
+            int dx = (int)((critter.transform.position.x - point.x) / Tile.xzScale);
+            int dy = (int)((critter.transform.position.z - point.z) / Tile.xzScale);
+            int radius = critter.stats.TheftDetectionRange;
+            if (dx * dx + dy * dy <= radius * radius && critter.SeesPointOverWalls(point))
+            {
+                reached.Add(critter);
             }
         }
+
+        // The original's order: column by column, then along each column.
+        reached.Sort((a, b) =>
+        {
+            Vector2Int ta = TileOf(a.transform.position);
+            Vector2Int tb = TileOf(b.transform.position);
+            return ta.x != tb.x ? ta.x.CompareTo(tb.x) : ta.y.CompareTo(tb.y);
+        });
+
+        for (int i = 0; i < reached.Count && i < 20; ++i)
+        {
+            reached[i].NoticeTheft();
+        }
     }
+
+    private void NoticeTheft()
+    {
+        // Set timer to interrupt wander state
+        theftDetectedTimer = 0.5f;
+
+        string name = GetLookName();
+        bool wasHostile = attitude == EAttitude.Hostile;
+        if (!wasHostile)
+        {
+            --attitude;
+        }
+
+        string msg = $"{name}{StringLoader.GetString(1, 225 + (int)attitude)}";
+        msg = char.ToUpper(msg[0]) + msg.Substring(1);
+        Messages.Add(msg);
+
+        if (!wasHostile && attitude == EAttitude.Hostile)
+        {
+            PlayAlertSound();
+        }
+    }
+
+    /// <summary>
+    /// Whether nothing of the level's walls, floors and ceilings stands between this creature's eye
+    /// and <paramref name="point"/>. Doors are looked through, as by the original's line of sight
+    /// (UW.EXE 0x17671), which tests no object.
+    /// </summary>
+    private bool SeesPointOverWalls(Vector3 point)
+    {
+        if (cachedCharacterController == null)
+        {
+            return false;
+        }
+
+        Vector3 eye = transform.TransformPoint(cachedCharacterController.center)
+                      + 0.4f * cachedCharacterController.height * Vector3.up;
+        Vector3 ray = point - eye;
+        int count = Physics.RaycastNonAlloc(eye, ray.normalized, theftSightHits, ray.magnitude, LayerMasks.EnvironmentAndCeiling,
+            QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < count; ++i)
+        {
+            if (theftSightHits[i].collider.GetComponentInParent<Door>() == null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static readonly RaycastHit[] theftSightHits = new RaycastHit[16];
 
     /// <summary>
     /// What this blow gains for landing on the target's back, 0 to 4.

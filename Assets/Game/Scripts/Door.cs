@@ -525,13 +525,18 @@ public class Door : Lockable
         spiked = true;
     }
 
-    public void Open()
+    /// <param name="byPlayer">The player opens it, by a use or by breaking it: only then does the
+    /// door's open trigger fire.</param>
+    public void Open(bool byPlayer = false)
     {
         if (!opening && !spiked)
         {
             opening = true;
             clipToPlay = doorOpenClip;
-            TryChainInteraction(EAction.Open);
+            if (byPlayer)
+            {
+                FireOpenTrigger();
+            }
 
             // portcullis caging Arial
             if (arialCutscene != null && LevelLoader.sLevelLoader.loadedLevel == 7 && objectIndex == 944)
@@ -548,6 +553,28 @@ public class Door : Lockable
             {
                 ParticleSpawner.SpawnParticle(EParticleType.PortcullisRise, transform.position);
             }
+        }
+    }
+
+    /// <summary>
+    /// The opening sends event 7 down the door's list, to its first trap or trigger, past the lock
+    /// (UW.EXE 0x387c6 -> 0x385d6), and only an open trigger answers it. The trigger takes the player
+    /// alone (w0 bit 11; a creature is refused at 0x83c56), so a door a creature or a lever opens does
+    /// not fire it and it stays armed. The game has five, each right behind a lock: two goblin doors
+    /// of level 1, the prisoner's cell of level 3 and two portcullises of level 7. Unlocking sends
+    /// event 6, which they ignore.
+    /// </summary>
+    private void FireOpenTrigger()
+    {
+        UUObject obj = link != 0 ? LevelLoader.GetObj(link) : null;
+        while (obj != null && obj is not (Trigger or Trap))
+        {
+            obj = obj.chainIndex != 0 ? LevelLoader.GetObj(obj.chainIndex) : null;
+        }
+
+        if (obj is Trigger trigger)
+        {
+            trigger.TryInteract(this, this, EAction.Open);
         }
     }
 
@@ -586,7 +613,7 @@ public class Door : Lockable
     {
         // only comes from the player, so can be unspiked
         spiked = false;
-        Open();
+        Open(true);
     }
 
     public override void TryInteract(UUObject originator, UUObject sender, EAction action)
@@ -723,7 +750,9 @@ public class Door : Lockable
             {
                 quality = 0;
                 Unlock();
-                Open();
+                // Only the player breaks doors here; in the original his blow, missile or spell
+                // opens a broken door as he would (UW.EXE 0x25c86 -> 0x387c6).
+                Open(true);
             }
         }
     }

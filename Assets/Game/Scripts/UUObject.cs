@@ -95,8 +95,6 @@ public class UUObject : LevelObject
     public Skills.ESkillTestResult loreResult; // success = magical?, critical success = identified
     public int loreResultLoreLevel = -1; // the lore skill level at which you obtained the loreResult
     
-    private readonly Collider[] cachedColliders = new Collider[16];
-    
     // Precached StringBuilder for building lookat names and object descriptions
     private static readonly StringBuilder lookNameBuilder = new StringBuilder(128);
 
@@ -736,22 +734,9 @@ public class UUObject : LevelObject
         // seems the ownership is pretty broad - just a race
         if (DataLoader.sDataLoader.comObjProps[(int)type].canBeOwned || type == EObjectType.DoTrap)
         {
-            int race = ownerIndex & 31;
-            if (race != 0)
-            {
-                // max distance is < 4 tiles
-                int count = Physics.OverlapSphereNonAlloc(transform.position, 4.0f * xzScale,
-                             cachedColliders, 1 << LayerMask.NameToLayer("Characters"));
-                for (int i = 0; i < count; i++)
-                {
-                    Collider col = cachedColliders[i];
-                    if (col is CharacterController)
-                    {
-                        UUObject obj = col.transform.root.gameObject.GetComponent<UUObject>();
-                        obj.StolenFrom(this, race);
-                    }
-                }
-            }
+            // Counted from the object, and looked at 12 height units (an eighth of a floor step each)
+            // above it (UW.EXE 0x71727).
+            Critter.TheftCheck(ownerIndex & 63, transform.position + 12.0f / 8.0f * Tile.yScale * Vector3.up);
         }
 
         if (LevelLoader.sLevelLoader.loadedLevel == 2)
@@ -1307,10 +1292,6 @@ public class UUObject : LevelObject
     public void TryDamage(int damage, Skills.ESkillTestResult result, int mask)
     {
         TryDamage(Resistance.Filter(damage, mask, resistances), result);
-    }
-
-    protected virtual void StolenFrom(UUObject item, int race)
-    {
     }
 
     public virtual void GetLightProps(ref float lightRange, ref float lightIntensity, ref float lightFlicker)

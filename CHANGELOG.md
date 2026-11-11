@@ -2,6 +2,14 @@
 
 ## Next release
 
+- Opening the prisoner's cell on level 3 yourself, with a lockpick or the Open spell, now frees him as in the original: talk to him and he dances his thanks and leaves, and the lizardman by his cell turns hostile. The lizardman language achievement now comes only from freeing him through the lizardman.
+
+- Conversations that make another creature friendly or hostile now do so, as in the original: making peace with a bandit on level 3 also calms his companion.
+
+- Taking what belongs to a group angers those of its members who can see you do it, up to seven or nine squares away for goblins, instead of any within three squares, even through a wall. The goblins by two locked doors on level 1 react when the door is opened, not when its lock is picked.
+
+- Unlocking a door no longer sets off something unrelated elsewhere on the level, such as a secret door on a later level opening by itself.
+
 - Browse in the game folder dialog now opens the system's Open dialog, also on Linux and the Steam Deck: pick game.gog or UW.EXE in the game's folder.
 
 - The Made with Unity screen at start-up can be cut short with any key, a click or a pad button.

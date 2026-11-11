@@ -680,8 +680,9 @@ public class Achievements : MonoBehaviour
 
     private bool CheckLanguage()
     {
-        // freeing Murgo proves you have learned the language
-        return PlayerData.GetQuestFlag(EQuestFlag.MurgoFreed) != 0;
+        // freeing Murgo through Sseetharee proves you have learned the language; opening his cell
+        // with a pick or a spell frees him as well (quest flag 0), but proves nothing
+        return PlayerData.sData?.freedMurgoByTrade ?? false;
     }
 
     private bool CheckSkill()
