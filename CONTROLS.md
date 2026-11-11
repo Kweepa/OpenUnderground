@@ -122,7 +122,6 @@ time.
 |X|Erase the highlighted note|
 |D-pad left / right|Previous / next note|
 |Left stick, while writing a note|Move the note|
-|B (hold)|Reveal fog / extra tiles while held|
 |B (release)|Close the map|
 |D-pad up / down|Previous / next map page|
 

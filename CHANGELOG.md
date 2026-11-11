@@ -2,6 +2,8 @@
 
 ## Next release
 
+- On the pad, Select no longer opens the map over the sleep or repair question, where A on the map answered Yes unseen and could leave you unable to move. Left or right on the last skill of character creation no longer empties the screen, and an A pressed on the map or a rune no longer picks up an item in the inventory.
+
 - Name Enchantment cast on an item in the inventory now shows the same rising runes and white mist as an item named in the world.
 
 - On the pad, a wand used from the inventory with Y now waits, ready, and the attack trigger fires it at the crosshair while the right stick aims, a wand of missiles shot after shot until B puts it away; before, each shot was a held Y with the thumb off the stick. Name Enchantment and its wand can now name an item picked with A in the inventory, which on the pad worked only on things lying in the world.

@@ -8,6 +8,8 @@ public class FluteGUI : MonoBehaviour
     public GUIStyle keyLetterStyle;
 
     public Texture2D upDownTex;
+    // made on first use from keyLetterStyle: not serialized, or the Editor would fill it with an empty style
+    [System.NonSerialized] private GUIStyle stickKeyStyle;
     public Texture2D aButtonTex;
     public Texture2D bButtonTex;
     /// <summary>Keyboard Esc hint icon (same asset as HowMany).</summary>
@@ -231,7 +233,20 @@ public class FluteGUI : MonoBehaviour
         UiScale.DrawTexture(UiScale.R(r), tex);
         if (!mouseKbHints)
         {
-            UiScale.DrawTexture(UiScale.R(r.x + 29, r.y + 69, 24, 24), upDownTex);
+            // the left stick picks the note, not the d-pad its picture showed (fix 473)
+            if (stickKeyStyle == null && keyLetterStyle != null)
+            {
+                stickKeyStyle = new GUIStyle(keyLetterStyle) { alignment = TextAnchor.MiddleCenter };
+                stickKeyStyle.normal.textColor = Color.white;
+            }
+            if (stickKeyStyle != null)
+            {
+                HintBar.DrawPadKey(UiScale.R(r.x + 25, r.y + 69, 32, 24), "LS", UiScale.Style(stickKeyStyle));
+            }
+            else
+            {
+                UiScale.DrawTexture(UiScale.R(r.x + 29, r.y + 69, 24, 24), upDownTex);
+            }
         }
         tex = DataLoader.sDataLoader.objTex[(int)instrumentType];
         UiScale.DrawTexture(UiScale.R(r.x + 38, r.y + 32, 3 * tex.width, 3.6f * tex.height), tex);
