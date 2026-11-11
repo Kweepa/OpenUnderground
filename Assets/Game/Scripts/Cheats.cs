@@ -8,7 +8,7 @@ using UnityEditor;
 
 /// <summary>
 /// The cheats, set from the Inspector. Assets/Editor/CheatsEditor.cs draws them in the order of the
-/// fields below, with the level and its two buttons, the tile to teleport to, the three things to
+/// fields below, with the level and its three buttons, the tile to teleport to, the three things to
 /// spawn and the skill to set each on one row of its own. In the Editor, what is set there is kept
 /// for the next run; see KeepInEditorPrefs().
 /// </summary>
@@ -20,13 +20,13 @@ public class Cheats : MonoBehaviour
     public const int LastLevel = 9;
 
     // The level to go to: the last one set in the panel, not the one the game is on, so the
-    // stairs and a load leave it alone. It is applied only from the panel - typed and confirmed
-    // by leaving the box, Enter in the box even with the value unchanged, or + and -. A new game
-    // starts on the first level and a load on the saved one, whatever the box says.
+    // stairs and a load leave it alone. It is applied only from the panel, by Enter in the box -
+    // even with the value unchanged - or by its Go button; + and - only change the number. A new
+    // game starts on the first level and a load on the saved one, whatever the box says.
     public int level = 1;
 
-    // The tile to jump to on the level currently loaded: the player lands on its centre when either
-    // box is changed, on Enter or when it loses focus.
+    // The tile to jump to on the level currently loaded: the player lands on its centre on Enter in
+    // either box or by the Go button. A click of the quill on the map fills it in.
     public Vector2Int teleportToTile;
 
     // The player's poison and hit points, shown as they are and set the same way: type a value and it
@@ -227,6 +227,19 @@ public class Cheats : MonoBehaviour
         {
             LevelLoader.sLevelLoader.RequestLevelFromCheats(level);
         }
+    }
+
+    /// <summary>
+    /// The tile to teleport to, from a click of the quill on the map: it fills the two boxes for the
+    /// Go button, and nothing moves. In the Editor it is kept like a value typed in the panel.
+    /// </summary>
+    public void SetTeleportTile(int x, int y)
+    {
+        teleportToTile = new Vector2Int(x, y);
+#if UNITY_EDITOR
+        KeepInEditorPrefs(typeof(Cheats).GetField(nameof(teleportToTile)));
+        EditorUtility.SetDirty(this);
+#endif
     }
 
     public void Teleport()

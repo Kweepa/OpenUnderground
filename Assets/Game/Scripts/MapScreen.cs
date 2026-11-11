@@ -496,6 +496,19 @@ public class MapScreen : MonoBehaviour
 
     public static bool IsMapScreenVisible() => sMapScreen != null && sMapScreen.visible;
 
+    /// <summary>
+    /// Turns the open map to the level loaded, after the Cheats panel changed it. Not while a note
+    /// is being written: it belongs to the page shown.
+    /// </summary>
+    public static void TurnToLoadedLevel()
+    {
+        if (sMapScreen == null || !sMapScreen.visible || sMapScreen.currentNote != null)
+            return;
+
+        sMapScreen.selectedPage = LevelLoader.sLevelLoader.loadedLevel;
+        sMapScreen.mapPage = sMapScreen.mapPages[sMapScreen.selectedPage];
+    }
+
     /// <summary>Used by <see cref="SoftwareCursorOverlay"/> so the quill shares IMGUI depth with the software cursor.</summary>
     public static bool TryGetSoftwareCursorQuill(out Texture2D tex, out float guiX, out float guiY, out float drawWidth, out float drawHeight)
     {
@@ -616,6 +629,10 @@ public class MapScreen : MonoBehaviour
         if (MapKeyboardOverlayActive())
             return;
 
+#if UNITY_EDITOR
+        FillCheatsTeleportTile();
+#endif
+
         if (highlightedNote != null)
         {
             currentNote = highlightedNote;
@@ -654,6 +671,27 @@ public class MapScreen : MonoBehaviour
         currentNote = null;
     }
     
+#if UNITY_EDITOR
+    /// <summary>
+    /// The tile under the quill's tip, written into the Cheats panel's teleport boxes for its Go
+    /// button. A page is 320 x 200 with row 0 at the bottom, and tile (x, y) covers the 3 x 3
+    /// pixels from column 32 + 3x and row 6 + 3y, as UpdateTile() draws it. The tile is the one on
+    /// the page shown; Go teleports on the level loaded.
+    /// </summary>
+    private void FillCheatsTeleportTile()
+    {
+        if (Cheats.sCheats == null)
+            return;
+
+        float px = quillX * 320.0f / Screen.width;
+        float py = 200.0f - quillY * 200.0f / Screen.height;
+        int tileX = Mathf.FloorToInt((px - 32.0f) / 3.0f);
+        int tileY = Mathf.FloorToInt((py - 6.0f) / 3.0f);
+        if (tileX >= 0 && tileX < 64 && tileY >= 0 && tileY < 64)
+            Cheats.sCheats.SetTeleportTile(tileX, tileY);
+    }
+#endif
+
     public void Start()
     {
         if (DataLoader.sDataLoader != null && DataLoader.sDataLoader.palettes[1].colors.Length > 0)

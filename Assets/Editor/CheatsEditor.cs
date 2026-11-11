@@ -7,11 +7,10 @@ using UnityEngine;
 
 /// <summary>
 /// The Cheats component, drawn in the order Cheats declares its fields, with a few rows that hold
-/// more than one: the level with a + and a - button; the tile to teleport to as two boxes, which
-/// teleport when either is changed, and a Go button; the object, the stack and the creature to
-/// spawn, each a list to search with a Spawn button beside it, and the creature's distance and
-/// attitude on the row below; and the skill to set beside its value. Whatever is set here is kept
-/// for the next run.
+/// more than one: the level with a +, a - and a Go button; the tile to teleport to as two boxes
+/// and a Go button; the object, the stack and the creature to spawn, each a list to search with a
+/// Spawn button beside it, and the creature's distance and attitude on the row below; and the
+/// skill to set beside its value. Whatever is set here is kept for the next run.
 /// </summary>
 [CustomEditor(typeof(Cheats))]
 public class CheatsEditor : Editor
@@ -46,17 +45,17 @@ public class CheatsEditor : Editor
         object[] before = Array.ConvertAll(kept, f => f.GetValue(cheats));
         Action action = null;
 
-        // Read before the boxes are drawn: the box that has the focus takes the key when it draws.
+        // The level and the tile are applied only by Enter in their boxes or by their Go button.
+        // Their boxes take a number as it is typed, so leaving one changes nothing. Read before the
+        // boxes are drawn: the box that has the focus takes the key when it draws. Enter works with
+        // nothing typed too: the level box holds the last level set here, which is not always the
+        // one the game is on.
         Event e = Event.current;
         string focused = GUI.GetNameOfFocusedControl();
-        bool enterInTile = e.type == EventType.KeyDown
-            && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
-            && (focused == TileXControl || focused == TileYControl);
-        // Enter in the level box goes to the level it shows even when nothing was typed: it holds
-        // the last level set here, which is not always the one the game is on.
-        bool enterInLevel = e.type == EventType.KeyDown
-            && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
-            && focused == LevelControl;
+        bool enter = e.type == EventType.KeyDown
+            && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter);
+        bool enterInTile = enter && (focused == TileXControl || focused == TileYControl);
+        bool enterInLevel = enter && focused == LevelControl;
 
         SerializedProperty prop = serializedObject.GetIterator();
         bool enterChildren = true;
@@ -132,17 +131,20 @@ public class CheatsEditor : Editor
     }
 
     /// <summary>
-    /// The level, with a + and a - button that stop at the first and the last level. The box takes
-    /// a typed level only on Enter or when it loses focus. True when the level has just changed
-    /// here; that and Enter in the box are the only times the game goes to it.
+    /// The level, with a + and a - button that stop at the first and the last level, and a Go
+    /// button as wide as the Spawn ones. The box takes a level as it is typed, and + and - change
+    /// the number from there; none of them goes to it. True when Go is clicked.
+    ///
+    /// Not a delayed box: one that loses the focus writes back the text it holds, so + or - on it
+    /// while it had the focus was undone a moment later.
     /// </summary>
     private static bool DrawLevel(SerializedProperty level)
     {
         float height = EditorGUIUtility.singleLineHeight;
-        int before = level.intValue;
+        bool clicked;
         EditorGUILayout.BeginHorizontal();
         GUI.SetNextControlName(LevelControl);
-        int typed = EditorGUILayout.DelayedIntField(new GUIContent(level.displayName), level.intValue);
+        int typed = EditorGUILayout.IntField(new GUIContent(level.displayName), level.intValue);
         if (typed != level.intValue)
         {
             level.intValue = typed;
@@ -151,6 +153,7 @@ public class CheatsEditor : Editor
         {
             if (GUILayout.Button("+", GUILayout.Width(22), GUILayout.Height(height)))
             {
+                ReleaseLevelBox();
                 level.intValue++;
             }
         }
@@ -158,8 +161,13 @@ public class CheatsEditor : Editor
         {
             if (GUILayout.Button("-", GUILayout.Width(22), GUILayout.Height(height)))
             {
+                ReleaseLevelBox();
                 level.intValue--;
             }
+        }
+        using (new EditorGUI.DisabledScope(!Application.isPlaying))
+        {
+            clicked = GUILayout.Button("Go", GUILayout.Width(ButtonWidth()), GUILayout.Height(height));
         }
         EditorGUILayout.EndHorizontal();
 
@@ -169,12 +177,25 @@ public class CheatsEditor : Editor
         {
             level.intValue = clamped;
         }
-        return level.intValue != before;
+        return clicked;
     }
 
     /// <summary>
-    /// The tile as X and Y on one row, with a Go button as wide as the Spawn ones. True when either
-    /// box has just been changed or the button is clicked.
+    /// Takes the focus from the level box before + or - change the level: a box with the focus
+    /// shows the text it holds, not the field, so the new number would not show.
+    /// </summary>
+    private static void ReleaseLevelBox()
+    {
+        if (GUI.GetNameOfFocusedControl() == LevelControl)
+        {
+            GUI.FocusControl(null);
+        }
+    }
+
+    /// <summary>
+    /// The tile as X and Y on one row, with a Go button as wide as the Spawn ones. Each box takes a
+    /// number as it is typed, and not a delayed one, as the level's: the map fills them in, and a
+    /// delayed box losing the focus would write its old text over that. True when Go is clicked.
     /// </summary>
     private static bool DrawTeleport(SerializedProperty tile)
     {
@@ -184,10 +205,10 @@ public class CheatsEditor : Editor
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.PrefixLabel("Teleport");
         GUI.SetNextControlName(TileXControl);
-        int x = EditorGUILayout.DelayedIntField(v.x, GUILayout.MinWidth(30));
+        int x = EditorGUILayout.IntField(v.x, GUILayout.MinWidth(30));
         GUILayout.Label("x", GUILayout.ExpandWidth(false));
         GUI.SetNextControlName(TileYControl);
-        int y = EditorGUILayout.DelayedIntField(v.y, GUILayout.MinWidth(30));
+        int y = EditorGUILayout.IntField(v.y, GUILayout.MinWidth(30));
         using (new EditorGUI.DisabledScope(!Application.isPlaying))
         {
             clicked = GUILayout.Button("Go", GUILayout.Width(ButtonWidth()), GUILayout.Height(height));
@@ -197,7 +218,6 @@ public class CheatsEditor : Editor
         if (x != v.x || y != v.y)
         {
             tile.vector2IntValue = new Vector2Int(x, y);
-            return true;
         }
         return clicked;
     }
