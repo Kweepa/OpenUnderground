@@ -1946,6 +1946,7 @@ public class LevelLoader : MonoBehaviour
                 DeactivateCurrentLevel();
                 LoadLevel(level);
                 PlayerObject.Player.DebugJumpToLevelStart();
+                MapScreen.TurnToLoadedLevel();
             }
         }
     }
