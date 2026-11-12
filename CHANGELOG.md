@@ -2,7 +2,7 @@
 
 ## Next release
 
-- The game folder dialog shows Validating... or Searching... while it works, and no longer freezes while it unpacks game.gog.
+- The game folder dialog shows Validating... or Searching... while it works, no longer freezes while it unpacks game.gog, and unpacks it again if that was cut short.
 
 - Your own mp3 and ogg music tracks no longer freeze the game for a moment when one starts: a long track used to stop it for about a second.
 
