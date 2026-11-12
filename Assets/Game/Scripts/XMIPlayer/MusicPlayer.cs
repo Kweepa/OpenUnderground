@@ -95,6 +95,9 @@ public class MusicPlayer : MonoBehaviour
     // OnAudioFilterRead() writes the synthesizer over whatever its source plays.
     private AudioSource clipSource;
     private AudioClip clip;
+    // The request the clip came from. A streamed clip plays from the bytes it downloaded, so the
+    // request lives as long as the clip and is disposed with it.
+    private UnityWebRequest clipWeb;
     // True from the request to the first sample, so that a track still loading counts as playing and
     // Music does not take it for one that has ended.
     private bool clipLoading;
@@ -451,6 +454,8 @@ public class MusicPlayer : MonoBehaviour
             Destroy(clip);
             clip = null;
         }
+        clipWeb?.Dispose();
+        clipWeb = null;
         
         // Reset all MIDI channels - stop all notes
         if (synthesizer != null)
@@ -503,16 +508,20 @@ public class MusicPlayer : MonoBehaviour
     /// come in the meantime.
     /// </summary>
     /// <remarks>
-    /// Tried on the Windows player and under Proton for mp3, ogg and wav (mod 900's probe, October
-    /// 2026): every way of asking - streamed, compressed - decodes the whole track into memory, a few
-    /// tens of megabytes for a few minutes of music, so only the track that plays is kept.
+    /// The track is streamed: decoded as it plays, not whole before it starts. Decoded whole, the
+    /// work is done inside GetContent(), on the main thread, and the game stands still meanwhile:
+    /// 28 ms for an 11-second mp3, 14.4 s for a 68-minute one, against a few ms streamed (measured
+    /// in play, November 2026). The clip reports DecompressOnLoad either way, so its loadType does
+    /// not tell the two apart.
     /// </remarks>
     private IEnumerator LoadClip(string fullPath, bool loop, int request)
     {
-        using UnityWebRequest web = UnityWebRequestMultimedia.GetAudioClip(FileUri(fullPath), AudioTypeOf(fullPath));
+        UnityWebRequest web = UnityWebRequestMultimedia.GetAudioClip(FileUri(fullPath), AudioTypeOf(fullPath));
+        ((DownloadHandlerAudioClip)web.downloadHandler).streamAudio = true;
         yield return web.SendWebRequest();
         if (request != clipRequest)
         {
+            web.Dispose();
             yield break;
         }
 
@@ -536,11 +545,17 @@ public class MusicPlayer : MonoBehaviour
 
         if (loaded == null || loaded.length <= 0.0f)
         {
+            if (loaded != null)
+            {
+                Destroy(loaded);
+            }
+            web.Dispose();
             currentTrack = "";
             yield break;
         }
 
         clip = loaded;
+        clipWeb = web;
         clipSource.clip = clip;
         clipSource.loop = loop;
         clipSource.volume = masterVolumeScale * duckMultiplier;
