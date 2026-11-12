@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The game folder dialog shows Validating... or Searching... while it works, and no longer freezes while it unpacks game.gog.
+
 - Your own mp3 and ogg music tracks no longer freeze the game for a moment when one starts: a long track used to stop it for about a second.
 
 - Opening the prisoner's cell on level 3 yourself, with a lockpick or the Open spell, now frees him as in the original: talk to him and he dances his thanks and leaves, and the lizardman by his cell turns hostile. The lizardman language achievement now comes only from freeing him through the lizardman.

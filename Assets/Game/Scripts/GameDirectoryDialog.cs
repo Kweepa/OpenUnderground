@@ -21,6 +21,19 @@ public class GameDirectoryDialog : MonoBehaviour
     private bool lastFoundPathUsedGogExtract = false;
     /// <summary>True if game.gog was unpacked from ISO this run (false if LooseData cache was reused).</summary>
     private bool lastGogExtractPerformedFresh = false;
+    /// <summary>
+    /// What the window is busy with while a validation or a search runs on a worker thread - "Validating",
+    /// "Searching", "Extracting game.gog" - and the folder it is looking at; null when idle. Shown with dots that
+    /// count 1, 2, 3, so the window is seen to be working: unpacking game.gog takes a while on a slow disk.
+    /// </summary>
+    private volatile string workingHeadline;
+    /// <summary>The path in the field when it last validated: Validate Path is not offered again for it.</summary>
+    private string validatedInput;
+    private volatile string workingDetail;
+    /// <summary>Application.persistentDataPath, read on the main thread for the extraction on the worker.</summary>
+    private string persistentDataPath;
+    /// <summary>In LooseData from the start of an extraction to its verified end: a copy that still has it is cut short.</summary>
+    private const string ExtractingMarker = "extracting.tmp";
     
     [Header("Testing")]
     [Tooltip("Check this to clear the saved game directory path on startup (for testing)")]
@@ -52,6 +65,7 @@ public class GameDirectoryDialog : MonoBehaviour
     public Color backgroundColor = new Color(0.545f, 0.353f, 0.169f); // Brown wood color
     public Color buttonBoxColor = new Color(1.0f, 0.843f, 0.0f); // Warm yellow
     public Color buttonBoxHighlightColor = Color.white;
+    public Color buttonBoxDisabledColor = new Color(0.482f, 0.341f, 0.204f); // #7B5734, dark brown, for a button greyed out
 
     private static bool sStartupInfoLogged;
 
@@ -109,6 +123,7 @@ public class GameDirectoryDialog : MonoBehaviour
     private void Awake()
     {
         LogStartupInfo();
+        persistentDataPath = Application.persistentDataPath;
 
         if (statusStyle != null)
         {
@@ -158,11 +173,11 @@ public class GameDirectoryDialog : MonoBehaviour
                 case ESelectedControl.Browse:
                     return true; // Always enabled
                 case ESelectedControl.AutoSearch:
-                    return !isSearching;
+                    return CanAutoSearch();
                 case ESelectedControl.ValidatePath:
-                    return !string.IsNullOrEmpty(inputPath);
+                    return CanValidate();
                 case ESelectedControl.ContinueQuit:
-                    return true; // Always enabled (shows Quit if invalid)
+                    return CanQuit();
                 default:
                     return true;
                 }
@@ -265,26 +280,20 @@ public class GameDirectoryDialog : MonoBehaviour
                     BrowseForFolder();
                     break;
                 case ESelectedControl.AutoSearch:
-                    if (!isSearching)
+                    if (CanAutoSearch())
                     {
                         StartCoroutine(AutoSearch());
                     }
                     break;
                 case ESelectedControl.ValidatePath:
-                    if (!string.IsNullOrEmpty(inputPath))
+                    if (CanValidate())
                     {
                         ValidateInputPath();
                     }
                     break;
                 case ESelectedControl.ContinueQuit:
-                    if (isValidPath && !string.IsNullOrEmpty(foundPath))
+                    if (CanQuit())
                     {
-                        GameDataPath.SetGameRootPath(foundPath);
-                        SceneManager.LoadScene("Logos");
-                    }
-                    else
-                    {
-                        // Quit
                         Application.Quit();
                     }
                     break;
@@ -379,7 +388,7 @@ public class GameDirectoryDialog : MonoBehaviour
         float buttonStartX = dialogX + 60;
         
         // Auto Search button
-        GUI.enabled = !isSearching;
+        GUI.enabled = CanAutoSearch();
         Rect autoSearchRect = new Rect(buttonStartX, buttonsY, buttonWidth, 80);
         bool autoSearchSelected = selectedControl == ESelectedControl.AutoSearch;
         DrawButtonWithBox(autoSearchRect, "Auto Search", autoSearchSelected);
@@ -392,7 +401,7 @@ public class GameDirectoryDialog : MonoBehaviour
         // Validate button (for manual entry) - greyed out if no path entered
         Rect validateRect = new Rect(buttonStartX + buttonWidth + buttonSpacing, buttonsY, buttonWidth, 80);
         bool validateSelected = selectedControl == ESelectedControl.ValidatePath;
-        bool canValidate = !string.IsNullOrEmpty(inputPath);
+        bool canValidate = CanValidate();
         GUI.enabled = canValidate;
         DrawButtonWithBox(validateRect, "Validate Path", validateSelected && canValidate);
         if (GUI.Button(validateRect, "Validate Path", buttonStyle))
@@ -401,24 +410,17 @@ public class GameDirectoryDialog : MonoBehaviour
         }
         GUI.enabled = true;
         
-        // Continue/Quit button
+        // Quit button: a valid path moves on by itself (DelayedContinue), so there is no Continue to press
+        GUI.enabled = CanQuit();
         Rect continueRect = new Rect(buttonStartX + (buttonWidth + buttonSpacing) * 2, buttonsY, buttonWidth, 80);
         bool continueSelected = selectedControl == ESelectedControl.ContinueQuit;
-        string continueButtonText = isValidPath ? "Continue" : "Quit";
+        string continueButtonText = "Quit";
         DrawButtonWithBox(continueRect, continueButtonText, continueSelected);
         if (GUI.Button(continueRect, continueButtonText, buttonStyle))
         {
-            if (isValidPath && !string.IsNullOrEmpty(foundPath))
-            {
-                GameDataPath.SetGameRootPath(foundPath);
-                SceneManager.LoadScene("Logos");
-            }
-            else
-            {
-                // Quit
-                Application.Quit();
-            }
+            Application.Quit();
         }
+        GUI.enabled = true;
         
         // Handle Enter key in text field
         if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return)
@@ -435,6 +437,11 @@ public class GameDirectoryDialog : MonoBehaviour
         // Check if mouse is over the button or if controller selected
         bool isHighlighted = buttonRect.Contains(Event.current.mousePosition) || isSelected;
         Color boxColor = isHighlighted ? buttonBoxHighlightColor : buttonBoxColor;
+        // A greyed-out button has a dark box, and neither the pointer nor the pad's selection lights it.
+        if (!GUI.enabled)
+        {
+            boxColor = buttonBoxDisabledColor;
+        }
         
         // Draw outline box (4 lines: top, bottom, left, right)
         float lineWidth = 2f;
@@ -484,8 +491,36 @@ public class GameDirectoryDialog : MonoBehaviour
         ValidateInputPath();
     }
     
+    /// <summary>
+    /// Validate Path is offered when the field holds a path, nothing is being validated or searched, and the path is
+    /// not the one that has just validated. After a failure it is offered again, with Auto Search and Quit.
+    /// </summary>
+    private bool CanValidate()
+    {
+        return !string.IsNullOrEmpty(inputPath) && !isSearching && !(isValidPath && inputPath == validatedInput);
+    }
+    
+    /// <summary>
+    /// Quit is offered when nothing is being validated, searched or unpacked - quitting half way through game.gog
+    /// would leave a copy cut short - and not once a path has validated, when the game is about to move on.
+    /// </summary>
+    private bool CanQuit()
+    {
+        return !isSearching && !isValidPath;
+    }
+    
+    /// <summary>Auto Search is offered on the same terms as Quit: not while working, nor once the game is about to load.</summary>
+    private bool CanAutoSearch()
+    {
+        return !isSearching && !isValidPath;
+    }
+    
     private void ValidateInputPath()
     {
+        if (isSearching || (isValidPath && inputPath == validatedInput))
+        {
+            return;
+        }
         lastGogExtractError = "";
         lastFoundPathUsedGogExtract = false;
         if (string.IsNullOrEmpty(inputPath))
@@ -495,13 +530,86 @@ public class GameDirectoryDialog : MonoBehaviour
             return;
         }
         
+        StartCoroutine(ValidateOnWorker(inputPath));
+    }
+    
+    /// <summary>
+    /// Runs the validation, and the unpacking of game.gog it may need, on a worker thread, so that the window keeps
+    /// drawing and shows it is busy; then reports as before.
+    /// </summary>
+    private IEnumerator ValidateOnWorker(string path)
+    {
+        isSearching = true;
+        isValidPath = false;
+        workingHeadline = "Validating";
+        workingDetail = path;
+        System.Threading.Tasks.Task<string> work = System.Threading.Tasks.Task.Run(() => FindGameData(path));
+        while (!work.IsCompleted)
+        {
+            ShowWorking();
+            yield return null;
+        }
+        workingHeadline = null;
+        isSearching = false;
+        if (work.IsFaulted)
+        {
+            UnityEngine.Debug.LogError($"Validating {path} failed: {work.Exception?.GetBaseException().Message}");
+        }
+        string validatedPath = work.IsFaulted ? null : work.Result;
+        
+        if (validatedPath != null)
+        {
+            foundPath = validatedPath;
+            isValidPath = true;
+            validatedInput = path;
+            string headline = !lastFoundPathUsedGogExtract ? "Valid game directory found"
+                : lastGogExtractPerformedFresh ? "Extracted game data to" : "Using extracted game data at";
+            
+            // Automatically proceed when valid path is found (after delay)
+            StartCoroutine(DelayedContinue(validatedPath, headline));
+        }
+        else
+        {
+            isValidPath = false;
+            if (!string.IsNullOrEmpty(lastGogExtractError))
+            {
+                statusMessage = lastGogExtractError;
+            }
+            else
+            {
+                statusMessage = "Invalid directory. Could not find SOUND/UW01.XMI or game.gog file. Please check the path and try again.";
+            }
+        }
+    }
+    
+    /// <summary>The status line while busy: the headline with one, two or three dots, three changes a second.</summary>
+    private void ShowWorking()
+    {
+        string headline = workingHeadline;
+        if (headline != null)
+        {
+            statusMessage = StatusMessageTwoLines(WithDots(headline), workingDetail);
+        }
+    }
+    
+    private static string WithDots(string headline)
+    {
+        return headline + new string('.', 1 + (int)(Time.unscaledTime * 3f) % 3);
+    }
+    
+    /// <summary>
+    /// The game's data in a folder: loose files, or game.gog unpacked. Runs on a worker thread, so nothing in here
+    /// may touch the Unity API.
+    /// </summary>
+    private string FindGameData(string path)
+    {
         // First try standard validation (loose files)
-        string validatedPath = GameDataPath.ValidateGameDirectory(inputPath);
+        string validatedPath = GameDataPath.ValidateGameDirectory(path);
         
         // If not found and input is a directory, check for game.gog file
-        if (validatedPath == null && Directory.Exists(inputPath))
+        if (validatedPath == null && Directory.Exists(path))
         {
-            string gogFile = Path.Combine(inputPath, "game.gog");
+            string gogFile = Path.Combine(path, "game.gog");
             if (File.Exists(gogFile))
             {
                 // Check if GOG file contains game data
@@ -521,37 +629,7 @@ public class GameDirectoryDialog : MonoBehaviour
                 }
             }
         }
-        
-        if (validatedPath != null)
-        {
-            foundPath = validatedPath;
-            isValidPath = true;
-            if (lastFoundPathUsedGogExtract)
-            {
-                statusMessage = lastGogExtractPerformedFresh
-                    ? StatusMessageTwoLines("Extracted game data to:", validatedPath)
-                    : StatusMessageTwoLines("Using extracted game data at:", validatedPath);
-            }
-            else
-            {
-                statusMessage = StatusMessageTwoLines("Valid game directory found:", validatedPath);
-            }
-            
-            // Automatically proceed when valid path is found (after delay)
-            StartCoroutine(DelayedContinue(validatedPath));
-        }
-        else
-        {
-            isValidPath = false;
-            if (!string.IsNullOrEmpty(lastGogExtractError))
-            {
-                statusMessage = lastGogExtractError;
-            }
-            else
-            {
-                statusMessage = "Invalid directory. Could not find SOUND/UW01.XMI or game.gog file. Please check the path and try again.";
-            }
-        }
+        return validatedPath;
     }
     
     private IEnumerator AutoSearch()
@@ -560,7 +638,9 @@ public class GameDirectoryDialog : MonoBehaviour
         lastFoundPathUsedGogExtract = false;
         isSearching = true;
         isValidPath = false;
-        statusMessage = "Searching for game directory...";
+        workingDetail = null;
+        workingHeadline = "Searching";
+        ShowWorking();
         
         string[] searchPaths = {
             @"C:\GOG Games",
@@ -579,33 +659,36 @@ public class GameDirectoryDialog : MonoBehaviour
                 continue;
             }
             
-            statusMessage = StatusMessageTwoLines("Searching in:", searchPath);
-            yield return null; // Allow UI to update
+            // Each folder is searched on a worker thread, so the window keeps drawing: unpacking a game.gog found
+            // there takes a while.
+            workingHeadline = "Searching";
+            workingDetail = searchPath;
+            System.Threading.Tasks.Task<string> work = System.Threading.Tasks.Task.Run(() => SearchDirectory(searchPath, 4)); // Max depth 4
+            while (!work.IsCompleted)
+            {
+                ShowWorking();
+                yield return null;
+            }
             
-            string found = SearchDirectory(searchPath, 4); // Max depth 4
+            string found = work.IsFaulted ? null : work.Result;
             if (!string.IsNullOrEmpty(found))
             {
+                workingHeadline = null;
                 foundPath = found;
                 isValidPath = true;
                 inputPath = found;
-                if (lastFoundPathUsedGogExtract)
-                {
-                    statusMessage = lastGogExtractPerformedFresh
-                        ? StatusMessageTwoLines("Extracted game data to:", found)
-                        : StatusMessageTwoLines("Using extracted game data at:", found);
-                }
-                else
-                {
-                    statusMessage = StatusMessageTwoLines("Found game data:", found);
-                }
+                validatedInput = found;
+                string headline = !lastFoundPathUsedGogExtract ? "Found game data"
+                    : lastGogExtractPerformedFresh ? "Extracted game data to" : "Using extracted game data at";
                 isSearching = false;
                 
                 // Automatically proceed when valid path is found (after delay)
-                StartCoroutine(DelayedContinue(found));
+                StartCoroutine(DelayedContinue(found, headline));
                 yield break;
             }
         }
         
+        workingHeadline = null;
         isSearching = false;
         if (!string.IsNullOrEmpty(lastGogExtractError))
         {
@@ -703,13 +786,13 @@ public class GameDirectoryDialog : MonoBehaviour
     /// <summary>
     /// Extracts a GOG file (ISO9660) to LooseData under Application.persistentDataPath.
     /// Returns the path to the extracted game root if successful, null otherwise.
-    /// On failure, sets <see cref="lastGogExtractError"/> for UI.
+    /// On failure, sets <see cref="lastGogExtractError"/> for UI. Runs on a worker thread: no Unity API.
     /// </summary>
     private string ExtractGogFile(string gogFilePath)
     {
         lastGogExtractError = "";
         lastGogExtractPerformedFresh = false;
-        string looseDataPath = Path.Combine(Application.persistentDataPath, "LooseData");
+        string looseDataPath = Path.Combine(persistentDataPath, "LooseData");
         try
         {
             // Check if already extracted and valid.
@@ -720,7 +803,12 @@ public class GameDirectoryDialog : MonoBehaviour
             // for those, so the whole ISO was re-extracted on every pass through this dialog.
             // Besides being slow, that failed outright whenever another copy of the game was
             // running and holding the data files open.
-            string alreadyExtracted = GameDataPath.ValidateGameDirectory(looseDataPath);
+            //
+            // A copy cut short - the game closed half way through - would pass that check as soon as UW01.XMI is
+            // written, so a marker file stands in LooseData from the start of an extraction to its verified end, and
+            // while it is there the copy is not trusted and is made again.
+            string marker = Path.Combine(looseDataPath, ExtractingMarker);
+            string alreadyExtracted = File.Exists(marker) ? null : GameDataPath.ValidateGameDirectory(looseDataPath);
             if (alreadyExtracted != null)
             {
                 UnityEngine.Debug.Log($"Using existing extracted data at: {alreadyExtracted}");
@@ -734,6 +822,8 @@ public class GameDirectoryDialog : MonoBehaviour
             }
             
             UnityEngine.Debug.Log($"Extracting GOG file {gogFilePath} to {looseDataPath}...");
+            workingHeadline = "Extracting game.gog";
+            File.WriteAllText(marker, "game.gog is being extracted here; while this file exists the copy is not complete.");
             using (FileStream isoStream = File.OpenRead(gogFilePath))
             {
                 // Try joliet: false first (standard ISO9660)
@@ -792,6 +882,7 @@ public class GameDirectoryDialog : MonoBehaviour
                 return null;
             }
             
+            File.Delete(marker);
             UnityEngine.Debug.Log($"Successfully extracted GOG file to: {extractedPath}");
             return extractedPath;
         }
@@ -799,7 +890,7 @@ public class GameDirectoryDialog : MonoBehaviour
         {
             lastGogExtractError = StatusMessageTwoLines(
                 $"Cannot write extracted game data (access denied): {ex.Message}",
-                Application.persistentDataPath);
+                persistentDataPath);
             UnityEngine.Debug.LogError($"Failed to extract GOG file {gogFilePath}: {ex.Message}");
             return null;
         }
@@ -827,9 +918,18 @@ public class GameDirectoryDialog : MonoBehaviour
         return headline + "\n" + secondLine;
     }
     
-    private IEnumerator DelayedContinue(string path)
+    /// <summary>
+    /// Saves the path and moves on to the title after autoContinueDelay, the headline's dots counting meanwhile so
+    /// the window is not taken for stuck.
+    /// </summary>
+    private IEnumerator DelayedContinue(string path, string headline)
     {
-        yield return new WaitForSeconds(autoContinueDelay);
+        float end = Time.time + autoContinueDelay;
+        while (Time.time < end)
+        {
+            statusMessage = StatusMessageTwoLines(WithDots(headline), path);
+            yield return null;
+        }
         GameDataPath.SetGameRootPath(path);
         SceneManager.LoadScene("Logos");
     }
