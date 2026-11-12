@@ -27,8 +27,6 @@ public class GameDirectoryDialog : MonoBehaviour
     /// count 1, 2, 3, so the window is seen to be working: unpacking game.gog takes a while on a slow disk.
     /// </summary>
     private volatile string workingHeadline;
-    /// <summary>The path in the field when it last validated: Validate Path is not offered again for it.</summary>
-    private string validatedInput;
     private volatile string workingDetail;
     /// <summary>Application.persistentDataPath, read on the main thread for the extraction on the worker.</summary>
     private string persistentDataPath;
@@ -143,7 +141,7 @@ public class GameDirectoryDialog : MonoBehaviour
         {
             // Verify SOUND/UW01.XMI exists
             string soundFile = Path.Combine(savedPath, "Sound", "UW01.XMI");
-            if (File.Exists(soundFile))
+            if (File.Exists(soundFile) && !IsCutShortCopy(savedPath))
             {
                 // Path is valid, skip to Logos
                 UnityEngine.Debug.Log($"Game directory already set: {savedPath}");
@@ -152,13 +150,40 @@ public class GameDirectoryDialog : MonoBehaviour
             }
             else
             {
-                // Path exists but file is missing, clear it
+                // Path exists but the game's files are missing, or were unpacked only in part: clear it
                 GameDataPath.SetGameRootPath(null);
-                statusMessage = "Previously saved directory is no longer valid. Please select a new directory.";
+                statusMessage = File.Exists(soundFile)
+                    ? "The game data unpacked from game.gog is incomplete. Please validate the game's folder again."
+                    : "Previously saved directory is no longer valid. Please select a new directory.";
             }
         }
     }
       
+    /// <summary>
+    /// True when the path lies in LooseData and an extraction of game.gog there was cut short (its marker is still
+    /// there). The saved path outlives the folder - GetGameRootPath() returns null for a missing folder but keeps the
+    /// key - so after LooseData is deleted and a new extraction is stopped half way, the old path would point at a copy
+    /// with UW01.XMI and files missing. No Unity API: FindGameData() calls it on the worker.
+    /// </summary>
+    private bool IsCutShortCopy(string path)
+    {
+        string looseDataPath = Path.Combine(persistentDataPath, "LooseData");
+        if (!File.Exists(Path.Combine(looseDataPath, ExtractingMarker)))
+        {
+            return false;
+        }
+        try
+        {
+            string folder = Path.GetFullPath(path).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            string loose = Path.GetFullPath(looseDataPath).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            return folder.StartsWith(loose, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+    }
+    
     private void Update()
     {
         // Handle controller navigation
@@ -171,13 +196,12 @@ public class GameDirectoryDialog : MonoBehaviour
                 {
                 case ESelectedControl.TextField:
                 case ESelectedControl.Browse:
-                    return true; // Always enabled
                 case ESelectedControl.AutoSearch:
-                    return CanAutoSearch();
+                    return IsIdle();
                 case ESelectedControl.ValidatePath:
                     return CanValidate();
                 case ESelectedControl.ContinueQuit:
-                    return CanQuit();
+                    return IsIdle();
                 default:
                     return true;
                 }
@@ -277,10 +301,13 @@ public class GameDirectoryDialog : MonoBehaviour
                 switch (selectedControl)
                 {
                 case ESelectedControl.Browse:
-                    BrowseForFolder();
+                    if (IsIdle())
+                    {
+                        BrowseForFolder();
+                    }
                     break;
                 case ESelectedControl.AutoSearch:
-                    if (CanAutoSearch())
+                    if (IsIdle())
                     {
                         StartCoroutine(AutoSearch());
                     }
@@ -292,7 +319,7 @@ public class GameDirectoryDialog : MonoBehaviour
                     }
                     break;
                 case ESelectedControl.ContinueQuit:
-                    if (CanQuit())
+                    if (IsIdle())
                     {
                         Application.Quit();
                     }
@@ -336,6 +363,10 @@ public class GameDirectoryDialog : MonoBehaviour
         float browseButtonWidth = 120;
         float inputFieldWidth = dialogWidth - 120; // Leave space for padding (60px padding on each side)
         
+        // The field and Browse are greyed on the same terms as the buttons below: a path given while the game is busy,
+        // or about to load, would be ignored, or validated while the first one loads
+        GUI.enabled = IsIdle();
+        
         // Text field with outline box - highlight if selected
         Rect textFieldRect = new Rect(dialogX + 60, inputSectionY, inputFieldWidth, 60);
         bool textFieldSelected = selectedControl == ESelectedControl.TextField;
@@ -358,6 +389,7 @@ public class GameDirectoryDialog : MonoBehaviour
         {
             BrowseForFolder();
         }
+        GUI.enabled = true;
         
         // Status message - positioned between input and buttons (two lines + wrap; keep clear of button row)
         float statusY = inputSectionY + 110;
@@ -388,7 +420,7 @@ public class GameDirectoryDialog : MonoBehaviour
         float buttonStartX = dialogX + 60;
         
         // Auto Search button
-        GUI.enabled = CanAutoSearch();
+        GUI.enabled = IsIdle();
         Rect autoSearchRect = new Rect(buttonStartX, buttonsY, buttonWidth, 80);
         bool autoSearchSelected = selectedControl == ESelectedControl.AutoSearch;
         DrawButtonWithBox(autoSearchRect, "Auto Search", autoSearchSelected);
@@ -411,7 +443,7 @@ public class GameDirectoryDialog : MonoBehaviour
         GUI.enabled = true;
         
         // Quit button: a valid path moves on by itself (DelayedContinue), so there is no Continue to press
-        GUI.enabled = CanQuit();
+        GUI.enabled = IsIdle();
         Rect continueRect = new Rect(buttonStartX + (buttonWidth + buttonSpacing) * 2, buttonsY, buttonWidth, 80);
         bool continueSelected = selectedControl == ESelectedControl.ContinueQuit;
         string continueButtonText = "Quit";
@@ -468,6 +500,10 @@ public class GameDirectoryDialog : MonoBehaviour
     /// </summary>
     private void BrowseForFolder()
     {
+        if (!IsIdle())
+        {
+            return;
+        }
         if (!NativeFileDialog.IsAvailable)
         {
             statusMessage = "Type the path of the game's folder above.";
@@ -492,32 +528,25 @@ public class GameDirectoryDialog : MonoBehaviour
     }
     
     /// <summary>
-    /// Validate Path is offered when the field holds a path, nothing is being validated or searched, and the path is
-    /// not the one that has just validated. After a failure it is offered again, with Auto Search and Quit.
+    /// Nothing is being validated, searched or unpacked, and no path has validated: the field, Browse, Auto Search and
+    /// Quit are offered only then. Quitting half way through game.gog would leave a copy cut short, and once a path has
+    /// validated the game moves on by itself (isValidPath is set only where DelayedContinue() starts). After a failure
+    /// everything is offered again.
     /// </summary>
+    private bool IsIdle()
+    {
+        return !isSearching && !isValidPath;
+    }
+    
+    /// <summary>Validate Path: when the window is idle and the field holds a path.</summary>
     private bool CanValidate()
     {
-        return !string.IsNullOrEmpty(inputPath) && !isSearching && !(isValidPath && inputPath == validatedInput);
-    }
-    
-    /// <summary>
-    /// Quit is offered when nothing is being validated, searched or unpacked - quitting half way through game.gog
-    /// would leave a copy cut short - and not once a path has validated, when the game is about to move on.
-    /// </summary>
-    private bool CanQuit()
-    {
-        return !isSearching && !isValidPath;
-    }
-    
-    /// <summary>Auto Search is offered on the same terms as Quit: not while working, nor once the game is about to load.</summary>
-    private bool CanAutoSearch()
-    {
-        return !isSearching && !isValidPath;
+        return IsIdle() && !string.IsNullOrEmpty(inputPath);
     }
     
     private void ValidateInputPath()
     {
-        if (isSearching || (isValidPath && inputPath == validatedInput))
+        if (!IsIdle())
         {
             return;
         }
@@ -561,7 +590,6 @@ public class GameDirectoryDialog : MonoBehaviour
         {
             foundPath = validatedPath;
             isValidPath = true;
-            validatedInput = path;
             string headline = !lastFoundPathUsedGogExtract ? "Valid game directory found"
                 : lastGogExtractPerformedFresh ? "Extracted game data to" : "Using extracted game data at";
             
@@ -603,8 +631,12 @@ public class GameDirectoryDialog : MonoBehaviour
     /// </summary>
     private string FindGameData(string path)
     {
-        // First try standard validation (loose files)
+        // First try standard validation (loose files), unless they are an extraction of game.gog cut short
         string validatedPath = GameDataPath.ValidateGameDirectory(path);
+        if (validatedPath != null && IsCutShortCopy(validatedPath))
+        {
+            validatedPath = null;
+        }
         
         // If not found and input is a directory, check for game.gog file
         if (validatedPath == null && Directory.Exists(path))
@@ -677,7 +709,6 @@ public class GameDirectoryDialog : MonoBehaviour
                 foundPath = found;
                 isValidPath = true;
                 inputPath = found;
-                validatedInput = found;
                 string headline = !lastFoundPathUsedGogExtract ? "Found game data"
                     : lastGogExtractPerformedFresh ? "Extracted game data to" : "Using extracted game data at";
                 isSearching = false;
