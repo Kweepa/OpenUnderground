@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The Steam copy of the original game is accepted: its `game.bin` is unpacked like the GoG copy's `game.gog`. On Windows a GoG or Steam copy is found by itself the first time the game starts, wherever it was installed; Auto Search looks further, in every Steam library also under Proton, and in `C:\UW` and `C:\DOSBox` for the DOS game.
+
 - The game folder dialog shows Validating... or Searching... while it works, no longer freezes while it unpacks game.gog, and unpacks it again if that was cut short.
 
 - Your own mp3 and ogg music tracks no longer freeze the game for a moment when one starts: a long track used to stop it for about a second.
