@@ -64,13 +64,19 @@ public sealed class GameOption
     /// <summary>The names of a Choice row, kept as their place in this list; null for the soundfont and the screen's rows.</summary>
     public readonly string[] Choices;
     public readonly EOptionStore Store;
+    /// <summary>A web page the detail panel offers under the description, opened with a click; null for none.</summary>
+    public readonly string Link;
+    /// <summary>What the detail panel writes for <see cref="Link"/>.</summary>
+    public readonly string LinkText;
     private readonly Func<float, string> format;
 
     public GameOption(EOptionSection section, string key, string label, string description, EOptionKind kind,
         float defaultValue, float min = 0f, float max = 1f, float step = 1f, bool storedAsFloat = false,
         Func<float, string> format = null, string original = null, float originalValue = float.NaN, string[] choices = null,
-        EOptionStore store = EOptionStore.Prefs)
+        EOptionStore store = EOptionStore.Prefs, string link = null, string linkText = null)
     {
+        Link = link;
+        LinkText = linkText ?? link;
         Section = section;
         Key = key;
         Label = label;
@@ -119,6 +125,10 @@ public static class GameOptions
     public const string SoundFontKey = "Options_SoundFont";
     public const string DefaultSoundFont = "Soundfonts/MT32.sf2";
     public const string MusicVolumeKey = "Options_MusicVolume";
+    /// <summary>The last entry of the soundfont's list: the music sent to a MIDI device (MusicPlayerExternalMidi.cs).</summary>
+    public const string ExternalMidiName = "MT-32 EXT MIDI";
+    // How long the player has to say the music is heard on the MIDI device before it goes back to the soundfont.
+    private const float ExternalMidiConfirmSeconds = 15f;
     /// <summary>The key of the Music tracks row, which opens the music page instead of holding a value.</summary>
     public const string MusicPageKey = "page:music";
     public const float DefaultMusicVolume = 0.5f;
@@ -165,8 +175,9 @@ public static class GameOptions
             "Adjusts the volume of the sound effects.",
             EOptionKind.Slider, PlayerInput.DefaultEffectsVolume, 0f, 1f, 0.05f, storedAsFloat: true, format: Percent),
         new(EOptionSection.Audio, SoundFontKey, "Soundfont",
-            "Chooses the soundfont the music is played with. Different soundfonts emulate classic sound cards such as the MT-32.",
-            EOptionKind.Choice, 0f),
+            "Chooses the soundfont the music is played with. Different soundfonts emulate classic sound cards such as the MT-32.\n"
+            + "<b>" + ExternalMidiName + ":</b> the music goes to a MIDI device instead, such as the Munt MT-32 emulator with its ROMs, which plays it as the original did on a Roland MT-32. Without one, there is no music.",
+            EOptionKind.Choice, 0f, link: "https://sourceforge.net/projects/munt/", linkText: "Munt, the MT-32 emulator: sourceforge.net/projects/munt"),
         new(EOptionSection.Audio, MusicPageKey, "Music tracks...",
             "Which tracks play in each situation of the game - exploring, a fight, the map, a conversation - with your own music files added from disk, listened to, switched off or removed, and the soundfont the original's music is played through.",
             EOptionKind.Page, 0f),
@@ -247,30 +258,71 @@ public static class GameOptions
         return rows;
     }
 
-    /// <summary>The soundfonts on disk, found again; called when the menu opens.</summary>
+    /// <summary>
+    /// The soundfonts on disk, found again; called when the menu opens. A MIDI device chosen and not
+    /// found before is looked for again here, quietly.
+    /// </summary>
     public static void ScanSoundFonts()
     {
+        MusicPlayer music = MusicPlayer.Instance;
+        if (MusicPlayer.ExternalMidiChosen && music != null && music.ExternalMidiPort == null)
+        {
+            music.StartExternalMidi(out _);
+        }
         try
         {
             string folder = Path.Combine(Application.streamingAssetsPath, "Soundfonts");
             if (!Directory.Exists(folder))
             {
-                soundFonts = new[] { CurrentSoundFont };
+                soundFonts = new[] { CurrentSoundFont, ExternalMidiName };
                 return;
             }
-            string[] files = Directory.GetFiles(folder, "*.sf2", SearchOption.TopDirectoryOnly);
-            soundFonts = new string[files.Length];
-            for (int i = 0; i < files.Length; i++)
-            {
-                soundFonts[i] = "Soundfonts/" + Path.GetFileName(files[i]);
-            }
-            Array.Sort(soundFonts, StringComparer.OrdinalIgnoreCase);
+            soundFonts = MusicOutputs(Directory.GetFiles(folder, "*.sf2", SearchOption.TopDirectoryOnly));
         }
         catch (Exception e)
         {
             Debug.LogError($"Error scanning soundfonts: {e.Message}");
-            soundFonts = new[] { CurrentSoundFont };
+            soundFonts = new[] { CurrentSoundFont, ExternalMidiName };
         }
+    }
+
+    // The order of the list, the user's of 15 November 2026: the MT-32 soundfont, the MIDI device that
+    // plays the MT-32 itself, then the other two cards; any other soundfont after them, by name.
+    private static readonly string[] MusicOutputOrder = { "MT32.sf2", ExternalMidiName, "OPL2.sf2", "GUS.sf2" };
+
+    /// <summary>
+    /// The soundfonts found, named the way the options store them ("Soundfonts/x.sf2"), in the list's
+    /// order and with <see cref="ExternalMidiName"/> among them: what the Soundfont row and the music
+    /// page's list step through.
+    /// </summary>
+    public static string[] MusicOutputs(string[] files)
+    {
+        List<string> names = new List<string>();
+        foreach (string f in files)
+        {
+            names.Add(Path.GetFileName(f));
+        }
+        names.Add(ExternalMidiName);
+        names.Sort((a, b) =>
+        {
+            int ia = Array.FindIndex(MusicOutputOrder, n => string.Equals(n, a, StringComparison.OrdinalIgnoreCase));
+            int ib = Array.FindIndex(MusicOutputOrder, n => string.Equals(n, b, StringComparison.OrdinalIgnoreCase));
+            if (ia < 0)
+            {
+                ia = MusicOutputOrder.Length;
+            }
+            if (ib < 0)
+            {
+                ib = MusicOutputOrder.Length;
+            }
+            return ia != ib ? ia.CompareTo(ib) : string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+        });
+        string[] list = new string[names.Count];
+        for (int i = 0; i < names.Count; i++)
+        {
+            list[i] = names[i] == ExternalMidiName ? ExternalMidiName : "Soundfonts/" + names[i];
+        }
+        return list;
     }
 
     public static string CurrentSoundFont => PlayerPrefs.GetString(SoundFontKey, DefaultSoundFont);
@@ -301,7 +353,9 @@ public static class GameOptions
             case EOptionKind.Choice when o.Choices != null:
                 return Mathf.Clamp(PlayerPrefs.GetInt(o.Key, Mathf.RoundToInt(o.Default)), 0, o.Choices.Length - 1);
             case EOptionKind.Choice:
-                return Mathf.Max(0, SoundFontIndex(CurrentSoundFont));
+                return MusicPlayer.ExternalMidiChosen
+                    ? Mathf.Max(0, Array.IndexOf(soundFonts, ExternalMidiName))
+                    : Mathf.Max(0, SoundFontIndex(CurrentSoundFont));
             default:
                 return o.StoredAsFloat ? PlayerPrefs.GetFloat(o.Key, o.Default) : PlayerPrefs.GetInt(o.Key, Mathf.RoundToInt(o.Default));
         }
@@ -322,7 +376,7 @@ public static class GameOptions
         {
             return o.Choices[Mathf.RoundToInt(Get(o))];
         }
-        return IsSoundFont(o) ? Path.GetFileNameWithoutExtension(CurrentSoundFont) : o.Format(Get(o));
+        return IsSoundFont(o) ? CurrentMusicOutputName : o.Format(Get(o));
     }
 
     public static string DefaultText(GameOption o)
@@ -353,7 +407,7 @@ public static class GameOptions
             return true;
         }
         return IsSoundFont(o)
-            ? SoundFontIndex(CurrentSoundFont) == SoundFontIndex(DefaultSoundFont)
+            ? !MusicPlayer.ExternalMidiChosen && SoundFontIndex(CurrentSoundFont) == SoundFontIndex(DefaultSoundFont)
             : Mathf.Abs(Get(o) - o.Default) < 0.001f;
     }
 
@@ -379,8 +433,16 @@ public static class GameOptions
             case EOptionKind.Choice:
                 if (soundFonts.Length > 0)
                 {
+                    // the soundfonts and, among them, the MIDI device
                     int i = ((Mathf.RoundToInt(value) % soundFonts.Length) + soundFonts.Length) % soundFonts.Length;
-                    SetSoundFont(soundFonts[i]);
+                    if (soundFonts[i] == ExternalMidiName)
+                    {
+                        ChooseExternalMidi();
+                    }
+                    else
+                    {
+                        SetSoundFont(soundFonts[i]);
+                    }
                 }
                 return;
             default:
@@ -450,7 +512,108 @@ public static class GameOptions
     private static void SetSoundFont(string name)
     {
         PlayerPrefs.SetString(SoundFontKey, name);
+        PlayerPrefs.SetInt(MusicPlayer.ExternalMidiKey, 0);
         soundFontAppliesAt = Time.unscaledTime + SoundFontSettleSeconds;
+    }
+
+    /// <summary>A soundfont chosen elsewhere, the music page's list: put into effect as the row would.</summary>
+    public static void ChooseSoundFont(string name)
+    {
+        SetSoundFont(name);
+    }
+
+    /// <summary>
+    /// The MIDI device chosen, looked for once the list is still. Without one the music is silent (the
+    /// user's rule, 15 November 2026); the MT-32 soundfont is kept behind it only for a way back.
+    /// </summary>
+    /// <param name="ask">
+    /// False from the music page, where the player is already listening and steps from one soundfont to
+    /// the next: no question there (the user's rule, 15 November 2026).
+    /// </param>
+    public static void ChooseExternalMidi(bool ask = true)
+    {
+        PlayerPrefs.SetString(SoundFontKey, DefaultSoundFont);
+        PlayerPrefs.SetInt(MusicPlayer.ExternalMidiKey, 1);
+        soundFontAppliesAt = Time.unscaledTime + SoundFontSettleSeconds;
+        askWhenApplied = ask;
+    }
+
+    // Whether putting the MIDI device into effect asks its question; reset after each time.
+    private static bool askWhenApplied = true;
+
+    /// <summary>What the soundfont row shows: the soundfont's name, or the MIDI device.</summary>
+    public static string CurrentMusicOutputName =>
+        MusicPlayer.ExternalMidiChosen ? ExternalMidiName : Path.GetFileNameWithoutExtension(CurrentSoundFont);
+
+    /// <summary>A question for the player, asked by the menu in its Yes/No box: No lit, and with a countdown that answers No.</summary>
+    public sealed class Question
+    {
+        public string Text;
+        public Action OnYes;
+        public Action OnNo;
+        public float Seconds;
+    }
+
+    private static Question pendingQuestion;
+
+    /// <summary>The question waiting to be asked, taken by the menu that asks it.</summary>
+    public static Question TakeQuestion()
+    {
+        Question q = pendingQuestion;
+        pendingQuestion = null;
+        return q;
+    }
+
+    /// <summary>
+    /// The music to the soundfont or the MIDI device, as chosen. When the device is new to this
+    /// choice, the player is asked: with none found, whether to keep the choice; with one, whether
+    /// the music is heard, since a device that plays nothing - Munt without its ROMs - answers like
+    /// any other. Quietly, when the menu is closing and nothing could be asked.
+    /// </summary>
+    private static void ApplyMusicOutput(bool ask)
+    {
+        MusicPlayer music = MusicPlayer.Instance;
+        if (music == null)
+        {
+            return;
+        }
+        float volume = PlayerPrefs.GetFloat(MusicVolumeKey, DefaultMusicVolume);
+        if (!MusicPlayer.ExternalMidiChosen)
+        {
+            music.StopExternalMidi();
+            music.ReloadSynthesizerWithSoundFont(CurrentSoundFont, volume);
+            return;
+        }
+
+        music.ReloadSynthesizerWithSoundFont(CurrentSoundFont, volume);
+        bool wasPlaying = music.ExternalMidiPort != null;
+        if (music.StartExternalMidi(out string port))
+        {
+            if (ask && !wasPlaying)
+            {
+                pendingQuestion = new Question
+                {
+                    Text = $"The music now plays on {port}. Do you hear it?",
+                    OnNo = BackToSoundFont,
+                    Seconds = ExternalMidiConfirmSeconds,
+                };
+            }
+        }
+        else if (ask)
+        {
+            pendingQuestion = new Question
+            {
+                Text = "No MIDI device found. Keep " + ExternalMidiName + "? There is no music until one is found.",
+                OnNo = BackToSoundFont,
+            };
+        }
+    }
+
+    private static void BackToSoundFont()
+    {
+        SetSoundFont(DefaultSoundFont);
+        soundFontAppliesAt = -1f;
+        ApplyMusicOutput(false);
     }
 
     /// <summary>A number written back exactly as it was kept, not snapped to the row's steps, and put into effect.</summary>
@@ -515,8 +678,11 @@ public static class GameOptions
         ScreenOptions.Tick();
         if (soundFontAppliesAt >= 0f && Time.unscaledTime >= soundFontAppliesAt)
         {
+            // set to 0 by Save(), when the menu is closing and cannot ask
+            bool ask = soundFontAppliesAt > 0f && askWhenApplied;
             soundFontAppliesAt = -1f;
-            MusicPlayer.Instance?.ReloadSynthesizerWithSoundFont(CurrentSoundFont, PlayerPrefs.GetFloat(MusicVolumeKey, DefaultMusicVolume));
+            askWhenApplied = true;
+            ApplyMusicOutput(ask);
         }
     }
 
@@ -601,6 +767,7 @@ public static class GameOptions
     {
         private readonly Dictionary<GameOption, float> numbers = new Dictionary<GameOption, float>();
         private readonly string soundFont;
+        private readonly bool externalMidi;
         private readonly GameBindings.Snapshot bindings = new GameBindings.Snapshot();
         private readonly ScreenOptions.Saved screen = ScreenOptions.Capture();
 
@@ -614,6 +781,7 @@ public static class GameOptions
                 }
             }
             soundFont = CurrentSoundFont;
+            externalMidi = MusicPlayer.ExternalMidiChosen;
         }
 
         public bool Differs()
@@ -625,7 +793,8 @@ public static class GameOptions
                     return true;
                 }
             }
-            return CurrentSoundFont != soundFont || bindings.Differs() || !screen.Equals(ScreenOptions.Capture());
+            return CurrentSoundFont != soundFont || MusicPlayer.ExternalMidiChosen != externalMidi || bindings.Differs()
+                || !screen.Equals(ScreenOptions.Capture());
         }
 
         public void Restore()
@@ -639,7 +808,11 @@ public static class GameOptions
                     Put(kv.Key, kv.Value);
                 }
             }
-            if (CurrentSoundFont != soundFont)
+            if (externalMidi && !MusicPlayer.ExternalMidiChosen)
+            {
+                ChooseExternalMidi();
+            }
+            else if (CurrentSoundFont != soundFont || (!externalMidi && MusicPlayer.ExternalMidiChosen))
             {
                 SetSoundFont(soundFont);
             }
@@ -666,6 +839,7 @@ public static class GameOptions
             if (IsSoundFont(o))
             {
                 PlayerPrefs.SetString(o.Key, CurrentSoundFont);
+                PlayerPrefs.SetInt(MusicPlayer.ExternalMidiKey, MusicPlayer.ExternalMidiChosen ? 1 : 0);
             }
             else if (o.StoredAsFloat)
             {
