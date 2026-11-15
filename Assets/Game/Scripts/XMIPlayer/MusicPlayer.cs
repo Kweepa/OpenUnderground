@@ -79,6 +79,9 @@ public class MusicPlayer : MonoBehaviour
 
     // Velocity remap: MeltySynth uses (v/127)^2 gain; LUT can pre-lift soft notes
     private readonly byte[] velocityRemap = new byte[128];
+    // True while the soundfont is MT32.sf2, which needs MT32Velocity() for some programs.
+    // Set on the main thread, read on the audio thread.
+    private volatile bool mt32SoundFont;
     private float lastBuiltVelocityCurveAmount = float.NaN;
 
     // Voice / drop stats for debug HUD (written on audio thread, read on main)
@@ -222,6 +225,8 @@ public class MusicPlayer : MonoBehaviour
             Debug.LogWarning("Make sure the file is in 'Assets/StreamingAssets/' and the filename is correct.");
             return;
         }
+
+        mt32SoundFont = Path.GetFileName(soundFontFileName).Equals("MT32.sf2", StringComparison.OrdinalIgnoreCase);
 
         // 3. Load MeltySynth with performance-optimized settings
         var settings = new MeltySynth.SynthesizerSettings((int)xmiSampleRate);
@@ -636,6 +641,14 @@ public class MusicPlayer : MonoBehaviour
         }
 
         int remappedVelocity = velocityRemap[Mathf.Clamp(velocity, 0, 127)];
+        if (mt32SoundFont && channel != 9)
+        {
+            int mt32Velocity = MT32Velocity(programs[channel], velocity);
+            if (mt32Velocity > 0)
+            {
+                remappedVelocity = mt32Velocity;
+            }
+        }
         synthesizer.NoteOn(channel, note, remappedVelocity);
         heldNotes[channel, note] = remappedVelocity;
 
@@ -643,6 +656,34 @@ public class MusicPlayer : MonoBehaviour
         if (active > peakActiveVoices)
         {
             peakActiveVoices = active;
+        }
+    }
+
+    /// <summary>
+    /// The velocity to play a program at with MT32.sf2, or -1 for the usual remap.
+    /// </summary>
+    /// <remarks>
+    /// The soundfont gives every program the same answer to velocity, but on an MT-32 each timbre
+    /// has its own, and the original sends velocities unchanged. Both curves were measured against
+    /// a recording of the original on an MT-32.
+    /// SoundTrack (program 36) barely answers to velocity. The map's track opens on a SoundTrack pad
+    /// at velocity 14, which an MT-32 plays 6 dB under the melody that follows and the usual remap
+    /// 17 dB under, so the first two seconds sounded silent; 85 + 0.3 x velocity puts it 6 dB under.
+    /// The Timpani (program 112) is louder than the usual remap makes it but still soft at low
+    /// velocity: the Wanderer's strokes at velocity 48 stand out of the music by 3-4 dB on an MT-32
+    /// and by 0-1 dB with the usual remap, and its stroke at 14 is not heard. 30 + 1.5 x velocity
+    /// matches both.
+    /// </remarks>
+    private static int MT32Velocity(int program, int velocity)
+    {
+        switch (program)
+        {
+            case 36:
+                return Mathf.Clamp(Mathf.RoundToInt(85f + 0.3f * velocity), 1, 127);
+            case 112:
+                return Mathf.Clamp(Mathf.RoundToInt(30f + 1.5f * velocity), 1, 127);
+            default:
+                return -1;
         }
     }
 
