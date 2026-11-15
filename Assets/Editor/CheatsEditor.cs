@@ -8,9 +8,10 @@ using UnityEngine;
 /// <summary>
 /// The Cheats component, drawn in the order Cheats declares its fields, with a few rows that hold
 /// more than one: the level with a +, a - and a Go button; the tile to teleport to as two boxes
-/// and a Go button; the object, the stack and the creature to spawn, each a list to search with a
-/// Spawn button beside it, and the creature's distance and attitude on the row below; and the
-/// skill to set beside its value. Whatever is set here is kept for the next run.
+/// and a Go button; the object, the stack (any object the game stacks) and the creature to spawn,
+/// each a list to search with a Spawn button beside it, and the creature's distance and attitude
+/// on the row below; and the skill to set beside its value. Whatever is set here is kept for the
+/// next run.
 /// </summary>
 [CustomEditor(typeof(Cheats))]
 public class CheatsEditor : Editor
@@ -22,11 +23,13 @@ public class CheatsEditor : Editor
     // Drawn on the row of another field.
     private static readonly HashSet<string> drawnInRow = new HashSet<string> { "critterDistance", "critterHostile", "skillValue" };
 
-    // The stacks worth spawning in a pile: the ammunition and the money.
+    // The stacks offered before the game's data is loaded: the ammunition and the money. Once it is,
+    // every object the game stacks (MakeStackList).
     private static readonly EObjectType[] stackKinds =
     {
         EObjectType.SlingStone, EObjectType.Arrow, EObjectType.CrossbowBolt, EObjectType.Coin, EObjectType.GoldCoin,
     };
+    private static bool stackTypesFromData;
 
     // What each list offers, in alphabetical order.
     private static EObjectType[] objectTypes;
@@ -39,6 +42,7 @@ public class CheatsEditor : Editor
     {
         serializedObject.Update();
         MakeLists();
+        MakeStackList();
 
         Cheats cheats = (Cheats)target;
         FieldInfo[] kept = Cheats.KeptFields();
@@ -324,6 +328,34 @@ public class CheatsEditor : Editor
         objectTypes = SortedByName(objects.ToArray());
         stackTypes = SortedByName((EObjectType[])stackKinds.Clone());
         critterTypes = SortedByName(critters.ToArray());
+    }
+
+    /// <summary>
+    /// Every type the game stacks - portable, with COMOBJ's no-stack bit clear, as UUObject.stackable
+    /// reads it - the iron spikes, the food, the gems, the runestones among them. Read from the
+    /// game's data, so made once it is loaded; until then the list is the ammunition and the money.
+    /// </summary>
+    private static void MakeStackList()
+    {
+        ComObjProps[] props = DataLoader.sDataLoader != null ? DataLoader.sDataLoader.comObjProps : null;
+        if (stackTypesFromData || props == null)
+        {
+            return;
+        }
+
+        List<EObjectType> stacks = new List<EObjectType>();
+        foreach (EObjectType type in Enum.GetValues(typeof(EObjectType)))
+        {
+            int i = (int)type;
+            if (i >= 0 && i < props.Length && props[i] != null && props[i].isPortable && props[i].stackable
+                && !stacks.Contains(type))
+            {
+                stacks.Add(type);
+            }
+        }
+
+        stackTypes = SortedByName(stacks.ToArray());
+        stackTypesFromData = true;
     }
 
     private static EObjectType[] SortedByName(EObjectType[] types)
