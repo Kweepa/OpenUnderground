@@ -202,9 +202,21 @@ public class XMISequencer
         // Clear all pending note-offs
         pendingNoteOffs.Clear();
         
-        // Send All Notes Off and All Sound Off commands to all MIDI channels
+        // Release every note on all MIDI channels - sustain off, then All Notes Off - and let them ring
+        // out with their release and reverb, as the original's driver does; no All Sound Off
         for (int channel = 0; channel < 16; channel++)
         {
+            // Sustain off (CC 64)
+            MusicCommand cmdSustainOff;
+            cmdSustainOff.Type = MusicCommandType.ControllerChange;
+            cmdSustainOff.Channel = channel;
+            cmdSustainOff.Controller = 64;
+            cmdSustainOff.Value = 0;
+            cmdSustainOff.Note = 0;
+            cmdSustainOff.Program = 0;
+            cmdSustainOff.Velocity = 0;
+            commandQueue.Enqueue(cmdSustainOff);
+
             // All Notes Off (CC 123)
             MusicCommand cmdNotesOff;
             cmdNotesOff.Type = MusicCommandType.ControllerChange;
@@ -215,17 +227,6 @@ public class XMISequencer
             cmdNotesOff.Program = 0;
             cmdNotesOff.Velocity = 0;
             commandQueue.Enqueue(cmdNotesOff);
-            
-            // All Sound Off (CC 120)
-            MusicCommand cmdSoundOff;
-            cmdSoundOff.Type = MusicCommandType.ControllerChange;
-            cmdSoundOff.Channel = channel;
-            cmdSoundOff.Controller = 120;
-            cmdSoundOff.Value = 0;
-            cmdSoundOff.Note = 0;
-            cmdSoundOff.Program = 0;
-            cmdSoundOff.Velocity = 0;
-            commandQueue.Enqueue(cmdSoundOff);
         }
         
         // Read the first delta-time again to schedule the first event
