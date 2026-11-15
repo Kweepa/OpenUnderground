@@ -227,6 +227,9 @@ public sealed class GameMenu
     private string hostQuestion;
     private Action hostYes;
     private bool hostWarning;
+    private Action hostNo;
+    // When a question with a countdown answers No by itself (unscaled time), 0 for none.
+    private float confirmUntil;
 
     private float selectHeld;
     private bool selectFired;
@@ -379,9 +382,20 @@ public sealed class GameMenu
     /// <param name="warning">Written in red: what a yes does cannot be undone.</param>
     public void Ask(string question, Action onYes, bool warning = false)
     {
+        Ask(question, onYes, null, 0f, warning);
+    }
+
+    /// <summary>
+    /// The same, with an action on a no too, and a countdown: after <paramref name="seconds"/> with no
+    /// answer the box answers No by itself (0: it waits).
+    /// </summary>
+    public void Ask(string question, Action onYes, Action onNo, float seconds, bool warning = false)
+    {
         hostQuestion = question;
         hostYes = onYes;
         hostWarning = warning;
+        hostNo = onNo;
+        confirmUntil = seconds > 0f ? Time.unscaledTime + seconds : 0f;
         confirmYes = false;
         confirm = EConfirm.Host;
         Sound(skin.MakeSound);
@@ -604,7 +618,10 @@ public sealed class GameMenu
             case EConfirm.Reset: return $"Put every setting of {SectionName(Section)} back to its default?";
             case EConfirm.ResetAll: return $"Put every setting of {TabName(Tab)} back to its default?";
             case EConfirm.Undo: return "Put every setting back as it was when you opened the menu?";
-            case EConfirm.Host: return hostQuestion;
+            case EConfirm.Host:
+                return confirmUntil > 0f
+                    ? hostQuestion + $" ({Mathf.Max(0, Mathf.CeilToInt(confirmUntil - Time.unscaledTime))})"
+                    : hostQuestion;
             case EConfirm.Display: return $"Keep this display? It goes back in {ScreenOptions.ConfirmSecondsLeft} s.";
             default:
                 return Section == EOptionSection.Keyboard
@@ -617,6 +634,7 @@ public sealed class GameMenu
     {
         EConfirm what = confirm;
         confirm = EConfirm.None;
+        confirmUntil = 0f;
         if (what == EConfirm.Display)
         {
             if (yes)
@@ -633,6 +651,10 @@ public sealed class GameMenu
         if (!yes)
         {
             Sound(skin.BackSound);
+            if (what == EConfirm.Host)
+            {
+                hostNo?.Invoke();
+            }
             return;
         }
         Sound(skin.MakeSound);
@@ -699,6 +721,21 @@ public sealed class GameMenu
             return false;
         }
         UpdateStartHeld();
+
+        // a question of the options' own: the MIDI device found, or not
+        if (confirm == EConfirm.None)
+        {
+            GameOptions.Question question = GameOptions.TakeQuestion();
+            if (question != null)
+            {
+                Ask(question.Text, question.OnYes, question.OnNo, question.Seconds);
+            }
+        }
+        else if (confirm == EConfirm.Host && confirmUntil > 0f && Time.unscaledTime >= confirmUntil)
+        {
+            Answer(false);
+            return false;
+        }
 
         Gamepad pad = Gamepad.current;
         Keyboard keys = Keyboard.current;
@@ -2003,6 +2040,22 @@ public sealed class GameMenu
         if (o.Kind != EOptionKind.Page)
         {
             Text(new Rect(left, y, width, 36f), "<b>Default:</b> " + GameOptions.DefaultText(o), SmallFont, TextAnchor.UpperLeft, UnselectColor);
+            y += 48f;
+        }
+        if (o.Link != null)
+        {
+            // a web page the row points to, opened in the browser with a click
+            float lh = MeasureHeight(o.LinkText, SmallFont, width);
+            Rect link = new Rect(left, y, width, lh);
+            bool hover = Hover(link);
+            Color linkColor = hover ? Color.white : SelectColor;
+            Text(link, o.LinkText, SmallFont, TextAnchor.UpperLeft, linkColor, true);
+            // underlined, as a link is: IMGUI's rich text has no underline
+            Fill(new Rect(left, y + Mathf.Min(lh, SmallFont * 1.25f) - 2f, Mathf.Min(width, Measure(o.LinkText, SmallFont)), 2f), linkColor);
+            if (confirm == EConfirm.None && Clicked(link))
+            {
+                Application.OpenURL(o.Link);
+            }
         }
     }
 

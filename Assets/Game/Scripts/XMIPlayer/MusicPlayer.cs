@@ -17,7 +17,7 @@ public enum ESampleRate
 }
 
 [RequireComponent(typeof(AudioSource))]
-public class MusicPlayer : MonoBehaviour
+public partial class MusicPlayer : MonoBehaviour
 {
     private string soundFontFileName = "Soundfonts/MT32.sf2";
 
@@ -135,6 +135,8 @@ public class MusicPlayer : MonoBehaviour
         
         // --- 2. Initialize Synthesizer (from bundled StreamingAssets) ---
         InitializeSynthesizer();
+        // and the external synthesizer, when it is the one chosen (MusicPlayerExternalMidi.cs)
+        InitializeExternalMidi();
         
         clipSource = new GameObject("RecordedMusic").AddComponent<AudioSource>();
         clipSource.transform.SetParent(transform, false);
@@ -172,6 +174,9 @@ public class MusicPlayer : MonoBehaviour
         {
             clipSource.volume = masterVolumeScale * duckMultiplier;
         }
+
+        // the external synthesizer's volume, and the soundfont back if its port stopped answering
+        UpdateExternalMidi();
     }
 
     /// <summary>
@@ -695,8 +700,9 @@ public class MusicPlayer : MonoBehaviour
     }
 
     // --- Unity Audio Hook ---
-    // Runs on the dedicated, real-time Audio Thread
-    void OnAudioFilterRead(float[] data, int channels)
+    // Runs on the dedicated, real-time Audio Thread, called from OnAudioFilterRead() (MusicPlayerExternalMidi.cs)
+    // unless the music is playing on an external synthesizer
+    private void RenderSynth(float[] data, int channels)
     {
         if (forgetHeldNotes)
         {

@@ -484,10 +484,8 @@ public class MusicSetupPage : IGameMenuSubPage
         try
         {
             string folder = Path.Combine(Application.streamingAssetsPath, "Soundfonts");
-            string[] files = Directory.GetFiles(folder, "*.sf2");
-            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
-            // Named the way the options panel stores them.
-            return Array.ConvertAll(files, f => "Soundfonts/" + Path.GetFileName(f));
+            // Named and ordered as the options' Soundfont row has them, the MIDI device among them.
+            return GameOptions.MusicOutputs(Directory.GetFiles(folder, "*.sf2"));
         }
         catch (Exception e)
         {
@@ -498,8 +496,9 @@ public class MusicSetupPage : IGameMenuSubPage
 
     private static string CurrentSoundFont => PlayerPrefs.GetString("Options_SoundFont", "Soundfonts/MT32.sf2");
 
-    private int CurrentSoundFontIndex => Array.FindIndex(soundFonts, f => string.Equals(Path.GetFileName(f),
-        Path.GetFileName(CurrentSoundFont), StringComparison.OrdinalIgnoreCase));
+    private int CurrentSoundFontIndex => MusicPlayer.ExternalMidiChosen
+        ? Array.IndexOf(soundFonts, GameOptions.ExternalMidiName)
+        : Array.FindIndex(soundFonts, f => string.Equals(Path.GetFileName(f), Path.GetFileName(CurrentSoundFont), StringComparison.OrdinalIgnoreCase));
 
     private void OpenSoundFontList()
     {
@@ -523,10 +522,18 @@ public class MusicSetupPage : IGameMenuSubPage
 
         Sound(menu.Skin.MakeSound);
         string chosen = soundFonts[index];
-        PlayerPrefs.SetString("Options_SoundFont", chosen);
+        // The XMI being listened to carries on through the new soundfont or the MIDI device, once the
+        // options have put it into effect.
+        if (chosen == GameOptions.ExternalMidiName)
+        {
+            // no question here: the player is listening already
+            GameOptions.ChooseExternalMidi(false);
+        }
+        else
+        {
+            GameOptions.ChooseSoundFont(chosen);
+        }
         PlayerPrefs.Save();
-        // Restarts the XMI being listened to, through the new soundfont; does nothing for the same one.
-        MusicPlayer.Instance?.ReloadSynthesizerWithSoundFont(chosen, PlayerPrefs.GetFloat("Options_MusicVolume", 0.5f));
     }
 
     private void SetStatus(string text, float seconds = StatusSeconds)
