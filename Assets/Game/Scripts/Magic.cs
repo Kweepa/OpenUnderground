@@ -403,7 +403,7 @@ public class Magic : MonoBehaviour
         new SSpell("OG", "Lightning", 9, -1, 0, 271, 82), // done (PAK: Electrical Bolt)
         new SSpell("QL", "Night Vision", 9, 12, 120, 270, 5), // done
         new SSpell("RTP", "Speed", 9, 13, 30, 268, 176), // done
-        new SSpell("SJ", "Strengthen Door", 9, -1, 0, 272, 178), // unused
+        new SSpell("SJ", "Strengthen Door", 9, -1, 0, 272, 178), // spikes the door: Door.Spike()
         new SSpell("IS", "Thick Skin", 12, 16, 90, 273, 35), // done
 
         // fourth circle
@@ -3228,6 +3228,11 @@ public class Magic : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Strengthen Door, whose spell does nothing in the original (UW.EXE 0x35900 has no case for it),
+    /// here spikes the targeted closed door shut with ten nails - see Door.Spike() - and answers as
+    /// the iron spike does, message 129, or 128 for an open door.
+    /// </summary>
     void CastStrengthenDoor(Vector3? aimDirFromCameraOpt = null)
     {
         if (aimDirFromCameraOpt.HasValue)
@@ -3245,7 +3250,7 @@ public class Magic : MonoBehaviour
 
             if (TryGetDoorAlongAimRay(c.transform.position, d, out Door door) && door != null)
             {
-                door.Spike();
+                SpikeDoorMessage(door.Spike(bySpell: true));
             }
 
             return;
@@ -3256,9 +3261,18 @@ public class Magic : MonoBehaviour
             Door door = Interaction.sInt.centeredObject as Door;
             if (door != null)
             {
-                door.Spike();
+                SpikeDoorMessage(door.Spike(bySpell: true));
             }
         }
+    }
+
+    /// <summary>
+    /// The iron spike's two answers (Spike.Equip()): "The door is now spiked closed.", or for an open
+    /// door "You can only spike closed doors."
+    /// </summary>
+    private static void SpikeDoorMessage(bool spiked)
+    {
+        Messages.Add(1, spiked ? 129 : 128);
     }
 
     /// <summary>

@@ -2,6 +2,8 @@
 
 ## Next release
 
+- A door spiked shut, with an iron spike or the Strengthen Door spell, now shows its spikes on your side, gone when you open it: the first iron spike goes by the lock, every further one and the spell's ten anywhere along the frame. The more spikes, the more blows the door takes to break, and the blows knock them out one by one; a look or the cursor calls it a spiked door, it stays spiked after a save and load, a portcullis or a secret door can no longer be spiked, and iron spikes used with the mouse are now used up, one a door, the rest staying in hand.
+
 - When the music changes, on opening the map for instance, the last notes of the old track now fade out with their own release and echo instead of stopping dead, as in the original.
 
 - With the MT-32 sound font, the timpani can be heard again: they played far too low to hear in most tracks, Wanderer among them. The map's music no longer opens on two seconds of near silence: its soft opening pad plays as loud as on an MT-32.

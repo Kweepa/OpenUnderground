@@ -4518,6 +4518,42 @@ public class Inventory : MonoBehaviour
     /// After <see cref="TryThrow"/>'s logical <see cref="UUObject.Throw"/> path: keys/poles/etc. can succeed without
     /// leaving the cursor — do not close the inventory slide-out in that case.
     /// </summary>
+    /// <summary>
+    /// Uses up one of an item whose Throw() used it rather than threw it (an iron spike on a door):
+    /// the mouse's way to use a carried item. Equip()'s Consume is applied by TryEquipSelection() and
+    /// the paperdoll, not by TryThrow(), which stows what is still on the cursor; so the last one is
+    /// taken off the cursor before it is destroyed. The rest of a stack stays on the cursor, ready for
+    /// the next door, as a pad's user just presses again.
+    /// </summary>
+    public void UseUpOneAfterThrow(UUObject item)
+    {
+        if (item.quantity > 1)
+        {
+            item.quantity--;
+            if (mouseCursorCarriedPortable == item)
+            {
+                keepOnCursorAfterThrow = item;
+            }
+
+            return;
+        }
+
+        if (mouseCursorCarriedPortable == item)
+        {
+            mouseCursorCarriedPortable = null;
+        }
+
+        if (usingItem == item)
+        {
+            usingItem = null;
+        }
+
+        Utils.DestroyItem(item);
+    }
+
+    // Set by UseUpOneAfterThrow() for the stack left on the cursor, read once by TryThrow().
+    private UUObject keepOnCursorAfterThrow;
+
     private bool ItemStillInHandAfterThrowSuccess(UUObject item)
     {
         if (!item)
@@ -4557,12 +4593,19 @@ public class Inventory : MonoBehaviour
             }
 
             // throw (eg flag) // TODO: switch to use
+            keepOnCursorAfterThrow = null;
             if (itemToThrow.Throw())
             {
+                bool keepOnCursor = keepOnCursorAfterThrow == itemToThrow;
+                keepOnCursorAfterThrow = null;
                 ClearHeldAfterThrow(itemToThrow);
                 if (itemToThrow != null && !LevelLoader.worldObj.Contains(itemToThrow))
                 {
-                    TryStowMouseCursorCarriedPortable();
+                    if (!keepOnCursor)
+                    {
+                        TryStowMouseCursorCarriedPortable();
+                    }
+
                     CancelPendingThrowCloseInventory();
                 }
 

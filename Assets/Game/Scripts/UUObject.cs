@@ -1503,6 +1503,7 @@ public class UUObject : LevelObject
             lookNameBuilder.Append("cursed ");
         }
 
+        AppendLookAdjectives(lookNameBuilder);
         lookNameBuilder.Append(quantity > 1 ? pluralName : singularName);
 
         AddArticle(lookNameBuilder);
@@ -1518,6 +1519,14 @@ public class UUObject : LevelObject
     public virtual string GetUnderCursorName()
     {
         return GetLookName();
+    }
+
+    /// <summary>
+    /// Words of the object's own state, put just before its noun in the look and under the cursor,
+    /// after the quality and "magical": a spiked door is "a sturdy spiked door".
+    /// </summary>
+    protected virtual void AppendLookAdjectives(StringBuilder sb)
+    {
     }
 
     protected virtual string GetIdentifiedName(string baseName)

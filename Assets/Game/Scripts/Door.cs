@@ -7,6 +7,16 @@ public class DoorSaveData : UUObjectSaveData
 {
     public bool opening;
     public float openAmount;
+
+    // The spike, which the original keeps in the door's own record (owner set to 63 by UW.EXE
+    // 0x36c42) and so in every save, with what the blows have worn of it. The side, the seed, the count
+    // and the first nail's place draw the same nails again on a load.
+    public bool spiked;
+    public int spikeSide;
+    public int spikeSeed;
+    public int spikeNailCount;
+    public bool spikeLockFirst;
+    public int spikeWear;
 }
 
 public class Door : Lockable
@@ -37,9 +47,28 @@ public class Door : Lockable
 
     public bool spiked;
 
+    // Which face the door was spiked from, +1 the collider's forward face and -1 the other (0 in a save
+    // written before the nails, read as +1), the seed of the nails' places and angles, how many nails
+    // it holds - one for each iron spike, ten for each cast of the spell, up to SpikeMaxNails - and
+    // whether the first was an iron spike's, which goes by the lock.
+    private int spikeSide;
+    private int spikeSeed;
+    private int spikeNailCount;
+    private bool spikeLockFirst;
+
+    // How much of the spike's strength the blows have worn away since the door was last spiked.
+    private int spikeWear;
+
+    private const int SpikeNailsBySpell = 10;
+    private const int SpikeMaxNails = 20;
+    private readonly List<GameObject> spikeNails = new();
+    private bool spikeNailsBuilt;
+
     public override void Update()
     {
         base.Update();
+
+        SyncSpikeNails();
 
         if (Time.deltaTime > 0.0f)
         {
@@ -520,17 +549,311 @@ public class Door : Lockable
         }
     }
 
-    public void Spike()
+    /// <summary>
+    /// Spikes the door shut, with an iron spike or the Strengthen Door spell: no creature opens it or
+    /// paths through it, the spike takes the blows before the door does (TryDamage), and the player's
+    /// next use, or anything else that opens it, pulls the spike (Open). The nails show, a sight of
+    /// this remake's own, between the door and the frame on the side the player stands: an iron
+    /// spike drives one, the first by the lock at mid height and the next ones anywhere along the
+    /// jambs and the lintel, and the spell ten; the blows knock them out as they wear the spike, the
+    /// last one with its last point. A look calls the door spiked (AppendLookAdjectives).
+    /// An open door cannot be spiked, as the iron spike already said (message 128), nor a portcullis
+    /// or a secret door (CanBeSpiked).
+    /// </summary>
+    /// <param name="bySpell">The spell, not an iron spike.</param>
+    /// <returns>False for a door that cannot be spiked.</returns>
+    public bool Spike(bool bySpell)
     {
+        if (!CanBeSpiked)
+        {
+            return false;
+        }
+
+        if (!spiked)
+        {
+            spikeSide = PlayerObject.Player != null ? SideOf(PlayerObject.Player.mainCamera.transform.position) : 1;
+            spikeSeed = Random.Range(1, int.MaxValue);
+            spikeLockFirst = !bySpell;
+        }
+
+        // the nails still standing, and the new ones
+        int before = spiked ? StandingSpikeNails : 0;
+        spikeNailCount = Mathf.Min(before + (bySpell ? SpikeNailsBySpell : 1), SpikeMaxNails);
+
+        // Every spiking makes the spike whole again, as UW.EXE 0x36c42 (SpikeDoor_seg040_662,
+        // USEITEMS.C) sets the door's owner to 63 whether it was spiked or not.
+        spikeWear = 0;
         spiked = true;
+
+        // drawn again with the new ones; each nail has its own seed, so the old ones stay put
+        DestroySpikeNails();
+        return true;
+    }
+
+    /// <summary>
+    /// A closed door, but not a portcullis or a secret door: the user's choice for this remake. The
+    /// original spikes all eight closed doors, 320 to 327 (UW.EXE 0x36c42, SpikeDoor_seg040_662,
+    /// USEITEMS.C), the portcullis and the secret door among them.
+    /// </summary>
+    public bool CanBeSpiked => !opening && type is not (EObjectType.Portcullis or EObjectType.SecretDoor);
+
+    /// <summary>The nails the door holds; a save of the first test build has no count, and held ten.</summary>
+    private int SpikeNails => spikeNailCount > 0 ? spikeNailCount : SpikeNailsBySpell;
+
+    /// <summary>
+    /// The spike's strength, the damage it takes before the door does: 15 and 2 for each nail, 17
+    /// for one iron spike and 35 for the spell. The original gives every spike 31, the five bits above
+    /// the spike's own in the door's owner field (63 = 31 &lt;&lt; 1 | 1, UW.EXE 0x36c42); here the
+    /// nails count, by design.
+    /// </summary>
+    private int SpikeStrength => 15 + 2 * SpikeNails;
+
+    /// <summary>
+    /// The nails still in the door: as many of them as the strength left is of the whole, rounded
+    /// up, so the last one goes only when nothing is left. The last driven go first.
+    /// </summary>
+    private int StandingSpikeNails => spiked
+        ? (SpikeNails * (SpikeStrength - spikeWear) + SpikeStrength - 1) / SpikeStrength
+        : 0;
+
+    protected override void AppendLookAdjectives(System.Text.StringBuilder sb)
+    {
+        // "a sturdy spiked door", in the look and under the cursor. The original says it on a line of
+        // its own after the description, "The door is spiked." (block 1, string 131, from UW.EXE
+        // 0x7c621, SpecialLook, LOOK.C, for a closed door with the spike's bit set).
+        if (spiked && !opening)
+        {
+            sb.Append("spiked ");
+        }
+    }
+
+    /// <summary>
+    /// The side of the leaf its lock is on, in the leaf's own x: the edge away from the hinge, which
+    /// is the edge that swings. A door with no hinge (the portcullis) gets +1.
+    /// </summary>
+    private float LockEdgeSide()
+    {
+        if (hinge == null || cachedDoorCollider == null)
+        {
+            return 1.0f;
+        }
+
+        Vector3 h = cachedDoorCollider.transform.InverseTransformPoint(hinge.transform.position) - cachedDoorCollider.center;
+        return h.x > 0.0f ? -1.0f : 1.0f;
+    }
+
+    /// <summary>+1 when <paramref name="point"/> is on the forward face of the door's leaf, -1 when on the other.</summary>
+    private int SideOf(Vector3 point)
+    {
+        if (cachedDoorCollider == null)
+        {
+            return 1;
+        }
+
+        Transform leaf = cachedDoorCollider.transform;
+        Vector3 local = leaf.InverseTransformPoint(point) - cachedDoorCollider.center;
+        return local.z >= 0.0f ? 1 : -1;
+    }
+
+    /// <summary>
+    /// Keeps the nails in step with <see cref="spiked"/>, whatever set or cleared it: built once the
+    /// door is spiked and shut (so they are placed on the leaf where it rests), removed when the
+    /// spike is pulled.
+    /// </summary>
+    private void SyncSpikeNails()
+    {
+        if (spiked && cachedDoorCollider != null && openAmount <= 0.001f
+            && (!spikeNailsBuilt || spikeNails.Count != StandingSpikeNails))
+        {
+            // the blows have knocked some out: the rest are drawn again, each from its own seed
+            DestroySpikeNails();
+            CreateSpikeNails();
+        }
+        else if (!spiked && spikeNailsBuilt)
+        {
+            DestroySpikeNails();
+        }
+    }
+
+    private void DestroySpikeNails()
+    {
+        foreach (GameObject nail in spikeNails)
+        {
+            if (nail != null)
+            {
+                Destroy(nail);
+            }
+        }
+
+        spikeNails.Clear();
+        spikeNailsBuilt = false;
+    }
+
+    /// <summary>
+    /// Copies of the iron spike's own model, without its object, on the face the door was spiked
+    /// from: the first by the lock at mid height when an iron spike drove it, every other one at
+    /// random along the two jambs and the lintel. Each enters the leaf one to three centimetres from
+    /// its edge, point first, tilted up to 30 degrees from straight in, in any direction, with most
+    /// of it out. Only the nails still standing are drawn (StandingSpikeNails), and each from a seed
+    /// of its own, so adding nails or losing them to blows leaves the others put.
+    /// </summary>
+    private void CreateSpikeNails()
+    {
+        spikeNailsBuilt = true;
+
+        GameObject prefab = LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.objectModelMap != null
+            ? LevelLoader.sLevelLoader.objectModelMap.objects[(int)EObjectType.Spike]
+            : null;
+        MeshFilter source = prefab != null ? prefab.GetComponentInChildren<MeshFilter>(true) : null;
+        MeshRenderer sourceRenderer = source != null ? source.GetComponent<MeshRenderer>() : null;
+        if (source == null || source.sharedMesh == null || sourceRenderer == null)
+        {
+            return;
+        }
+
+        Mesh mesh = source.sharedMesh;
+        SpikeAxis(mesh, out Vector3 tipAxis, out float meshLength);
+        Vector3 nailScale = source.transform.lossyScale;
+        float length = meshLength * Mathf.Abs(Vector3.Dot(nailScale, Abs(tipAxis)));
+
+        Transform leaf = cachedDoorCollider.transform;
+        Vector3 centre = cachedDoorCollider.center;
+        Vector3 size = cachedDoorCollider.size;
+        float side = spikeSide < 0 ? -1.0f : 1.0f;
+        Vector3 inward = leaf.TransformDirection(new Vector3(0.0f, 0.0f, -side)).normalized;
+        Vector3 across = Vector3.Cross(inward, leaf.up).normalized;
+
+        for (int i = 0; i < StandingSpikeNails; ++i)
+        {
+            var rng = new System.Random(unchecked(spikeSeed + 7919 * i));
+
+            // the edge, in the leaf's own space, and the way out of the leaf across it
+            Vector3 local;
+            Vector3 outLocal;
+            if (i == 0 && spikeLockFirst)
+            {
+                // the lock's jamb, about half way up
+                float lockSide = LockEdgeSide();
+                float up = (float)(0.04 * (2.0 * rng.NextDouble() - 1.0));
+                local = new Vector3(lockSide * 0.5f * size.x, up * size.y, 0.0f);
+                outLocal = new Vector3(lockSide, 0.0f, 0.0f);
+            }
+            else
+            {
+                // an edge, weighted by its length: the left jamb, the right jamb, the lintel
+                double pick = rng.NextDouble() * (2.0 * size.y + size.x);
+                float along = (float)(0.1 + 0.8 * rng.NextDouble());
+                if (pick < 2.0 * size.y)
+                {
+                    float x = pick < size.y ? -1.0f : 1.0f;
+                    local = new Vector3(0.5f * x * size.x, (along - 0.5f) * size.y, 0.0f);
+                    outLocal = new Vector3(x, 0.0f, 0.0f);
+                }
+                else
+                {
+                    local = new Vector3((along - 0.5f) * size.x, 0.5f * size.y, 0.0f);
+                    outLocal = Vector3.up;
+                }
+            }
+
+            local.z = side * 0.5f * size.z;
+            local += centre;
+            Vector3 outward = leaf.TransformDirection(outLocal).normalized;
+
+            // in through the face one to three centimetres inside the leaf's edge
+            float inset = (float)(0.01 + 0.02 * rng.NextDouble());
+            Vector3 entry = leaf.TransformPoint(local) - outward * inset;
+
+            // the point tilted 0 to 30 degrees from straight in, towards any direction, and the nail
+            // turned at random about its own length
+            Vector3 tiltAxis = Quaternion.AngleAxis((float)(rng.NextDouble() * 360.0), inward) * across;
+            Vector3 tipDirection = Quaternion.AngleAxis((float)(rng.NextDouble() * 30.0), tiltAxis) * inward;
+            Quaternion rotation = Quaternion.AngleAxis((float)(rng.NextDouble() * 360.0), tipDirection)
+                                  * Quaternion.FromToRotation(tipAxis, tipDirection);
+
+            // three fifths of it outside the face: the centre a tenth of a length out
+            Vector3 position = entry - tipDirection * (0.1f * length);
+
+            var nail = new GameObject("SpikeNail");
+            nail.transform.SetParent(transform, false);
+            nail.transform.SetPositionAndRotation(position, rotation);
+            Vector3 parentScale = transform.lossyScale;
+            nail.transform.localScale = new Vector3(nailScale.x / parentScale.x, nailScale.y / parentScale.y,
+                nailScale.z / parentScale.z);
+            nail.AddComponent<MeshFilter>().sharedMesh = mesh;
+            nail.AddComponent<MeshRenderer>().sharedMaterials = sourceRenderer.sharedMaterials;
+            spikeNails.Add(nail);
+        }
+    }
+
+    private static Vector3 Abs(Vector3 v)
+    {
+        return new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+    }
+
+    private static Mesh spikeAxisMesh;
+    private static Vector3 spikeAxisTip;
+    private static float spikeAxisLength;
+
+    /// <summary>
+    /// The spike model's length and which way its point faces, in the mesh's own space: the length
+    /// is the longest side of its bounds, and the point is the end whose vertices stay closer to the
+    /// axis. Read from the mesh (its import keeps it readable) rather than assumed from the export.
+    /// </summary>
+    private static void SpikeAxis(Mesh mesh, out Vector3 tip, out float length)
+    {
+        if (spikeAxisMesh == mesh)
+        {
+            tip = spikeAxisTip;
+            length = spikeAxisLength;
+            return;
+        }
+
+        Bounds bounds = mesh.bounds;
+        Vector3 extent = bounds.size;
+        int axis = extent.x >= extent.y && extent.x >= extent.z ? 0 : (extent.y >= extent.z ? 1 : 2);
+        length = extent[axis];
+        float band = 0.2f * length;
+        double spreadLow = 0.0, spreadHigh = 0.0;
+        int countLow = 0, countHigh = 0;
+        foreach (Vector3 v in mesh.vertices)
+        {
+            Vector3 off = v - bounds.center;
+            off[axis] = 0.0f;
+            if (v[axis] <= bounds.min[axis] + band)
+            {
+                spreadLow += off.magnitude;
+                ++countLow;
+            }
+            else if (v[axis] >= bounds.max[axis] - band)
+            {
+                spreadHigh += off.magnitude;
+                ++countHigh;
+            }
+        }
+
+        bool pointHigh = countLow == 0 || countHigh == 0 || spreadHigh / countHigh <= spreadLow / countLow;
+        tip = Vector3.zero;
+        tip[axis] = pointHigh ? 1.0f : -1.0f;
+
+        spikeAxisMesh = mesh;
+        spikeAxisTip = tip;
+        spikeAxisLength = length;
     }
 
     /// <param name="byPlayer">The player opens it, by a use or by breaking it: only then does the
     /// door's open trigger fire.</param>
+    /// <remarks>
+    /// Whoever opens the door pulls its spike - the player, a lever or trigger, a conversation, a
+    /// blow that breaks it - as UW.EXE 0x387c6 (OpenDoor, USEITEMS.C) clears the spike's bit for every
+    /// caller. Only a creature's own use is refused a spiked door (UW.EXE 0x38115, UseRect), which
+    /// here is Critter's test of spiked before it calls this.
+    /// </remarks>
     public void Open(bool byPlayer = false)
     {
-        if (!opening && !spiked)
+        if (!opening)
         {
+            spiked = false;
             opening = true;
             clipToPlay = doorOpenClip;
             if (byPlayer)
@@ -745,6 +1068,26 @@ public class Door : Lockable
                 Utils.PlayClip2d(hitSound);
             }
 
+            // The spike takes the blow first, and while it has strength left the door loses nothing
+            // and cannot break: UW.EXE 0x25f97 (damage_object, DAMAGE.C), after the shift by the
+            // quality class, and what is left of a blow over the spike's strength is lost. So a
+            // strength of 35 is 35 points of a weapon's damage on a door of class 0, 70 on one of
+            // class 1, 140 on one of class 2.
+            if (spiked && spikeWear < SpikeStrength)
+            {
+                spikeWear = Mathf.Min(SpikeStrength, spikeWear + appliedDamage);
+
+                // The last nail knocked out, the spike is gone: the door is no longer spiked and
+                // the next blow is its own. In the original the spike's bit stays set at 0, so a
+                // creature still cannot open the door and a look still calls it spiked.
+                if (spikeWear >= SpikeStrength)
+                {
+                    spiked = false;
+                }
+
+                return;
+            }
+
             quality -= appliedDamage;
             if (quality <= 0)
             {
@@ -828,6 +1171,12 @@ public class Door : Lockable
         {
             doorData.opening = opening;
             doorData.openAmount = openAmount;
+            doorData.spiked = spiked;
+            doorData.spikeSide = spikeSide;
+            doorData.spikeSeed = spikeSeed;
+            doorData.spikeNailCount = spikeNailCount;
+            doorData.spikeLockFirst = spikeLockFirst;
+            doorData.spikeWear = spikeWear;
         }
     }
 
@@ -839,6 +1188,16 @@ public class Door : Lockable
         {
             opening = doorData.opening;
             openAmount = doorData.openAmount;
+            spiked = doorData.spiked;
+            spikeSide = doorData.spikeSide;
+            spikeSeed = doorData.spikeSeed;
+            spikeNailCount = doorData.spikeNailCount;
+            spikeLockFirst = doorData.spikeLockFirst;
+            spikeWear = doorData.spikeWear;
+            if (spikeNailsBuilt)
+            {
+                DestroySpikeNails();      // drawn again by Update() from the restored seed
+            }
 
             // a secret door saved open was found: the level's loading hid its tile again
             if (opening && initialTile != null && initialTile.hidden)
