@@ -285,7 +285,7 @@ public class MusicPlayer : MonoBehaviour
         if (controller >= 120)
         {
             // The channel mode messages. Reset All Controllers clears what the channel had, and All
-            // Sound Off and All Notes Off - which the sequencer sends when a track loops - the notes.
+            // Sound Off and All Notes Off - the second sent when a track loops - the notes.
             if (controller == 121)
             {
                 controllerOrder[channel].Clear();
@@ -462,15 +462,18 @@ public class MusicPlayer : MonoBehaviour
         clipWeb?.Dispose();
         clipWeb = null;
         
-        // Reset all MIDI channels - stop all notes
+        // Every note released, as the original's driver ends a track: a Note Off for each note sounding and
+        // the sustain pedal up, never All Sound Off, so the last notes ring on with their own release and
+        // reverb under the next track - opening the map, the exploring music fades instead of stopping
+        // dead. UW.EXE 0x1f39c (load_new_music, SOUND.C) stops the old sequence just before starting the
+        // new one, and the driver's stop sends note-offs only.
         if (synthesizer != null)
         {
             for (int channel = 0; channel < 16; channel++)
             {
-                // All Notes Off (CC 123)
+                // Sustain off (CC 64), then All Notes Off (CC 123)
+                synthesizer.ProcessMidiMessage(channel, 0xB0, 64, 0);
                 synthesizer.ProcessMidiMessage(channel, 0xB0, 123, 0);
-                // All Sound Off (CC 120)
-                synthesizer.ProcessMidiMessage(channel, 0xB0, 120, 0);
             }
         }
         forgetHeldNotes = true;
