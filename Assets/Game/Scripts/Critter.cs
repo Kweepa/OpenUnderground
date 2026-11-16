@@ -6298,11 +6298,8 @@ public class Critter : UUObject
 
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
     {
-        // Easy mode: increase damage done to enemies by 3/2
-        if (PlayerData.sData.easy)
-        {
-            damage = damage * 3 / 2;
-        }
+        // No bonus on Easy: the original's flag has two readers, the player's attack score and the
+        // halving of what he takes (UW.EXE 0x2544d DoPlayerWeapon and 0x24e4a do_damage, COMBAT.C)
         hp -= damage;
         // whoever struck it; the player's blows say so afterwards, in StruckByPlayer()
         lastBlowByPlayer = false;
@@ -7205,7 +7202,7 @@ public class Critter : UUObject
                 // creature's venom - the higher of the two, never added - unless the player
                 // resists poison (UW.EXE 0x259ee at 0x25aba-0x25afc).
                 bool poisoning = poison > PlayerData.sData.poison && PlayerObject.TryPoison(poison);
-                damage = PlayerObject.Player.AbsorbWithArmour(damage, bodyPart);
+                damage = PlayerObject.EasyCut(PlayerObject.Player.AbsorbWithArmour(damage, bodyPart));
                 PlayerObject.Player.DamageFromBlow(result, damage, poisoning ? EDamageType.Poison : EDamageType.Damage, Resistance.Blow);
             }
             else
