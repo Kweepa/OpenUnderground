@@ -1207,7 +1207,8 @@ public class Utils
     /// </summary>
     public static bool SafeToSleepOffDrink()
     {
-        if (Music.GetMusicState() == EMusicState.Combat)
+        // a fight is also the injured and the winning track, not only the plain one
+        if (Music.IsInCombat())
         {
             return false;
         }

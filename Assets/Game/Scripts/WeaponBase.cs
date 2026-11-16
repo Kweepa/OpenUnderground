@@ -828,10 +828,10 @@ public class WeaponBase : UUObject
         int hitChance = Skills.GetSkill(ESkill.Attack) / 2
                         + Skills.GetSkill(skill)
                         + PlayerData.sData.dexterity / 7;
-        // Easy mode: add 5 to damage check
+        // Easy adds 7 to the attack score: UW.EXE 0x2544d (DoPlayerWeapon, COMBAT.C)
         if (PlayerData.sData.easy)
         {
-            hitChance += 5;
+            hitChance += 7;
         }
         if (isEnchanted && !string.IsNullOrEmpty(enchantmentName) && enchantmentIndex < 8 // an accuracy enchantment
             && !(asKnown && loreResult != Skills.ESkillTestResult.CriticalSuccess))

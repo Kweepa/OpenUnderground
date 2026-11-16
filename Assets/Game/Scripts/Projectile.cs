@@ -524,7 +524,7 @@ public class Projectile : UUObject
                     // Missiles and melee share the damage routine in the original (UW.EXE
                     // 0x259e7 and 0x2527e), so armour soaks an arrow exactly as it soaks a
                     // swing, by the protection covering wherever it struck.
-                    damage = player.AbsorbWithArmour(damage, transform.position.y);
+                    damage = PlayerObject.EasyCut(player.AbsorbWithArmour(damage, transform.position.y));
                     if (damage > 0)
                     {
                         player.Damage(Skills.ESkillTestResult.Success, damage, EDamageType.Damage, mask);

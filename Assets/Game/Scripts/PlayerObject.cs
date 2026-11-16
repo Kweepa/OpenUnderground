@@ -2029,9 +2029,9 @@ public class PlayerObject : MonoBehaviour
 
         if (!PlayerData.sData.dead && !Cheats.sCheats.invincible)
         {
-            // Easy mode: reduce damage taken by player to 2/3
-            int actualDamage = PlayerData.sData.easy ? (damage * 2 / 3) : damage;
-            PlayerData.sData.hp -= actualDamage;
+            // Easy is not applied here: only a creature's blow and a missile's hit are halved, before
+            // they arrive (EasyCut()); the poison, traps, falls, lava and spells hurt in full.
+            PlayerData.sData.hp -= damage;
             // A blow that takes every hit point left kills, as in the original: the damage routine
             // sets the hit points to 0 when the blow is at least what is left (UW.EXE 0x1c3ea), and
             // the world tick calls the death of the player as soon as they are 0 (0x26565).
@@ -2414,6 +2414,20 @@ public class PlayerObject : MonoBehaviour
         {
             PlayerData.sData.poison = level;
         }
+    }
+
+    /// <summary>
+    /// On Easy a creature's blow and a missile's hit on the player are halved, after the armour and
+    /// before the resistances: UW.EXE 0x24e4a (do_damage, COMBAT.C), reached only from a melee blow
+    /// (do_attack) and a missile's hit (missile_thwack). Every other harm - the poison, traps, falls,
+    /// lava, drowning, a spell's burst - reaches the damage gate directly and is not cut. Rounded up
+    /// where the original shifts down, the user's choice of 17 November 2026: there a blow of one
+    /// point did nothing on Easy, here a blow that gets past the armour always costs a point, as the
+    /// creatures' damage roll already rounds up (Critter's blow).
+    /// </summary>
+    public static int EasyCut(int damage)
+    {
+        return PlayerData.sData.easy ? (damage + 1) >> 1 : damage;
     }
 
     /// <summary>
