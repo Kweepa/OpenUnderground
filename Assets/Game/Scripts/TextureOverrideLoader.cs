@@ -23,6 +23,72 @@ public static class TextureOverrideLoader
         ApplyDoorOverrides(folder, doorTex);
     }
 
+    public static void ApplyUI(Texture2D[] panelsTex, Texture2D[] bodiesTex, Texture2D[] armorFTex, Texture2D[] armorMTex)
+    {
+        string folder = Path.Combine(Application.streamingAssetsPath, "Textures");
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        if (panelsTex != null)
+        {
+            for (int i = 0; i < panelsTex.Length; ++i)
+            {
+                Texture2D tex = TryLoadImage(ResolveOverridePath(folder, "panel" + i.ToString("D2")), TextureWrapMode.Clamp, FilterMode.Point);
+                if (tex != null)
+                {
+                    panelsTex[i] = tex;
+                }
+            }
+        }
+
+        if (bodiesTex != null)
+        {
+            for (int i = 0; i < 5 && i < bodiesTex.Length; ++i)
+            {
+                string path = ResolveOverridePath(folder, "body_m" + i) ?? ResolveOverridePath(folder, "body" + i.ToString("D2"));
+                Texture2D tex = TryLoadImage(path, TextureWrapMode.Clamp, FilterMode.Point);
+                if (tex != null)
+                {
+                    bodiesTex[i] = tex;
+                }
+            }
+            for (int i = 0; i < 5 && (i + 5) < bodiesTex.Length; ++i)
+            {
+                string path = ResolveOverridePath(folder, "body_f" + i) ?? ResolveOverridePath(folder, "body" + (i + 5).ToString("D2"));
+                Texture2D tex = TryLoadImage(path, TextureWrapMode.Clamp, FilterMode.Point);
+                if (tex != null)
+                {
+                    bodiesTex[i + 5] = tex;
+                }
+            }
+        }
+
+        if (armorFTex != null)
+        {
+            for (int i = 0; i < armorFTex.Length; ++i)
+            {
+                Texture2D tex = TryLoadImage(ResolveOverridePath(folder, "armor_f" + i.ToString("D2")), TextureWrapMode.Clamp, FilterMode.Point);
+                if (tex != null)
+                {
+                    armorFTex[i] = tex;
+                }
+            }
+        }
+        if (armorMTex != null)
+        {
+            for (int i = 0; i < armorMTex.Length; ++i)
+            {
+                Texture2D tex = TryLoadImage(ResolveOverridePath(folder, "armor_m" + i.ToString("D2")), TextureWrapMode.Clamp, FilterMode.Point);
+                if (tex != null)
+                {
+                    armorMTex[i] = tex;
+                }
+            }
+        }
+    }
+
     private static void ApplyCyclingOverrides(
         string folder,
         string prefix,
@@ -43,7 +109,7 @@ public static class TextureOverrideLoader
             List<Texture2D> frames = TryLoadLetteredFrames(folder, baseName, wrapMode);
             if (frames == null)
             {
-                Texture2D staticTex = TryLoadImage(ResolveOverridePath(folder, baseName), wrapMode);
+                Texture2D staticTex = TryLoadImage(ResolveOverridePath(folder, baseName), wrapMode, FilterMode.Point);
                 if (staticTex == null)
                 {
                     continue;
@@ -77,7 +143,7 @@ public static class TextureOverrideLoader
         for (int i = 0; i < count; ++i)
         {
             string baseName = "door" + i.ToString("D2");
-            Texture2D tex = TryLoadImage(ResolveOverridePath(folder, baseName), TextureWrapMode.Clamp);
+            Texture2D tex = TryLoadImage(ResolveOverridePath(folder, baseName), TextureWrapMode.Clamp, FilterMode.Point);
             if (tex != null)
             {
                 doorTex[i] = tex;
@@ -112,7 +178,7 @@ public static class TextureOverrideLoader
                 break;
             }
 
-            Texture2D tex = TryLoadImage(path, wrapMode);
+            Texture2D tex = TryLoadImage(path, wrapMode, FilterMode.Point);
             if (tex == null)
             {
                 break;
@@ -138,7 +204,7 @@ public static class TextureOverrideLoader
         return null;
     }
 
-    private static Texture2D TryLoadImage(string path, TextureWrapMode wrapMode)
+    private static Texture2D TryLoadImage(string path, TextureWrapMode wrapMode, FilterMode filterMode)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
@@ -154,7 +220,7 @@ public static class TextureOverrideLoader
             return null;
         }
 
-        tex.filterMode = FilterMode.Point;
+        tex.filterMode = filterMode;
         tex.wrapMode = wrapMode;
         tex.Apply(true, true);
         return tex;
