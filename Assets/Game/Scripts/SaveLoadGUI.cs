@@ -72,16 +72,16 @@ public class SaveLoadGUI : MonoBehaviour
     private float musicVolume = 0.7f;
     private string soundFont = "MT32";
     private float effectsVolume = 1.0f;
-    private float mouseLookSpeed = 1.0f;
+    private float mouseLookSpeed = PlayerInput.DefaultMouseLookSpeed;
     private bool useKeyAutomatically = true;
     private bool autoJump = false;
     private bool invertLook = false;
+    private bool autoSave = true;
+    private bool keepMusicOnMap = true;
     
     // Options tab navigation
     private int optionsIndex = 0;
-    private const int OPTIONS_ITEM_COUNT = 7; // music vol, soundfont, effects vol, mouse look speed, 3 checkboxes
-    private const float MinMouseLookSpeed = 0.8f;
-    private const float MaxMouseLookSpeed = 2.2f;
+    private const int OPTIONS_ITEM_COUNT = 9; // music vol, soundfont, effects vol, mouse look, invert, use-key, auto-jump, autosave, keep music on map
     private static readonly string[] OptionsDescriptions =
     {
         "Adjusts the volume of in-game music.",
@@ -91,6 +91,8 @@ public class SaveLoadGUI : MonoBehaviour
         "Reverses up and down when looking with the mouse or gamepad.",
         "Enabled: a locked door unlocks automatically if you have the correct key and use the door. Disabled: you must manually unlock a door by finding the correct key in your inventory and using the key.",
         "Enabled: the player jumps automatically at the edge when running straight ahead toward a gap or a deep drop. To step off a ledge instead, hold A or D as well, or push the stick only partway.",
+        "Enabled: the first time you enter each dungeon level, the game writes an autosave for that level.",
+        "Enabled: opening the map leaves the exploring music playing. Disabled: the map plays its own track.",
     };
     private const string OptionsApplyFooter = "Changes are only saved when you select Apply All.";
     private string[] availableSoundFonts = new string[0];
@@ -1404,7 +1406,7 @@ public class SaveLoadGUI : MonoBehaviour
         // Mouse look rate slider
         text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
         GUI.Label(new Rect(x + 40, contentY, labelWidth, lineHeight), "Mouse look rate", text);
-        mouseLookSpeed = GUI.HorizontalSlider(new Rect(controlX, contentY + lineHeight / 3, sliderWidth, 20), mouseLookSpeed, MinMouseLookSpeed, MaxMouseLookSpeed);
+        mouseLookSpeed = GUI.HorizontalSlider(new Rect(controlX, contentY + lineHeight / 3, sliderWidth, 20), mouseLookSpeed, PlayerInput.MinMouseLookSpeed, PlayerInput.MaxMouseLookSpeed);
         contentY += lineHeight;
         currentItem++;
         
@@ -1428,6 +1430,20 @@ public class SaveLoadGUI : MonoBehaviour
         text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
         autoJump = GUI.Toggle(new Rect(x + 40, contentY + lineHeight / 3, checkboxSize, checkboxSize), autoJump, "");
         GUI.Label(new Rect(x + 60, contentY, w - 60, lineHeight), "Auto jump", text);
+        contentY += lineHeight;
+        currentItem++;
+
+        // Autosave on level entry
+        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
+        autoSave = GUI.Toggle(new Rect(x + 40, contentY + lineHeight / 3, checkboxSize, checkboxSize), autoSave, "");
+        GUI.Label(new Rect(x + 60, contentY, w - 60, lineHeight), "Autosave on level entry", text);
+        contentY += lineHeight;
+        currentItem++;
+
+        // Keep music on map
+        text.normal.textColor = (optionsIndex == currentItem) ? selectColor : unselectColor;
+        keepMusicOnMap = GUI.Toggle(new Rect(x + 40, contentY + lineHeight / 3, checkboxSize, checkboxSize), keepMusicOnMap, "");
+        GUI.Label(new Rect(x + 60, contentY, w - 60, lineHeight), "Keep music on map", text);
 
         text.alignment = TextAnchor.MiddleLeft;
         text.normal.textColor = selectColor;
@@ -1462,10 +1478,12 @@ public class SaveLoadGUI : MonoBehaviour
         soundFont = PlayerPrefs.GetString("Options_SoundFont", "Soundfonts/MT32.sf2");
         effectsVolume = PlayerPrefs.GetFloat("Options_EffectsVolume", PlayerInput.DefaultEffectsVolume);
         mouseLookSpeed = PlayerPrefs.GetFloat("Options_MouseLookSpeed", PlayerInput.DefaultMouseLookSpeed);
-        mouseLookSpeed = Mathf.Clamp(mouseLookSpeed, MinMouseLookSpeed, MaxMouseLookSpeed);
+        mouseLookSpeed = Mathf.Clamp(mouseLookSpeed, PlayerInput.MinMouseLookSpeed, PlayerInput.MaxMouseLookSpeed);
         useKeyAutomatically = PlayerPrefs.GetInt("Options_UseKeyAutomatically", 1) == 1;
         autoJump = PlayerPrefs.GetInt("Options_AutoJump", 0) == 1;
         invertLook = PlayerPrefs.GetInt("Options_InvertLook", 0) == 1;
+        autoSave = PlayerPrefs.GetInt("Options_AutoSave", 1) == 1;
+        keepMusicOnMap = PlayerPrefs.GetInt("Options_KeepMusicOnMap", 1) == 1;
         
         // Scan for available sound fonts
         ScanSoundFonts();
@@ -1555,7 +1573,7 @@ public class SaveLoadGUI : MonoBehaviour
                 effectsVolume = Mathf.Clamp01(effectsVolume + direction * 0.05f);
                 break;
             case 3: // Mouse look speed
-                mouseLookSpeed = Mathf.Clamp(mouseLookSpeed + direction * 0.05f, MinMouseLookSpeed, MaxMouseLookSpeed);
+                mouseLookSpeed = Mathf.Clamp(mouseLookSpeed + direction * 0.05f, PlayerInput.MinMouseLookSpeed, PlayerInput.MaxMouseLookSpeed);
                 break;
             case 4: // Invert look checkbox - toggle on either direction
                 invertLook = !invertLook;
@@ -1565,6 +1583,12 @@ public class SaveLoadGUI : MonoBehaviour
                 break;
             case 6: // Auto jump checkbox - toggle on either direction
                 autoJump = !autoJump;
+                break;
+            case 7: // Autosave on level entry
+                autoSave = !autoSave;
+                break;
+            case 8: // Keep music on map
+                keepMusicOnMap = !keepMusicOnMap;
                 break;
         }
     }
@@ -1579,14 +1603,14 @@ public class SaveLoadGUI : MonoBehaviour
         PlayerPrefs.SetInt("Options_UseKeyAutomatically", useKeyAutomatically ? 1 : 0);
         PlayerPrefs.SetInt("Options_AutoJump", autoJump ? 1 : 0);
         PlayerPrefs.SetInt("Options_InvertLook", invertLook ? 1 : 0);
+        PlayerPrefs.SetInt("Options_AutoSave", autoSave ? 1 : 0);
+        PlayerPrefs.SetInt("Options_KeepMusicOnMap", keepMusicOnMap ? 1 : 0);
         // The options with no row on this panel are written too, at the value in force: a read
         // creates nothing, so until something writes them they are missing from the registry,
         // which is the only place they can be changed.
-        PlayerPrefs.SetInt("Options_KeepMusicOnMap", PlayerInput.KeepMusicOnMap ? 1 : 0);
         PlayerPrefs.SetInt("Options_AmbientSilenceMax", (int)PlayerInput.AmbientSilenceMax);
         PlayerPrefs.SetInt("Options_ShieldSpellsSoak", PlayerInput.ShieldSpellsSoak ? 1 : 0);
         PlayerPrefs.SetInt("Options_RewardOnlyFirstTrapCopy", PlayerInput.RewardOnlyFirstTrapCopy ? 1 : 0);
-        PlayerPrefs.SetInt("Options_AutoSave", PlayerInput.AutoSave ? 1 : 0);
         PlayerPrefs.Save();
         
         // Apply music volume to MusicPlayer
@@ -1596,6 +1620,6 @@ public class SaveLoadGUI : MonoBehaviour
             MusicPlayer.Instance.ReloadSynthesizerWithSoundFont(soundFont, musicVolume);
         }
         
-        Debug.Log($"Applied and saved options: Music={musicVolume:F2}, SoundFont={soundFont}, Effects={effectsVolume:F2}, MouseLookSpeed={mouseLookSpeed:F2}, UseKeyAuto={useKeyAutomatically}, AutoJump={autoJump}, InvertLook={invertLook}");
+        Debug.Log($"Applied and saved options: Music={musicVolume:F2}, SoundFont={soundFont}, Effects={effectsVolume:F2}, MouseLookSpeed={mouseLookSpeed:F2}, UseKeyAuto={useKeyAutomatically}, AutoJump={autoJump}, InvertLook={invertLook}, AutoSave={autoSave}, KeepMusicOnMap={keepMusicOnMap}");
     }
 }

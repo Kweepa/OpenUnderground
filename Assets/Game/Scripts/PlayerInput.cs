@@ -6,9 +6,9 @@ using UnityEngine.InputSystem;
 /// </summary>
 public static class PlayerInput
 {
-    public const float DefaultMouseLookSpeed = 1f;
-    public const float MinMouseLookSpeed = 0.8f;
-    public const float MaxMouseLookSpeed = 2.2f;
+    public const float DefaultMouseLookSpeed = 1.75f;
+    public const float MinMouseLookSpeed = 0.25f;
+    public const float MaxMouseLookSpeed = 5.0f;
 
     public static float MouseLookSpeed =>
         Mathf.Clamp(PlayerPrefs.GetFloat("Options_MouseLookSpeed", DefaultMouseLookSpeed),
