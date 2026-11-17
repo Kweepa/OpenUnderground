@@ -53,8 +53,9 @@ public class PlayerPanelInput : MonoBehaviour
             return;
         }
 
-        // the game menu, and the small-window warning, which reads A, B and Start itself (fix 460)
-        if ((PlayerObject.Player.controlsDisabled & (EControlMask.SaveLoad | EControlMask.Warning)) != 0)
+        // the game menu, and the small-window warning, which reads A, B and Start itself (fix 460); and the sleep,
+        // which in the original takes no input from "You make camp" to the waking (UW.EXE 0x81f8f, player_sleep, SKILLS.C)
+        if ((PlayerObject.Player.controlsDisabled & (EControlMask.SaveLoad | EControlMask.Warning | EControlMask.Resting)) != 0)
         {
             continuousWalkDismissTime = 0f;
             GameplayCursorPolicy.Apply(PlayerObject.Player);

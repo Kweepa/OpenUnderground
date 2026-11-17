@@ -1,3 +1,5 @@
+using UnityEngine;
+
 /// <summary>
 /// When the player's poison hurts, and how much.
 /// </summary>
@@ -25,6 +27,31 @@ public class PoisonClock
     private bool pulseResisted;
     private float intoMinute;
     private int pulsesThisMinute;
+
+    /// <summary>The clock as a save keeps it: where the minute and the next point stand.</summary>
+    public PoisonClockData Save()
+    {
+        return new PoisonClockData
+        {
+            minuteLeft = minuteLeft,
+            pulseLeft = pulseLeft,
+            pulseArmed = pulseArmed,
+            pulseResisted = pulseResisted,
+            intoMinute = intoMinute,
+            pulsesThisMinute = pulsesThisMinute,
+        };
+    }
+
+    /// <summary>The clock as it was saved, so a load does not start the minute over (fix 525).</summary>
+    public void Load(PoisonClockData data)
+    {
+        minuteLeft = data.minuteLeft > 0.0f ? Mathf.Min(data.minuteLeft, MinuteSeconds) : MinuteSeconds;
+        pulseLeft = data.pulseLeft;
+        pulseArmed = data.pulseArmed;
+        pulseResisted = data.pulseResisted;
+        intoMinute = data.intoMinute;
+        pulsesThisMinute = Mathf.Max(0, data.pulsesThisMinute);
+    }
 
     /// <summary>The points already done in the minute under way, in pulses.</summary>
     public int PulsesThisMinute => pulsesThisMinute;
@@ -130,4 +157,16 @@ public class PoisonClock
 
         return total;
     }
+}
+
+/// <summary>A <see cref="PoisonClock"/> in a save.</summary>
+[System.Serializable]
+public class PoisonClockData
+{
+    public float minuteLeft;
+    public float pulseLeft;
+    public bool pulseArmed;
+    public bool pulseResisted;
+    public float intoMinute;
+    public int pulsesThisMinute;
 }

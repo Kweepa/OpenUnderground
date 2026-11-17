@@ -2,6 +2,10 @@
 
 ## Next release
 
+- After a sleep the mana no longer fills up by itself in two seconds, nor does a ring of Regeneration heal you fully, as in the original; and nothing in the inventory answers during the sleep, so a second sleep can no longer start inside the first.
+
+- Loading a game no longer starts the poison's minute over, nor hurts a starving or exhausted character at once, and the poison line in the stats panel is now green.
+
 - Easy now works as in the original: blows and missiles that hit you do half damage instead of two thirds, you hit a little more often, and the monsters no longer take half again from your blows, while poison, traps, falls and spells hurt in full, so poison is no longer harmless on Easy. Passing out drunk in a fight now kills on Easy as on Standard, and at any point of the fight, not only while the plain combat music plays.
 
 - The cudgel and the three maces are held lower while you charge a blow, so the head of the maces no longer runs off the top of the screen.

@@ -191,6 +191,10 @@ public class StatsPanel : MonoBehaviour
         lerpIn = Utils.DampedApproachUnscaledTime(lerpIn, lerpTarget, 0.2f);
     }
 
+    // the poisoned vitality flask's own green: the colour most of its middle segments are drawn in (FLASKS.GR, images
+    // 50-62, palette 0 with the remake's gamma), #50B438
+    private const string PoisonColour = "50B438";
+
     private static string Bold(string text)
     {
         return "<b>" + text + "</b>";
@@ -295,9 +299,13 @@ public class StatsPanel : MonoBehaviour
             {
                 // The original's scale, UW.EXE 0x262b7-0x262bf: 84 + (level - 1) / 3, so the levels
                 // 1 to 15 take the five adverbs three each.
+                // In green, the vitality flask's colour while poisoned: ours, the user's choice of 17 November 2026; the
+                // original prints this line plain in the scroll, on a click on the flask (UW.EXE 0x261ff, flask_info, INTERACT.C).
+                status += "<color=#" + PoisonColour + ">";
                 status += StringLoader.GetString(1, 91);
                 status += Bold(StringLoader.GetString(1, 84 + Mathf.Clamp((PlayerData.sData.poison - 1) / 3, 0, 4)));
-                status += StringLoader.GetString(1, 92);
+                status += StringLoader.GetString(1, 92).TrimEnd('\r', '\n');
+                status += "</color>\n";
             }
 
             status = status.Replace("\r", "");

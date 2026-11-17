@@ -1253,6 +1253,24 @@ public class Magic : MonoBehaviour
 
     private double lastIncrementedMana;
     private double lastCheckedPermanentSpells;
+    // false until both marks are set: on a new game they start at the clock, 19:00, not at 0 (LoadFromData() sets them on a load)
+    private bool marksSet;
+
+    /// <summary>
+    /// The game clock jumps: a sleep, an incense vision, a repair at the anvil. The original runs no world tick
+    /// for the time skipped - UW.EXE 0x81f8f (player_sleep, SKILLS.C) adds the hours to the clock and does its
+    /// own accounting, and only the play screen runs the tick, on real seconds (duration_check, PLAYTIME.C) -
+    /// so the jump pays no five-minute mana and no worn regeneration: both marks move with the clock.
+    /// </summary>
+    public static void SkipTime(double seconds)
+    {
+        PlayerData.sData.gameTime += seconds;
+        if (sMagic != null)
+        {
+            sMagic.lastIncrementedMana += seconds;
+            sMagic.lastCheckedPermanentSpells += seconds;
+        }
+    }
 
     private void PlayMoveSound()
     {
@@ -1341,6 +1359,13 @@ public class Magic : MonoBehaviour
             {
                 ReleaseTypingKeys();
             }
+        }
+
+        if (!marksSet)
+        {
+            lastIncrementedMana = PlayerData.sData.gameTime;
+            lastCheckedPermanentSpells = PlayerData.sData.gameTime;
+            marksSet = true;
         }
 
         // recover mana over time
@@ -4725,8 +4750,10 @@ public class Magic : MonoBehaviour
     {
         if (data == null) return;
         
-        lastIncrementedMana = data.lastIncrementedMana;
-        lastCheckedPermanentSpells = data.lastCheckedPermanentSpells;
+        // a save of an earlier build may hold marks hours behind the clock, after a sleep: at most one step is still due
+        lastIncrementedMana = System.Math.Max(data.lastIncrementedMana, PlayerData.sData.gameTime - 5 * 60);
+        lastCheckedPermanentSpells = System.Math.Max(data.lastCheckedPermanentSpells, PlayerData.sData.gameTime - RegenerationSeconds);
+        marksSet = true;
 
         mousePrimedSpellIndex = -1;
         mousePrimedSpellWasCritical = false;

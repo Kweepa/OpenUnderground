@@ -40,6 +40,12 @@ public static class Sleeping
     // can sleep here, so that a refusal is not preceded by a question.
     private static void AskThenSleep(int way)
     {
+        // not inside a sleep already under way
+        if (Resting)
+        {
+            return;
+        }
+
         if (Utils.CanSleepHere(notify: true))
         {
             RepairDialog.AskYesNo("Do you wish to go to sleep?", yes =>
@@ -61,8 +67,16 @@ public static class Sleeping
         return Sleep(Forced);
     }
 
+    private static bool Resting => PlayerObject.Player != null && (PlayerObject.Player.controlsDisabled & EControlMask.Resting) != 0;
+
     private static IEnumerator Sleep(int way)
     {
+        // one sleep at a time: a second one started inside the first would pay the hours, the healing and the hunger twice
+        if (Resting)
+        {
+            yield break;
+        }
+
         PlayerObject.DisableControls(EControlMask.Resting, true);
 
         if (way != Forced)
@@ -146,7 +160,7 @@ public static class Sleeping
         PlayerObject.Player.GetComponent<PlayerEffectsController>()?.EndMushroomTrip();
 
         int hours = Random.Range(2, 7);
-        PlayerData.sData.gameTime += hours * 60 * 60;
+        Magic.SkipTime(hours * 60 * 60);
         // Ours: the repopulation makes up the hours as if the player had stayed awake where he lies,
         // before a creature may come and wake him.
         Repopulation.Update();
@@ -185,7 +199,7 @@ public static class Sleeping
             {
                 moreHours += Random.Range(1, 3);
             }
-            PlayerData.sData.gameTime += moreHours * 60 * 60;
+            Magic.SkipTime(moreHours * 60 * 60);
             hours += moreHours;
             Repopulation.Update();
 

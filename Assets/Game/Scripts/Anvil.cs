@@ -146,7 +146,7 @@ public class Anvil : UUObject
         // is at a twelfth, settled by playing it: at the full rate two repairs were enough to
         // leave a rested character fatigued and a third one bleeding. Neither mapping is the
         // original's - what is the original's is the clock.
-        PlayerData.sData.gameTime += 60.0 * minutes;
+        Magic.SkipTime(60.0 * minutes);
         PlayerData.sData.hunger = Mathf.Min(PlayerData.sData.hunger + minutes, 255);
         PlayerData.sData.fatigue = Mathf.Min(PlayerData.sData.fatigue + minutes / 12, 30);
 

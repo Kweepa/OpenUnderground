@@ -122,7 +122,9 @@ public class Inventory : MonoBehaviour
     private int dy = 66;
 
     // the small-window warning too, modal: its press does not reach the pack (SmallWindowWarning.BlocksInput)
-    private const EControlMask InventoryModalUiMask = EControlMask.HowMany | EControlMask.RepairDialog | EControlMask.Warning;
+    // and the sleep, which in the original is one call that takes no input (UW.EXE 0x81f8f, player_sleep, SKILLS.C)
+    private const EControlMask InventoryModalUiMask = EControlMask.HowMany | EControlMask.RepairDialog | EControlMask.Warning
+        | EControlMask.Resting;
 
     // Screens whose left clicks are their own: a click there does not throw the item on the mouse cursor. The game
     // menu, the map, a cutscene and the flute used to count as "outside the panel", and the click threw it.

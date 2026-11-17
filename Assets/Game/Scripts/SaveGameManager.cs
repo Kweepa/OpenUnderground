@@ -1194,6 +1194,7 @@ public class SaveGameManager : MonoBehaviour
         data.wasGrounded = player.wasGrounded;
         data.stamina = player.stamina;
         data.staminaRecoverDelayRemaining = player.staminaRecoverDelayRemaining;
+        player.SaveClocks(data);
         
         // Encountered critters for summon spell
         data.encounteredCritters = new List<EncounteredCritterEntry>();
@@ -1296,6 +1297,7 @@ public class SaveGameManager : MonoBehaviour
         }
         player.stamina = Mathf.Clamp01(data.stamina);
         player.staminaRecoverDelayRemaining = Mathf.Max(0f, data.staminaRecoverDelayRemaining);
+        player.LoadClocks(data);
         
         // Restore basic stats
         playerData.female = data.female;

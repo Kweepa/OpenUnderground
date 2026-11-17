@@ -135,6 +135,15 @@ public class PlayerSaveData
     public bool wasGrounded;
     public float stamina = 1.0f;
     public float staminaRecoverDelayRemaining;
+
+    // The clocks of hunger, fatigue, their damage and the poison (fixes 507, 525). A save of an earlier build has
+    // none, and its zeros would read as due now: clocksSaved says they are there.
+    public bool clocksSaved;
+    public float timeToNextHunger;
+    public float timeToNextFatigue;
+    public float timeToNextHungerDamage;
+    public float timeToNextFatigueDamage;
+    public PoisonClockData poisonClock;
     
     // Encountered critters for summon spell
     public List<EncounteredCritterEntry> encounteredCritters;
