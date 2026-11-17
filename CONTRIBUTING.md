@@ -60,6 +60,11 @@ not in a separate pull request: the reviewer sees how the change will be told, a
 is turned down leaves no line behind. The README describes the builds players can download, so a
 new platform enters it with the first build released for it.
 
+**Say where new assets come from.** A pull request that adds an image, a sound, a model, a font
+or any other asset says in its description where it comes from - made by you, generated with a
+tool (and which), or taken from somewhere (with the link and its licence) - and that you have
+the right to publish it here. Without that it cannot be merged.
+
 ## Commit messages
 
 The commit message is what fills in the pull request description, so it is worth writing once,
