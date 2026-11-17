@@ -199,14 +199,15 @@ public static class NativeFileDialog
     public static bool IsAvailable => true;
 
 #if UNITY_STANDALONE_OSX && !UNITY_EDITOR
-    [DllImport("__Internal")]
+    // PlugIns/NativeFileDialogMac.bundle (compiled from .mm). __Internal is iOS/static-link only.
+    [DllImport("NativeFileDialogMac")]
     private static extern IntPtr MacNativeFileDialog_OpenFile(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string title,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string patterns,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string initialFolder,
         int multiple);
 
-    [DllImport("__Internal")]
+    [DllImport("NativeFileDialogMac")]
     private static extern void MacNativeFileDialog_Free(IntPtr ptr);
 #endif
 
