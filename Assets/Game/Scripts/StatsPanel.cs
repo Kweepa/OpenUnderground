@@ -12,6 +12,30 @@ public class StatsPanel : MonoBehaviour
 
     public static StatsPanel sStatsPanel;
 
+    private const float BaseWidth = 83f;
+    private const float BaseHeight = 114f;
+
+    private void Awake()
+    {
+        if (background != null)
+        {
+            background.filterMode = FilterMode.Point;
+        }
+
+        string statsOverride = System.IO.Path.Combine(Application.streamingAssetsPath, "Textures/statspanel.png");
+        if (System.IO.File.Exists(statsOverride))
+        {
+            byte[] bytes = System.IO.File.ReadAllBytes(statsOverride);
+            Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (tex.LoadImage(bytes))
+            {
+                tex.filterMode = FilterMode.Point;
+                tex.wrapMode = TextureWrapMode.Clamp;
+                background = tex;
+            }
+        }
+    }
+
     /// <summary>Whether the panel is on the left of the screen, where it covers the magic panel.</summary>
     public bool IsOnLeft => onLeft;
 
@@ -118,8 +142,8 @@ public class StatsPanel : MonoBehaviour
     /// <summary>The panel as drawn, on its side and sliding in from it.</summary>
     private Rect GetPanelRect()
     {
-        float w = ScaleX * (background.width - CropRight);
-        float h = ScaleY * (background.height - CropTop - CropBottom);
+        float w = ScaleX * (BaseWidth - CropRight);
+        float h = ScaleY * (BaseHeight - CropTop - CropBottom);
         float slide = lerpIn * (w + PlayerPanelState.PanelMargin);
         float x = onLeft ? slide - w : Screen.width - slide;
         return new Rect(x, PlayerPanelState.PanelMargin, w, h);

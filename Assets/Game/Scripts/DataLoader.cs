@@ -177,6 +177,12 @@ public class DataLoader : MonoBehaviour
         lftiTex = GraphicsLoader.GetTextures("../Data/lfti.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
         opbtnTex = GraphicsLoader.GetTextures("../Data/opbtn.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp, paletteIndex: 2);
 
+        TextureOverrideLoader.ApplyUI(panelsTex, bodiesTex, armor_fTex, armor_mTex);
+        SetTexturesFilter(panelsTex, FilterMode.Point);
+        SetTexturesFilter(bodiesTex, FilterMode.Point);
+        SetTexturesFilter(armor_fTex, FilterMode.Point);
+        SetTexturesFilter(armor_mTex, FilterMode.Point);
+
 #if true
       buttonsTex = GraphicsLoader.GetTextures("../Data/buttons.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
       viewsTex = GraphicsLoader.GetTextures("../Data/views.gr", zeroAlpha: 0.0f, wrapMode: TextureWrapMode.Clamp);
@@ -243,5 +249,21 @@ public class DataLoader : MonoBehaviour
         }
 
         tex.Apply();
+    }
+
+    private static void SetTexturesFilter(Texture2D[] texs, FilterMode mode)
+    {
+        if (texs == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < texs.Length; ++i)
+        {
+            if (texs[i] != null)
+            {
+                texs[i].filterMode = mode;
+            }
+        }
     }
 }

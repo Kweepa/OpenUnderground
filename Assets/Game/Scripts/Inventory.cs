@@ -2328,6 +2328,10 @@ public class Inventory : MonoBehaviour
     protected void Start()
     {
         sInv = this;
+        if (crackPatch != null)
+        {
+            crackPatch.filterMode = FilterMode.Point;
+        }
         if (GetComponent<SoftwareCursorOverlay>() == null)
             gameObject.AddComponent<SoftwareCursorOverlay>();
 
@@ -5546,19 +5550,30 @@ public class Inventory : MonoBehaviour
             // panel
             {
                 Texture2D tex = DataLoader.sDataLoader.panelsTex[0];
-                GUI.DrawTexture(new Rect(Screen.width - invPosition, PanelTop, 3 * tex.width, 3.6f * tex.height), tex);
+                const float basePanelW = 83f;
+                const float basePanelH = 114f;
+                float panelDrawW = 3 * basePanelW;
+                float panelDrawH = 3.6f * basePanelH;
+
+                GUI.DrawTexture(new Rect(Screen.width - invPosition, PanelTop, panelDrawW, panelDrawH), tex);
                 // now draw a section at the bottom to extend the panel by two rows
                 GUI.DrawTextureWithTexCoords(
-                    new Rect(Screen.width - invPosition, PanelTop + 3.6f * (tex.height - 4), 3 * tex.width, 3.6f * 40),
+                    new Rect(Screen.width - invPosition, PanelTop + 3.6f * (basePanelH - 4), panelDrawW, 3.6f * 40),
                     tex,
                     new Rect(0, 0, 1, 40.0f / 114));
                 // finally draw the patch to cover the crack
-                GUI.DrawTexture(new Rect(Screen.width - invPosition + 9, PanelTop + 3.6f * (tex.height - crackPatchHeight), 3 * crackPatch.width, 3.6f * crackPatch.height), crackPatch);
+                if (crackPatch != null)
+                {
+                    float patchDrawW = 3 * (crackPatch.width > 100 ? 77f : crackPatch.width);
+                    GUI.DrawTexture(new Rect(Screen.width - invPosition + 9, PanelTop + 3.6f * (basePanelH - crackPatchHeight), patchDrawW, 3.6f * crackPatchHeight), crackPatch);
+                }
             }
-            // woman
+            // woman / man paperdoll
             {
                 Texture2D tex = DataLoader.sDataLoader.bodiesTex[(PlayerData.sData.female ? 5 : 0) + PlayerData.sData.portrait];
-                GUI.DrawTexture(new Rect(Screen.width - invPosition + 72, PanelTop + 15, 3 * tex.width, 3.6f * tex.height), tex);
+                float bodyW = 3 * (tex.width > 50 ? 34f : tex.width);
+                float bodyH = 3.6f * (tex.height > 80 ? 50f : tex.height);
+                GUI.DrawTexture(new Rect(Screen.width - invPosition + 72, PanelTop + 15, bodyW, bodyH), tex);
             }
             // carry weight remaining
             int remainingCarryWeight = Mathf.Max(0, PlayerObject.Player.remainingCarryWeight);
