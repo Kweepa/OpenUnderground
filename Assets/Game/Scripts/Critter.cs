@@ -3368,11 +3368,21 @@ public class Critter : UUObject
                 break;
             }
 
+            // An afraid creature takes a near hearing for the player himself, and runs (FleesOnNotice()),
+            // instead of turning to the sound until it senses him at its side. Ours: the original's fleeing
+            // creature does not perceive at all, knowing where its target is (UW.EXE 0x1a0aa (crit_flee,
+            // AI.C)); only the guard walks to a sound (UW.EXE 0x19360 (crit_guard, AI.C)).
+            if (afraid && !cornered)
+            {
+                awareOfPlayer = true;
+                return true;
+            }
+
             alertedByPlayer = true;
             // The growl that says it has noticed something, once (Kweepa's sound, given to the near
             // answer too at the user's request of 10 October 2026).
             PlayNoticeSound();
-            // An afraid creature does not come to see what it heard (FleesOnNotice()).
+            // A cornered one that is still afraid does not come to see what it heard either.
             if (Random.Range(0, 2) == 0 && !afraid)
             {
                 WalkToPlayersTile();
@@ -4017,8 +4027,16 @@ public class Critter : UUObject
 
             // Running home, it turns on a player who comes within two tiles and can be reached: the
             // user's choice of 11 October 2026, so the run is a way out of a fight at range, not a free
-            // pass to close in on it.
-            if (returningHome && perceptionTick && PlayerWithinTiles(2.0f)
+            // pass to close in on it. An afraid one runs from him instead (FleesOnNotice()); a cornered
+            // one turns on him.
+            if (returningHome && perceptionTick && PlayerWithinTiles(2.0f) && afraid && !cornered
+                && attitude == EAttitude.Hostile && attackTarget == null)
+            {
+                returningHome = false;
+                awareOfPlayer = true;
+                RunAway();
+            }
+            else if (returningHome && perceptionTick && PlayerWithinTiles(2.0f)
                 && GetPath(out List<Vector3> toPlayer, transform.position, GetTargetFootPos(), mayCrossLava: false))
             {
                 returningHome = false;
@@ -5982,9 +6000,10 @@ public class Critter : UUObject
         float maxDrop = Tile.yScale * Mathf.Max(-cornerDiff1, -cornerDiff2);
 
         // Both ends must be within stepOffset for steps up, and maxDropHeight for drops down
-        // Fleeing or confused characters can drop by maxDropHeight, others only by stepOffset
+        // Fleeing or confused characters can drop by maxDropHeight, others only by stepOffset.
+        // A flight's path is sought before its state is set (RunAway()), so fleePathing counts too.
         float stepOffset = cachedCharacterController.stepOffset;
-        bool canDropFar = state == EState.TurnToFlee || confusionTime > 0.0f;
+        bool canDropFar = fleePathing || state is EState.TurnToFlee or EState.Flee || confusionTime > 0.0f;
         float allowedDropHeight = canDropFar ? maxDropHeight : stepOffset;
         return maxStepUp <= stepOffset && maxDrop <= allowedDropHeight;
     }
@@ -6777,10 +6796,11 @@ public class Critter : UUObject
 
     /// <summary>
     /// The speed a fleeing creature backs off at when the player is next to it, facing him: half its
-    /// walk in the original's units, <c>(critterStats byte 0x0b + 1) / 2</c> (UW.EXE 0x1a237), made a
-    /// speed as the combat step makes its own (TryStartCombatStep()).
+    /// walk in the original's units, <c>(critterStats byte 0x0b + 1) / 2</c> (UW.EXE 0x1a237 (crit_flee,
+    /// AI.C)), CreatureSpeedUnit each, as the combat step makes its own (TryStartCombatStep()): a
+    /// goblin's walk of 4 backs off at 2 units, 1.1 m/s.
     /// </summary>
-    private float BackOffSpeed => (stats.WalkSpeed + 1) / 2 * walkSpeed / 4.0f;
+    private float BackOffSpeed => (stats.WalkSpeed + 1) / 2 * CreatureSpeedUnit;
 
     /// <summary>
     /// Whether the creature bleeds, by the splats its stats row gives it: blood or a pool of it,
