@@ -44,6 +44,22 @@ Please keep a pull request to the files it needs. A few things produce large dif
 - **`Library/`, `Temp/`, `Logs/`, build output.** These are not in the repository and should stay
   out.
 
+### Before you open it
+
+**Try it in the game.** Anything that changes what is on screen or how the game plays is played
+before the pull request is opened, and the description says what was done and what was seen: the
+level, the save, the steps, and a before-and-after screenshot when the change is visual. A test
+plan with empty boxes is a list of things nobody has tried yet. Where a change has nothing on
+screen - a build setting, a tool - say how it was measured instead.
+
+**Tell the players, in the same commit.** If a player will notice the change, add one line for it
+to `CHANGELOG.md`, under `## Next release`: what the player sees, in one or two sentences, not how
+the code does it. If the change alters something `README.md` describes - where the data files or
+the saves are, what the game runs on - update that as well. Both go in the change's own commit,
+not in a separate pull request: the reviewer sees how the change will be told, and a change that
+is turned down leaves no line behind. The README describes the builds players can download, so a
+new platform enters it with the first build released for it.
+
 ## Commit messages
 
 The commit message is what fills in the pull request description, so it is worth writing once,
@@ -70,6 +86,10 @@ cuts it there, moving the rest into the description. Wrap the body at 72-80 colu
 
 The summary should be readable in ten seconds. Put the detail below it, where it gets read only if
 someone wants it.
+
+For a fix, the summary starts from the problem: what goes wrong, and where a player meets it. A
+reviewer who has to guess what a change is for cannot judge whether it is needed, however good its
+code.
 
 ## Changing how the game plays
 
