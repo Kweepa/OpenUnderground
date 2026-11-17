@@ -1167,6 +1167,18 @@ public class FrontEnd : MonoBehaviour
         {
             frontEndCamera.tag = "Untagged";
         }
+
+        // Journey Onward into a save should not carry the title-screen track into the dungeon.
+        // Music on the Player prefab would otherwise call LetCurrentTrackFinish() in Awake and
+        // leave the intro/title music playing (by design for a new game, wrong for a load).
+        if (MusicPlayer.Instance != null)
+        {
+            MusicPlayer.Instance.SetMusicDuckMultiplier(1f);
+            if (MusicConfig.Contains(EMusicSituation.Title, MusicPlayer.Instance.currentTrack))
+            {
+                MusicPlayer.Instance.StopMusic();
+            }
+        }
         
         Instantiate(levelLoader);
         Instantiate(player);

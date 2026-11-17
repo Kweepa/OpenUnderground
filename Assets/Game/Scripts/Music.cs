@@ -125,12 +125,14 @@ public class Music : MonoBehaviour
         }
         
         // Let the title screen track finish instead of cutting it off. Music lives on the Player
-        // prefab, so Awake() runs the moment the game starts - on a new character and on a load
-        // alike - and the menu track is still playing. The original does not cut it either: it
-        // carries on into the dungeon and the ambient rotation only takes over once it ends.
-        // Clearing the loop is what lets it end at all, since the front end started it looping.
-        // From there Update() does the rest: the exploring branch sees nothing playing, serves the
-        // usual stretch of quiet if the player asked for it, and then draws the first track.
+        // prefab, so Awake() runs the moment a new game starts and the menu track is still playing.
+        // The original does not cut it either: it carries on into the dungeon and the ambient
+        // rotation only takes over once it ends. Clearing the loop is what lets it end at all,
+        // since the front end started it looping. From there Update() does the rest: the exploring
+        // branch sees nothing playing, serves the usual stretch of quiet if the player asked for
+        // it, and then draws the first track.
+        // Loads stop the title track in FrontEnd.LoadAGame before the player is spawned, so this
+        // branch is for a new character only.
         if (musicPlayer.IsPlaying)
         {
             musicPlayer.LetCurrentTrackFinish();
