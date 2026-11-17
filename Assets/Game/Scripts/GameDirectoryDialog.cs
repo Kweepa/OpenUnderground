@@ -84,6 +84,9 @@ public class GameDirectoryDialog : MonoBehaviour
     public Color buttonBoxHighlightColor = Color.white;
     public Color buttonBoxDisabledColor = new Color(0.482f, 0.341f, 0.204f); // #7B5734, dark brown, for a button greyed out
 
+    // An error in the status line: a darker red than Color.red, which glared on the wood (the user, 17 November 2026).
+    private static readonly Color errorColor = new Color32(165, 22, 14, 255);
+
     private static bool sStartupInfoLogged;
 
     private static void LogStartupInfo()
@@ -431,7 +434,7 @@ public class GameDirectoryDialog : MonoBehaviour
             }
             else
             {
-                GUI.color = Color.red;
+                GUI.color = errorColor;
             }
             
             GUI.Label(UiScale.R(dialogX + 60, statusY, dialogWidth - 120, 100), 
@@ -699,9 +702,10 @@ public class GameDirectoryDialog : MonoBehaviour
     
     /// <summary>
     /// At the window's start, before any button: the game's folders as GOG's and Steam's installers write them in the
-    /// registry, a few folders searched in a moment. Found there, the game is validated and loads; if not, or if the
-    /// search fails, the field, Browse and Auto Search are offered with no message, the instructions saying what to do,
-    /// and Auto Search goes on through the usual places.
+    /// registry, a few folders searched in a moment. Found there, the game is validated and loads; if not, the field,
+    /// Browse and Auto Search are offered with no message, the instructions saying what to do, and Auto Search tries
+    /// these folders again and goes on through the usual places. A game.gog or game.bin found there that could not be unpacked - a full disk, no
+    /// access - is said, though: that is not a game missing, and no other search would say it.
     /// </summary>
     private IEnumerator RegistrySearch()
     {
@@ -710,15 +714,25 @@ public class GameDirectoryDialog : MonoBehaviour
         startupSearch = isValidPath;
     }
     
-    /// <summary>The Auto Search button: the usual places and the Steam libraries, the registry's folders tried at start.</summary>
+    /// <summary>
+    /// The Auto Search button: the registry's folders again, then the usual places and the Steam libraries. The
+    /// registry's first, though the start has tried them (the user's choice, 17 November 2026): a game.gog found there
+    /// that could not be unpacked - a full disk - is unpacked again once the player has made room, wherever it is.
+    /// </summary>
     private IEnumerator AutoSearch()
     {
-        return SearchRoots(FixedSearchRoots(), "Auto-search completed. Could not find game directory. Please enter the path manually.");
+        List<SearchRoot> roots = RegistrySearchRoots();
+        foreach (SearchRoot root in FixedSearchRoots())
+        {
+            AddRoot(roots, root.Folder, root.Depth);
+        }
+        return SearchRoots(roots, "Auto-search completed. Could not find game directory. Please enter the path manually.");
     }
     
     /// <summary>
     /// Searches the folders in order and moves on with the first that holds the game. Not found, the status shows the
-    /// extraction's error or notFoundMessage; with notFoundMessage null, what it showed before.
+    /// extraction's error, whichever search it was; else notFoundMessage, or with notFoundMessage null what it showed
+    /// before.
     /// </summary>
     private IEnumerator SearchRoots(List<SearchRoot> roots, string notFoundMessage)
     {
@@ -770,13 +784,13 @@ public class GameDirectoryDialog : MonoBehaviour
         
         workingHeadline = null;
         isSearching = false;
-        if (notFoundMessage == null)
-        {
-            statusMessage = previousMessage;
-        }
-        else if (!string.IsNullOrEmpty(lastGogExtractError))
+        if (!string.IsNullOrEmpty(lastGogExtractError))
         {
             statusMessage = lastGogExtractError;
+        }
+        else if (notFoundMessage == null)
+        {
+            statusMessage = previousMessage;
         }
         else
         {
@@ -796,13 +810,13 @@ public class GameDirectoryDialog : MonoBehaviour
         {
             AddRoot(roots, install, 2);
         }
-        UnityEngine.Debug.Log("Search at start: game folders in the registry " + (installs.Count == 0 ? "none" : string.Join("; ", installs)));
+        UnityEngine.Debug.Log("Game folders in the registry: " + (installs.Count == 0 ? "none" : string.Join("; ", installs)));
         return roots;
     }
     
     /// <summary>
-    /// Where Auto Search looks, in order, each folder with how many levels of it are searched (the folder itself is
-    /// the first): the usual places, four, among them C:\UW and C:\DOSBox for a copy of the DOS game; then the
+    /// Where Auto Search looks after the registry's folders, in order, each folder with how many levels of it are
+    /// searched (the folder itself is the first): the usual places, four, among them C:\UW and C:\DOSBox for a copy of the DOS game; then the
     /// steamapps\common folder of every Steam library, three - the folder, each game's, and one below.
     /// </summary>
     private static List<SearchRoot> FixedSearchRoots()
