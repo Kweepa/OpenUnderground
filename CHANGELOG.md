@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Holding Enter while typing runes no longer casts the spell over and over, nor does a held letter fill the shelf; holding the cast key, or the pad's cast button, now tries again after a failed roll or until you are ready to cast, and stops at the first spell that goes off: one press, one spell.
+
 - A creature that has fled from you now runs again when it hears you close by, or meets you on its way home, instead of coming to look or turning on you; a fleeing creature jumps down a ledge of up to two metres again, and backs away from you at the original's speed, about twice as fast as before.
 
 - Gaining a level with the weapon raised now plays its fanfare, a creature that wakes you starts the combat music at once, and the next game no longer opens with the warning music after a death with the weapon up, nor is a blow held as you die swung; with the Alert music switched off, raising the weapon no longer cuts the music. The title music now plays once and the menu then goes on with an ambient track, as in the original. A damaged track of your own now just ends where it breaks, and a track you listened to and then removed is deleted from the Music folder.
