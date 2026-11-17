@@ -2482,11 +2482,6 @@ public class Magic : MonoBehaviour
                 }
             }
 
-            for (int j = Inventory.sInv.litLights.Count - 1; j >= 0; --j)
-            {
-                Inventory.sInv.litLights[j].SetLit(false);
-                putOut = true;
-            }
         }
 
         if (putOut)
