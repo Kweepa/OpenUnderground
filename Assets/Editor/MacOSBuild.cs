@@ -191,7 +191,15 @@ public static class MacOSBuild
 
             string dest = Path.Combine(appPath, "Contents", "Resources", "PlayerIcon.icns");
             File.Copy(icnsPath, dest, true);
-            // Nudge Finder to drop any cached Dock icon for this path.
+            // Unity CLI may drop provenance next to Contents; that breaks the bundle seal.
+            string provenance = Path.Combine(appPath, "unity-build.provenance.json");
+            if (File.Exists(provenance))
+            {
+                File.Delete(provenance);
+            }
+            // Replacing a sealed resource invalidates the signature; ad-hoc resign so
+            // right-click / Option-Open Gatekeeper bypass works on other Macs.
+            RunTool("/usr/bin/codesign", "--force", "--deep", "--sign", "-", appPath);
             RunTool("/usr/bin/touch", appPath);
             Debug.Log("macOS build: embedded PlayerIcon.icns from " + AppIconPath);
         }
