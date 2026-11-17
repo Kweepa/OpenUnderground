@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Gaining a level with the weapon raised now plays its fanfare, a creature that wakes you starts the combat music at once, and the next game no longer opens with the warning music after a death with the weapon up, nor is a blow held as you die swung; with the Alert music switched off, raising the weapon no longer cuts the music. The title music now plays once and the menu then goes on with an ambient track, as in the original. A damaged track of your own now just ends where it breaks, and a track you listened to and then removed is deleted from the Music folder.
+
 - An ear of corn on the lit torch you hold now makes popcorn, and on the pad incense burns on it instead of putting it out; combining two items no longer fails after part of a pile was taken, and a refused incense burn no longer loses a block.
 
 - A pile of torches or candles in the inventory now lights one of them, taking off a lit light now lets its snuffing be heard and an unlit one is silent, a key taken off a pile keeps its "(level N)", and on the pad the inventory's A hint now says it also picks an item up.

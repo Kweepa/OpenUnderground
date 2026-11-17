@@ -47,7 +47,7 @@ public class MusicSetupPage : IGameMenuSubPage
         "While the map is open, unless the options keep the music playing on the map.",
         "While you sleep.",
         "While you talk to someone.",
-        "On the title screen."
+        "On the title screen, once; then the menu loops an ambient track."
     };
 
     private static readonly Color selectColor = new Color32(255, 213, 64, 255);
@@ -847,21 +847,21 @@ internal static class TrackLengths
     /// <summary>"3:12", or nothing while the file is still to be measured, or "?".</summary>
     public static string Text(string path, MonoBehaviour host)
     {
-        if (seconds.TryGetValue(path, out float length))
+        if (!seconds.TryGetValue(path, out float length))
         {
-            return float.IsNaN(length) ? "" : length < 0f ? "?" : Format(length);
+            length = float.NaN;
+            seconds[path] = length;
+            waiting.Enqueue(path);
         }
 
-        seconds[path] = float.NaN;
-        waiting.Enqueue(path);
         // The one that measured may be gone - the title screen is rebuilt after a game - and with it
-        // its coroutine.
-        if (runner == null && host != null)
+        // its coroutine: asked for every row, so that the files still waiting are measured too.
+        if (runner == null && host != null && waiting.Count > 0)
         {
             runner = host;
             host.StartCoroutine(MeasureWaiting());
         }
-        return "";
+        return float.IsNaN(length) ? "" : length < 0f ? "?" : Format(length);
     }
 
     private static string Format(float length)
@@ -872,40 +872,57 @@ internal static class TrackLengths
 
     private static IEnumerator MeasureWaiting()
     {
-        while (waiting.Count > 0)
+        // Cleared however the loop ends, so that the next row asked for starts it again (Text()).
+        try
         {
-            string path = waiting.Dequeue();
-            float length = -1f;
-            if (Path.GetExtension(path).Equals(".xmi", StringComparison.OrdinalIgnoreCase))
+            while (waiting.Count > 0)
             {
-                length = MeasureXmi(path);
-            }
-            else
-            {
-                using UnityWebRequest web = UnityWebRequestMultimedia.GetAudioClip(MusicPlayer.FileUri(path), MusicPlayer.AudioTypeOf(path));
-                ((DownloadHandlerAudioClip)web.downloadHandler).streamAudio = true;
-                yield return web.SendWebRequest();
-                if (web.result == UnityWebRequest.Result.Success)
+                // Taken off the queue once measured: a coroutine that dies with its host leaves it to
+                // the next one.
+                string path = waiting.Peek();
+                float length = -1f;
+                if (Path.GetExtension(path).Equals(".xmi", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
-                        AudioClip clip = DownloadHandlerAudioClip.GetContent(web);
-                        if (clip != null)
-                        {
-                            length = clip.length > 0f ? clip.length : -1f;
-                            UnityEngine.Object.Destroy(clip);
-                        }
+                        length = MeasureXmi(path);
                     }
                     catch (Exception)
                     {
                         length = -1f;
                     }
                 }
+                else
+                {
+                    using UnityWebRequest web = UnityWebRequestMultimedia.GetAudioClip(MusicPlayer.FileUri(path), MusicPlayer.AudioTypeOf(path));
+                    ((DownloadHandlerAudioClip)web.downloadHandler).streamAudio = true;
+                    yield return web.SendWebRequest();
+                    if (web.result == UnityWebRequest.Result.Success)
+                    {
+                        try
+                        {
+                            AudioClip clip = DownloadHandlerAudioClip.GetContent(web);
+                            if (clip != null)
+                            {
+                                length = clip.length > 0f ? clip.length : -1f;
+                                UnityEngine.Object.Destroy(clip);
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            length = -1f;
+                        }
+                    }
+                }
+                seconds[path] = length;
+                waiting.Dequeue();
+                yield return null;
             }
-            seconds[path] = length;
-            yield return null;
         }
-        runner = null;
+        finally
+        {
+            runner = null;
+        }
     }
 
     private static float MeasureXmi(string path)

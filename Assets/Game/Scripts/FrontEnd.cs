@@ -524,22 +524,38 @@ public class FrontEnd : MonoBehaviour
     }
 
     /// <summary>
-    /// Plays one of the title tracks, looping, unless one of them is playing already: coming back
-    /// from the Setup screen or from a game does not start it over. Setup's music tracks call it too,
-    /// when they close.
+    /// Plays one of the title tracks once, then loops the menu's track (MusicConfig.MenuTrack()), as
+    /// the original plays its title theme once and then theme 4 (UW.EXE 0x2055c, loop_music_maybe,
+    /// SOUND.C). A title track or the menu's track already playing goes on: coming back from the Setup
+    /// screen or from a game does not start it over. Setup's music tracks call it too, when they close.
     /// </summary>
     public static void StartTitleMusic()
     {
         MusicPlayer player = MusicPlayer.Instance;
-        if (player == null || (player.IsPlaying && MusicConfig.Contains(EMusicSituation.Title, player.currentTrack)))
+        if (player == null)
         {
+            return;
+        }
+
+        string menu = MusicConfig.MenuTrack();
+        if (player.IsPlaying && MusicConfig.Contains(EMusicSituation.Title, player.currentTrack))
+        {
+            // Still the title track, from the start or carried into a game and back: once, then the menu's.
+            player.FollowWith(menu);
+            return;
+        }
+        if (player.IsPlaying && menu != null && MusicConfig.SamePath(menu, player.currentTrack))
+        {
+            // The menu's track, or the same file playing in the game when it was left.
+            player.LoopCurrentTrack();
             return;
         }
 
         string title = MusicConfig.Pick(EMusicSituation.Title);
         if (title != null)
         {
-            player.SwitchTrack(title, true);
+            player.SwitchTrack(title, false);
+            player.FollowWith(menu);
         }
         else
         {

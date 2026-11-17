@@ -95,11 +95,7 @@ public class Logos : MonoBehaviour
             // Start title music. The first read of music.txt is here, which writes it with the
             // original's tracks if it is not there yet: right after the game's files were found.
             MusicConfig.EnsureLoaded();
-            string titleTrack = MusicConfig.Pick(EMusicSituation.Title);
-            if (MusicPlayer.Instance != null && titleTrack != null)
-            {
-                MusicPlayer.Instance.SwitchTrack(titleTrack, true);
-            }
+            FrontEnd.StartTitleMusic();
             
             FadeIn();
             break;

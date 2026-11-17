@@ -281,6 +281,25 @@ public static class MusicConfig
         return playable[Random.Range(0, playable.Count)];
     }
 
+    /// <summary>
+    /// The track the title menu loops once the title track has played: the original's theme 4, as its
+    /// main menu has it (UW.EXE 0x2055c, loop_music_maybe, SOUND.C), while the Atmosphere list has it
+    /// switched on and on disk; else that list's first playable track; null when it has none.
+    /// </summary>
+    public static string MenuTrack()
+    {
+        string theme4 = Resolve(SoundFolderPrefix + "UW04.XMI");
+        List<string> playable = PlayablePaths(EMusicSituation.Atmosphere);
+        foreach (string path in playable)
+        {
+            if (SamePath(path, theme4))
+            {
+                return path;
+            }
+        }
+        return playable.Count > 0 ? playable[0] : null;
+    }
+
     /// <summary>The full paths of the situation's tracks that are switched on and on disk.</summary>
     public static List<string> PlayablePaths(EMusicSituation situation)
     {
@@ -600,12 +619,20 @@ public static class MusicConfig
                 }
             }
 
+            // Each on its own: a file that cannot go - one open elsewhere - leaves the others to be deleted.
             foreach (string file in Directory.GetFiles(Folder))
             {
                 string name = Path.GetFileName(file);
                 if (IsSupported(name) && !used.Contains(name))
                 {
-                    File.Delete(file);
+                    try
+                    {
+                        File.Delete(file);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"Music: cannot delete {file}: {e.Message}");
+                    }
                 }
             }
         }
