@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
 /// The system's Open dialog, for picking files from anywhere on disk (the Setup screen's music, the game's folder by one
-/// of its files): Windows, and Wine under Proton,
-/// which is how the game runs on Linux and on a Steam Deck. Elsewhere it is not available.
+/// of its files): Windows and Wine under Proton, and macOS. Elsewhere it is not available.
 /// </summary>
 /// <remarks>
 /// Unity has no file dialog of its own in a built game. This one blocks the game until it closes,
@@ -194,6 +194,173 @@ public static class NativeFileDialog
             ShowWindow(window, SW_RESTORE);
         }
         SetForegroundWindow(window);
+    }
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+    public static bool IsAvailable => true;
+
+#if UNITY_STANDALONE_OSX && !UNITY_EDITOR
+    [DllImport("__Internal")]
+    private static extern IntPtr MacNativeFileDialog_OpenFile(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string title,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string patterns,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string initialFolder,
+        int multiple);
+
+    [DllImport("__Internal")]
+    private static extern void MacNativeFileDialog_Free(IntPtr ptr);
+#endif
+
+    public static string[] OpenFiles(string title, string filterName, string[] extensions, string initialFolder, out string error)
+    {
+        return Open(title, extensions, initialFolder, true, out error);
+    }
+
+    public static string OpenFile(string title, string filterName, string[] patterns, string initialFolder, out string error)
+    {
+        string[] files = Open(title, patterns, initialFolder, false, out error);
+        return files.Length > 0 ? files[0] : null;
+    }
+
+    private static string[] Open(string title, string[] patterns, string initialFolder, bool multiple, out string error)
+    {
+        error = null;
+#if UNITY_STANDALONE_OSX && !UNITY_EDITOR
+        try
+        {
+            IntPtr ptr = MacNativeFileDialog_OpenFile(title ?? "", ExtensionList(patterns), initialFolder ?? "", multiple ? 1 : 0);
+            if (ptr == IntPtr.Zero)
+            {
+                return Array.Empty<string>();
+            }
+
+            string resultStr = Marshal.PtrToStringUTF8(ptr);
+            MacNativeFileDialog_Free(ptr);
+            if (string.IsNullOrEmpty(resultStr))
+            {
+                return Array.Empty<string>();
+            }
+
+            return resultStr.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+        catch (DllNotFoundException)
+        {
+            return RunAppleScriptChooser(title, initialFolder, multiple, out error);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return RunAppleScriptChooser(title, initialFolder, multiple, out error);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return Array.Empty<string>();
+        }
+#else
+        string ext = ExtensionList(patterns);
+        int semi = ext.IndexOf(';');
+        if (semi >= 0)
+        {
+            ext = ext.Substring(0, semi);
+        }
+        string file = UnityEditor.EditorUtility.OpenFilePanel(title ?? "", initialFolder ?? "", ext);
+        return string.IsNullOrEmpty(file) ? Array.Empty<string>() : new[] { file };
+#endif
+    }
+
+    /// <summary>Extensions only, semicolon-separated: "game.gog" and "*.mp3" both become "gog" and "mp3".</summary>
+    private static string ExtensionList(string[] patterns)
+    {
+        if (patterns == null || patterns.Length == 0)
+        {
+            return "";
+        }
+
+        var exts = new List<string>();
+        foreach (string pattern in patterns)
+        {
+            if (string.IsNullOrWhiteSpace(pattern) || pattern == "*" || pattern == "*.*")
+            {
+                continue;
+            }
+
+            string ext = pattern.Trim();
+            int dot = ext.LastIndexOf('.');
+            if (dot >= 0 && dot < ext.Length - 1)
+            {
+                ext = ext.Substring(dot + 1);
+            }
+            ext = ext.Trim().TrimStart('*');
+            if (ext.Length == 0 || ext == "*")
+            {
+                continue;
+            }
+            if (!exts.Exists(existing => string.Equals(existing, ext, StringComparison.OrdinalIgnoreCase)))
+            {
+                exts.Add(ext);
+            }
+        }
+        return string.Join(";", exts);
+    }
+
+    private static string[] RunAppleScriptChooser(string title, string initialFolder, bool multiple, out string error)
+    {
+        error = null;
+        try
+        {
+            string prompt = AppleScriptString(string.IsNullOrEmpty(title) ? "Choose a file" : title);
+            string location = "";
+            if (!string.IsNullOrEmpty(initialFolder) && Directory.Exists(initialFolder))
+            {
+                location = " default location (POSIX file \"" + AppleScriptString(initialFolder) + "\")";
+            }
+
+            string script = multiple
+                ? "try\nset theFiles to choose file with prompt \"" + prompt + "\"" + location + " with multiple selections allowed\nset output to \"\"\nrepeat with f in theFiles\nset output to output & (POSIX path of f) & linefeed\nend repeat\nreturn output\non error number -128\nreturn \"\"\nend try"
+                : "try\nreturn POSIX path of (choose file with prompt \"" + prompt + "\"" + location + ")\non error number -128\nreturn \"\"\nend try";
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "/usr/bin/osascript",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            psi.ArgumentList.Add("-e");
+            psi.ArgumentList.Add(script);
+
+            using Process proc = Process.Start(psi);
+            string output = proc.StandardOutput.ReadToEnd();
+            string errText = proc.StandardError.ReadToEnd();
+            proc.WaitForExit();
+            if (proc.ExitCode != 0)
+            {
+                if (!string.IsNullOrWhiteSpace(errText)
+                    && errText.IndexOf("User canceled", StringComparison.OrdinalIgnoreCase) < 0
+                    && errText.IndexOf("-128", StringComparison.Ordinal) < 0)
+                {
+                    error = errText.Trim();
+                }
+                return Array.Empty<string>();
+            }
+
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                return Array.Empty<string>();
+            }
+
+            return output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return Array.Empty<string>();
+        }
+    }
+
+    private static string AppleScriptString(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 #else
     public static bool IsAvailable => false;
