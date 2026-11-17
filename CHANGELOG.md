@@ -2,6 +2,10 @@
 
 ## Next release
 
+- An ear of corn on the lit torch you hold now makes popcorn, and on the pad incense burns on it instead of putting it out; combining two items no longer fails after part of a pile was taken, and a refused incense burn no longer loses a block.
+
+- A pile of torches or candles in the inventory now lights one of them, taking off a lit light now lets its snuffing be heard and an unlit one is silent, a key taken off a pile keeps its "(level N)", and on the pad the inventory's A hint now says it also picks an item up.
+
 - After a sleep the mana no longer fills up by itself in two seconds, nor does a ring of Regeneration heal you fully, as in the original; and nothing in the inventory answers during the sleep, so a second sleep can no longer start inside the first.
 
 - Loading a game no longer starts the poison's minute over, nor hurts a starving or exhausted character at once, and the poison line in the stats panel is now green.

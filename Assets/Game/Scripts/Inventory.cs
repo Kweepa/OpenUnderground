@@ -106,7 +106,6 @@ public class Inventory : MonoBehaviour
     public UUObject[] tradeSlots = new UUObject[8];
     public bool[] tradeSlotSelected = new bool[8];
 
-    public List<LightSource> litLights = new();
 
     public static Inventory sInv;
 
@@ -515,6 +514,18 @@ public class Inventory : MonoBehaviour
     /// Puts an object from the pack, or the cursor, into the first free holding slot and equips it;
     /// false, with nothing moved, when all three are taken. A light lights there.
     /// </summary>
+    /// <summary>
+    /// One light off a pile in the pack, worn and lit in the first free shoulder or hand, the rest of the pile left
+    /// where it is (UW.EXE 0x37266, UseLight, USEITEMS.C, through InvRemoveOneObject). False with no slot free.
+    /// </summary>
+    public bool TryWearOneFromPile(UUObject pile)
+    {
+        if (FreeHoldingSlot() == EInvSlot.None)
+            return false;
+
+        return TryWearFromPack(Split(pile));
+    }
+
     public bool TryWearFromPack(UUObject obj)
     {
         EInvSlot slot = FreeHoldingSlot();
@@ -593,18 +604,21 @@ public class Inventory : MonoBehaviour
             return true;
         }
 
+        // asked before a block is peeled off a pile: a refused burn peeled one that belonged to nothing (fix 492)
+        if (!Utils.CanSleepHere(notify: true))
+        {
+            NormalizeUnusedCombineHeldItem(true);
+            return true;
+        }
+
         if (held != null && held.type == EObjectType.BlockOfIncense && held.quantity > 1)
         {
             UUObject peeled = LevelLoader.CreateObjectOfType(held.type);
             CopyPeeledStackProperties(held, peeled);
             peeled.PostLoadInitialize();
             --held.quantity;
-            List<UUObject> heldList = FindObjectInInventory(held);
-            if (heldList != null)
-            {
-                heldList.Add(held);
-            }
-            else
+            // the rest of the pile into the pack, unless it is in a list already
+            if (FindObjectInInventory(held) == null)
             {
                 GetCurrentListInternal().Add(held);
             }
@@ -666,6 +680,78 @@ public class Inventory : MonoBehaviour
     }
 
     /// <summary>
+    /// A held item on a worn one, by the CMB.DAT table: an ear of corn on the lit torch makes popcorn (fix 490). The
+    /// original tries the table on any occupied slot, the paperdoll's too, and the product goes on the cursor while
+    /// the worn one stays (UW.EXE 0x7b2bb, AddToOccupiedSlot, INVPANEL.C; 0x6e156, ObjsBeCombinable, COMBINE.C).
+    /// Only the recipes that use up the held item and keep the worn one. A held pile gives one, the rest staying in the
+    /// pack, as the pack's own recipes peel a pile (TryCombineObjects()); the original refuses a pile. False when the
+    /// pair is no such recipe, for the caller to go on.
+    /// </summary>
+    private bool TryPaperdollRecipe(UUObject slotObj)
+    {
+        if (usingItem == null || slotObj == null)
+        {
+            return false;
+        }
+
+        ObjectCombination comb = CombineObjects.FindCombination(slotObj, usingItem);
+        if (comb == null || comb.GetResult() == 0 || comb.Object1Destroyed() || !comb.Object2Destroyed())
+        {
+            return false;
+        }
+
+        if (!CanCraftInInventory())
+        {
+            NormalizeUnusedCombineHeldItem(true);
+            return true;
+        }
+
+        UUObject held = usingItem;
+        bool inPack = FindObjectInInventory(held) != null;
+        UUObject result = LevelLoader.CreateObjectOfType((EObjectType)comb.GetResult());
+        result.PostLoadInitialize();
+        Utils.PlayClip2d(GetCombinationSound(slotObj.type, held.type) ?? combine);
+        if (held.quantity > 1)
+        {
+            // one off the pile is used; the rest stays in the pack, or goes there from the pointer
+            --held.quantity;
+            if (!inPack)
+            {
+                GetCurrentListInternal().Add(held);
+            }
+
+            if (inPack)
+            {
+                // the product beside the pile
+                List<UUObject> list = FindObjectInInventory(held);
+                list.Insert(list.IndexOf(held) + 1, result);
+            }
+            else
+            {
+                mouseCursorCarriedPortable = result;
+            }
+        }
+        else
+        {
+            if (inPack)
+            {
+                // held from the pack (the pad): the product takes its place there
+                ReplaceItemInInventory(held, result);
+            }
+            else
+            {
+                // held on the pointer: the product goes on it
+                mouseCursorCarriedPortable = result;
+            }
+
+            Utils.DestroyItem(held);
+        }
+
+        usingItem = null;
+        return true;
+    }
+
+    /// <summary>
     /// Held oil flask on an equipped torch/lantern (paperdoll). Handles success, lit/full refusal, and craft lockout.
     /// Returns false when the pair is not oil + torch/lantern (caller should continue).
     /// </summary>
@@ -714,6 +800,11 @@ public class Inventory : MonoBehaviour
         }
 
         if (slotObj != null && TryCombineHeldOilWithPaperdollLight(slotObj))
+        {
+            return true;
+        }
+
+        if (slotObj != null && TryPaperdollRecipe(slotObj))
         {
             return true;
         }
@@ -2507,7 +2598,10 @@ public class Inventory : MonoBehaviour
     private void RunPaperdollShortPrimaryReleaseAtSlot(int slotIndex)
     {
         UUObject obj = invSlotContents[slotIndex];
-        if (obj != null && usingItem != null && TryCombineHeldOilWithPaperdollLight(obj))
+        // an item held on the pad and used on what is worn: incense or corn on the lit torch, oil on the lantern;
+        // incense no longer puts the torch out (fix 490)
+        if (obj != null && usingItem != null
+            && (TryIncenseBurnInteraction(usingItem, obj) || TryCombineHeldOilWithPaperdollLight(obj) || TryPaperdollRecipe(obj)))
         {
             return;
         }
@@ -2544,8 +2638,13 @@ public class Inventory : MonoBehaviour
         if (obj == null)
             return;
 
+        // a lit light taken off is snuffed, and its sound is the one heard: the move's would cover it
+        bool snuffed = obj is LightSource light && light.IsLit();
         obj.Unequip();
-        Utils.PlayClip2d(unequip);
+        if (!snuffed)
+        {
+            Utils.PlayClip2d(unequip);
+        }
 
         List<UUObject> curList = GetCurrentListInternal();
         invSlotContents[slotIndex] = null;
@@ -2566,8 +2665,13 @@ public class Inventory : MonoBehaviour
         if (obj == null)
             return;
 
+        // a lit light taken off is snuffed, and its sound is the one heard: the move's would cover it
+        bool snuffed = obj is LightSource light && light.IsLit();
         obj.Unequip();
-        Utils.PlayClip2d(unequip);
+        if (!snuffed)
+        {
+            Utils.PlayClip2d(unequip);
+        }
 
         invSlotContents[slotIndex] = null;
         if (obj is WeaponBase)
@@ -2724,6 +2828,8 @@ public class Inventory : MonoBehaviour
         peeled.quality = source.quality;
         peeled.flags = source.flags;
         peeled.ownerIndex = source.ownerIndex;
+        // the level a key belongs to, which its name prints, "(level N)" (fix 579)
+        peeled.originalLevel = source.originalLevel;
 
         // The enchantment too. The peeled object is made fresh, so its special is 0 and says
         // nothing, and special cannot carry the enchantment of anything that stacks anyway: below
@@ -2781,8 +2887,10 @@ public class Inventory : MonoBehaviour
             return;
         }
 
-        // cmb.dat recipes — still require a single-unit HowMany selection
-        if (HowMany.sHowMany.howMany == 1)
+        // cmb.dat recipes, with one held ingredient. Asked of the object itself, not of the last How many? answer,
+        // which a pile taken earlier may have left above 1 (fix 491): the original refuses a pile on either side
+        // (UW.EXE 0x6e156, ObjsBeCombinable, COMBINE.C); a pile in the pack is peeled below, the remake's.
+        if (usingItem.quantity == 1)
         {
             UUObject obj1 = currentList[index];
             UUObject obj2 = usingItem;
@@ -6339,8 +6447,14 @@ public class Inventory : MonoBehaviour
                             string lookText = names ? "Identify" : currentItem.GetLookText();
                             if (!string.IsNullOrEmpty(lookText) && !hideLightSourceHintDuringTrade)
                             {
+                                // A held picks the item up, to carry it onto another or onto the figure: say so, as the
+                                // mouse's hint says Move (the user's request of 17 November 2026)
+                                if (!names && usingItem == null)
+                                {
+                                    lookText += "/Pick up";
+                                }
                                 PadGlyphs.DrawBound(UiScale.R(x + 80, y + 48, 24, 24), GameActions.PadInventory.Select);
-                                GUI.Label(UiScale.R(x + 110, y + 48, 100, 20), lookText, UiScale.Style(descriptionStyle));
+                                GUI.Label(UiScale.R(x + 110, y + 48, 160, 20), lookText, UiScale.Style(descriptionStyle));
                             }
                             if (Conversations.runningConversation == null)
                             {

@@ -526,10 +526,6 @@ public class PlayerObject : MonoBehaviour
                 level = Mathf.Max(level, worn.Brightness);
             }
         }
-        foreach (LightSource light in Inventory.sInv.litLights)
-        {
-            level = Mathf.Max(level, light.Brightness);
-        }
 
         if (Magic.sMagic.IsSpellActive(Magic.ESpell.Daylight))
         {

@@ -5,7 +5,6 @@ public class LightSourceSaveData : UUObjectSaveData
 {
     public bool lit;
     public int qualityDropCountdown;
-    public int extinguishCountdown;
 }
 
 public class LightSource : UUObject
@@ -18,7 +17,6 @@ public class LightSource : UUObject
     private Texture2D[] animated;
 
     private int qualityDropCountdown;
-    private int extinguishCountdown;
 
     public override void Initialize(ushort[] objData, byte[] critterData)
     {
@@ -77,7 +75,6 @@ public class LightSource : UUObject
         {
             lightData.lit = lit;
             lightData.qualityDropCountdown = qualityDropCountdown;
-            lightData.extinguishCountdown = extinguishCountdown;
         }
     }
 
@@ -89,7 +86,6 @@ public class LightSource : UUObject
         {
             lit = lightData.lit;
             qualityDropCountdown = lightData.qualityDropCountdown;
-            extinguishCountdown = lightData.extinguishCountdown;
         }
     }
 
@@ -167,18 +163,14 @@ public class LightSource : UUObject
             return;
         }
 
-        if (quantity != 1)
-        {
-            return;
-        }
-
         if (IsWorn())
         {
             SetLit(true);
             return;
         }
 
-        if (!Inventory.sInv.TryWearFromPack(this))
+        // a pile: one comes off it and is lit, as in the original (fix 569)
+        if (!(quantity > 1 ? Inventory.sInv.TryWearOneFromPile(this) : Inventory.sInv.TryWearFromPack(this)))
         {
             Messages.Add(1, 246); // your hands are full
         }
@@ -219,8 +211,6 @@ public class LightSource : UUObject
         }
         else
         {
-            Inventory.sInv.litLights.Remove(this);
-            extinguishCountdown = 0;
             Utils.PlayClip2d(extinguishSound);
         }
     }
@@ -296,26 +286,28 @@ public class LightSource : UUObject
 
     public override EEquipAction Equip()
     {
-        extinguishCountdown = 0;
         if (quality > 0)
         {
             SetLit(true);
-            Inventory.sInv.litLights.Remove(this);
         }
         return EEquipAction.Equip;
     }
 
     public override void Unequip()
     {
-        SetLit(false);
+        // only a lit one is snuffed, with its sound (fix 516)
+        if (lit)
+        {
+            SetLit(false);
+        }
     }
     
     protected override string GetIdentifiedName(string baseName)
     {
         // don't identify the taper if in conversation with Zak and he has it
         if (type == EObjectType.Taper
-            && (Conversations.runningConversation?.conversationIndex ?? 0) != (int)EWhoAmI.Zak
-                || Inventory.Contains(EObjectType.Taper))
+            && ((Conversations.runningConversation?.conversationIndex ?? 0) != (int)EWhoAmI.Zak
+                || Inventory.Contains(EObjectType.Taper)))
         {
             return StringLoader.GetString(1, 262);
         }
@@ -348,15 +340,6 @@ public class LightSource : UUObject
                         lightSource.SetLit(false);
                     }
                 }
-            }
-        }
-
-        for (int i = Inventory.sInv.litLights.Count - 1; i >= 0; --i)
-        {
-            LightSource lightSource = Inventory.sInv.litLights[i];
-            if (--lightSource.extinguishCountdown <= 0)
-            {
-                lightSource.SetLit(false);
             }
         }
     }
