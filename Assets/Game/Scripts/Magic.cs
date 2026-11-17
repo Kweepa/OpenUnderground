@@ -219,6 +219,26 @@ public class Magic : MonoBehaviour
 
     private float timeBeforeCanCastAgain;
 
+    /// <summary>
+    /// How often a held cast key or button tries again: the original's every held key, no sooner than 30
+    /// ticks of its 256 Hz clock after the last (UW.EXE 0x1e4af (do_keyarray_input, MOUSE.C)), F8 among
+    /// them, which casts whenever the wait after the last cast has passed (UW.EXE 0x78dd9 (try_cast,
+    /// RUNES.C)). Here the tries stop at the first spell that goes off, cast or backfired: one press, one
+    /// spell (the user's rule of 17 November 2026); a failed roll and the wait are tried again.
+    /// </summary>
+    private const float CastKeyRepeatSeconds = 30.0f / 256.0f;
+
+    // When a held cast key, and the pad's cast button, try next (CastKeyRepeatSeconds), and whether each
+    // is held from a press taken here that has not yet cast: a key held down through a screen that had it,
+    // the map or a conversation, does not cast.
+    private float castKeyRepeatAt;
+    private bool castKeyHeld;
+    private float padCastRepeatAt;
+    private bool padCastHeld;
+
+    // The rune-typing keys taken and not yet up, whose repeated KeyDown is ignored (HandleRuneTypingGui()).
+    private readonly HashSet<KeyCode> heldTypingKeys = new();
+
     /// <summary>Spell index after successful rune cast (mouse/keyboard); mana applied on aim confirm.</summary>
     private int mousePrimedSpellIndex = -1;
 
@@ -1478,9 +1498,30 @@ public class Magic : MonoBehaviour
                     Utils.PlayClip2d(clearSpell);
                 }
 
+                // As the cast key: held, it tries again until a spell goes off (CastKeyRepeatSeconds).
+                if (!GameActions.PadMagic.Cast.IsPressed())
+                {
+                    padCastHeld = false;
+                }
                 if (GameActions.PadMagic.Cast.WasPressedThisFrame() && spellInProgress.Count > 1)
-                    TryCastFromSpellRunes();
+                {
+                    padCastHeld = !TryCastFromSpellRunes();
+                    padCastRepeatAt = Time.time + CastKeyRepeatSeconds;
+                }
+                else if (padCastHeld && Time.time >= padCastRepeatAt)
+                {
+                    padCastHeld = !TryCastFromSpellRunes(repeat: true);
+                    padCastRepeatAt = Time.time + CastKeyRepeatSeconds;
+                }
             }
+            else
+            {
+                padCastHeld = false;
+            }
+        }
+        else
+        {
+            padCastHeld = false;
         }
 
         // With the panel open as well as closed. C is the cast key, and the panel that shows the
@@ -1489,11 +1530,27 @@ public class Magic : MonoBehaviour
         // puts the panel away by itself, so one press casts and closes. Not while anything else
         // has the player: the options menu, which pauses the game, a conversation, the map, a
         // dialog, sleep. The two panels and Roaming Sight are the masks that leave C free.
+        // Held, it tries again as the original's F8 does until a spell goes off (CastKeyRepeatSeconds);
+        // Enter never repeats a cast (HandleRuneTypingGui()).
         const EControlMask castKeyFree = EControlMask.Magic | EControlMask.Inventory | EControlMask.RoamingSight;
-        if ((PlayerObject.Player.controlsDisabled & ~castKeyFree) == 0
-            && GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Cast))
+        bool castKeyFreeNow = (PlayerObject.Player.controlsDisabled & ~castKeyFree) == 0
+                              && !GameInput.IsGameplayKeyboardInputBlocked();
+        if (!castKeyFreeNow || !GameActions.KeysWorld.Cast.IsPressed())
         {
-            TryCastFromSpellRunes();
+            castKeyHeld = false;
+        }
+        if (castKeyFreeNow)
+        {
+            if (GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Cast))
+            {
+                castKeyHeld = !TryCastFromSpellRunes();
+                castKeyRepeatAt = Time.time + CastKeyRepeatSeconds;
+            }
+            else if (castKeyHeld && Time.time >= castKeyRepeatAt)
+            {
+                castKeyHeld = !TryCastFromSpellRunes(repeat: true);
+                castKeyRepeatAt = Time.time + CastKeyRepeatSeconds;
+            }
         }
 
         if (holdTime > 0.0f)
@@ -2225,14 +2282,32 @@ public class Magic : MonoBehaviour
         PlayerData.sData.mana = Mathf.Max(0, PlayerData.sData.mana - cost);
     }
 
-    private void TryCastFromSpellRunes()
+    /// <param name="repeat">
+    /// A held cast key or button trying again. What holding cannot change - not a spell, a circle too
+    /// high, too little mana, a spell still waiting for its aim - is passed over in silence, so a held key
+    /// does not print the same refusal eight times a second; the wait after the last cast is told each
+    /// time, as a failed roll is (the user's choice of 17 November 2026). The original's F8 repeats every
+    /// refusal.
+    /// </param>
+    /// <returns>Whether a spell went off: the roll passed or backfired.</returns>
+    private bool TryCastFromSpellRunes(bool repeat = false)
     {
         if (spellInProgress.Count <= 1)
         {
-            return;
+            return false;
         }
 
-        TutorialManager.NotifyCastAttempt();
+        if (repeat && mousePrimedSpellIndex >= 0)
+        {
+            return false;
+        }
+
+        bool wentOff = false;
+
+        if (!repeat)
+        {
+            TutorialManager.NotifyCastAttempt();
+        }
 
         string spellToCast = "";
         foreach (int r in spellInProgress)
@@ -2255,7 +2330,12 @@ public class Magic : MonoBehaviour
             wasASpell = true;
             castASpellWithTheseRunes = true;
 
-            if ((PlayerData.sData.charLevel + 1) / 2 < spells[i].circle && !Cheats.sCheats.castWithoutMana)
+            if (repeat && ((PlayerData.sData.charLevel + 1) / 2 < spells[i].circle
+                           || !IsMagicAvailable() || PlayerData.sData.mana < spells[i].cost) && !Cheats.sCheats.castWithoutMana)
+            {
+                // a held key: not at all (see the parameter)
+            }
+            else if ((PlayerData.sData.charLevel + 1) / 2 < spells[i].circle && !Cheats.sCheats.castWithoutMana)
             {
                 Messages.Add(1, 210);
             }
@@ -2290,6 +2370,7 @@ public class Magic : MonoBehaviour
                 switch (result)
                 {
                 case Skills.ESkillTestResult.CriticalFailure:
+                    wentOff = true;
                     // "The spell backfires." In the original a backfire is still a cast: it goes on
                     // to the wait before the next cast and to the full mana (UW.EXE 0x78f67, then
                     // 0x78fad and 0x78fd2), and casts effect 9 on the caster with circle / 2 as
@@ -2309,6 +2390,7 @@ public class Magic : MonoBehaviour
                     Utils.PlayClip2d(castFailed);
                     break;
                 case Skills.ESkillTestResult.Success:
+                    wentOff = true;
                     // runes that worked go on the spell list, whatever happens to the spell next
                     AddToSpellList(i);
                     if (TryBeginMousePrimedSpellAfterRuneSuccess(i, false) || MissileHasNoRoom(i, null))
@@ -2322,6 +2404,7 @@ public class Magic : MonoBehaviour
                     castSpells[i] = true;
                     break;
                 case Skills.ESkillTestResult.CriticalSuccess:
+                    wentOff = true;
                     AddToSpellList(i);
                     if (TryBeginMousePrimedSpellAfterRuneSuccess(i, true) || MissileHasNoRoom(i, null))
                     {
@@ -2373,8 +2456,10 @@ public class Magic : MonoBehaviour
             break;
         }
 
-        if (!wasASpell)
+        if (!wasASpell && !repeat)
             Messages.Add("Not a spell.");
+
+        return wentOff;
     }
 
     /// <summary>
@@ -4133,6 +4218,11 @@ public class Magic : MonoBehaviour
     private void HandleRuneTypingGui()
     {
         Event e = Event.current;
+        if (e.type == EventType.KeyUp)
+        {
+            heldTypingKeys.Remove(e.keyCode);
+            return;
+        }
         if (e.type != EventType.KeyDown)
         {
             return;
@@ -4144,15 +4234,34 @@ public class Magic : MonoBehaviour
             // Alt-Enter is the fullscreen switch: it neither starts typing nor casts (mod 740)
             return;
         }
+
+        // IMGUI sends KeyDown again at the system's key repeat while a key is held: a held Enter
+        // started typing, cast, and started again, and a held letter filled the shelf. A key taken is
+        // ignored until it is up; Backspace keeps its repeat, to take a row of runes back.
+        if (k != KeyCode.Backspace && heldTypingKeys.Contains(k))
+        {
+            if (typingRunes)
+            {
+                e.Use();
+            }
+            return;
+        }
+
         if (!typingRunes)
         {
             if ((k == KeyCode.Return || k == KeyCode.KeypadEnter) && CanStartTypingRunes())
             {
                 StartTypingRunes();
+                heldTypingKeys.Add(k);
                 e.Use();
             }
 
             return;
+        }
+
+        if (k != KeyCode.None)
+        {
+            heldTypingKeys.Add(k);
         }
 
         switch (k)
