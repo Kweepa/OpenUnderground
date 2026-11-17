@@ -27,7 +27,7 @@ public class Incense : UUObject
 
         PlayerObject.Player.fade = 1.0f;
 
-        PlayerData.sData.gameTime += 30 * 60; // 30 minutes
+        Magic.SkipTime(30 * 60); // 30 minutes
 
         // play one of the three cup dreams
         CutscenePlayer dream = Instantiate(dreams[PlayerData.sData.cupDreamIndex]);

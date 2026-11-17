@@ -1659,7 +1659,7 @@ public class PlayerObject : MonoBehaviour
             timeToNextHunger -= Time.deltaTime;
             if (timeToNextHunger < 0.0f)
             {
-                timeToNextHunger = 60.0f;
+                timeToNextHunger = HungerSeconds;
                 PlayerData.sData.hunger = Mathf.Min(PlayerData.sData.hunger + 1, 255);
             }
 
@@ -1670,14 +1670,14 @@ public class PlayerObject : MonoBehaviour
                 {
                     Messages.Add(1, 17);
                     Damage(Skills.ESkillTestResult.Success, Utils.GetDamageRoll(3), EDamageType.Direct);
-                    timeToNextHungerDamage = 60.0f;
+                    timeToNextHungerDamage = HungerDamageSeconds;
                 }
             }
 
             timeToNextFatigue -= Time.deltaTime;
             if (timeToNextFatigue < 0.0f)
             {
-                timeToNextFatigue = 300.0f;
+                timeToNextFatigue = FatigueSeconds;
                 PlayerData.sData.fatigue = Mathf.Min(PlayerData.sData.fatigue + 1, 30);
             }
 
@@ -1688,7 +1688,7 @@ public class PlayerObject : MonoBehaviour
                 {
                     // You are fatigued.
                     Messages.Add($"{StringLoader.GetString(1, 91)}{StringLoader.GetString(1, 113)}.");
-                    timeToNextFatigueDamage = 90.0f;
+                    timeToNextFatigueDamage = FatigueDamageSeconds;
                     Damage(Skills.ESkillTestResult.Success, Utils.GetDamageRoll(3), EDamageType.Direct);
                 }
             }
@@ -1812,10 +1812,53 @@ public class PlayerObject : MonoBehaviour
         return Mathf.Max(1, Mathf.RoundToInt(maxHitPoints * Random.Range(0.16f, 0.24f)));
     }
 
-    private float timeToNextHunger = 60.0f;
-    private float timeToNextFatigue = 300.0f;
+    private const float HungerSeconds = 60.0f;
+    private const float FatigueSeconds = 300.0f;
+    private const float HungerDamageSeconds = 60.0f;
+    private const float FatigueDamageSeconds = 90.0f;
+    private float timeToNextHunger = HungerSeconds;
+    private float timeToNextFatigue = FatigueSeconds;
     private float timeToNextHungerDamage;
     private float timeToNextFatigueDamage;
+
+    /// <summary>The clocks of hunger, fatigue, their damage and the poison, into a save (fixes 507, 525).</summary>
+    public void SaveClocks(PlayerSaveData data)
+    {
+        data.clocksSaved = true;
+        data.timeToNextHunger = timeToNextHunger;
+        data.timeToNextFatigue = timeToNextFatigue;
+        data.timeToNextHungerDamage = timeToNextHungerDamage;
+        data.timeToNextFatigueDamage = timeToNextFatigueDamage;
+        data.poisonClock = poisonClock.Save();
+    }
+
+    /// <summary>
+    /// The clocks as they were saved, so a load neither starts the poison's minute and the fatigue's five minutes over
+    /// nor hurts a starving or exhausted character in its first frame. A save without them (an earlier build) starts
+    /// every clock full: no damage due at once.
+    /// </summary>
+    public void LoadClocks(PlayerSaveData data)
+    {
+        if (data.clocksSaved)
+        {
+            timeToNextHunger = Mathf.Clamp(data.timeToNextHunger, 0.0f, HungerSeconds);
+            timeToNextFatigue = Mathf.Clamp(data.timeToNextFatigue, 0.0f, FatigueSeconds);
+            timeToNextHungerDamage = Mathf.Clamp(data.timeToNextHungerDamage, 0.0f, HungerDamageSeconds);
+            timeToNextFatigueDamage = Mathf.Clamp(data.timeToNextFatigueDamage, 0.0f, FatigueDamageSeconds);
+            if (data.poisonClock != null)
+            {
+                poisonClock.Load(data.poisonClock);
+            }
+        }
+        else
+        {
+            timeToNextHunger = HungerSeconds;
+            timeToNextFatigue = FatigueSeconds;
+            timeToNextHungerDamage = HungerDamageSeconds;
+            timeToNextFatigueDamage = FatigueDamageSeconds;
+            poisonClock.Reset();
+        }
+    }
 
     private float timeInWater;
     private float timeToNextWaterDamage;
