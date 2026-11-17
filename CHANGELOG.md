@@ -2,6 +2,16 @@
 
 ## Next release
 
+- Native macOS Universal build (Apple silicon and Intel): browse for game data with the system Open dialog, and the game folder dialog searches Steam, GOG Galaxy, and common install locations on Mac.
+
+- The character sheet and inventory panels keep the original pixel look again (point filtering), instead of a soft upscale.
+
+- Mouse look rate defaults higher for trackpads, and the Options slider now runs from 0.25 to 5.0.
+
+- Options can turn autosave-on-level-entry and keep-music-on-map on or off (both were already in the game; autosave stays on by default).
+
+- The macOS / Standalone app has its own icon. Player builds use LZ4HC compression, smaller critter/item import settings, and ship without the unused OPL2 soundfont and TextMesh Pro examples.
+
 - A door spiked shut, with an iron spike or the Strengthen Door spell, now shows its spikes on your side, gone when you open it: the first iron spike goes by the lock, every further one and the spell's ten anywhere along the frame. The more spikes, the more blows the door takes to break, and the blows knock them out one by one; a look or the cursor calls it a spiked door, it stays spiked after a save and load, a portcullis or a secret door can no longer be spiked, and iron spikes used with the mouse are now used up, one a door, the rest staying in hand.
 
 - When the music changes, on opening the map for instance, the last notes of the old track now fade out with their own release and echo instead of stopping dead, as in the original.
