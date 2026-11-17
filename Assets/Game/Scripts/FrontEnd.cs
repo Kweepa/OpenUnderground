@@ -10,7 +10,7 @@ using UnityEditor;
 public class FrontEnd : MonoBehaviour
 {
     // Shown in the title menu corner and startup logs; update when shipping.
-    public static string DisplayVersion = "v3.2";
+    public static string DisplayVersion = "v3.6";
 
     public CutscenePlayer introCutscene;
     public CutscenePlayer creditsCutscene;
