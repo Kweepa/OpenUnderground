@@ -254,8 +254,9 @@ public static class Sleeping
         // The sleep music runs on a little rather than stopping the instant the eyes open. With
         // no dream to play the whole sleep is two seconds, so cutting it on the last frame left
         // barely a bar of it. Control is already back, so this waits without holding anything up.
+        // A creature that woke the player may have started a fight meanwhile, and the fight keeps the music.
         yield return new WaitForSeconds(2.0f);
-        Music.ResumeExploringMusic();
+        Music.AfterSleep();
     }
 
     /// <summary>

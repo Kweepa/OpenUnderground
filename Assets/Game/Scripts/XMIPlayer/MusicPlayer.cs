@@ -110,6 +110,44 @@ public partial class MusicPlayer : MonoBehaviour
     private bool clipLoading;
     // Bumped by every switch and stop: a load that finishes after it belongs to a track nobody wants.
     private int clipRequest;
+    // The last track asked for could not be started: a file that will not load or decode.
+    private bool startFailed;
+    // The track to loop once the one playing has ended (FollowWith()); cleared by every switch and stop.
+    private string followTrack;
+
+    /// <summary>
+    /// Loops the track at path once the one playing has ended, as the original's main menu follows its
+    /// title theme with theme 4 (UW.EXE 0x2055c, loop_music_maybe, SOUND.C). Null cancels it, as does
+    /// any switch, stop or LetCurrentTrackFinish().
+    /// </summary>
+    public void FollowWith(string path)
+    {
+        followTrack = path;
+    }
+
+    /// <summary>The track playing goes round again when it ends, the reverse of LetCurrentTrackFinish().</summary>
+    public void LoopCurrentTrack()
+    {
+        if (sequencer != null)
+        {
+            sequencer.Loop = true;
+        }
+        if (clipSource != null)
+        {
+            clipSource.loop = true;
+        }
+    }
+
+    /// <summary>
+    /// Whether the last track asked for failed to start, answered once. Music waits before drawing
+    /// again, instead of asking for the same broken file on every frame.
+    /// </summary>
+    public bool TakeStartFailure()
+    {
+        bool failed = startFailed;
+        startFailed = false;
+        return failed;
+    }
     
     void Awake()
     {
@@ -177,6 +215,14 @@ public partial class MusicPlayer : MonoBehaviour
 
         // the external synthesizer's volume, and the soundfont back if its port stopped answering
         UpdateExternalMidi();
+
+        if (followTrack != null && !IsPlaying)
+        {
+            // Stopped first, so that a follow-on that is the track just ended starts again as well.
+            string next = followTrack;
+            StopMusic();
+            SwitchTrack(next, true);
+        }
     }
 
     /// <summary>
@@ -403,12 +449,14 @@ public partial class MusicPlayer : MonoBehaviour
         
         // Stop current music
         StopMusic();
+        startFailed = false;
         
         // Build full path and load
         string fullPath = Path.Combine(soundFolderPath, fileName);
         if (!File.Exists(fullPath))
         {
             Debug.LogError($"Song file not found at path: {fullPath}");
+            startFailed = true;
             return;
         }
         
@@ -438,6 +486,7 @@ public partial class MusicPlayer : MonoBehaviour
     /// </remarks>
     public void LetCurrentTrackFinish()
     {
+        followTrack = null;
         if (sequencer != null)
         {
             sequencer.Loop = false;
@@ -455,6 +504,7 @@ public partial class MusicPlayer : MonoBehaviour
     {
         // Clear sequencer (IsLoaded is checked in OnAudioFilterRead)
         sequencer = null;
+        followTrack = null;
 
         ++clipRequest;
         clipLoading = false;
@@ -568,6 +618,7 @@ public partial class MusicPlayer : MonoBehaviour
             }
             web.Dispose();
             currentTrack = "";
+            startFailed = true;
             yield break;
         }
 
@@ -623,6 +674,7 @@ public partial class MusicPlayer : MonoBehaviour
         if (!sequencer.IsLoaded)
         {
             sequencer = null;
+            startFailed = true;
         }
     }
 

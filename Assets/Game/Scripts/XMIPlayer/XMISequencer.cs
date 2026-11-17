@@ -161,8 +161,9 @@ public class XMISequencer
 
         try
         {
-            FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-            reader = new BinaryReader(fileStream);
+            // Read whole and the file closed at once: a handle held for as long as the track plays kept
+            // the Setup page from deleting a copy it had played or measured (MusicConfig.DeleteUnusedCopies()).
+            reader = new BinaryReader(new MemoryStream(File.ReadAllBytes(filePath)));
 
             // Parse the file to find the EVNT chunk
             FindEventChunk(reader.BaseStream.Length);
@@ -202,8 +203,19 @@ public class XMISequencer
         // Clear all pending note-offs
         pendingNoteOffs.Clear();
         
-        // Release every note on all MIDI channels - sustain off, then All Notes Off - and let them ring
-        // out with their release and reverb, as the original's driver does; no All Sound Off
+        ReleaseAllNotes();
+
+        // Read the first delta-time again to schedule the first event
+        int firstDelta = ReadXmiDeltaTime(evntChunkEnd);
+        nextEventTimeInSong = firstDelta * secondsPerTick;
+    }
+    
+    /// <summary>
+    /// Releases every note on all MIDI channels - sustain off, then All Notes Off - and lets them ring
+    /// out with their release and reverb, as the original's driver does; no All Sound Off.
+    /// </summary>
+    private void ReleaseAllNotes()
+    {
         for (int channel = 0; channel < 16; channel++)
         {
             // Sustain off (CC 64)
@@ -228,12 +240,8 @@ public class XMISequencer
             cmdNotesOff.Velocity = 0;
             commandQueue.Enqueue(cmdNotesOff);
         }
-        
-        // Read the first delta-time again to schedule the first event
-        int firstDelta = ReadXmiDeltaTime(evntChunkEnd);
-        nextEventTimeInSong = firstDelta * secondsPerTick;
     }
-    
+
     /// <summary>
     // Processes audio samples and fires events with sample-accurate timing.
     // Called from the MusicPlayer's OnAudioFilterRead() method.
@@ -249,28 +257,42 @@ public class XMISequencer
         // --- 1. Process any pending note-offs ---
         pendingNoteOffs.ProcessDueNoteOffs(currentTimeInSong, commandQueue);
         
-        // --- 2. Process all events scheduled for "now" ---
-        while (IsLoaded && nextEventTimeInSong <= currentTimeInSong && !hasReachedEVNTEnd)
+        // A file cut short, or whose chunk runs past its end, fails here, on the audio thread: the
+        // track ends where it breaks. Let out, the exception came back at every buffer with IsLoaded
+        // still true, so the track never ended and the next one was never drawn.
+        try
         {
-            // This function will process the event at 'nextEventTimeInSong'
-            // and then calculate the *next* 'nextEventTimeInSong'.
-            ReadAndProcessNextEvent();
+            // --- 2. Process all events scheduled for "now" ---
+            while (IsLoaded && nextEventTimeInSong <= currentTimeInSong && !hasReachedEVNTEnd)
+            {
+                // This function will process the event at 'nextEventTimeInSong'
+                // and then calculate the *next* 'nextEventTimeInSong'.
+                ReadAndProcessNextEvent();
+            }
+
+            // --- 3. Check if track has truly ended ---
+            // Track ends when we've processed all EVNT events AND all notes have finished
+            if (hasReachedEVNTEnd && pendingNoteOffs.Count == 0)
+            {
+                if (Loop)
+                {
+                    // Loop back to the beginning
+                    ResetToStart();
+                }
+                else
+                {
+                    // Stop playback
+                    IsLoaded = false;
+                }
+            }
         }
-        
-        // --- 3. Check if track has truly ended ---
-        // Track ends when we've processed all EVNT events AND all notes have finished
-        if (hasReachedEVNTEnd && pendingNoteOffs.Count == 0)
+        catch (Exception ex)
         {
-            if (Loop)
-            {
-                // Loop back to the beginning
-                ResetToStart();
-            }
-            else
-            {
-                // Stop playback
-                IsLoaded = false;
-            }
+            Debug.LogWarning($"XMI: the track breaks off at {currentTimeInSong:F1} s and ends there: {ex.Message}");
+            IsLoaded = false;
+            // The notes sounding at the break would never get their note-offs, and held on.
+            pendingNoteOffs.Clear();
+            ReleaseAllNotes();
         }
     }
 

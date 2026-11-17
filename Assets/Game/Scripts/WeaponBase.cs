@@ -119,6 +119,12 @@ public class WeaponBase : UUObject
     /// </remarks>
     public static bool IsRaised { get; private set; }
 
+    /// <summary>
+    /// A new game starts with the weapon down. The static outlives the scene, and a death in a fight
+    /// leaves it up: the death cutscene stops the clock that lowers the weapon.
+    /// </summary>
+    public static void ForgetRaised() => IsRaised = false;
+
     // Whether this weapon went up because the player asked. Being in Hold is not enough, and
     // that is the whole point: Equip() sets resetTime to zero on purpose to show off the weapon
     // just put in hand, and loading a game equips whatever was held, so a weapon comes up on
@@ -404,7 +410,9 @@ public class WeaponBase : UUObject
             break;
         case EState.Prepare:
             SetPosition(hold);
-            if (!hold || PlayerObject.Player.isInWater)
+            // A charge held through the player's death is dropped, not swung when the button is let go
+            // under the death cutscene.
+            if (!hold || PlayerObject.Player.isInWater || PlayerData.sData.dead)
             {
                 ChangeState(EState.Reset);
             }

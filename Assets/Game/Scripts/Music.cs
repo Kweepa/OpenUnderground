@@ -135,6 +135,10 @@ public class Music : MonoBehaviour
             Debug.LogError("MusicPlayer instance not found! Make sure MusicPlayer is in the scene.");
             return;
         }
+
+        // A weapon still up when the last game ended - a death in a fight stops the clock that lowers
+        // it - must not open this one with the warning music over the title track.
+        WeaponBase.ForgetRaised();
         
         // Let the title screen track finish instead of cutting it off. Music lives on the Player
         // prefab, so Awake() runs the moment the game starts - on a new character and on a load
@@ -207,9 +211,49 @@ public class Music : MonoBehaviour
                 sMusic.combatSwitchCooldown = 0.0f;
                 sMusic.StartStateMusic(EMusicState.Combat);
                 break;
+
+            case EMusicState.Sleep when sMusic.AwakeInSleepMusic:
+                // Woken by a creature, in the seconds the sleep music runs on: the fight takes the
+                // music at once, as the original's combat request replaces the walking theme it asks
+                // for on waking (UW.EXE 0x2058d, change_music_maybe, SOUND.C).
+                sMusic.musicState = EMusicState.Combat;
+                sMusic.combatSwitchCooldown = 0.0f;
+                sMusic.StartStateMusic(EMusicState.Combat);
+                break;
             }
         }
     }
+
+    /// <summary>
+    /// The sleep music is still playing, but the player is awake: control is back, and the music runs on
+    /// for two seconds before the corridors take over (Sleeping.Sleep(), AfterSleep()).
+    /// </summary>
+    private bool AwakeInSleepMusic => musicState == EMusicState.Sleep && PlayerObject.Player != null
+        && (PlayerObject.Player.controlsDisabled & EControlMask.Resting) == 0;
+
+    /// <summary>
+    /// Whether the warning has a track to play. Without one the warning leaves the music alone, as the
+    /// level up does: entering it would stop the ambient track, and leaving it start another.
+    /// </summary>
+    /// <remarks>
+    /// Asked every frame the weapon is up while exploring, so the answer is kept for a second: the list
+    /// changes only on the Setup page, and a file only on the player's disk.
+    /// </remarks>
+    private static bool HasAlertMusic
+    {
+        get
+        {
+            if (Time.unscaledTime >= alertMusicCheckedUntil)
+            {
+                alertMusicKnown = MusicConfig.PlayablePaths(EMusicSituation.Alert).Count > 0;
+                alertMusicCheckedUntil = Time.unscaledTime + 1.0f;
+            }
+            return alertMusicKnown;
+        }
+    }
+
+    private static bool alertMusicKnown;
+    private static float alertMusicCheckedUntil = float.NegativeInfinity;
 
     /// <summary>
     /// Something hostile has noticed the player, but has not swung at him yet.
@@ -231,16 +275,16 @@ public class Music : MonoBehaviour
         // A longer tail the raised weapon left is kept; a stale one from an earlier warning is not.
         sMusic.alertTime = sMusic.musicState == EMusicState.Alert ? Mathf.Max(sMusic.alertTime, creatureAlertTail) : creatureAlertTail;
 
-        switch (sMusic.musicState)
+        bool entering = IsExploringState(sMusic.musicState) || sMusic.AwakeInSleepMusic;
+        if (entering && !HasAlertMusic)
         {
-        case EMusicState.ExploringA:
-        case EMusicState.ExploringB:
-        case EMusicState.ExploringC:
-        case EMusicState.ExploringD:
-        case EMusicState.Alert:
+            return;
+        }
+
+        if (entering || sMusic.musicState == EMusicState.Alert)
+        {
             sMusic.musicState = EMusicState.Alert;
             sMusic.StartStateMusic(EMusicState.Alert);
-            break;
         }
     }
 
@@ -269,7 +313,7 @@ public class Music : MonoBehaviour
     /// </summary>
     private void LeaveFight()
     {
-        if (lastAlertHeartbeat >= 0.0f && Time.time - lastAlertHeartbeat < 0.5f)
+        if (lastAlertHeartbeat >= 0.0f && Time.time - lastAlertHeartbeat < 0.5f && HasAlertMusic)
         {
             musicState = EMusicState.Alert;
             alertTime = creatureAlertTail;
@@ -363,10 +407,10 @@ public class Music : MonoBehaviour
     {
         if (sMusic != null)
         {
-            // Nothing is configured for this in the original: of the nine places that ask for a
-            // track, none is a level up, and the nearest is the kill itself, which asks for the
-            // one this remake plays on a victory. So with no track named here, say nothing at
-            // all rather than cutting the music for a second of silence.
+            // The original plays nothing on a level up (UW.EXE 0x341d8, player_get_exp, SKILLCHK.C,
+            // and advance, SKILLS.C, ask for no track); the remake plays the victory fanfare by
+            // default (MusicConfig), and only a player who empties the Level up list hears nothing.
+            // Then the music is left alone, rather than cut for a second of silence.
             if (MusicConfig.PlayablePaths(EMusicSituation.LevelUp).Count == 0)
             {
                 return;
@@ -378,6 +422,7 @@ public class Music : MonoBehaviour
             case EMusicState.ExploringB:
             case EMusicState.ExploringC:
             case EMusicState.ExploringD:
+            case EMusicState.Alert:
             case EMusicState.Combat:
             case EMusicState.Injured:
             case EMusicState.Winning:
@@ -690,6 +735,18 @@ public class Music : MonoBehaviour
             sMusic.StartExploringMusic();
         }
     }
+
+    /// <summary>
+    /// The sleep music has run on after waking: the corridors take over, unless something else has
+    /// taken the music meanwhile - a fight with the creature that woke the player, a death.
+    /// </summary>
+    public static void AfterSleep()
+    {
+        if (sMusic != null && sMusic.musicState == EMusicState.Sleep)
+        {
+            sMusic.StartExploringMusic();
+        }
+    }
     
     private void StartStateMusic(EMusicState state)
     {
@@ -758,7 +815,8 @@ public class Music : MonoBehaviour
         case EMusicState.ExploringC:
         case EMusicState.ExploringD:
             // Raising the weapon is enough on its own: the player has said he expects trouble.
-            if (WeaponBase.IsRaised)
+            // Without a warning track the ambient music goes on, its tracks following each other.
+            if (WeaponBase.IsRaised && HasAlertMusic)
             {
                 Alert();
                 break;
@@ -771,6 +829,12 @@ public class Music : MonoBehaviour
             // them, as it holds the creatures that keep them going.
             if (!musicPlayer.IsPlaying)
             {
+                // A track that would not start - a broken file of the player's - is not asked for
+                // again at once, and with it the same error line on every frame.
+                if (musicPlayer.TakeStartFailure())
+                {
+                    exploringSilenceTimer = noTrackRetry;
+                }
                 if (exploringSilenceTimer == 0.0f && SilenceBetweenTracks)
                 {
                     exploringSilenceTimer = TakeSilenceLength();
