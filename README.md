@@ -35,13 +35,13 @@ Every change is listed in the [CHANGELOG](CHANGELOG.md).
 
 ## Download and play
 
-Get the latest build from the [itch.io page](https://kweepa.itch.io/unity-underground). It runs on Windows, and on Linux or a Steam Deck through Proton.
+Get the latest build from the [itch.io page](https://kweepa.itch.io/unity-underground). It runs on Windows, on native macOS (Universal), and on Linux or a Steam Deck through Proton.
 
-**You need the original game's data files**: the `game.gog` file of a GoG copy, the `game.bin` file of a Steam copy, or the `CRIT`, `CUTS`, `DATA` and `SOUND` folders of an installed original copy. GoG is the version it is tested with; the original DOS version should work too. The game looks for them in the usual places, and if it does not find them you can point it to the folder. If your copy is the ISO version (`game.gog` or `game.bin`), the game extracts the data into a `LooseData` folder next to your saves (in AppData\LocalLow on Windows), not into the GOG install.
+**You need the original game's data files**: the `game.gog` file of a GoG copy, the `game.bin` file of a Steam copy, or the `CRIT`, `CUTS`, `DATA` and `SOUND` folders of an installed original copy. GoG is the version it is tested with; the original DOS version should work too. The game looks for them in the usual places (including Steam and GOG on macOS), and if it does not find them you can point it to the folder. If your copy is the ISO version (`game.gog` or `game.bin`), the game extracts the data into a `LooseData` folder next to your saves (in AppData\LocalLow on Windows, or under `~/Library/Application Support` on macOS), not into the GOG install.
 
 You can play with a gamepad or with mouse and keyboard, and the game switches between them as you use them. Every control is listed in [CONTROLS.md](CONTROLS.md).
 
-Your saves are in `%USERPROFILE%\AppData\LocalLow\Kweepa\UnityUnderground\Saves`.
+Your saves are in `%USERPROFILE%\AppData\LocalLow\Kweepa\UnityUnderground\Saves` on Windows, and under `~/Library/Application Support/Kweepa/UnityUnderground/Saves` on macOS.
 
 ## Linux and Steam Deck
 

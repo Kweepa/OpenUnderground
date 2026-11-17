@@ -20,3 +20,13 @@ Animated wall/floor textures (palette-cycle replacements)
   All frames in a sequence must share the same extension as the 'a' frame.
 
 Doors are static only (door00 … door12).
+
+UI, inventory, and paperdoll overrides
+  panel00.png … panel03.png (inventory, magic, and stats panel backgrounds)
+  statspanel.png (stats panel wood background)
+  body_m0.png … body_m4.png (male paperdoll bodies)
+  body_f0.png … body_f4.png (female paperdoll bodies)
+  armor_m00.png … armor_m75.png (male paperdoll armor)
+  armor_f00.png … armor_f75.png (female paperdoll armor)
+  A higher-resolution file keeps the original on-screen size: the panel is laid out as 83×114
+  and a paperdoll body as 34×50.
