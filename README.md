@@ -11,25 +11,33 @@ This project is a wrapper for the well-known 1992 dungeon crawler by Blue Sky Pr
   - 3D models for critters and objects
   - better lighting and particles
   - full audio
+  - supports external MIDI devices, such as a real MT-32 or the Munt emulator
 
 ![Two ghosts by a grave](Docs/images/ghosts.jpg)
 
 **Modern conveniences**
 
-  - gamepad support, and mouse and keyboard
+  - gamepad support, with Xbox or PlayStation button prompts, and mouse and keyboard
+  - every key and pad button can be changed, with a Classic keys preset for the original's layout; the Controls tab draws the keyboard and the pad with what each key and button does
   - autosave at the beginning of each Abyss level and five quicksave slots, rolling in BG3 style
   - achievements
-  - sprinting, bound to the Acrobat skill. Be warned: dashing through the level can make you miss secret details
+  - sprinting, bound to the Acrobat skill (be warned: dashing through the level can make you miss secret details)
   - four ratings on the inventory panel: attack and damage by the weapon hand, defence and armour by the shield hand
   - clearer attack feedback: the charge cursor stays dark until a release would actually land a swing, then lights up and fills
   - every few seconds the Search skill looks for you, and points out possible secrets and trapped objects in front of you
   - every few seconds the Track skill tells you of creatures nearby, and in which direction
   - a history of the last hundred messages: Page Up and Page Down, or the d-pad, scroll back through what you missed
   - a list of the spells you know beside the magic panel, with their runes: those in the manual from the start, the others as you find them
+  - a locked door unlocks by itself when you use it with the right key in your pack
+  - display settings: monitor, display mode and resolution, field of view, camera bob, and how much the interface grows on large screens; it also fits small ones such as a Steam Deck
+  - the gameplay helpers, such as automatic Search, Traps and Track reports, sprinting, and items hidden in debris, can be turned off in the game menu if you prefer the original experience
 
 **Faithful to the original**
 
 ![A conversation, with the inventory open beside it](Docs/images/conversation.jpg)
+
+  - the levels, objects, conversations, music and cutscenes come from your own copy of the original game
+  - its rules as they were: combat, experience, skills, magic, traps and how the creatures behave follow the original
 
 Every change is listed in the [CHANGELOG](CHANGELOG.md).
 
