@@ -2296,6 +2296,9 @@ public class Critter : UUObject
 
     private void ProjectileEvent()
     {
+        // A shot or a cast is the creature's answer too, a summoning included: a critical can make it
+        // flinch again (TryDamage()).
+        flinchSpent = false;
         if (type == EObjectType.Tyball)
         {
             // choose from a few possibilities. for now launch sheet lightning to see
@@ -2308,6 +2311,11 @@ public class Critter : UUObject
     }
 
     protected bool actionDone;
+    /// <summary>
+    /// A critical blow has made the creature flinch and it has not thrown a blow or a shot since: until
+    /// it does, another critical does not make it flinch (TryDamage()). Not saved: a load clears it.
+    /// </summary>
+    private bool flinchSpent;
     /// <summary>When the current state began (Time.time), for LeftClip().</summary>
     private float stateStartTime;
     private bool deathProcessed;
@@ -5042,6 +5050,10 @@ public class Critter : UUObject
 
     protected virtual void LaunchProjectile()
     {
+        // A shot is thrown, also one a caster throws by hand (Caster.ThrowKnifeEvent()): a critical
+        // can make the creature flinch again (TryDamage()).
+        flinchSpent = false;
+
         EObjectType projectileType = GetProjectileType();
         if (projectileType != 0 && !HasRoomToLaunch(projectileType))
         {
@@ -6399,13 +6411,17 @@ public class Critter : UUObject
         // original has no flinch, and a creature hit mid-swing still strikes (UW.EXE 0x1c2d2 writes
         // no action or phase). A creature's critical on the player costs the player his charge in
         // return (PlayerObject.DamageFromBlow()).
+        // Once a flinch has cost it a swing, it does not flinch again until it has thrown its next
+        // blow or shot (flinchSpent): a player whose blows are nearly all critical would otherwise
+        // keep it flinching and never let it strike back.
         bool flinching = false;
-        if (result == Skills.ESkillTestResult.CriticalSuccess && hp > 0 && !returningHome)
+        if (result == Skills.ESkillTestResult.CriticalSuccess && hp > 0 && !returningHome && !flinchSpent)
         {
             if (cachedAnimator != null && cachedAnimator.HasState(0, Animator.StringToHash("Flinch")))
             {
                 SetState(EState.Flinch);
                 flinching = true;
+                flinchSpent = true;
             }
         }
 
@@ -7172,6 +7188,9 @@ public class Critter : UUObject
 
     protected void TryDamageTarget()
     {
+        // The blow is thrown, hit or miss: a critical can make the creature flinch again.
+        flinchSpent = false;
+
         if (GetDistanceToTarget() > meleeAttackRange + meleeAttackHysteresis)
         {
             // miss
