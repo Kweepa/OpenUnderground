@@ -380,7 +380,12 @@ public class XMISequencer
             case 0xB0: // Controller Change
                 byte controller = reader.ReadByte();
                 byte value = reader.ReadByte();
-                
+
+                // XMIDI's loop controllers, FOR (116) and NEXT (117), are passed on like the others and
+                // never acted on, as in the original. UW01.XMI, the title theme, has a FOR/NEXT pair
+                // round most of the track, but its NEXT is 0, and every music driver the original ships
+                // (MT32MPU.ADV, ADLIB.ADV and the others) ignores a NEXT under 64, so the original plays
+                // the track through once. A recording that repeats that part was not made from the game.
                 commandQueue.Enqueue(new MusicCommand { Type = MusicCommandType.ControllerChange, Channel = channel, Controller = controller, Value = value });
                 break;
             

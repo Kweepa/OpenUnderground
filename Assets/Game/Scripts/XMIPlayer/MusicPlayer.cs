@@ -59,6 +59,10 @@ public partial class MusicPlayer : MonoBehaviour
     private readonly int[,] controllerValues = new int[16, 128];
     private readonly List<int>[] controllerOrder = NewControllerOrder();
     private readonly int[] programs = NewChannelArray();
+    // The last volume (CC 7) the track gave each channel, before MT32Volume() moves it.
+    private readonly int[] trackVolumes = NewChannelArray(127);
+    // The same for the reverb send (CC 91), MeltySynth's default until the track sets one.
+    private readonly int[] trackReverbs = NewChannelArray(DefaultReverbSend);
     private readonly int[] pitchBends = NewChannelArray();
     private readonly int[] channelPressures = NewChannelArray();
     private readonly int[,] heldNotes = new int[16, 128];
@@ -292,7 +296,13 @@ public partial class MusicPlayer : MonoBehaviour
         for (int i = 0; i < 16; i++)
         {
             // MIDI Controller Change: (channel, 0xB0, controller 7 (volume), value 127)
-            created.ProcessMidiMessage(i, 0xB0, 7, 127);
+            created.ProcessMidiMessage(i, 0xB0, 7, SynthVolume(i, 127));
+        }
+        if (mt32SoundFont)
+        {
+            // Every channel's volume is MT32Headroom lower (MT32Volume()), so that a program can be
+            // raised by up to that much; the master volume gives it back.
+            created.MasterVolume *= Mathf.Pow(10f, MT32Headroom / 20f);
         }
 
         // With a track playing, the audio thread takes the new synthesizer up itself, after putting it
@@ -317,12 +327,12 @@ public partial class MusicPlayer : MonoBehaviour
         return order;
     }
 
-    private static int[] NewChannelArray()
+    private static int[] NewChannelArray(int value = -1)
     {
         int[] values = new int[16];
         for (int i = 0; i < values.Length; ++i)
         {
-            values[i] = -1;
+            values[i] = value;
         }
         return values;
     }
@@ -350,6 +360,14 @@ public partial class MusicPlayer : MonoBehaviour
         }
 
         controllerValues[channel, controller] = value;
+        if (controller == 7)
+        {
+            trackVolumes[channel] = value;
+        }
+        else if (controller == 91)
+        {
+            trackReverbs[channel] = value;
+        }
         controllerOrder[channel].Remove(controller);
         controllerOrder[channel].Add(controller);
     }
@@ -365,11 +383,17 @@ public partial class MusicPlayer : MonoBehaviour
         {
             foreach (int controller in controllerOrder[channel])
             {
-                synthesizer.ProcessMidiMessage(channel, 0xB0, controller, controllerValues[channel, controller]);
+                int value = controllerValues[channel, controller];
+                synthesizer.ProcessMidiMessage(channel, 0xB0, controller,
+                    controller == 7 ? SynthVolume(channel, value) : controller == 91 ? SynthReverb(channel, value) : value);
             }
             if (programs[channel] >= 0)
             {
-                synthesizer.ProcessMidiMessage(channel, 0xC0, programs[channel], 0);
+                synthesizer.ProcessMidiMessage(channel, 0xC0, SynthProgram(channel, programs[channel]), 0);
+                if (mt32SoundFont)
+                {
+                    synthesizer.ProcessMidiMessage(channel, 0xB0, 91, SynthReverb(channel, trackReverbs[channel]));
+                }
             }
             if (pitchBends[channel] >= 0)
             {
@@ -739,6 +763,101 @@ public partial class MusicPlayer : MonoBehaviour
         }
     }
 
+    /// <summary>How far MT32Volume() can raise a program, in dB.</summary>
+    private const float MT32Headroom = 12f;
+
+    /// <summary>MeltySynth's reverb send (CC 91) on a channel no message has set.</summary>
+    private const int DefaultReverbSend = 40;
+
+    /// <summary>The reverb send (CC 91) to give the synthesizer for a channel the track set to send.</summary>
+    private int SynthReverb(int channel, int send)
+    {
+        int own = mt32SoundFont && channel != 9 && programs[channel] >= 0 ? MT32Reverb(programs[channel]) : -1;
+        return own >= 0 ? own : send;
+    }
+
+    /// <summary>
+    /// The reverb send to play a program with on MT32.sf2, or -1 for the track's. Jungle Tune's notes
+    /// are a few hundredths of a second long, and an MT-32 lets them ring on in its reverb for a
+    /// second after; the glockenspiel that plays them stops short without more of it.
+    /// </summary>
+    private static int MT32Reverb(int program)
+    {
+        return program == 127 ? 127 : -1;
+    }
+
+    /// <summary>The soundfont's preset that plays a track's program: MT32Preset() with MT32.sf2.</summary>
+    private int SynthProgram(int channel, int program)
+    {
+        return mt32SoundFont && channel != 9 ? MT32Preset(program) : program;
+    }
+
+    /// <summary>The volume (CC 7) to give the synthesizer for a channel the track set to volume.</summary>
+    private int SynthVolume(int channel, int volume)
+    {
+        if (!mt32SoundFont)
+        {
+            return volume;
+        }
+        float gain = channel == 9 || programs[channel] < 0 ? 0f : MT32Volume(programs[channel]);
+        return Mathf.Clamp(Mathf.RoundToInt(volume * Mathf.Pow(10f, (gain - MT32Headroom) / 40f)), 0, 127);
+    }
+
+    /// <summary>
+    /// The preset of MT32.sf2 that plays an MT-32 program the soundfont does not have.
+    /// </summary>
+    /// <remarks>
+    /// MT32.sf2 names and plays most programs as the MT-32 does, but fills some with General MIDI
+    /// presets: another instrument. Its Shakuhachi is mostly breath where the MT-32's has a pitch. Each of these is played instead by the preset of the soundfont
+    /// closest to the MT-32's timbre, chosen against a recording of the tracks on an MT-32 (the
+    /// level at each note's pitch and harmonics, and how much of it is pitch and how much noise).
+    /// The three other General MIDI fillers the tracks use (33, 43, 121) come close enough. The
+    /// choices between presets of like timbre were made by ear against the recording.
+    /// </remarks>
+    private static int MT32Preset(int program)
+    {
+        switch (program)
+        {
+            case 23: return 9;      // Celesta 2, a Bandoneon in MT32.sf2: its Glockenspiel
+            case 38: return 11;     // Warm Bell, a Synth Bass: Vibraphone
+            case 25: return 92;     // Syn Brass 2, a Steel Guitar: French Horn, which holds its notes
+            case 34: return 37;     // Chorale, a Picked Bass: Atmosphere
+            case 49: return 48;     // Str Sect 2, a Slow Strings that swells late: Strings
+            case 107: return 77;    // Shakuhachi, mostly breath in MT32.sf2: Pan Pipes
+            case 127: return 101;   // Jungle Tune, a Gun Shot with no pitch: Glock, a glockenspiel
+            default: return program;
+        }
+    }
+
+    /// <summary>
+    /// How much louder or softer to play a program with MT32.sf2 than the soundfont makes it, in dB.
+    /// </summary>
+    /// <remarks>
+    /// Measured against the same recording, at each note's pitch, against the track's median note,
+    /// checked on the tracks' overall level and peaks, and corrected by ear (Flute 2 and the French
+    /// Horn). Not raised although they measure soft: the whistle (109) and flute (72) of Descent,
+    /// whose samples are breathier than the MT-32's and already carry the track's level.
+    /// </remarks>
+    private static float MT32Volume(int program)
+    {
+        switch (program)
+        {
+            case 93: return 5f;     // French Horn 2
+            case 85: return 8f;     // English Horn
+            case 107: return 6f;    // Shakuhachi, on Pan Pipes
+            case 25: return 5f;     // Syn Brass 2, on the French Horn
+            case 92: return 4f;     // French Horn 1
+            case 34: return 3f;     // Chorale, on Atmosphere
+            case 127: return 5f;    // Jungle Tune, on the Glock
+            case 84: return -3f;    // Oboe
+            case 23: return -7f;    // Celesta 2, on the Glockenspiel
+            case 58: return -7f;    // Harp 2
+            case 73: return -4f;    // Flute 2
+            case 74: return -8f;    // Piccolo 1
+            default: return 0f;
+        }
+    }
+
     // --- Unity Audio Hook ---
     // Runs on the dedicated, real-time Audio Thread, called from OnAudioFilterRead() (MusicPlayerExternalMidi.cs)
     // unless the music is playing on an external synthesizer
@@ -785,12 +904,29 @@ public partial class MusicPlayer : MonoBehaviour
                 break;
             case MusicCommandType.ProgramChange:
                 // MIDI Program Change: (channel, 0xC0, program, 0)
-                synthesizer.ProcessMidiMessage(cmd.Channel, 0xC0, cmd.Program, 0);
+                synthesizer.ProcessMidiMessage(cmd.Channel, 0xC0, SynthProgram(cmd.Channel, cmd.Program), 0);
                 programs[cmd.Channel] = cmd.Program;
+                if (mt32SoundFont)
+                {
+                    // the new program's level and reverb
+                    synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, 7, SynthVolume(cmd.Channel, trackVolumes[cmd.Channel]));
+                    synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, 91, SynthReverb(cmd.Channel, trackReverbs[cmd.Channel]));
+                }
                 break;
             case MusicCommandType.ControllerChange:
                 // MIDI Controller Change: (channel, 0xB0, controller, value)
-                synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, cmd.Controller, cmd.Value);
+                if (cmd.Controller == 7)
+                {
+                    synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, 7, SynthVolume(cmd.Channel, cmd.Value));
+                }
+                else if (cmd.Controller == 91)
+                {
+                    synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, 91, SynthReverb(cmd.Channel, cmd.Value));
+                }
+                else
+                {
+                    synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, cmd.Controller, cmd.Value);
+                }
                 RecordController(cmd.Channel, cmd.Controller, cmd.Value);
                 break;
             case MusicCommandType.PolyphonicAftertouch:
