@@ -119,25 +119,7 @@ public static class Sleeping
 
         PlayerObject.Player.fade = 1.0f;
 
-        if (way != Forced)
-        {
-            // determine whether to play a dream
-            int dreamIndex = PlayerData.GetDreamIndex();
-            if (dreamIndex >= 0)
-            {
-                PlayerData.sData.MarkDreamDreamt(dreamIndex);
-                CutscenePlayer dream = Object.Instantiate(GetDreams()[dreamIndex]);
-                while (dream != null)
-                {
-                    yield return null;
-                }
-            }
-            else
-            {
-                yield return new WaitForSeconds(2.0f);
-            }
-        }
-        else
+        if (way == Forced)
         {
             PlayerData.sData.passedOutDrunk = true;
             yield return new WaitForSeconds(1.0f);
@@ -179,6 +161,7 @@ public static class Sleeping
         }
 
         string waking;
+        int dreamIndex = -1;
         if (Critter.AmbushSleeper())
         {
             // Woken by a creature: some rest, no healing. The original takes 32 of its 255 fatigue,
@@ -226,12 +209,33 @@ public static class Sleeping
             PlayerData.sData.hunger = Mathf.Min(PlayerData.sData.hunger + Random.Range(24, 56), 255);
             PlayerData.sData.drunkenness = Mathf.Max(PlayerData.sData.drunkenness - 32, 0);
             waking = StringLoader.GetString(1, fed ? 18 : 19); // you feel rested, your sleep is uneasy
+
+            // A dream comes only at the end of a full sleep the player chose, as in the original
+            // (UW.EXE 0x81f8f, player_sleep, SKILLS.C).
+            if (way != Forced && !PlayerData.sData.dead)
+            {
+                dreamIndex = PlayerData.PickDream();
+            }
         }
 
         if (PlayerData.sData.dead)
         {
             PlayerObject.DisableControls(EControlMask.Resting, false);
             yield break;
+        }
+
+        if (dreamIndex >= 0)
+        {
+            PlayerData.sData.MarkDreamDreamt(dreamIndex);
+            CutscenePlayer dream = Object.Instantiate(GetDreams()[dreamIndex]);
+            while (dream != null)
+            {
+                yield return null;
+            }
+        }
+        else if (way != Forced)
+        {
+            yield return new WaitForSeconds(2.0f);
         }
 
         // The original says only how the sleep went. Ours: how long it was, and how the player is now.

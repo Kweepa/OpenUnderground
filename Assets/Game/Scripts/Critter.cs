@@ -2381,6 +2381,12 @@ public class Critter : UUObject
         {
             PlayerData.SetQuestFlag(EQuestFlag.RodrickKilled, 1);
         }
+        else if (whoami == EWhoAmI.Prisoner)
+        {
+            // Murgo: his death sets the quest flag Sseetharee's conversation reads (UW.EXE 0x7460f,
+            // death_check, WORLDEV.C, at 0x74731)
+            PlayerData.SetQuestFlag(EQuestFlag.BefriendedLizardmen, 1);
+        }
         else if (whoami == EWhoAmI.Tyball)
         {
             PlayerObject.Player.StartCoroutine(TyballDead(this));

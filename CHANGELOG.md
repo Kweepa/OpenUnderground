@@ -2,6 +2,10 @@
 
 ## Next release
 
+- Garamon's dreams come in the original's order again: the second at the first full sleep away from the first level, the story ones at the first full sleep after their events, none after a sleep a creature interrupted and none once his story is over. The other six now come at a slower pace that grows after each one, and may come again, where before a late event could leave the unseen ones out for good.
+
+- If the prisoner Murgo dies, Sseetharee answers as in the original when asked about him.
+
 - The death cutscene no longer shows a strip of the frame's ornament at the bottom centre of the screen, which looked like the handle of a weapon: the picture was cut out two rows too low.
 
 - A much stronger character no longer keeps a creature flinching with critical after critical so that it never strikes back, as the head bandit of level 3 did: a creature that has flinched now gets its next swing or shot before a critical can make it flinch again.
