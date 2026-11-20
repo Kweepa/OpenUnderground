@@ -784,12 +784,16 @@ public class FrontEnd : MonoBehaviour
                 MusicPlayer.Instance.SetMusicDuckMultiplier(0.5f);
             break;
         case 1:
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // A developer's shortcut past character creation (Shift with the click, or the right
+            // trigger with A), with the character the scene holds: not in a release build.
             if (debugSkipCreateCharacter)
             {
                 StartCoroutine(StartNewGame());
                 state = EState.Done;
             }
             else
+#endif
             {
                 state = EState.CreateCharacter;
                 creator = Instantiate(createCharacter);
