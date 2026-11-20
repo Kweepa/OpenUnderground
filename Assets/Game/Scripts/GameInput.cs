@@ -11,8 +11,50 @@ public static class GameInput
 
     public static Keyboard CurrentKeyboard => Keyboard.current;
 
-    /// <summary>Alt held: Alt-Enter is the fullscreen switch (Unity's own), never an Enter for the game.</summary>
-    public static bool AltHeld => Keyboard.current is { } k && (k.leftAltKey.isPressed || k.rightAltKey.isPressed);
+    /// <summary>
+    /// Alt held: Alt-Enter is the fullscreen switch (Unity's own), never an Enter for the game. Also true
+    /// for half a second after the window changes mode or focus: the switch freezes the game, and the
+    /// keys of the Alt-Enter come in together afterwards, Alt already up when Enter reads as pressed,
+    /// so the title menu took the Enter as a choice.
+    /// </summary>
+    public static bool AltHeld =>
+        (Keyboard.current is { } k && (k.leftAltKey.isPressed || k.rightAltKey.isPressed))
+        || Time.realtimeSinceStartup - windowChangedAt < WindowChangeGrace;
+
+    private const float WindowChangeGrace = 0.5f;
+
+    /// <summary>How far a stick must be pushed to make the pad the device in use.</summary>
+    private const float StickTakesOver = 0.5f;
+    private static bool sticksWereOut;
+    private static float windowChangedAt = float.NegativeInfinity;
+    private static bool wasFullScreen;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void WatchWindow()
+    {
+        windowChangedAt = float.NegativeInfinity;
+        wasFullScreen = Screen.fullScreen;
+        Application.focusChanged -= OnFocusChanged;
+        Application.focusChanged += OnFocusChanged;
+        InputSystem.onBeforeUpdate -= CheckFullScreen;
+        InputSystem.onBeforeUpdate += CheckFullScreen;
+    }
+
+    private static void OnFocusChanged(bool focused)
+    {
+        windowChangedAt = Time.realtimeSinceStartup;
+    }
+
+    // Before the input of the frame is read, so the Enter that comes in with the switch already sees it.
+    private static void CheckFullScreen()
+    {
+        bool fullScreen = Screen.fullScreen;
+        if (fullScreen != wasFullScreen)
+        {
+            wasFullScreen = fullScreen;
+            windowChangedAt = Time.realtimeSinceStartup;
+        }
+    }
 
     /// <summary>Enter or the keypad's Enter pressed this frame, Alt-Enter not counting (mod 740).</summary>
     public static bool EnterPressedThisFrame() =>
@@ -29,7 +71,8 @@ public static class GameInput
 
     /// <summary>
     /// Call once per frame before gameplay reads input. Gamepad wins over mouse/keyboard if both fire the same frame.
-    /// Stick drift does not change the scheme (only buttons, d-pad, mouse, keys, wheel).
+    /// Stick drift does not change the scheme: a stick counts only on the frame it is pushed past half
+    /// its travel, and not while it is held, so walking with a stick does not take the mouse's place.
     /// </summary>
     public static void RefreshLastActiveDevice()
     {
@@ -64,6 +107,18 @@ public static class GameInput
             var dpad = gp.dpad;
             if (dpad.up.wasPressedThisFrame || dpad.down.wasPressedThisFrame
                 || dpad.left.wasPressedThisFrame || dpad.right.wasPressedThisFrame)
+            {
+                LastActiveDevice = GameInputDevice.Gamepad;
+                return;
+            }
+
+            // The triggers and the sticks too: after a click the attack trigger did not attack, and the
+            // right stick did not turn the view, until another of the pad's buttons was pressed.
+            bool sticksOut = gp.leftStick.ReadValue().sqrMagnitude > StickTakesOver * StickTakesOver
+                || gp.rightStick.ReadValue().sqrMagnitude > StickTakesOver * StickTakesOver;
+            bool stickPushed = sticksOut && !sticksWereOut;
+            sticksWereOut = sticksOut;
+            if (gp.leftTrigger.wasPressedThisFrame || gp.rightTrigger.wasPressedThisFrame || stickPushed)
             {
                 LastActiveDevice = GameInputDevice.Gamepad;
                 return;
