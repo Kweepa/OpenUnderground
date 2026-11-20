@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Lore identifies an item you look at a little less often, as in the original: its roll was the sequel's, one step easier. And a trader's goods on the trade table show at most as magical, as in the original: looking at them no longer reveals what they are.
+
 - Switching to fullscreen and back with Alt+Enter no longer picks the highlighted entry of the title menu. After a click, the pad's attack trigger attacks and its right stick turns the view at once, and a pad left plugged in no longer rumbles while you play with the mouse and keyboard.
 
 - With the MT-32 sound font, seven instruments the font did not have, or had as little more than breath, are no longer played by others: the gun shot in the combat music is a ringing glockenspiel again, the map's accordion a soft bell, the Wanderer's plucked guitar a held brass, Descent's bass a vibraphone and the shakuhachi a pan flute. The horns, the English horn, the harp and the piccolo now play as loud as on an MT-32.
