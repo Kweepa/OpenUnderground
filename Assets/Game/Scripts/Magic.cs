@@ -4000,6 +4000,13 @@ public class Magic : MonoBehaviour
                 
                 if (critterData != null)
                 {
+                    // A new creature, not a copy of the one met: no whoami, so neither that one's
+                    // name and conversation (the gazer of level 2 has whoami 110) nor the silence of
+                    // whoami 255, and goal 8 against no one, as the original's summon starts it:
+                    // UW.EXE 0x351e5 (creat_spell, SPELLS.C) and 0x7010e (creature_obj_init, CREATURE.C).
+                    critterData[18] = 0;
+                    critterData[3] = 8;
+                    critterData[4] &= 0xf0;
                     Critter obj = LevelLoader.sLevelLoader.CreateObjectOfType(objData, critterData) as Critter;
                     if (obj != null)
                     {

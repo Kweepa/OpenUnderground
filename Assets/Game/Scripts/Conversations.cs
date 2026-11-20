@@ -169,7 +169,10 @@ public partial class Conversation
                     val = (short)npc.hp;
                     break;
                 case "npc_attitude":
-                    val = (short)npc.attitude;
+                    // 0 for a creature attacking the player, whatever its attitude, and 6 for an
+                    // ally: UW.EXE 0x70400 (setup_converse_data, CONVVARS.C)
+                    val = (short)(npc.goal == Critter.EGoal.AttackTarget5 && npc.gtarg == 1 ? 0
+                                  : npc.playerAlly ? 6 : (int)npc.attitude);
                     break;
                 case "npc_gtarg":
                     val = (short)npc.gtarg;
@@ -329,7 +332,16 @@ public partial class Conversation
                     npc.hp = val;
                     break;
                 case "npc_attitude":
-                    npc.attitude = (Critter.EAttitude)val;
+                    // Above 3 is an ally, friendly: UW.EXE 0x70892 (update_converse_data, CONVVARS.C)
+                    if (val > 3)
+                    {
+                        npc.attitude = Critter.EAttitude.Friendly;
+                        npc.playerAlly = true;
+                    }
+                    else
+                    {
+                        npc.attitude = (Critter.EAttitude)val;
+                    }
                     break;
                 case "npc_gtarg":
                     npc.gtarg = val;
