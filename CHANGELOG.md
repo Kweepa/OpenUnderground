@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The music is cleaner with every sound font: held notes lose a slight roughness they had, and it has room for every note, where 12 voices cut the map's music, which plays up to nearly 60, and left out one note in six of the death music.
+
 - When the game's files cannot be unpacked from the copy found at the first start (a full disk, no access), the window now says why instead of saying nothing, and Auto Search tries that copy again once you have made room.
 
 - Holding Enter while typing runes no longer casts the spell over and over, nor does a held letter fill the shelf; holding the cast key, or the pad's cast button, now tries again after a failed roll or until you are ready to cast, and stops at the first spell that goes off: one press, one spell.

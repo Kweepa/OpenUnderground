@@ -46,10 +46,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   userDataSubfolder: SOUND
-  maximumPolyphony: 12
+  maximumPolyphony: 64
   stereoWidth: 0.5
-  xmiSampleRate: 32000
-  noteDropVelocityThreshold: 16
+  noteDropVelocityThreshold: 0
   velocityCurveAmount: 1
   currentTrack: 
 --- !u!82 &4401554661091093842
