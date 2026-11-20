@@ -138,7 +138,7 @@ public class CreateCharacter : MonoBehaviour
         PlayerData.sData.fatigue = 0;
         PlayerData.sData.drunkenness = 0;
 
-        PlayerData.sData.ShuffleDreams();
+        PlayerData.sData.ResetDreams();
 
         PlayerData.sData.playerName = "";
     }

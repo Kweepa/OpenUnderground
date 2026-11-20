@@ -108,6 +108,10 @@ public class PlayerSaveData
     public int[] globalVars;
     
     // Dreams
+    public int dreamBits;
+    public int dreamsShown;
+    // false in a save made before dreamBits, whose dreams are in dreamsRemaining
+    public bool dreamBitsSaved;
     public List<int> dreamsRemaining;
     public double timeOfLastDream;
     public int cupDreamIndex;

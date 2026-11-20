@@ -103,7 +103,13 @@ public class PlayerData : MonoBehaviour
     /// </summary>
     public double[] repopulationClock;
 
-    public List<int> dreamsRemaining;
+    /// <summary>
+    /// Garamon's dreams, a bit each as the original keeps them (player->dreams): dreams 0, 1 and 4-9
+    /// set once seen, dreams 2 and 3 set while due and cleared once seen.
+    /// </summary>
+    public int dreamBits;
+    /// <summary>How many times one of dreams 4-9 has been shown, repeats included: it sets the wait before the next.</summary>
+    public int dreamsShown;
     public double timeOfLastDream;
     public int cupDreamIndex;
 
@@ -190,48 +196,124 @@ public class PlayerData : MonoBehaviour
         return value;
     }
 
-    public void ShuffleDreams()
+    public void ResetDreams()
     {
-        // play dream 0 first, then a random one from this list
-        dreamsRemaining = new List<int>();
-        List<int> dreams = new List<int>(new[] { 1, 4, 5, 6, 7, 8, 9 });
-        while (dreams.Count > 0)
-        {
-            int pick = UnityEngine.Random.Range(0, dreams.Count);
-            dreamsRemaining.Add(dreams[pick]);
-            dreams.RemoveAt(pick);
-        }
-        // dream 0 first
-        dreamsRemaining.Insert(0, 0);
-    }
-
-    public void SetTyballDead()
-    {
-        dreamsRemaining = new List<int>(new[] { 2, 3 });
-        // make sure we see the next dream immediately
+        dreamBits = 0;
+        dreamsShown = 0;
         timeOfLastDream = 0;
     }
 
-    private int GetDreamIndexInternal()
+    /// <summary>
+    /// The dreams of a save made before dreamBits: the list of those still to come, which Tyball's death
+    /// replaced with dreams 2 and 3. Which of 4-9 were seen before that is lost, so they start again.
+    /// </summary>
+    public void DreamsFromOldSave(List<int> remaining)
     {
-        // need at least 10 hours between dreams
-        // sleeping lasts 8 hours so it's really only 2 hours of gameplay
-        if (gameTime - timeOfLastDream < 10 * 60 * 60
-            || dreamsRemaining.Count == 0)
+        ResetDreams();
+        if (remaining.Count == 0 || remaining.Contains(2) || remaining.Contains(3))
+        {
+            dreamBits = 3;
+            if (remaining.Contains(2))
+            {
+                dreamBits |= 4;
+            }
+            if (remaining.Count == 0)
+            {
+                dreamsShown = 6;
+            }
+            return;
+        }
+        foreach (int dream in new[] { 0, 1, 4, 5, 6, 7, 8, 9 })
+        {
+            if (!remaining.Contains(dream))
+            {
+                dreamBits |= 1 << dream;
+                if (dream >= 4)
+                {
+                    ++dreamsShown;
+                }
+            }
+        }
+    }
+
+    /// <summary>Dream 2 is due: Tyball is dead (UW.EXE TyballDeath_ovr107_13D1, WORLDEV.C).</summary>
+    public void SetTyballDead()
+    {
+        dreamBits |= 1 << 2;
+    }
+
+    /// <summary>
+    /// Dream 3 is due: a talisman came to rest in the lava at the heart of level 8 before Garamon was
+    /// buried (UW.EXE 0x2be7f, mob_to_static, OBJPHYS.C).
+    /// </summary>
+    public void SetTalismanInLavaTooEarly()
+    {
+        dreamBits |= 1 << 3;
+    }
+
+    /// <summary>
+    /// The dream at the end of a full sleep the player chose, or -1 (Sleeping). Dreams 0-3 as the
+    /// original picks them (UW.EXE 0x81de3, dream, SKILLS.C), at the first such sleep after their
+    /// event: dream 0 at once, dream 1 off level 1, 2 and 3 while due. None at all once Garamon is
+    /// buried.
+    /// </summary>
+    /// <remarks>
+    /// Dreams 4-9 are a middle way of ours. In the original one of the six is drawn one full sleep in
+    /// four (one in eight fed on a bedroll), and nothing if it was seen already: about sixty full
+    /// sleeps to see them all. Kweepa's showed one at every sleep at least 10 hours after the last
+    /// dream, each once. Here one of the six is drawn, repeats included as in the original, at a full
+    /// sleep at least 10 hours after the last dream, and each one shown makes the next wait two hours
+    /// longer, up to 20.
+    /// </remarks>
+    private int PickDreamInternal()
+    {
+        if (garamonAtRest)
         {
             return -1;
         }
 
-        int index = dreamsRemaining[0];
-        dreamsRemaining.RemoveAt(0);
+        int dream = -1;
+        if ((dreamBits & 1) == 0)
+        {
+            dream = 0;
+        }
+        else if (LevelLoader.sLevelLoader.loadedLevel > 1 && (dreamBits & 2) == 0)
+        {
+            dream = 1;
+        }
+        else if ((dreamBits & 4) != 0)
+        {
+            dream = 2;
+        }
+        else if ((dreamBits & 8) != 0)
+        {
+            dream = 3;
+        }
+
+        if (dream >= 0)
+        {
+            // seen for 0 and 1, no longer due for 2 and 3
+            dreamBits ^= 1 << dream;
+        }
+        else
+        {
+            double wait = (10 + 2 * Mathf.Min(dreamsShown, 5)) * 60 * 60;
+            if (gameTime - timeOfLastDream < wait)
+            {
+                return -1;
+            }
+            dream = 4 + UnityEngine.Random.Range(0, 6);
+            dreamBits |= 1 << dream;
+            ++dreamsShown;
+        }
 
         timeOfLastDream = gameTime;
-        return index;
+        return dream;
     }
 
-    public static int GetDreamIndex()
+    public static int PickDream()
     {
-        return sData.GetDreamIndexInternal();
+        return sData.PickDreamInternal();
     }
 
     public void Start()
@@ -239,7 +321,7 @@ public class PlayerData : MonoBehaviour
         sData = this;
 
         // in case we skip the character creation
-        ShuffleDreams();
+        ResetDreams();
 
         // Global persistence across saves (legacy behavior)
         MergeDefeatedCrittersFromPrefs();

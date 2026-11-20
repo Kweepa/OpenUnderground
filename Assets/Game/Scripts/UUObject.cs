@@ -1675,6 +1675,16 @@ public class UUObject : LevelObject
     {
         bool destroyed = false;
         if (LevelLoader.sLevelLoader.loadedLevel == 8
+            && !PlayerData.sData.garamonAtRest
+            && !PlayerData.sData.dead
+            && t.x is >= 30 and <= 34 && t.y is >= 31 and <= 34
+            && GetComponent<Talisman>() != null)
+        {
+            // Too early: Garamon is not yet buried, and he says so in dream 3 (UW.EXE 0x2be7f,
+            // mob_to_static, OBJPHYS.C, which does it for any object of the talismans' types).
+            PlayerData.sData.SetTalismanInLavaTooEarly();
+        }
+        else if (LevelLoader.sLevelLoader.loadedLevel == 8
             && PlayerData.sData.garamonAtRest
             && t.x is >= 30 and <= 34 && t.y is >= 31 and <= 34)
         {

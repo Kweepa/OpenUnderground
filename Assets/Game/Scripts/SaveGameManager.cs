@@ -1167,7 +1167,9 @@ public class SaveGameManager : MonoBehaviour
         System.Array.Copy(playerData.globalVars, data.globalVars, playerData.globalVars.Length);
         
         // Dreams
-        data.dreamsRemaining = new List<int>(playerData.dreamsRemaining);
+        data.dreamBits = playerData.dreamBits;
+        data.dreamsShown = playerData.dreamsShown;
+        data.dreamBitsSaved = true;
         data.timeOfLastDream = playerData.timeOfLastDream;
         data.cupDreamIndex = playerData.cupDreamIndex;
         
@@ -1337,13 +1339,18 @@ public class SaveGameManager : MonoBehaviour
         System.Array.Copy(data.globalVars, playerData.globalVars, Mathf.Min(data.globalVars.Length, playerData.globalVars.Length));
         
         // Restore dreams
-        if (data.dreamsRemaining != null)
+        if (data.dreamBitsSaved)
         {
-            playerData.dreamsRemaining = new List<int>(data.dreamsRemaining);
+            playerData.dreamBits = data.dreamBits;
+            playerData.dreamsShown = data.dreamsShown;
+        }
+        else if (data.dreamsRemaining != null)
+        {
+            playerData.DreamsFromOldSave(data.dreamsRemaining);
         }
         else
         {
-            playerData.ShuffleDreams();
+            playerData.ResetDreams();
         }
         playerData.timeOfLastDream = data.timeOfLastDream;
         playerData.cupDreamIndex = data.cupDreamIndex;
