@@ -2,6 +2,8 @@
 
 ## Next release
 
+- With the MT-32 sound font, seven instruments the font did not have, or had as little more than breath, are no longer played by others: the gun shot in the combat music is a ringing glockenspiel again, the map's accordion a soft bell, the Wanderer's plucked guitar a held brass, Descent's bass a vibraphone and the shakuhachi a pan flute. The horns, the English horn, the harp and the piccolo now play as loud as on an MT-32.
+
 - The music is cleaner with every sound font: held notes lose a slight roughness they had, and it has room for every note, where 12 voices cut the map's music, which plays up to nearly 60, and left out one note in six of the death music.
 
 - When the game's files cannot be unpacked from the copy found at the first start (a full disk, no access), the window now says why instead of saying nothing, and Auto Search tries that copy again once you have made room.
