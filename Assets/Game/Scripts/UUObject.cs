@@ -1452,7 +1452,9 @@ public class UUObject : LevelObject
             if (loreResultLoreLevel < loreSkill)
             {
                 loreResultLoreLevel = loreSkill;
-                Skills.ESkillTestResult newLoreResult = Skills.GetResult(loreSkill, 8);
+                // Difficulty 10, as the original's look at an item: UW.EXE 0x2723e (inv_look, INTERACT.C).
+                // 8 is the sequel's.
+                Skills.ESkillTestResult newLoreResult = Skills.GetResult(loreSkill, 10);
                 if (newLoreResult > loreResult)
                 {
                     loreResult = newLoreResult;
@@ -1514,6 +1516,27 @@ public class UUObject : LevelObject
         }
 
         return GetIdentifiedName(lookNameBuilder.ToString());
+    }
+
+    /// <summary>
+    /// The name at a given level of detail, as GetLookName() gives it, without a Lore roll and
+    /// without changing what the object keeps: for the trader's goods on the trade table.
+    /// </summary>
+    public string GetLookNameAt(Skills.ESkillTestResult detail)
+    {
+        Skills.ESkillTestResult keptResult = loreResult;
+        int keptLevel = loreResultLoreLevel;
+        loreResult = detail;
+        loreResultLoreLevel = int.MaxValue;
+        try
+        {
+            return GetLookName();
+        }
+        finally
+        {
+            loreResult = keptResult;
+            loreResultLoreLevel = keptLevel;
+        }
     }
 
     public virtual string GetUnderCursorName()

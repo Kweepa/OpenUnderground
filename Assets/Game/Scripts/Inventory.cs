@@ -1383,6 +1383,40 @@ public class Inventory : MonoBehaviour
         return (slotIndex & 3) >= 2;
     }
 
+    // What Lore made of each of the trader's goods in this trade (TradeSlotName()).
+    private readonly Dictionary<UUObject, Skills.ESkillTestResult> traderGoodsLore = new();
+
+    /// <summary>A new trade: its goods are looked at afresh (Critter.Conversation_setup_to_barter()).</summary>
+    public void ForgetTraderGoodsLore()
+    {
+        traderGoodsLore.Clear();
+    }
+
+    /// <summary>
+    /// The name of what lies in a trade slot. The player's own items read as in the pack. The
+    /// trader's are never named past "magical": the original rolls Lore against 20 at each look
+    /// at one of them, for "magical" at best (UW.EXE 0x6ac13, UseTradeSlot_ovr097_6E8, BARTER.C),
+    /// and no spell can be cast in a conversation to learn more. Here the roll is made once per
+    /// item in each trade, not at every frame the name is drawn, and nothing of it is kept on the
+    /// item.
+    /// </summary>
+    private string TradeSlotName(int slot)
+    {
+        UUObject item = tradeSlots[slot];
+        if (IsPlayerTradeSlotIndex(slot))
+        {
+            return item.GetLookName();
+        }
+        if (!traderGoodsLore.TryGetValue(item, out Skills.ESkillTestResult detail))
+        {
+            detail = Skills.GetResult(Skills.GetSkill(ESkill.Lore), 20) >= Skills.ESkillTestResult.Success
+                ? Skills.ESkillTestResult.Success
+                : Skills.ESkillTestResult.Failure;
+            traderGoodsLore[item] = detail;
+        }
+        return item.GetLookNameAt(detail);
+    }
+
     private void GetTradeTrayColumnXs(out int tx1, out int tx2)
     {
         // 27 into each tray drawn by Conversations
@@ -6307,7 +6341,7 @@ public class Inventory : MonoBehaviour
                     }
                     else if (hoverTradeTray)
                     {
-                        Utils.DropShadowText(hoverDesc.GetLookName(),
+                        Utils.DropShadowText(TradeSlotName(tradeHoverDescSlot),
                             ((tradeHoverDescSlot & 3) >= 2 ? x2 : x1) - 22, y1 + 121, 240, 40, descriptionStyle);
                     }
                     else
@@ -6612,7 +6646,7 @@ public class Inventory : MonoBehaviour
                 // name the highlighted item
                 if (tradeSlots[tradeSlot] != null)
                 {
-                    Utils.DropShadowText(tradeSlots[tradeSlot].GetLookName(), ((tradeSlot & 3) >= 2 ? x2 : x1) - 22, y1 + 121, 240, 40, descriptionStyle);
+                    Utils.DropShadowText(TradeSlotName(tradeSlot), ((tradeSlot & 3) >= 2 ? x2 : x1) - 22, y1 + 121, 240, 40, descriptionStyle);
                 }
                 break;
             }

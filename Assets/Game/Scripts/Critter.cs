@@ -7475,6 +7475,7 @@ public class Critter : UUObject
 
     public void Conversation_setup_to_barter()
     {
+        Inventory.sInv.ForgetTraderGoodsLore();
         // first scan through loot and pick what is possible
         // then randomly choose from the good stuff
         bool firstWeapon = false;
