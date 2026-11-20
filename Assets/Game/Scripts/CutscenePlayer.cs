@@ -127,6 +127,8 @@ public class CutscenePlayer : MonoBehaviour
     public Font font;
     [Tooltip("how to fit the cutscene to the play window")]
     public CutsceneFitType fitType = CutsceneFitType.Spill;
+    [Tooltip("Corner only: the rows of the frame below the view window. The death's frames sit two rows higher than the others")]
+    public int cornerBottom = 3;
     [Tooltip("whether to play to the end or stop a couple of frames before")]
     public bool playAllFrames;
     [Tooltip("if frameNum event issued, just show this frame. mainly for windows and gravestones")]
@@ -738,13 +740,14 @@ public class CutscenePlayer : MonoBehaviour
             {
                 // carefully positioned to trim off the dragons and compass
                 // note that the x,y here are from the bottom left
-                Color[] subColors = tex.GetPixels(150, 3, 168, 109);
+                Color[] subColors = tex.GetPixels(150, cornerBottom, 168, 109);
                 Texture2D subTex = new Texture2D(168, 109);
                 subTex.SetPixels(subColors);
                 subTex.wrapMode = TextureWrapMode.Clamp;
                 subTex.filterMode = FilterMode.Point;
                 subTex.Apply();
 
+                Destroy(tex);
                 outputImages[f] = subTex;
             }
         }

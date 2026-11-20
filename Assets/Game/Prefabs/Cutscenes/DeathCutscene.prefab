@@ -48,6 +48,7 @@ MonoBehaviour:
   frameDuration: 0.1667
   font: {fileID: 0}
   fitType: 2
+  cornerBottom: 5
   playAllFrames: 0
   fixedFrame: 0
   audioSource: {fileID: 0}
