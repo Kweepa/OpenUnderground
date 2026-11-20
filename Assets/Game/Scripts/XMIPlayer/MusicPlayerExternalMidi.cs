@@ -235,7 +235,7 @@ public partial class MusicPlayer
             }
 
             int sentVolume = -1;
-            int sampleRate = (int)xmiSampleRate;
+            int sampleRate = SynthesisRate;
             double carried = 0.0;
             Stopwatch clock = Stopwatch.StartNew();
             long last = clock.ElapsedTicks;

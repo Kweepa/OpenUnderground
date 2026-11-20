@@ -7,15 +7,6 @@ using System.IO;
 using System.Threading;
 using System;
 
-public enum ESampleRate
-{
-    SampleRate11kHz = 11025,
-    SampleRate22kHz = 22050,
-    SampleRate32kHz = 32000,
-    SampleRate44_1kHz = 44100,
-    SampleRate48kHz = 48000
-}
-
 [RequireComponent(typeof(AudioSource))]
 public partial class MusicPlayer : MonoBehaviour
 {
@@ -34,19 +25,16 @@ public partial class MusicPlayer : MonoBehaviour
     
     [Header("XMI Playback Settings")]
     [Tooltip("Maximum simultaneous voices (lower = better performance, higher = more complex music)")]
-    [Range(8, 32)]
-    public int maximumPolyphony = 12;
+    [Range(8, 128)]
+    public int maximumPolyphony = 64;
     
     [Tooltip("Stereo width (0.0 = mono, 1.0 = full stereo)")]
     [Range(0.0f, 1.0f)]
     public float stereoWidth = 0.5f;
     
-    [Tooltip("Sample rate for XMI playback (lower = better performance, higher = better quality)")]
-    public ESampleRate xmiSampleRate = ESampleRate.SampleRate48kHz;
-
-    [Tooltip("When at max polyphony, skip incoming NoteOns softer than this velocity (0-127)")]
+    [Tooltip("When at max polyphony, skip incoming NoteOns softer than this velocity (0-127; 0 = never)")]
     [Range(0, 127)]
-    public int noteDropVelocityThreshold = 24;
+    public int noteDropVelocityThreshold = 0;
 
     [Tooltip("0 = MeltySynth native velocity (v^2), 1 = sqrt pre-compensate toward linear loudness")]
     [Range(0f, 1f)]
@@ -77,9 +65,15 @@ public partial class MusicPlayer : MonoBehaviour
     // Set by StopMusic() on the main thread: the held notes are forgotten on the next buffer.
     private volatile bool forgetHeldNotes;
 
-    // Resampling state
-    private double resamplePosition = 0.0; // Use double for precision, continuous (doesn't wrap)
     private int unityOutputSampleRate; // Cached from Awake() - AudioSettings can't be accessed from audio thread
+
+    /// <summary>
+    /// The rate the synthesizer and the sequencer run at: Unity's own output rate, so that what the
+    /// synthesizer renders goes out sample for sample. Rendering at another rate and resampling in
+    /// OnAudioFilterRead() rendered a sample or two more per buffer than it used, a seam at every
+    /// buffer, heard as a roughness on held notes.
+    /// </summary>
+    private int SynthesisRate => unityOutputSampleRate > 0 ? unityOutputSampleRate : 48000;
 
     // Velocity remap: MeltySynth uses (v/127)^2 gain; LUT can pre-lift soft notes
     private readonly byte[] velocityRemap = new byte[128];
@@ -284,7 +278,7 @@ public partial class MusicPlayer : MonoBehaviour
         mt32SoundFont = Path.GetFileName(soundFontFileName).Equals("MT32.sf2", StringComparison.OrdinalIgnoreCase);
 
         // 3. Load MeltySynth with performance-optimized settings
-        var settings = new MeltySynth.SynthesizerSettings((int)xmiSampleRate);
+        var settings = new MeltySynth.SynthesizerSettings(SynthesisRate);
         settings.MaximumPolyphony = maximumPolyphony;  // Limit voices to prevent CPU overload
         var created = new MeltySynth.Synthesizer(fullPath, settings); 
         
@@ -471,9 +465,6 @@ public partial class MusicPlayer : MonoBehaviour
 
         LoadSong(fullPath, loop);
         currentTrack = fileName;
-        
-        // Reset resampling state when switching tracks
-        resamplePosition = 0.0;
     }
     
     /// <summary>
@@ -666,11 +657,8 @@ public partial class MusicPlayer : MonoBehaviour
         ResetVoiceStats();
         RebuildVelocityRemap();
 
-        // Use configured sample rate
-        int actualSampleRate = (int)xmiSampleRate;
-        
         // Create sequencer - TPQN will be auto-calculated from meta-events
-        sequencer = new XMISequencer(fullPath, commandQueue, actualSampleRate, loop);
+        sequencer = new XMISequencer(fullPath, commandQueue, SynthesisRate, loop);
         if (!sequencer.IsLoaded)
         {
             sequencer = null;
@@ -776,25 +764,11 @@ public partial class MusicPlayer : MonoBehaviour
         if (channels != 2) return;
         int sampleCount = data.Length / channels;
         
-        int unityOutputRate = unityOutputSampleRate; // Use cached value (can't call AudioSettings from audio thread)
-        int customRate = (int)xmiSampleRate;
-
         // 1. Process sequencer events with sample-accurate timing
         //    This happens BEFORE rendering to ensure notes start precisely
-        //    Sequencer processes at custom rate, so convert Unity's sample count
         if (sequencer != null)
         {
-            if (customRate == unityOutputRate)
-            {
-                sequencer.ProcessSamples(sampleCount);
-            }
-            else
-            {
-                // Convert Unity's sample count to custom rate samples
-                float rateRatio = (float)customRate / unityOutputRate;
-                int sequencerSamples = Mathf.CeilToInt(sampleCount * rateRatio);
-                sequencer.ProcessSamples(sequencerSamples);
-            }
+            sequencer.ProcessSamples(sampleCount);
         }
 
         // 2. Process all pending commands
@@ -838,84 +812,31 @@ public partial class MusicPlayer : MonoBehaviour
             }
         }
 
-        // 3. Render audio at custom sample rate, then resample to Unity's output rate
+        // 3. Render audio at Unity's output rate
         int voicesNow = synthesizer.ActiveVoiceCount;
         if (voicesNow > peakActiveVoices)
         {
             peakActiveVoices = voicesNow;
         }
 
-        if (customRate == unityOutputRate)
-        {
-            // No resampling needed - render directly
-            Span<float> leftBuffer = stackalloc float[sampleCount];
-            Span<float> rightBuffer = stackalloc float[sampleCount];
-            synthesizer.Render(leftBuffer, rightBuffer);
+        Span<float> leftBuffer = stackalloc float[sampleCount];
+        Span<float> rightBuffer = stackalloc float[sampleCount];
+        synthesizer.Render(leftBuffer, rightBuffer);
 
-            // Apply stereo width mixing, master volume scaling, and interleave
-            for (int i = 0, j = 0; i < sampleCount; i++)
-            {
-                float left = leftBuffer[i];
-                float right = rightBuffer[i];
-                
-                // Mix to reduce stereo width (0.0 = mono, 1.0 = full stereo)
-                float mono = (left + right) * 0.5f;
-                float mixedLeft = mono + (left - mono) * stereoWidth;
-                float mixedRight = mono + (right - mono) * stereoWidth;
-                
-                float vol = masterVolumeScale * duckMultiplier;
-                data[j++] = mixedLeft * vol;
-                data[j++] = mixedRight * vol;
-            }
-        }
-        else
+        // Apply stereo width mixing, master volume scaling, and interleave
+        for (int i = 0, j = 0; i < sampleCount; i++)
         {
-            // Resampling needed - generate samples on-demand and resample
-            // Calculate step size: how fast to step through source buffer
-            // When upsampling (customRate < unityRate), step is < 1.0
-            double step = (double)customRate / unityOutputRate;
+            float left = leftBuffer[i];
+            float right = rightBuffer[i];
             
-            // Calculate how many source samples we need
-            double startPos = resamplePosition;
-            double endPos = resamplePosition + (sampleCount - 1) * step;
-            int startIndex = (int)Math.Floor(startPos);
-            int endIndex = (int)Math.Ceiling(endPos) + 1; // +1 for interpolation
-            int samplesToGenerate = endIndex - startIndex;
+            // Mix to reduce stereo width (0.0 = mono, 1.0 = full stereo)
+            float mono = (left + right) * 0.5f;
+            float mixedLeft = mono + (left - mono) * stereoWidth;
+            float mixedRight = mono + (right - mono) * stereoWidth;
             
-            // Generate samples at custom rate
-            Span<float> leftBufferCustom = stackalloc float[samplesToGenerate];
-            Span<float> rightBufferCustom = stackalloc float[samplesToGenerate];
-            synthesizer.Render(leftBufferCustom, rightBufferCustom);
-            
-            // Resample from custom rate to Unity's output rate using linear interpolation
-            double readPos = resamplePosition - startIndex; // Relative to buffer start
-            for (int i = 0, j = 0; i < sampleCount; i++)
-            {
-                int index = (int)readPos;
-                double fraction = readPos - index;
-                
-                // Clamp indices to avoid out-of-bounds
-                int index0 = Mathf.Clamp(index, 0, samplesToGenerate - 1);
-                int index1 = Mathf.Clamp(index + 1, 0, samplesToGenerate - 1);
-                
-                // Linear interpolation
-                float left = (float)(leftBufferCustom[index0] * (1.0 - fraction) + leftBufferCustom[index1] * fraction);
-                float right = (float)(rightBufferCustom[index0] * (1.0 - fraction) + rightBufferCustom[index1] * fraction);
-                
-                // Mix to reduce stereo width (0.0 = mono, 1.0 = full stereo)
-                float mono = (left + right) * 0.5f;
-                float mixedLeft = mono + (left - mono) * stereoWidth;
-                float mixedRight = mono + (right - mono) * stereoWidth;
-                
-                float vol = masterVolumeScale * duckMultiplier;
-                data[j++] = mixedLeft * vol;
-                data[j++] = mixedRight * vol;
-                
-                readPos += step;
-            }
-            
-            // Update resample position (continuous, doesn't wrap)
-            resamplePosition = endPos + step;
+            float vol = masterVolumeScale * duckMultiplier;
+            data[j++] = mixedLeft * vol;
+            data[j++] = mixedRight * vol;
         }
     }
 }
