@@ -6317,8 +6317,14 @@ public class Critter : UUObject
 
     public override void TryDamage(int damage, Skills.ESkillTestResult result)
     {
-        // No bonus on Easy: the original's flag has two readers, the player's attack score and the
-        // halving of what he takes (UW.EXE 0x2544d DoPlayerWeapon and 0x24e4a do_damage, COMBAT.C)
+        // Easy mode: increase damage done to enemies by 3/2. Kweepa's choice, not the original's: there
+        // Easy gives +7 to the attack score and halves what the player takes (UW.EXE 0x2544d
+        // DoPlayerWeapon and 0x24e4a do_damage, COMBAT.C), and nothing more; kept so that fights on
+        // Easy stay short.
+        if (PlayerData.sData.easy)
+        {
+            damage = damage * 3 / 2;
+        }
         hp -= damage;
         // whoever struck it; the player's blows say so afterwards, in StruckByPlayer()
         lastBlowByPlayer = false;
