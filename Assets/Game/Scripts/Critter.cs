@@ -3469,6 +3469,11 @@ public class Critter : UUObject
     /// </summary>
     private bool ChaseGivesUp()
     {
+        if (StopsFightingPlayer())
+        {
+            return true;
+        }
+
         if (!perceptionTick || attackTarget != null || !awareOfPlayer)
         {
             return false;
@@ -3516,6 +3521,23 @@ public class Critter : UUObject
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// A creature fighting the player that is no longer set against him - neither hostile nor on goal
+    /// 5, as after Ally or a calming word - stops and goes back to idle, where only those two start a
+    /// fight. In the original the fight is goal 5 itself (UW.EXE 0x19541, crit_offense); here a
+    /// creature in the fight's states went on swinging at any attitude once it knew of the player.
+    /// </summary>
+    private bool StopsFightingPlayer()
+    {
+        if (attackTarget != null || hp <= 0 || attitude == EAttitude.Hostile || goal == EGoal.AttackTarget5)
+        {
+            return false;
+        }
+
+        SetState(EState.Idle);
+        return true;
     }
 
     /// <summary>
@@ -3917,6 +3939,15 @@ public class Critter : UUObject
             {
                 Music.AlertHeartbeat();
             }
+        }
+
+        // A creature sent to attack the player turns hostile on its own next tick, whatever its
+        // attitude: UW.EXE 0x19541 (crit_offense, AI.C) sets it on every tick of goal 5 with the
+        // player as target. A conversation's fight leaves it upset; without this it fought on
+        // upset, and could still be talked to before it noticed the player.
+        if (goal == EGoal.AttackTarget5 && gtarg == 1 && attitude != EAttitude.Hostile && hp > 0)
+        {
+            attitude = EAttitude.Hostile;
         }
 
         if (IsGolemWithShieldOfValor() && hp < 5)
@@ -4922,6 +4953,11 @@ public class Critter : UUObject
         if (playerAlly && attackTarget == null)
         {
             SetState(EState.Idle);
+            return;
+        }
+
+        if (StopsFightingPlayer())
+        {
             return;
         }
 
@@ -6084,9 +6120,16 @@ public class Critter : UUObject
     {
         bool gotResponse = false;
         bool talkToRodrick = whoami is EWhoAmI.Rodrick;
-        bool talkToTyball = whoami is EWhoAmI.Tyball && talkedTo == 0;
+        bool talkToTyball = whoami is EWhoAmI.Tyball;
+        // The original's gate, UW.EXE 0x6e490 (TalkTo, CONVERSE.C): the golem, Rodrick and Tyball
+        // always answer; no other creature that is hostile or sent to attack or flee from the
+        // player (goals 5, 6 and 9 with the player as target), unless it is an ally, nor one with
+        // whoami 255, the creatures that never talk; a creature waiting to talk (goal 10) always
+        // answers.
+        bool turnedOnPlayer = (goal is EGoal.AttackTarget5 or EGoal.FleeTarget or EGoal.AttackTarget9) && gtarg == 1;
+        bool refuses = ((attitude == EAttitude.Hostile || turnedOnPlayer) && !playerAlly) || (int)whoami == 255;
         if (hp > 0 && !Magic.sMagic.IsSpellActive(Magic.ESpell.FreezeTime)
-            && (attitude != EAttitude.Hostile || talkToRodrick || talkToTyball))
+            && (!refuses || goal == EGoal.AwaitConversation || whoami is EWhoAmI.Golem || talkToRodrick || talkToTyball))
         {
             if (Conversations.StartConversation(this))
             {
@@ -7767,6 +7810,15 @@ public class Critter : UUObject
 
     public void TryAlly()
     {
+        // An order to attack or flee from the player goes, as the original's Ally sends the creature
+        // to wander: UW.EXE 0x34c98 (sp_charm, SPELLS.C). Without this a creature a conversation
+        // had sent against the player turned hostile again at once.
+        if ((goal is EGoal.AttackTarget5 or EGoal.FleeTarget or EGoal.AttackTarget9) && gtarg == 1)
+        {
+            goal = EGoal.Wander2;
+            gtarg = 0;
+        }
+
         if (playerLastEngagedInCombat != null)
         {
             attackTarget = playerLastEngagedInCombat;

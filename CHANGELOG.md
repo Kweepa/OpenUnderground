@@ -2,6 +2,8 @@
 
 ## Next release
 
+- A creature a conversation sends to fight you, like a bandit of level 3 after a rude answer, now turns hostile as it attacks instead of staying upset, and no longer talks to you while it means to fight, as in the original: before, you could chat with such a bandit before he noticed you, part on good terms and still be attacked. Ally now stops such a creature, and the creatures that never talk in the original no longer do. A summoned gazer is no longer the named gazer of level 2.
+
 - Lore identifies an item you look at a little less often, as in the original: its roll was the sequel's, one step easier. And a trader's goods on the trade table show at most as magical, as in the original: looking at them no longer reveals what they are.
 
 - Switching to fullscreen and back with Alt+Enter no longer picks the highlighted entry of the title menu. After a click, the pad's attack trigger attacks and its right stick turns the view at once, and a pad left plugged in no longer rumbles while you play with the mouse and keyboard.
