@@ -11,6 +11,7 @@ public class ProjectileSaveData : UUObjectSaveData
 
 public class Projectile : UUObject
 {
+    // false on the sling stone, arrow and bolt prefabs, armed when they are shot
     public bool doDamage = true;
     public GameObject hitEffect;
     public float hitEffectScale;
@@ -19,10 +20,10 @@ public class Projectile : UUObject
     public bool createdByCursedEntity = false;
     
     [Tooltip("Radius of the projectile capsule for collision detection")]
-    public float collisionRadius = 0.1f;
+    public float collisionRadius = 0.1f; // 0.2 on the spell projectiles
     
     [Tooltip("Half-length of the projectile capsule (from center to end)")]
-    public float collisionHalfLength = 0.3f;
+    public float collisionHalfLength = 0.3f; // each projectile's prefab sets its own, 0 to 0.5
 
     public Vector3 oldPos = Vector3.zero;
     private Collider[] overlapCache = new Collider[8];

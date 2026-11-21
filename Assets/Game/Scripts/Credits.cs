@@ -12,7 +12,7 @@ public class Credits : MonoBehaviour
     public AudioClip turnPage;
     public AudioClip turnBack;
     
-    public float timePerCharacter = 0.05f;
+    public float timePerCharacter = 0.06f;
     public float minPageTime = 2.0f;
 
     private readonly int[] x =

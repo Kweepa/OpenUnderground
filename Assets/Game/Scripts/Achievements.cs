@@ -153,7 +153,7 @@ public class Achievements : MonoBehaviour
     public int fishCount = 20;
     public int repairCount = 10;
     public int waterWalkSteps = 100;
-    public int lavaWalkSteps = 10;
+    public int lavaWalkSteps = 100;
     public int booksBurned = 20;
 
     private int index;

@@ -5692,7 +5692,7 @@ public class Inventory : MonoBehaviour
     public int carryY = 200;
 
     public Texture2D crackPatch;
-    public float crackPatchHeight = 30.0f;
+    public float crackPatchHeight = 13.0f;
 
     /// <summary>
     /// The runes of the world's Name Enchantment effect (runes_tiled.png) white on a transparent ground, with the sheet's

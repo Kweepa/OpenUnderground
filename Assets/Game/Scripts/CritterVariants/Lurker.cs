@@ -6,7 +6,7 @@ namespace Game.Scripts.CritterVariants
     {
         public GameObject leftArm;
         public GameObject rightArm;
-        public float scale = 0.5f;
+        public float scale = 0.7f;
         public MeshRenderer waterRipple;
         public GameObject jaw;
 

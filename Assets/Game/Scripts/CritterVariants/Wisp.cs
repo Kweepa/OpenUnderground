@@ -6,7 +6,7 @@ namespace Game.Scripts.CritterVariants
     public class Wisp : Flyer
     {
         [Tooltip("Vertical bobbing magnitude (how high/low the Wisp bobs)")]
-        public float bobMagnitude = 0.1f;
+        public float bobMagnitude = 0.05f;
         
         [Tooltip("Vertical bobbing speed (how fast the Wisp bobs)")]
         public float bobSpeed = 1.0f;
@@ -21,7 +21,7 @@ namespace Game.Scripts.CritterVariants
         public float maxRotationDuration = 5.0f;
 
         [Tooltip("Maximum rotational velocity in degrees per second")]
-        public float maxRotationVelocity = 30.0f;
+        public float maxRotationVelocity = 15.0f;
 
         [Tooltip("Number of overlapping rotations to play simultaneously")]
         public int numOverlappingRotations = 3;

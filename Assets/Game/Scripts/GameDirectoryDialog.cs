@@ -58,7 +58,7 @@ public class GameDirectoryDialog : MonoBehaviour
     
     [Header("Settings")]
     [Tooltip("Delay in seconds before auto-continuing when a valid path is found")]
-    public float autoContinueDelay = 1.0f;
+    public float autoContinueDelay = 1.618f;
     
     private enum ESelectedControl
     {
