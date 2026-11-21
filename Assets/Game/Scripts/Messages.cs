@@ -40,18 +40,47 @@ public class Messages : MonoBehaviour
     /// <summary>While above zero, Add() holds every message back by this many seconds.</summary>
     private static float sAddDelay;
 
-    [Tooltip("How many past messages PageUp/PageDown can scroll back through.")]
-    public int historyCapacity = 100;
+    /// <summary>
+    /// How many past messages PageUp/PageDown can scroll back through. A constant, not a field the
+    /// inspector could hold at another value in a prefab or scene.
+    /// </summary>
+    private const int HistoryCapacity = 200;
+
+    /// <summary>What a line of the history is, which decides its colour there.</summary>
+    public enum EHistoryKind
+    {
+        /// <summary>A message of the game, in the pale yellow of the history.</summary>
+        Message,
+        /// <summary>A line someone says to the player in a conversation.</summary>
+        Speaker,
+        /// <summary>The player's own answer in a conversation.</summary>
+        Player,
+        /// <summary>A line of a conversation nobody says, the appraisal of a trade.</summary>
+        Narration,
+    }
+
+    /// <summary>Pale yellow while browsing: without a cue there is no telling history from live text.</summary>
+    private static readonly Color HistoryColor = new Color(1.0f, 0.85f, 0.4f, 1.0f);
 
     /// <summary>
-    /// Scrollback of the last <see cref="historyCapacity"/> messages, oldest at index 0.
+    /// The text colour of each kind in the history, over the same black shadow as the rest: a
+    /// brown for who speaks, an orange for the player, and a dark grey for the appraisal, black
+    /// on the scroll. Chosen in play.
+    /// </summary>
+    private static readonly string[] KindColor = { null, "#874406", "#EA882E", "#292827" };
+
+    /// <summary>
+    /// Scrollback of the last <see cref="HistoryCapacity"/> messages, oldest at index 0, with the
+    /// kind of each in historyKinds. The lines of a conversation go in too (AddToHistory()), and
+    /// the whole of it goes into the save.
     /// </summary>
     /// <remarks>
     /// A plain shifting array rather than a ring buffer: when it is full it copies the whole
     /// thing down by one, which happens at most once per message and costs nothing, and in
     /// exchange index 0 stays the oldest line so the window arithmetic in OnGUI is trivial.
     /// </remarks>
-    private string[] historyLines;
+    private readonly string[] historyLines = new string[HistoryCapacity];
+    private readonly EHistoryKind[] historyKinds = new EHistoryKind[HistoryCapacity];
     private int historyStored;
 
     /// <summary>
@@ -84,8 +113,22 @@ public class Messages : MonoBehaviour
 
     /// <summary>Index in wrappedLines of each message's first line, plus one past the end.</summary>
     private readonly List<int> wrappedFirst = new ();
+
+    /// <summary>The kind of the message each line of wrappedLines comes from.</summary>
+    private readonly List<EHistoryKind> wrappedKinds = new ();
     private float wrappedWidth = -1.0f;
+
+    /// <summary>Set when the history has to be wrapped again from scratch, after it was cleared.</summary>
     private bool wrappedDirty = true;
+
+    /// <summary>
+    /// The messages wrapped so far: wrappedCount of them, from the one numbered wrappedFromSerial.
+    /// A message that arrives is wrapped alone, and one that drops off the front takes its lines
+    /// with it, so two hundred messages, a conversation's long ones among them, are not wrapped
+    /// again word by word each time a line arrives while the history is open.
+    /// </summary>
+    private int wrappedFromSerial;
+    private int wrappedCount;
 
     /// <summary>The message style with no word wrap, to measure the lines and draw them.</summary>
     private GUIStyle referenceLineStyle;
@@ -361,7 +404,8 @@ public class Messages : MonoBehaviour
 
         bool moreAbove = false;
         bool moreBelow = false;
-        string allMessages = historyOpen && historyStored > 0 ? HistoryWindow(textWidth, out moreAbove, out moreBelow) : null;
+        string shadowMessages = null;
+        string allMessages = historyOpen && historyStored > 0 ? HistoryWindow(textWidth, out moreAbove, out moreBelow, out shadowMessages) : null;
         bool browsing = allMessages != null;
         float boxHeight;
         if (browsing)
@@ -377,6 +421,7 @@ public class Messages : MonoBehaviour
                 WrapInto(messages[i].message, textWidth, liveLines);
             }
             allMessages = string.Join("\n", liveLines).TrimEnd('\n');
+            shadowMessages = allMessages;
 
             // Without this an empty box would sit on screen whenever there are no messages. A
             // label with empty text was simply invisible before.
@@ -408,9 +453,8 @@ public class Messages : MonoBehaviour
         Rect textRect = new Rect(boxX + s * BoxPadLeft, boxBottom - s * BoxPadY - textHeight, textWidth, textHeight);
         Color previousTextColor = lineStyle.normal.textColor;
         lineStyle.normal.textColor = new Color(0, 0, 0, 1.0f);
-        GUI.Label(textRect, allMessages, lineStyle);
-        // Pale yellow while browsing: without a cue there is no telling history from live text.
-        lineStyle.normal.textColor = browsing ? new Color(1.0f, 0.85f, 0.4f, 1.0f) : Color.white;
+        GUI.Label(textRect, shadowMessages, lineStyle);
+        lineStyle.normal.textColor = browsing ? HistoryColor : Color.white;
         GUI.Label(new Rect(textRect.x + s, textRect.y - s, textRect.width, textRect.height), allMessages, lineStyle);
         lineStyle.normal.textColor = previousTextColor;
 
@@ -419,16 +463,16 @@ public class Messages : MonoBehaviour
 
     /// <summary>
     /// The lines of the history on screen, after applying the scrolling Update() asked for; null
-    /// when a step forward from the newest lines has closed the history.
+    /// when a step forward from the newest lines has closed the history. Each line of a
+    /// conversation is coloured by its kind on its own, so a tag never spans two lines; shadow is
+    /// the same lines with no colour, for the black shadow drawn under them.
     /// </summary>
-    private string HistoryWindow(float textWidth, out bool moreAbove, out bool moreBelow)
+    private string HistoryWindow(float textWidth, out bool moreAbove, out bool moreBelow, out string shadow)
     {
         moreAbove = false;
         moreBelow = false;
-        if (wrappedDirty || textWidth != wrappedWidth)
-        {
-            WrapHistory(textWidth);
-        }
+        shadow = null;
+        WrapHistory(textWidth);
 
         int last = wrappedLines.Count - 1;
         // the bottom line of the oldest window, the furthest back the view goes
@@ -475,25 +519,79 @@ public class Messages : MonoBehaviour
         int top = Mathf.Max(0, bottom - (HistoryLineCount - 1));
         moreAbove = top > 0;
         moreBelow = bottom < last;
-        return string.Join("\n", wrappedLines.GetRange(top, bottom - top + 1));
+        System.Text.StringBuilder text = new ();
+        System.Text.StringBuilder shadowText = new ();
+        for (int i = top; i <= bottom; ++i)
+        {
+            if (i > top)
+            {
+                text.Append('\n');
+                shadowText.Append('\n');
+            }
+            AppendColoured(text, wrappedLines[i], KindColor[(int)wrappedKinds[i]]);
+            shadowText.Append(wrappedLines[i]);
+        }
+        shadow = shadowText.ToString();
+        return text.ToString();
+    }
+
+    private static void AppendColoured(System.Text.StringBuilder text, string line, string colour)
+    {
+        if (colour == null || line.Length == 0)
+        {
+            text.Append(line);
+        }
+        else
+        {
+            text.Append("<color=").Append(colour).Append('>').Append(line).Append("</color>");
+        }
     }
 
     /// <summary>
-    /// Breaks every message of the history into the lines it takes in the box. Done again only
-    /// when a message arrives, the history is cleared or the width changes.
+    /// Breaks the messages of the history into the lines they take in the box. All of them only
+    /// when the width changes or the history was cleared; otherwise the lines of the messages
+    /// that dropped off the front go, and only the messages that arrived since are wrapped.
     /// </summary>
     private void WrapHistory(float textWidth)
     {
-        wrappedLines.Clear();
-        wrappedFirst.Clear();
-        for (int i = 0; i < historyStored; ++i)
+        if (wrappedDirty || textWidth != wrappedWidth)
         {
-            wrappedFirst.Add(wrappedLines.Count);
-            WrapInto(historyLines[i], textWidth, wrappedLines);
+            wrappedLines.Clear();
+            wrappedKinds.Clear();
+            wrappedFirst.Clear();
+            wrappedFirst.Add(0);
+            wrappedFromSerial = historyFirstSerial;
+            wrappedCount = 0;
+            wrappedWidth = textWidth;
+            wrappedDirty = false;
         }
-        wrappedFirst.Add(wrappedLines.Count);
-        wrappedWidth = textWidth;
-        wrappedDirty = false;
+
+        int dropped = Mathf.Min(historyFirstSerial - wrappedFromSerial, wrappedCount);
+        if (dropped > 0)
+        {
+            int droppedLines = wrappedFirst[dropped];
+            wrappedLines.RemoveRange(0, droppedLines);
+            wrappedKinds.RemoveRange(0, droppedLines);
+            wrappedFirst.RemoveRange(0, dropped);
+            for (int i = 0; i < wrappedFirst.Count; ++i)
+            {
+                wrappedFirst[i] -= droppedLines;
+            }
+            wrappedCount -= dropped;
+        }
+        // with wrappedCount at 0 the next message to wrap is the oldest stored, whatever dropped
+        wrappedFromSerial = historyFirstSerial;
+
+        for (int i = wrappedCount; i < historyStored; ++i)
+        {
+            WrapInto(historyLines[i], textWidth, wrappedLines);
+            while (wrappedKinds.Count < wrappedLines.Count)
+            {
+                wrappedKinds.Add(historyKinds[i]);
+            }
+            wrappedFirst.Add(wrappedLines.Count);
+        }
+        wrappedCount = historyStored;
     }
 
     /// <summary>
@@ -607,9 +705,9 @@ public class Messages : MonoBehaviour
     }
 
     /// <summary>
-    /// Clears the screen and the scrollback both. Called when a game is loaded: a load in the
-    /// middle of a game keeps this scene, so without it Page Up would scroll back into the game
-    /// just left.
+    /// Clears the screen and the scrollback both. Called when a game is loaded, before the save's
+    /// own history goes in (SetHistory()): a load in the middle of a game keeps this scene, so
+    /// without it Page Up would scroll back into the game just left.
     /// </summary>
     public static void ClearAll()
     {
@@ -623,33 +721,86 @@ public class Messages : MonoBehaviour
         sMessages.CloseHistory();
     }
 
-    private void RecordInHistory(string messageText)
+    /// <summary>
+    /// Puts a line in the history without showing it: a conversation's lines, which have their own
+    /// scroll on screen while it lasts, so that they can be read again after it.
+    /// </summary>
+    public static void AddToHistory(string text, EHistoryKind kind)
     {
-        // Allocated lazily, and resized in place if the capacity is edited in the inspector at
-        // runtime, so the log survives the change.
-        int capacity = Mathf.Max(1, historyCapacity);
-        if (historyLines == null || historyLines.Length != capacity)
+        if (sMessages == null || string.IsNullOrWhiteSpace(text))
         {
-            System.Array.Resize(ref historyLines, capacity);
-            historyStored = Mathf.Min(historyStored, historyLines.Length);
+            return;
         }
+        sMessages.RecordInHistory(text, kind);
+    }
 
-        if (historyStored >= historyLines.Length)
+    /// <summary>The history as it stands, oldest first, for the save, with the kind of each line.</summary>
+    public static List<string> GetHistory(out List<int> kinds)
+    {
+        List<string> lines = new ();
+        kinds = new ();
+        if (sMessages != null)
         {
-            for (int i = 1; i < historyLines.Length; ++i)
+            for (int i = 0; i < sMessages.historyStored; ++i)
+            {
+                lines.Add(sMessages.historyLines[i]);
+                kinds.Add((int)sMessages.historyKinds[i]);
+            }
+        }
+        Debug.Log($"Messages: {lines.Count} lines of history into the save");
+        return lines;
+    }
+
+    /// <summary>
+    /// Replaces the history with a save's, so that Page Up after a load shows what was done
+    /// before the save. A save made before the history was saved has none and leaves it empty;
+    /// a line with no kind is a message.
+    /// </summary>
+    public static void SetHistory(List<string> lines, List<int> kinds)
+    {
+        if (sMessages == null)
+        {
+            return;
+        }
+        ClearAll();
+        if (lines == null)
+        {
+            return;
+        }
+        for (int i = Mathf.Max(0, lines.Count - HistoryCapacity); i < lines.Count; ++i)
+        {
+            int kind = kinds != null && i < kinds.Count ? kinds[i] : 0;
+            if (kind < 0 || kind > (int)EHistoryKind.Narration)
+            {
+                kind = 0;
+            }
+            if (!string.IsNullOrWhiteSpace(lines[i]))
+            {
+                sMessages.RecordInHistory(lines[i], (EHistoryKind)kind);
+            }
+        }
+        Debug.Log($"Messages: {sMessages.historyStored} lines of history from the save");
+    }
+
+    private void RecordInHistory(string messageText, EHistoryKind kind)
+    {
+        if (historyStored >= HistoryCapacity)
+        {
+            for (int i = 1; i < HistoryCapacity; ++i)
             {
                 historyLines[i - 1] = historyLines[i];
+                historyKinds[i - 1] = historyKinds[i];
             }
-            historyStored = historyLines.Length - 1;
+            historyStored = HistoryCapacity - 1;
             ++historyFirstSerial;
         }
 
         historyLines[historyStored] = messageText.TrimEnd();
+        historyKinds[historyStored] = kind;
         ++historyStored;
 
-        // The view is pinned to a message, so the text on screen stays put; only the wrapping has
-        // to take the new message in.
-        wrappedDirty = true;
+        // The view is pinned to a message, so the text on screen stays put; the next OnGUI() wraps
+        // the new message alone (WrapHistory()).
     }
 
     void AddMessageInternal(string messageText, float time)
@@ -687,7 +838,7 @@ public class Messages : MonoBehaviour
 
         currentSource = Utils.PlayClip2d(actualClip, randomizePitch);
 
-        RecordInHistory(messageText);
+        RecordInHistory(messageText, EHistoryKind.Message);
 
         SDisplayMessage mess = new SDisplayMessage { message = messageText, time = actualTime };
         messages.Add(mess);

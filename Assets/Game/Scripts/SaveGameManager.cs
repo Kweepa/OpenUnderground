@@ -655,6 +655,7 @@ public class SaveGameManager : MonoBehaviour
         SaveInventoryData(saveData.inventoryData);
         SaveWorldObjects(saveData);
         SaveMapData(saveData);
+        saveData.messageHistory = Messages.GetHistory(out saveData.messageHistoryKinds);
         return saveData;
     }
 
@@ -727,8 +728,9 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
             
-            // The messages of the game being left, the scrollback with them
-            Messages.ClearAll();
+            // The messages of the game being left go, the scrollback with them, and the save's
+            // history takes its place
+            Messages.SetHistory(saveData.messageHistory, saveData.messageHistoryKinds);
 
             // Check if we need to change levels
             if (LevelLoader.sLevelLoader != null && LevelLoader.sLevelLoader.loadedLevel != saveData.currentLevel)
