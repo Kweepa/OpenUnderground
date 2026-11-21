@@ -116,6 +116,7 @@ public sealed class ControlsMap
         new KeyRow { Label = "Stats", EntryId = "Keys.World/Stats" },
         new KeyRow { Label = "Inventory and stats", EntryId = "Keys.World/CharacterPanel", Note = "The inventory, then the stats, then closed." },
         new KeyRow { Label = "Map", EntryId = "Keys.World/Map" },
+        new KeyRow { Label = "Notebook", EntryId = "Keys.World/Notebook", Note = "The map's first page: a list of things to do." },
         new KeyRow { Label = "Messages back", EntryId = "Keys.World/MessagesBack" },
         new KeyRow { Label = "Messages forward", EntryId = "Keys.World/MessagesForward" },
         new KeyRow { Header = "GENERAL" },
@@ -1328,6 +1329,7 @@ public sealed class ControlsMap
                 AddBound(lines, GameActions.PadWorld.MagicPanel, "Magic panel");
                 AddBound(lines, GameActions.PadWorld.Inventory, "Inventory");
                 AddBound(lines, GameActions.PadWorld.Map, "Map");
+                AddBound(lines, GameActions.PadWorld.Notebook, "Notebook (hold)");
                 AddBound(lines, GameActions.PadWorld.Quicksave, "Quicksave (hold)");
                 AddBound(lines, GameActions.PadWorld.Sleep, "Sleep (hold)");
                 AddBound(lines, GameActions.PadWorld.Track, "Track");
