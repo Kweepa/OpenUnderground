@@ -48,11 +48,20 @@ public class Spike : UUObject
             return EEquipAction.Nothing;
         }
 
+        // A refused spike is kept, Use rather than Nothing: with the mouse, Nothing would throw it
+        // (Inventory.TryThrow()), and Use puts it back as it does a key used on a door.
+        // A door that holds all the spikes it can (a remake's limit, Door.SpikesFull).
+        if (door.CanBeSpiked && door.SpikesFull)
+        {
+            Messages.Add("The door can hold no more spikes.");
+            return EEquipAction.Use;
+        }
+
         // an open door, a portcullis or a secret door: "You can only spike closed doors."
         if (!door.Spike(bySpell: false))
         {
             Messages.Add(1, 128);
-            return EEquipAction.Nothing;
+            return EEquipAction.Use;
         }
 
         Messages.Add(1, 129);
