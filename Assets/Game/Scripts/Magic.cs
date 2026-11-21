@@ -7,7 +7,7 @@ using UnityEngine.Rendering.PostProcessing;
 public struct SSpell
 {
     public SSpell(string _runes, string _name, int _cost, int _icon, int _duration, int _stringIndex,
-                  int _itemIndex = -1)
+                  int _itemIndex = -1, int _circle = 0)
     {
         runes = _runes;
         name = _name;
@@ -16,9 +16,21 @@ public struct SSpell
         duration = _duration;
         stringIndex = _stringIndex;
         itemIndex = _itemIndex;
+        circle = _circle > 0 ? _circle
+            : _stringIndex >= 256 && _stringIndex < 256 + 8 * 6 ? (_stringIndex - 256) / 6 + 1
+            : _cost / 3;
     }
 
-    public int circle => cost / 3;
+    /// <summary>
+    /// The circle: what the caster's level must reach, and what sets the casting roll, a backfire's
+    /// strength and the wait before the next cast. A number of its own, apart from the mana: in the
+    /// original both come from the spell's place, the circle index / 6 + 1 and the mana three times
+    /// that (UW.EXE 0x78ec8 (player_cast, RUNES.C)), and the 48 rune spells are named in block 6 in
+    /// that order, six a circle from 256, so the circle is read from the name's index. A spell given
+    /// a circle of its own keeps it; one not cast from the runes - an item's, a trap's - has none in
+    /// the original and takes the cost / 3 it always had.
+    /// </summary>
+    public readonly int circle;
 
     public readonly string runes;
     public string name;
@@ -465,7 +477,7 @@ public class Magic : MonoBehaviour
     {
         // first circle — stringIndex from block 6 castable range (256+)
         new SSpell("IMY", "Create Food", 3, -1, 0, 259, 129), // done
-        new SSpell("UP", "Leap", 6, 0, 60, 261, 17), // done
+        new SSpell("UP", "Leap", 3, 0, 60, 261, 17), // done; first circle as in UW.EXE 0x78ec8 (player_cast, RUNES.C): was 6
         new SSpell("IL", "Light", 3, 17, 1500, 256, 3), // done
         new SSpell("OJ", "Magic Arrow", 3, -1, 0, 258, 81), // done
         new SSpell("BIS", "Resist Blows", 3, 15, 90, 257, 34), // done
@@ -473,7 +485,8 @@ public class Magic : MonoBehaviour
 
         // second circle
         new SSpell("QC", "Create Fear", 6, -1, 0, 266, 113), // done (PAK: Cause Fear)
-        new SSpell("AS", "Curse", 24, 5, 0, 262, 49), // gotten from crowns on level 7, also on a scroll on level 4. guess at level
+        new SSpell("AS", "Curse", 24, 5, 0, 262, 49, _circle: 8), // gotten from crowns on level 7, also on a scroll on level 4. guess at level
+        // (Curse: second circle and 6 mana in the original; the eighth and 24 are kept with the remake's own effect, fix 171)
         new SSpell("WM", "Detect Monster", 6, -1, 0, 265, 177), // done
         new SSpell("IBM", "Lesser Heal", 6, -1, 0, 264, 66), // done
         new SSpell("IJ", "Rune of Warding", 6, -1, 0, 267, 131), // done
@@ -485,19 +498,19 @@ public class Magic : MonoBehaviour
         new SSpell("QL", "Night Vision", 9, 12, 120, 270, 5), // done
         new SSpell("RTP", "Speed", 9, 13, 30, 268, 176), // done
         new SSpell("SJ", "Strengthen Door", 9, -1, 0, 272, 178), // spikes the door: Door.Spike()
-        new SSpell("IS", "Thick Skin", 12, 16, 90, 273, 35), // done
+        new SSpell("IS", "Thick Skin", 9, 16, 90, 273, 35), // done; third circle, UW.EXE 0x78ec8: was 12
 
         // fourth circle
         new SSpell("SF", "Flameproof", 12, 10, 90, 278, 54), // done
         new SSpell("IM", "Heal", 12, -1, 0, 275, 68), // done
         new SSpell("NM", "Poison", 12, -1, 0, 277, 116), // done  
         new SSpell("AJ", "Remove Trap", 12, -1, 0, 279, 179), // done
-        new SSpell("YP", "Water Walk", 9, 3, 180, 274, 20), // done
+        new SSpell("YP", "Water Walk", 12, 3, 180, 274, 20), // done; fourth circle, UW.EXE 0x78ec8: was 9
 
         // fifth circle
         new SSpell("AN", "Cure Poison", 15, -1, 0, 285, 182), // done
         new SSpell("PF", "Fireball", 15, -1, 0, 280, 83), // done
-        new SSpell("HP", "Levitate", 15, 2, 60, 276, 19), // done
+        new SSpell("HP", "Levitate", 12, 2, 60, 276, 19), // done; fourth circle as the manual says and UW.EXE 0x78ec8 (player_cast, RUNES.C), was 15; left here, since a spell's place in this list is its number in the saves
         new SSpell("GSP", "Missile Protection", 15, 9, 60, 283, 53), // done
         new SSpell("OWY", "Name Enchantment", 15, -1, 0, 282, 180), // done
         new SSpell("EY", "Open", 15, -1, 0, 284, 181), // done
@@ -651,7 +664,7 @@ public class Magic : MonoBehaviour
 
     /// <summary>
     /// A spell's circle as the manual gives it, the grouping of block 6, six names to a circle: not
-    /// <see cref="SSpell.circle"/>, which comes from the cost and differs for five spells.
+    /// <see cref="SSpell.circle"/>, which differs for Curse.
     /// </summary>
     private static int SpellListCircle(int i) => (spells[i].stringIndex - 256) / 6 + 1;
 
@@ -1897,7 +1910,7 @@ public class Magic : MonoBehaviour
                 return;
             }
 
-            timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
+            timeBeforeCanCastAgain = (float)spells[i].circle / PlayerData.sData.charLevel;
             if (!onPad && nameEnchantInventoryItem != null && Inventory.sInv != null)
             {
                 Inventory.sInv.SuppressInventoryMousePrimaryShortReleaseOnce();
@@ -1935,7 +1948,7 @@ public class Magic : MonoBehaviour
         bubbleTime = crit ? 3.0f : 2.0f;
 
         castSpells[i] = true;
-        timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
+        timeBeforeCanCastAgain = (float)spells[i].circle / PlayerData.sData.charLevel;
         if (!onPad && nameEnchantInventoryItem != null && Inventory.sInv != null)
         {
             Inventory.sInv.SuppressInventoryMousePrimaryShortReleaseOnce();
@@ -2378,9 +2391,8 @@ public class Magic : MonoBehaviour
                 // against the mana cost, which is three times the circle. The margin differs by
                 // 5 + circle: six points at the first circle, thirteen at the eighth. UW.EXE
                 // 0x78ec8, read from its prologue to the lret; the roll is at 0x78f4d and calls
-                // GetResult, which is 0x30f9:0x000c, file 0x3419c. The circle here stays the one
-                // the rest of this method already uses - the cost divided by three - so that the
-                // handful of spells whose cost is wrong keep whatever circle they had.
+                // GetResult, which is 0x30f9:0x000c, file 0x3419c. The circle is SSpell.circle, the
+                // original's for every spell but Curse.
                 int casting = Skills.GetSkill(ESkill.Casting) + 5;
                 if (Cheats.sCheats.boostCasting)
                 {
@@ -2398,7 +2410,7 @@ public class Magic : MonoBehaviour
                     // Only a plain failure skips all of this (0x78f5e).
                     Messages.Add(1, 214);
                     PayMana(spells[i].cost);
-                    timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
+                    timeBeforeCanCastAgain = (float)spells[i].circle / PlayerData.sData.charLevel;
                     PlayerObject.Player.DamageFromBackfire(spells[i].circle / 2);
                     PlayCastSound(i);
                     break;
@@ -2598,7 +2610,7 @@ public class Magic : MonoBehaviour
     public bool TryCast(int i, bool anonymous = false)
     {
         // level / char level
-        timeBeforeCanCastAgain = spells[i].cost / 3.0f / PlayerData.sData.charLevel;
+        timeBeforeCanCastAgain = (float)spells[i].circle / PlayerData.sData.charLevel;
 
         // duration spell? Decided by the duration, not the icon: Curse has an icon, the one worn
         // Cursed items show, and was taken for a spell that lasts nothing, so its effect never ran.
