@@ -688,6 +688,7 @@ public class Magic : MonoBehaviour
 
         if (spellListEntries != null && mask == spellListMask)
         {
+            MarkWhatCanBeCast(spellListEntries);
             return spellListEntries;
         }
 
@@ -699,7 +700,7 @@ public class Magic : MonoBehaviour
             {
                 spellListEntries.Add(new SpellListPanel.Entry
                 {
-                    circle = SpellListCircle(i), runes = spells[i].runes,
+                    circle = SpellListCircle(i), runes = spells[i].runes, spell = i,
                     name = spellListShortNames.TryGetValue(spells[i].name, out string shortName) ? shortName : spells[i].name,
                     known = (mask & (1UL << i)) != 0
                 });
@@ -709,7 +710,26 @@ public class Magic : MonoBehaviour
         spellListEntries.Sort((a, b) => a.circle != b.circle
             ? a.circle.CompareTo(b.circle)
             : string.CompareOrdinal(a.name, b.name));
+        MarkWhatCanBeCast(spellListEntries);
         return spellListEntries;
+    }
+
+    /// <summary>
+    /// Marks the entries that can be cast now, at every draw, since a rune stowed or taken out or a
+    /// level gained changes it without changing the list: every rune in the rune bag, as the magic
+    /// panel shows them, and a circle the caster's level allows, by the cast's own test (the circle
+    /// from the cost, not the list's), which the mana cheat lifts there too. Mana is not looked at.
+    /// </summary>
+    private void MarkWhatCanBeCast(List<SpellListPanel.Entry> entries)
+    {
+        bool levelLifted = Cheats.sCheats != null && Cheats.sCheats.castWithoutMana;
+        int maxCircle = PlayerData.sData != null ? (PlayerData.sData.charLevel + 1) / 2 : 0;
+        for (int k = 0; k < entries.Count; ++k)
+        {
+            SpellListPanel.Entry entry = entries[k];
+            entry.canCast = HasAllRunesForSpell(entry.runes) && (levelLifted || spells[entry.spell].circle <= maxCircle);
+            entries[k] = entry;
+        }
     }
 
     /// <summary>Spells that have just joined the list, to be told once no conversation is running.</summary>
