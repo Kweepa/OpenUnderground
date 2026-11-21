@@ -28,6 +28,13 @@ public class SpellListPanel
         public string runes;
         public string name;
         public bool known;
+        /// <summary>Its index in Magic's spells, for what changes while the list does not.</summary>
+        public int spell;
+        /// <summary>
+        /// Whether the spell can be cast now as far as runes and level go; a known spell that cannot is
+        /// written faded.
+        /// </summary>
+        public bool canCast;
     }
 
     // The sheet in the original's pixels, and the scale it is drawn at: those of the stats panel as it
@@ -94,6 +101,11 @@ public class SpellListPanel
     // The ink of the names and headings, #190E06, chosen in play: a very dark brown, near the map's own
     // writing (MapScreen, 0.2, 0.1, 0.1).
     private static readonly Color Ink = new(0x19 / 255f, 0x0e / 255f, 0x06 / 255f);
+
+    // A known spell that cannot be cast now - a rune missing from the bag, or a circle above the
+    // caster's level - in both inks at this opacity, chosen in play: faded into the parchment, so
+    // the spells that can be cast stand out at a glance.
+    private const float CannotCastAlpha = 0.6f;
 
     // The rows are 10% taller than the font's own line, to space the list out.
     private const float LineSpacing = 1.1f;
@@ -211,6 +223,9 @@ public class SpellListPanel
             float namesWidth = NamesWidth(onTheRight);
             float y = CircleTop(circle, innerY) + lineStep * (1 + row) + headingGap;
             nameStyle.fontSize = nameSizes[i];
+            float alpha = entry.canCast ? 1 : CannotCastAlpha;
+            nameStyle.normal.textColor = new Color(Ink.r, Ink.g, Ink.b, alpha);
+            runeStyle.normal.textColor = new Color(RuneInk.r, RuneInk.g, RuneInk.b, alpha);
             GUI.Label(UiScale.R(nameX, y + TextDrop(nameSizes[i]), namesWidth, lineStep), entry.name, UiScale.Style(nameStyle));
             GUI.Label(UiScale.R(nameX + namesWidth + RuneGap, y + runeDrop, RunesWidth, lineStep), entry.runes, UiScale.Style(runeStyle));
             ++row;

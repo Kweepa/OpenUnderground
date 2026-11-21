@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The spell list fades the spells you know but cannot cast yet, for a rune missing from your rune bag or a circle above your level, so you see at a glance which ones you can cast.
+
 - The title menu waits for its fade-in to end before taking a choice: an entry picked at once used to open its screen dimmed, sometimes almost black, until you went back to the menu.
 
 - Page Up and Page Down now scroll back through the last two hundred messages, and what was said in conversations is among them, each line after the name of who said it: brown for the people you talk to, orange for you. A save keeps them, so after a load you can read what you were doing and what you were told.
