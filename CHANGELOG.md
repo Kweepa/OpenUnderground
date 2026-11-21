@@ -2,6 +2,8 @@
 
 ## Next release
 
+- With the GUS soundfont the music plays the instruments it was written for: the timpani is a timpani instead of a carillon, the horns are horns, the orchestra hit is no longer the sound of the sea, the combat music's jungle tune no longer a pistol shot, and the bongos, maracas, claves and tambourine are drums again instead of an out-of-tune blur.
+
 - Four spells are back in their circle, with its mana and level: Leap is first circle, 3 mana from level 1; Thick Skin third, 9 mana from level 5; Levitate and Water Walk fourth, 12 mana from level 7. Levitate and Thick Skin come sooner and cost less, Water Walk later and more.
 
 - The spell list fades the spells you know but cannot cast yet, for a rune missing from your rune bag or a circle above your level, so you see at a glance which ones you can cast.
