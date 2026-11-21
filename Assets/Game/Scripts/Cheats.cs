@@ -29,13 +29,26 @@ public class Cheats : MonoBehaviour
     // either box or by the Go button. A click of the quill on the map fills it in.
     public Vector2Int teleportToTile;
 
-    // The player's poison and hit points, shown as they are and set the same way: type a value and it
-    // is applied when the box loses focus or on Enter. Poison runs 0 to 15, as the game caps it; hit
-    // points 0 to the vitality, and 0 kills. Both follow the game while nothing is typed.
+    // The player's poison, character level, hit points and mana, shown as they are and set the same
+    // way: type a value and it is applied when the box loses focus or on Enter, and while nothing is
+    // typed each box follows the game. Poison runs 0 to 15, as the game caps it. The character level
+    // 1 to 16: the experience is set to the least that level needs and the maximum hit points worked
+    // out again, as a level gained would (SetCharacterLevel()). Hit points and mana are each a current
+    // value and a maximum on one row: the current from 0 to the maximum, and 0 hit points kill; the
+    // maximum from 1 (hit points) or 0 (mana) to 255, and the current comes down with it. The game
+    // works the maximum mana out again when the Mana skill rises (Skills.ManaAdvanced()).
     [Delayed]
     public int poisonValue;
     [Delayed]
+    public int characterLevelValue;
+    [Delayed]
     public int hitPointsValue;
+    [Delayed]
+    public int maxHitPointsValue;
+    [Delayed]
+    public int manaValue;
+    [Delayed]
+    public int maxManaValue;
 
     public bool giveAllKeys;
     public bool showConversationHeads;
@@ -82,7 +95,11 @@ public class Cheats : MonoBehaviour
     private ESkill shownSkill = (ESkill)(-1);
     private int shownValue = -1;
     private int shownPoison = -1;
+    private int shownCharacterLevel = -1;
     private int shownHitPoints = -1;
+    private int shownMaxHitPoints = -1;
+    private int shownMana = -1;
+    private int shownMaxMana = -1;
 
     public static Cheats sCheats;
 
@@ -104,7 +121,11 @@ public class Cheats : MonoBehaviour
     // there is written, not what the game changes - the level the stairs lead to, say. The three
     // boxes that follow the game and the weapon-hand tick, which is a button, are not kept.
     private const string PrefsPrefix = "UnityUnderground.Cheats.";
-    private static readonly string[] notKept = { nameof(poisonValue), nameof(hitPointsValue), nameof(skillValue), nameof(swapWeaponHand) };
+    private static readonly string[] notKept =
+    {
+        nameof(poisonValue), nameof(characterLevelValue), nameof(hitPointsValue), nameof(maxHitPointsValue), nameof(manaValue),
+        nameof(maxManaValue), nameof(skillValue), nameof(swapWeaponHand),
+    };
     private static FieldInfo[] keptFields;
 
     public static FieldInfo[] KeptFields()
@@ -195,7 +216,7 @@ public class Cheats : MonoBehaviour
         }
 
         UpdateSkillToSet();
-        UpdatePoisonAndHitPoints();
+        UpdatePlayerValues();
     }
 
     public void SpawnObject()
@@ -258,7 +279,10 @@ public class Cheats : MonoBehaviour
         Debug.Log($"[CHEAT] teleport to tile ({t.x},{t.y})");
     }
 
-    private void UpdatePoisonAndHitPoints()
+    // The highest the maximum hit points and the maximum mana can be set to: a byte each in the original.
+    private const int MaxPool = 255;
+
+    private void UpdatePlayerValues()
     {
         if (PlayerData.sData == null)
         {
@@ -266,8 +290,21 @@ public class Cheats : MonoBehaviour
         }
 
         PlayerData data = PlayerData.sData;
-        poisonValue = Track("poison", poisonValue, ref shownPoison, () => data.poison, 15, v => data.poison = v);
-        hitPointsValue = Track("hit points", hitPointsValue, ref shownHitPoints, () => data.hp, data.vitality, v =>
+        poisonValue = Track("poison", poisonValue, ref shownPoison, () => data.poison, 0, 15, v => data.poison = v);
+        characterLevelValue = Track("character level", characterLevelValue, ref shownCharacterLevel, () => data.charLevel, 1, 16,
+            SetCharacterLevel);
+        maxHitPointsValue = Track("maximum hit points", maxHitPointsValue, ref shownMaxHitPoints, () => data.vitality, 1, MaxPool, v =>
+        {
+            data.vitality = v;
+            data.hp = Mathf.Min(data.hp, v);
+        });
+        maxManaValue = Track("maximum mana", maxManaValue, ref shownMaxMana, () => data.maxMana, 0, MaxPool, v =>
+        {
+            data.maxMana = v;
+            data.mana = Mathf.Min(data.mana, v);
+        });
+        manaValue = Track("mana", manaValue, ref shownMana, () => data.mana, 0, data.maxMana, v => data.mana = v);
+        hitPointsValue = Track("hit points", hitPointsValue, ref shownHitPoints, () => data.hp, 0, data.vitality, v =>
         {
             if (v == 0)
             {
@@ -282,9 +319,26 @@ public class Cheats : MonoBehaviour
         });
     }
 
-    /// <summary>One box that shows a value of the game and sets it: a typed value from 0 to max is
+    /// <summary>
+    /// The character level, with the experience set to the least that level needs, so the two agree
+    /// and the next experience gained does not move the level back. The skill points' high-water mark
+    /// is raised with it, so the jump pays none. The maximum hit points are worked out again, and the
+    /// current ones gain what the maximum gains, as with a level gained in play.
+    /// </summary>
+    private static void SetCharacterLevel(int v)
+    {
+        PlayerData data = PlayerData.sData;
+        data.charLevel = v;
+        data.xp = PlayerObject.LeastXpForLevel(v);
+        data.skillPointsXpTier = Mathf.Max(data.skillPointsXpTier, data.xp / 20 / 300);
+        int previousMax = data.vitality;
+        data.vitality = PlayerObject.GetMaxHitPoints();
+        data.hp = Mathf.Clamp(data.hp + Mathf.Max(0, data.vitality - previousMax), 0, data.vitality);
+    }
+
+    /// <summary>One box that shows a value of the game and sets it: a typed value from min to max is
     /// applied, anything else is refused, and while nothing is typed the box follows the game.</summary>
-    private static int Track(string label, int typed, ref int shown, System.Func<int> get, int max, System.Action<int> set)
+    private static int Track(string label, int typed, ref int shown, System.Func<int> get, int min, int max, System.Action<int> set)
     {
         if (shown < 0)
         {
@@ -294,14 +348,14 @@ public class Cheats : MonoBehaviour
 
         if (typed != shown)
         {
-            if (typed >= 0 && typed <= max)
+            if (typed >= min && typed <= max)
             {
                 set(typed);
                 Debug.Log($"[CHEAT] {label} set to {typed}");
             }
             else
             {
-                Debug.LogWarning($"[CHEAT] {label}: {typed} is not 0 to {max}, left at {get()}");
+                Debug.LogWarning($"[CHEAT] {label}: {typed} is not {min} to {max}, left at {get()}");
             }
         }
 
