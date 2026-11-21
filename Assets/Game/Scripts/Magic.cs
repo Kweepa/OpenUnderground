@@ -3496,7 +3496,7 @@ public class Magic : MonoBehaviour
 
     /// <summary>
     /// Strengthen Door, whose spell does nothing in the original (UW.EXE 0x35900 has no case for it),
-    /// here spikes the targeted closed door shut with ten nails - see Door.Spike() - and answers as
+    /// here spikes the targeted closed door shut with five nails - see Door.Spike() - and answers as
     /// the iron spike does, message 129, or 128 for an open door.
     /// </summary>
     void CastStrengthenDoor(Vector3? aimDirFromCameraOpt = null)

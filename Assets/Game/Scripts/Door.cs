@@ -49,7 +49,7 @@ public class Door : Lockable
 
     // Which face the door was spiked from, +1 the collider's forward face and -1 the other (0 in a save
     // written before the nails, read as +1), the seed of the nails' places and angles, how many nails
-    // it holds - one for each iron spike, ten for each cast of the spell, up to SpikeMaxNails - and
+    // it holds - one for each iron spike, five for each cast of the spell, up to SpikeMaxNails - and
     // whether the first was an iron spike's, which goes by the lock.
     private int spikeSide;
     private int spikeSeed;
@@ -59,8 +59,12 @@ public class Door : Lockable
     // How much of the spike's strength the blows have worn away since the door was last spiked.
     private int spikeWear;
 
-    private const int SpikeNailsBySpell = 10;
-    private const int SpikeMaxNails = 20;
+    private const int SpikeNailsBySpell = 5;
+    private const int SpikeMaxNails = 10;
+
+    // The spike's strength: the first nail driven holds more than the others (SpikeStrength).
+    private const int SpikeFirstNailStrength = 17;
+    private const int SpikeNailStrength = 6;
     private readonly List<GameObject> spikeNails = new();
     private bool spikeNailsBuilt;
 
@@ -555,10 +559,10 @@ public class Door : Lockable
     /// next use, or anything else that opens it, pulls the spike (Open). The nails show, a sight of
     /// this remake's own, between the door and the frame on the side the player stands: an iron
     /// spike drives one, the first by the lock at mid height and the next ones anywhere along the
-    /// jambs and the lintel, and the spell ten; the blows knock them out as they wear the spike, the
-    /// last one with its last point. A look calls the door spiked (AppendLookAdjectives).
-    /// An open door cannot be spiked, as the iron spike already said (message 128), nor a portcullis
-    /// or a secret door (CanBeSpiked).
+    /// jambs and the lintel, and the spell five, up to ten a door; the blows knock them out as they
+    /// wear the spike, the last driven first and the first with the spike's last point. A look calls
+    /// the door spiked (AppendLookAdjectives). An open door cannot be spiked, as the iron spike
+    /// already said (message 128), nor a portcullis or a secret door (CanBeSpiked).
     /// </summary>
     /// <param name="bySpell">The spell, not an iron spike.</param>
     /// <returns>False for a door that cannot be spiked.</returns>
@@ -597,24 +601,44 @@ public class Door : Lockable
     /// </summary>
     public bool CanBeSpiked => !opening && type is not (EObjectType.Portcullis or EObjectType.SecretDoor);
 
-    /// <summary>The nails the door holds; a save of the first test build has no count, and held ten.</summary>
-    private int SpikeNails => spikeNailCount > 0 ? spikeNailCount : SpikeNailsBySpell;
+    /// <summary>
+    /// The door already holds as many spikes as it can, SpikeMaxNails standing: an iron spike is
+    /// refused and kept (Spike.Equip()).
+    /// </summary>
+    public bool SpikesFull => spiked && StandingSpikeNails >= SpikeMaxNails;
 
     /// <summary>
-    /// The spike's strength, the damage it takes before the door does: 15 and 2 for each nail, 17
-    /// for one iron spike and 35 for the spell. The original gives every spike 31, the five bits above
-    /// the spike's own in the door's owner field (63 = 31 &lt;&lt; 1 | 1, UW.EXE 0x36c42); here the
-    /// nails count, by design.
+    /// The nails the door holds, up to SpikeMaxNails: a save of the first test build has no count, and
+    /// held ten; one made before the cap was ten may hold up to twenty.
     /// </summary>
-    private int SpikeStrength => 15 + 2 * SpikeNails;
+    private int SpikeNails => spikeNailCount > 0 ? Mathf.Min(spikeNailCount, SpikeMaxNails) : SpikeMaxNails;
 
     /// <summary>
-    /// The nails still in the door: as many of them as the strength left is of the whole, rounded
-    /// up, so the last one goes only when nothing is left. The last driven go first.
+    /// The spike's strength, the damage it takes before the door does: 17 for the first nail and 6
+    /// for each other, so 17 for one iron spike, 41 for the spell and 71 for ten nails. The original
+    /// gives every spike 31, the five bits above the spike's own in the door's owner field
+    /// (63 = 31 &lt;&lt; 1 | 1, UW.EXE 0x36c42); here the nails count, by design.
     /// </summary>
-    private int StandingSpikeNails => spiked
-        ? (SpikeNails * (SpikeStrength - spikeWear) + SpikeStrength - 1) / SpikeStrength
-        : 0;
+    private int SpikeStrength => SpikeFirstNailStrength + SpikeNailStrength * (SpikeNails - 1);
+
+    /// <summary>
+    /// The nails still in the door: each blow's points come off the last driven first, 6 to a nail,
+    /// and the first nail goes with the spike's last point.
+    /// </summary>
+    private int StandingSpikeNails
+    {
+        get
+        {
+            int left = spiked ? SpikeStrength - spikeWear : 0;
+            if (left <= 0)
+            {
+                return 0;
+            }
+
+            int beyondFirst = Mathf.Max(0, left - SpikeFirstNailStrength);
+            return 1 + (beyondFirst + SpikeNailStrength - 1) / SpikeNailStrength;
+        }
+    }
 
     protected override void AppendLookAdjectives(System.Text.StringBuilder sb)
     {
@@ -693,9 +717,10 @@ public class Door : Lockable
     /// Copies of the iron spike's own model, without its object, on the face the door was spiked
     /// from: the first by the lock at mid height when an iron spike drove it, every other one at
     /// random along the two jambs and the lintel. Each enters the leaf one to three centimetres from
-    /// its edge, point first, tilted up to 30 degrees from straight in, in any direction, with most
-    /// of it out. Only the nails still standing are drawn (StandingSpikeNails), and each from a seed
-    /// of its own, so adding nails or losing them to blows leaves the others put.
+    /// its edge, point first, tilted up to 30 degrees from straight in, in any direction, driven in
+    /// as deep as the leaf allows, its point a centimetre short of the far face. Only the nails still
+    /// standing are drawn (StandingSpikeNails), and each from a seed of its own, so adding nails or
+    /// losing them to blows leaves the others put.
     /// </summary>
     private void CreateSpikeNails()
     {
@@ -716,12 +741,20 @@ public class Door : Lockable
         Vector3 nailScale = source.transform.lossyScale;
         float length = meshLength * Mathf.Abs(Vector3.Dot(nailScale, Abs(tipAxis)));
 
+        // the point in the mesh's own space, as the nail's model sets it: its origin is at the point
+        // (295_a_spike.fbx), not at its middle, and is read rather than assumed
+        Bounds meshBounds = mesh.bounds;
+        Vector3 tipLocal = meshBounds.center;
+        tipLocal += Vector3.Scale(tipAxis, meshBounds.extents);
+        Vector3 tipScaled = Vector3.Scale(nailScale, tipLocal);
+
         Transform leaf = cachedDoorCollider.transform;
         Vector3 centre = cachedDoorCollider.center;
         Vector3 size = cachedDoorCollider.size;
         float side = spikeSide < 0 ? -1.0f : 1.0f;
         Vector3 inward = leaf.TransformDirection(new Vector3(0.0f, 0.0f, -side)).normalized;
         Vector3 across = Vector3.Cross(inward, leaf.up).normalized;
+        float thickness = Mathf.Abs(size.z * leaf.lossyScale.z);
 
         for (int i = 0; i < StandingSpikeNails; ++i)
         {
@@ -771,8 +804,11 @@ public class Door : Lockable
             Quaternion rotation = Quaternion.AngleAxis((float)(rng.NextDouble() * 360.0), tipDirection)
                                   * Quaternion.FromToRotation(tipAxis, tipDirection);
 
-            // three fifths of it outside the face: the centre a tenth of a length out
-            Vector3 position = entry - tipDirection * (0.1f * length);
+            // the point as deep as the leaf allows, a centimetre short of the far face along the
+            // nail's slant, and never more than half the nail in
+            float slant = Mathf.Max(0.5f, Vector3.Dot(tipDirection, inward));
+            float depth = Mathf.Clamp((thickness - 0.01f) / slant, 0.0f, 0.5f * length);
+            Vector3 position = entry + tipDirection * depth - rotation * tipScaled;
 
             var nail = new GameObject("SpikeNail");
             nail.transform.SetParent(transform, false);
@@ -1071,8 +1107,8 @@ public class Door : Lockable
             // The spike takes the blow first, and while it has strength left the door loses nothing
             // and cannot break: UW.EXE 0x25f97 (damage_object, DAMAGE.C), after the shift by the
             // quality class, and what is left of a blow over the spike's strength is lost. So a
-            // strength of 35 is 35 points of a weapon's damage on a door of class 0, 70 on one of
-            // class 1, 140 on one of class 2.
+            // strength of 41 is 41 points of a weapon's damage on a door of class 0, 82 on one of
+            // class 1, 164 on one of class 2.
             if (spiked && spikeWear < SpikeStrength)
             {
                 spikeWear = Mathf.Min(SpikeStrength, spikeWear + appliedDamage);
