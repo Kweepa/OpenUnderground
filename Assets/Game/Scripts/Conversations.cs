@@ -576,6 +576,7 @@ public partial class Conversation
             if (pauseTime <= 0.0f)
             {
                 output.AppendLine(pauseText);
+                LogToHistory(npcName, pauseText, Messages.EHistoryKind.Speaker);
                 pauseText = "";
                 pauseTime = 0.0f;
             }
@@ -1167,7 +1168,9 @@ public partial class Conversation
         case "do_judgement":
             {
                 // appraise current trade
-                output.AppendLine(Inventory.sInv.Conversation_do_judgement());
+                string judgement = Inventory.sInv.Conversation_do_judgement();
+                output.AppendLine(judgement);
+                LogToHistory(null, judgement, Messages.EHistoryKind.Narration);
                 result = 0;
             }
             break;
@@ -1634,6 +1637,27 @@ public partial class Conversation
     private int privateGlobalsLength;
 
     public static StringBuilder output;
+
+    /// <summary>
+    /// A line of the conversation into the message history, after the name of who says it, so
+    /// that Page Up can read it again once the conversation is over, and after a load. A line
+    /// nobody says, such as the appraisal of a trade, goes in with no name. The scroll's tags are
+    /// taken off, since the history breaks its lines where a tag could be cut in two; kind gives
+    /// the line its colour there instead, line by line.
+    /// </summary>
+    public static void LogToHistory(string speaker, string text, Messages.EHistoryKind kind)
+    {
+        text = text == null ? "" : RichTextTag.Replace(text, "").Trim();
+        if (text.Length == 0)
+        {
+            return;
+        }
+        string name = string.IsNullOrEmpty(speaker) ? "" : char.ToUpper(speaker[0]) + speaker.Substring(1) + ": ";
+        Messages.AddToHistory(name + text, kind);
+    }
+
+    private static readonly Regex RichTextTag =
+        new (@"</?(?:color|i|b|size)(?:=[^>]*)?>");
 
     private short[] mem;
     private static int sp;
@@ -2193,6 +2217,7 @@ public class Conversations : MonoBehaviour
         ConversationOption chosen = gambits[index];
         Conversation.result = chosen.actualIndex;
         Conversation.output.AppendLine(FormatGambitLineForLog(chosen));
+        Conversation.LogToHistory(PlayerData.sData.playerName, chosen.gambit, Messages.EHistoryKind.Player);
         gambits.Clear();
         currentGambit = 0;
         Utils.PlayClip2d(makeSelection);
@@ -2478,6 +2503,7 @@ public class Conversations : MonoBehaviour
                         KeyboardGUI.sKeyboard.Show(runningConversation.babl_input, (result) => {
                             runningConversation.babl_input = result.Replace("'", "\u2019");
                             runningConversation.babl_get_input = false;
+                            Conversation.LogToHistory(PlayerData.sData.playerName, runningConversation.babl_input, Messages.EHistoryKind.Player);
                             // find the input in the strings
                             Conversation.result = StringLoader.FindStringInBlock(runningConversation.stringBlock,
                                 runningConversation.babl_input);

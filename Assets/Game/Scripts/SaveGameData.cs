@@ -23,6 +23,11 @@ public class SaveGameData
     public List<ObjectSaveData> worldObjects = new List<ObjectSaveData>();
     public LevelWorldSaveData[] worldObjectsByLevel;
     public MapSaveData mapData;
+    // The message history, oldest first, conversations included, to read again after a load, and
+    // the kind of each line (Messages.EHistoryKind), which gives it its colour. An older save has
+    // none, and loads with the history empty.
+    public List<string> messageHistory;
+    public List<int> messageHistoryKinds;
     
     public SaveGameData()
     {
