@@ -59,7 +59,7 @@ public partial class MusicPlayer : MonoBehaviour
     private readonly int[,] controllerValues = new int[16, 128];
     private readonly List<int>[] controllerOrder = NewControllerOrder();
     private readonly int[] programs = NewChannelArray();
-    // The last volume (CC 7) the track gave each channel, before MT32Volume() moves it.
+    // The last volume (CC 7) the track gave each channel, before MT32Volume() or GMVolume() moves it.
     private readonly int[] trackVolumes = NewChannelArray(127);
     // The same for the reverb send (CC 91), MeltySynth's default until the track sets one.
     private readonly int[] trackReverbs = NewChannelArray(DefaultReverbSend);
@@ -81,9 +81,14 @@ public partial class MusicPlayer : MonoBehaviour
 
     // Velocity remap: MeltySynth uses (v/127)^2 gain; LUT can pre-lift soft notes
     private readonly byte[] velocityRemap = new byte[128];
-    // True while the soundfont is MT32.sf2, which needs MT32Velocity() for some programs.
-    // Set on the main thread, read on the audio thread.
+    // True while the soundfont is MT32.sf2, played through MT32Preset() and MT32Volume(). Set on the
+    // main thread, read on the audio thread.
     private volatile bool mt32SoundFont;
+    // True while the soundfont is a General MIDI one, played through GMPreset() and GMVolume(): any
+    // but MT32.sf2 and OPL2.sf2, which plays the programs as the tracks number them, for now.
+    private volatile bool gmSoundFont;
+    // Whether the soundfont's programs and levels are set per program, as for the two above.
+    private bool TunedSoundFont => mt32SoundFont || gmSoundFont;
     private float lastBuiltVelocityCurveAmount = float.NaN;
 
     // Voice / drop stats for debug HUD (written on audio thread, read on main)
@@ -279,7 +284,9 @@ public partial class MusicPlayer : MonoBehaviour
             return;
         }
 
-        mt32SoundFont = Path.GetFileName(soundFontFileName).Equals("MT32.sf2", StringComparison.OrdinalIgnoreCase);
+        string soundFontName = Path.GetFileName(soundFontFileName);
+        mt32SoundFont = soundFontName.Equals("MT32.sf2", StringComparison.OrdinalIgnoreCase);
+        gmSoundFont = !mt32SoundFont && !soundFontName.Equals("OPL2.sf2", StringComparison.OrdinalIgnoreCase);
 
         // 3. Load MeltySynth with performance-optimized settings
         var settings = new MeltySynth.SynthesizerSettings(SynthesisRate);
@@ -298,11 +305,11 @@ public partial class MusicPlayer : MonoBehaviour
             // MIDI Controller Change: (channel, 0xB0, controller 7 (volume), value 127)
             created.ProcessMidiMessage(i, 0xB0, 7, SynthVolume(i, 127));
         }
-        if (mt32SoundFont)
+        if (TunedSoundFont)
         {
-            // Every channel's volume is MT32Headroom lower (MT32Volume()), so that a program can be
+            // Every channel's volume is VolumeHeadroom lower (SynthVolume()), so that a program can be
             // raised by up to that much; the master volume gives it back.
-            created.MasterVolume *= Mathf.Pow(10f, MT32Headroom / 20f);
+            created.MasterVolume *= Mathf.Pow(10f, VolumeHeadroom / 20f);
         }
 
         // With a track playing, the audio thread takes the new synthesizer up itself, after putting it
@@ -390,7 +397,7 @@ public partial class MusicPlayer : MonoBehaviour
             if (programs[channel] >= 0)
             {
                 synthesizer.ProcessMidiMessage(channel, 0xC0, SynthProgram(channel, programs[channel]), 0);
-                if (mt32SoundFont)
+                if (TunedSoundFont)
                 {
                     synthesizer.ProcessMidiMessage(channel, 0xB0, 91, SynthReverb(channel, trackReverbs[channel]));
                 }
@@ -717,7 +724,7 @@ public partial class MusicPlayer : MonoBehaviour
         }
 
         int remappedVelocity = velocityRemap[Mathf.Clamp(velocity, 0, 127)];
-        if (mt32SoundFont && channel != 9)
+        if (TunedSoundFont && channel != 9)
         {
             int mt32Velocity = MT32Velocity(programs[channel], velocity);
             if (mt32Velocity > 0)
@@ -736,11 +743,13 @@ public partial class MusicPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// The velocity to play a program at with MT32.sf2, or -1 for the usual remap.
+    /// The velocity to play a program at with MT32.sf2 or a General MIDI soundfont, or -1 for the
+    /// usual remap.
     /// </summary>
     /// <remarks>
     /// The soundfont gives every program the same answer to velocity, but on an MT-32 each timbre
-    /// has its own, and the original sends velocities unchanged. Both curves were measured against
+    /// has its own, and the original sends velocities unchanged. The tracks are written for those
+    /// answers, so a General MIDI soundfont gets them too. Both curves were measured against
     /// a recording of the original on an MT-32.
     /// SoundTrack (program 36) barely answers to velocity. The map's track opens on a SoundTrack pad
     /// at velocity 14, which an MT-32 plays 6 dB under the melody that follows and the usual remap
@@ -763,8 +772,8 @@ public partial class MusicPlayer : MonoBehaviour
         }
     }
 
-    /// <summary>How far MT32Volume() can raise a program, in dB.</summary>
-    private const float MT32Headroom = 12f;
+    /// <summary>How far MT32Volume() and GMVolume() can raise a program, in dB.</summary>
+    private const float VolumeHeadroom = 12f;
 
     /// <summary>MeltySynth's reverb send (CC 91) on a channel no message has set.</summary>
     private const int DefaultReverbSend = 40;
@@ -772,35 +781,40 @@ public partial class MusicPlayer : MonoBehaviour
     /// <summary>The reverb send (CC 91) to give the synthesizer for a channel the track set to send.</summary>
     private int SynthReverb(int channel, int send)
     {
-        int own = mt32SoundFont && channel != 9 && programs[channel] >= 0 ? MT32Reverb(programs[channel]) : -1;
+        int own = TunedSoundFont && channel != 9 && programs[channel] >= 0 ? ProgramReverb(programs[channel]) : -1;
         return own >= 0 ? own : send;
     }
 
     /// <summary>
-    /// The reverb send to play a program with on MT32.sf2, or -1 for the track's. Jungle Tune's notes
-    /// are a few hundredths of a second long, and an MT-32 lets them ring on in its reverb for a
-    /// second after; the glockenspiel that plays them stops short without more of it.
+    /// The reverb send to play a program with, or -1 for the track's. Jungle Tune's notes are a few
+    /// hundredths of a second long, and an MT-32 lets them ring on in its reverb for a second after;
+    /// the glockenspiel that plays them, in every soundfont, stops short without more of it.
     /// </summary>
-    private static int MT32Reverb(int program)
+    private static int ProgramReverb(int program)
     {
         return program == 127 ? 127 : -1;
     }
 
-    /// <summary>The soundfont's preset that plays a track's program: MT32Preset() with MT32.sf2.</summary>
+    /// <summary>The soundfont's preset that plays a track's program: MT32Preset() with MT32.sf2, GMPreset() with a General MIDI soundfont.</summary>
     private int SynthProgram(int channel, int program)
     {
-        return mt32SoundFont && channel != 9 ? MT32Preset(program) : program;
+        if (channel == 9 || !TunedSoundFont)
+        {
+            return program;
+        }
+        return mt32SoundFont ? MT32Preset(program) : GMPreset(program);
     }
 
     /// <summary>The volume (CC 7) to give the synthesizer for a channel the track set to volume.</summary>
     private int SynthVolume(int channel, int volume)
     {
-        if (!mt32SoundFont)
+        if (!TunedSoundFont)
         {
             return volume;
         }
-        float gain = channel == 9 || programs[channel] < 0 ? 0f : MT32Volume(programs[channel]);
-        return Mathf.Clamp(Mathf.RoundToInt(volume * Mathf.Pow(10f, (gain - MT32Headroom) / 40f)), 0, 127);
+        float gain = channel == 9 || programs[channel] < 0 ? 0f
+            : mt32SoundFont ? MT32Volume(programs[channel]) : GMVolume(programs[channel]);
+        return Mathf.Clamp(Mathf.RoundToInt(volume * Mathf.Pow(10f, (gain - VolumeHeadroom) / 40f)), 0, 127);
     }
 
     /// <summary>
@@ -858,6 +872,87 @@ public partial class MusicPlayer : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// The General MIDI preset that plays an MT-32 program, for a General MIDI soundfont.
+    /// </summary>
+    /// <remarks>
+    /// The tracks are written for an MT-32 and number its instruments, which General MIDI numbers
+    /// otherwise: on a General MIDI soundfont the timpani (112) played a tinkle bell and the
+    /// orchestra hit (122) a sea shore. Each program the tracks use is played by its General MIDI
+    /// instrument; where the MT-32's has none, by the one MT32Preset() chose by ear for MT32.sf2
+    /// (Celesta 2 and Jungle Tune on the glockenspiel, Warm Bell on the vibraphone, Syn Brass 2 on
+    /// the French horn, Chorale on Atmosphere, the Shakuhachi on the pan flute, Str Sect 2 on the
+    /// strings), or by the closest by ear and measure: Echo Pan, a pan flute with an echo, on the pan
+    /// flute, and the Triangle, whose number is a breath noise in General MIDI, on the tinkle bell, as soft as
+    /// the MT-32's high shimmer (the level set on the whole run of notes, not at their pitch). Harmo Pan
+    /// (33) keeps its number, as on MT32.sf2. The drum keys the tracks use are the same sounds in
+    /// both. Measured against a recording of the tracks on an MT-32 with GUS.sf2.
+    /// </remarks>
+    private static int GMPreset(int program)
+    {
+        switch (program)
+        {
+            case 23: return 9;      // Celesta 2: Glockenspiel
+            case 25: return 60;     // Syn Brass 2: French Horn, as on MT32.sf2
+            case 32: return 88;     // Fantasy: Pad 1 (Fantasia)
+            case 34: return 99;     // Chorale: FX 4 (Atmosphere)
+            case 36: return 97;     // SoundTrack: FX 2 (Soundtrack)
+            case 38: return 11;     // Warm Bell: Vibraphone
+            case 43: return 75;     // Echo Pan: Pan Flute
+            case 49: return 48;     // Str Sect 2: String Ensemble 1
+            case 51: return 45;     // Pizzicato: Pizzicato Strings
+            case 56: return 43;     // Contrabass
+            case 58: return 46;     // Harp 2: Orchestral Harp
+            case 72: return 73;     // Flute 1: Flute
+            case 74: return 72;     // Piccolo 1: Piccolo
+            case 83: return 71;     // Clarinet 2: Clarinet
+            case 84: return 68;     // Oboe
+            case 85: return 69;     // English Horn
+            case 86: return 70;     // Bassoon
+            case 90: return 57;     // Trombone 1: Trombone
+            case 92: return 60;     // French Horn 1: French Horn
+            case 93: return 60;     // French Horn 2: French Horn
+            case 107: return 75;    // Shakuhachi: Pan Flute
+            case 109: return 78;    // Whistle 2: Whistle
+            case 112: return 47;    // Timpani
+            case 117: return 116;   // Taiko: Taiko Drum
+            case 121: return 112;   // Triangle: Tinkle Bell
+            case 122: return 55;    // Orche Hit: Orchestra Hit
+            case 127: return 9;     // Jungle Tune: Glockenspiel
+            default: return program; // 48 and 73 are the same in both; 33 as on MT32.sf2
+        }
+    }
+
+    /// <summary>
+    /// How much louder or softer to play a program with a General MIDI soundfont, in dB.
+    /// </summary>
+    /// <remarks>
+    /// Measured with GUS.sf2 against the same recording, at each note's pitch, against the track's
+    /// median note; the breathy and the struck ones, where that measure misleads, kept near
+    /// MT32Volume()'s values chosen by ear.
+    /// </remarks>
+    private static float GMVolume(int program)
+    {
+        switch (program)
+        {
+            case 107: return 2f;    // Shakuhachi, on the Pan Flute
+            case 93: return 5f;     // French Horn 2
+            case 92: return 4f;     // French Horn 1
+            case 117: return 4f;    // Taiko
+            case 25: return 6f;     // Syn Brass 2, on the French Horn
+            case 38: return 3f;     // Warm Bell, on the Vibraphone
+            case 84: return -3f;    // Oboe
+            case 85: return -3f;    // English Horn
+            case 112: return -4f;   // Timpani
+            case 73: return -5f;    // Flute 2
+            case 23: return -7f;    // Celesta 2, on the Glockenspiel
+            case 74: return -8f;    // Piccolo 1
+            case 127: return -8f;   // Jungle Tune, on the Glockenspiel
+            case 121: return -14f;  // Triangle, on the Tinkle Bell
+            default: return 0f;
+        }
+    }
+
     // --- Unity Audio Hook ---
     // Runs on the dedicated, real-time Audio Thread, called from OnAudioFilterRead() (MusicPlayerExternalMidi.cs)
     // unless the music is playing on an external synthesizer
@@ -906,7 +1001,7 @@ public partial class MusicPlayer : MonoBehaviour
                 // MIDI Program Change: (channel, 0xC0, program, 0)
                 synthesizer.ProcessMidiMessage(cmd.Channel, 0xC0, SynthProgram(cmd.Channel, cmd.Program), 0);
                 programs[cmd.Channel] = cmd.Program;
-                if (mt32SoundFont)
+                if (TunedSoundFont)
                 {
                     // the new program's level and reverb
                     synthesizer.ProcessMidiMessage(cmd.Channel, 0xB0, 7, SynthVolume(cmd.Channel, trackVolumes[cmd.Channel]));
