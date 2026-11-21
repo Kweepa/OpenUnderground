@@ -10,8 +10,9 @@ using UnityEngine;
 /// more than one: the level with a +, a - and a Go button; the tile to teleport to as two boxes
 /// and a Go button; the object, the stack (any object the game stacks) and the creature to spawn,
 /// each a list to search with a Spawn button beside it, and the creature's distance and attitude
-/// on the row below; and the skill to set beside its value. Whatever is set here is kept for the
-/// next run.
+/// on the row below; the hit points and the mana, each its current value and its maximum side by
+/// side; and the skill to set beside its value. Whatever is set here is kept for the next run, but
+/// the boxes that follow the game.
 /// </summary>
 [CustomEditor(typeof(Cheats))]
 public class CheatsEditor : Editor
@@ -21,7 +22,10 @@ public class CheatsEditor : Editor
     private const string LevelControl = "CheatsLevel";
 
     // Drawn on the row of another field.
-    private static readonly HashSet<string> drawnInRow = new HashSet<string> { "critterDistance", "critterHostile", "skillValue" };
+    private static readonly HashSet<string> drawnInRow = new HashSet<string>
+    {
+        "critterDistance", "critterHostile", "skillValue", "maxHitPointsValue", "maxManaValue",
+    };
 
     // The stacks offered before the game's data is loaded: the ammunition and the money. Once it is,
     // every object the game stacks (MakeStackList).
@@ -107,6 +111,15 @@ public class CheatsEditor : Editor
                 break;
             case "skillToSet":
                 DrawSkill(prop);
+                break;
+            case "characterLevelValue":
+                EditorGUILayout.PropertyField(prop, new GUIContent("Character Level"));
+                break;
+            case "hitPointsValue":
+                DrawCurrentAndMax("Hit Points", prop, serializedObject.FindProperty("maxHitPointsValue"));
+                break;
+            case "manaValue":
+                DrawCurrentAndMax("Mana", prop, serializedObject.FindProperty("maxManaValue"));
                 break;
             default:
                 if (!drawnInRow.Contains(prop.name))
@@ -290,6 +303,21 @@ public class CheatsEditor : Editor
         GUILayout.Space(8);
         GUILayout.Label(hostileLabel, GUILayout.Width(EditorStyles.label.CalcSize(hostileLabel).x));
         EditorGUILayout.PropertyField(hostile, GUIContent.none, GUILayout.Width(16));
+        EditorGUILayout.EndHorizontal();
+    }
+
+    /// <summary>
+    /// A value of the player's and its maximum, side by side on one row, each with its small label;
+    /// both delayed boxes, as Cheats declares them.
+    /// </summary>
+    private static void DrawCurrentAndMax(string label, SerializedProperty current, SerializedProperty max)
+    {
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.PrefixLabel(label);
+        GUILayout.Label("current", GUILayout.ExpandWidth(false));
+        EditorGUILayout.PropertyField(current, GUIContent.none, GUILayout.MinWidth(30));
+        GUILayout.Label("max", GUILayout.ExpandWidth(false));
+        EditorGUILayout.PropertyField(max, GUIContent.none, GUILayout.MinWidth(30));
         EditorGUILayout.EndHorizontal();
     }
 

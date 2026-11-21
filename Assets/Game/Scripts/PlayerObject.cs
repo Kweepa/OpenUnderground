@@ -2341,6 +2341,12 @@ public class PlayerObject : MonoBehaviour
         50, 100, 150, 200, 300, 400, 600, 800, 1200, 1600, 2400, 3200, 4800, 6400, 9600
     };
 
+    /// <summary>The least experience a level needs, in the remake's units: one display point past its threshold.</summary>
+    public static int LeastXpForLevel(int level)
+    {
+        return level <= 1 ? 0 : (levelUp[Math.Min(level, levelUp.Length + 1) - 2] + 1) * 20;
+    }
+
     private static int GetNewLevel(int newXp)
     {
         int level = 1;
