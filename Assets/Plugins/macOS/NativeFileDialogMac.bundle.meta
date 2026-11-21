@@ -1,0 +1,36 @@
+fileFormatVersion: 2
+guid: 7c2a9e1f4b8d46a0b3e5f917c0d2a84e
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      '': Any
+    second:
+      enabled: 0
+      settings:
+        CPU: AnyCPU
+  - first:
+      '': Editor
+    second:
+      enabled: 1
+      settings:
+        CPU: AnyCPU
+        DefaultValueInitialized: true
+        OS: OSX
+  - first:
+      Standalone: OSX
+    second:
+      enabled: 1
+      settings:
+        CPU: AnyCPU
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
