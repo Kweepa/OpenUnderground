@@ -423,8 +423,9 @@ public class FrontEnd : MonoBehaviour
         case EState.Menu:
             palCycle = ((int)(10 * stateTime)) % openingScreen.Length;
             UpdateFade();
-            // use inputs to highlight and select options, unless the small window warning has them
-            if (!SmallWindowWarning.BlocksInput)
+            // use inputs to highlight and select options, unless the small window warning has them; not before the
+            // fade-in ends either, which runs only here: an entry chosen sooner left its screen dimmed (fix 627)
+            if (!SmallWindowWarning.BlocksInput && fadeAlpha <= 0.0f)
             {
                 UpdateMenu();
             }
