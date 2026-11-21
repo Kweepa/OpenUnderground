@@ -24,6 +24,9 @@ public class MapPageSaveData
 public class MapSaveData
 {
     public List<MapPageSaveData> pages = new List<MapPageSaveData>();
+    // the notebook on page 0 (MapNotebook): the lines to do, and those done, newest first; null in older saves
+    public List<string> notebookTodo = new List<string>();
+    public List<string> notebookDone = new List<string>();
     
     // Optimized boolean RLE: start value + comma-separated run lengths
     // Example: "0:100,5,50" = 100 false, 5 true, 50 false
@@ -498,11 +501,11 @@ public class MapScreen : MonoBehaviour
 
     /// <summary>
     /// Turns the open map to the level loaded, after the Cheats panel changed it. Not while a note
-    /// is being written: it belongs to the page shown.
+    /// or a line of the notebook is being written: it belongs to the page shown.
     /// </summary>
     public static void TurnToLoadedLevel()
     {
-        if (sMapScreen == null || !sMapScreen.visible || sMapScreen.currentNote != null)
+        if (sMapScreen == null || !sMapScreen.visible || sMapScreen.Writing)
             return;
 
         sMapScreen.selectedPage = LevelLoader.sLevelLoader.loadedLevel;
@@ -522,7 +525,7 @@ public class MapScreen : MonoBehaviour
         if (dl?.mapCursorTex == null)
             return false;
 
-        int idx = sMapScreen.currentNote != null ? 14 : 12;
+        int idx = sMapScreen.Writing ? 14 : 12;
         if (idx < 0 || idx >= dl.mapCursorTex.Length || dl.mapCursorTex[idx] == null)
             return false;
 
@@ -561,8 +564,14 @@ public class MapScreen : MonoBehaviour
     private float initialNoteX, initialNoteY; // and its place, which a cancel gives back
     private bool isNewNote; // Track if currentNote is a newly created note
 
+    // page 0 is the notebook's, 1 to 9 the levels', 10 to 20 for notes only
     private MapPage[] mapPages = new MapPage[21];
     private MapPage mapPage;
+
+    private readonly MapNotebook notebook = new MapNotebook();
+
+    /// <summary>A note or a line of the notebook is being written.</summary>
+    private bool Writing => currentNote != null || notebook.Writing;
 
     private int selectedPage;
 
@@ -573,6 +582,11 @@ public class MapScreen : MonoBehaviour
 
     private bool awaitingCloseAButtonRelease;
 
+    // The pad's Notebook is held, by default on the Map's button: the press opens the map on the level, and held this
+    // long it turns to the notebook (the user's, 22 November 2026); the time the press came, or -1.
+    private const float NotebookHoldSeconds = 0.5f;
+    private float notebookHeldSince = -1f;
+
     private static bool MapKeyboardOverlayActive()
     {
         if (KeyboardGUI.sKeyboard != null && KeyboardGUI.sKeyboard.IsVisible())
@@ -581,11 +595,16 @@ public class MapScreen : MonoBehaviour
             && (PlayerObject.Player.controlsDisabled & EControlMask.Keyboard) > 0)
             return true;
         // Note editor shows the keyboard from OnGUI after Update; block map Esc until the note is cleared.
-        return sMapScreen != null && sMapScreen.currentNote != null;
+        return sMapScreen != null && sMapScreen.Writing;
     }
 
     private void TryEraseHighlightedMapNote()
     {
+        if (selectedPage == MapNotebook.Page)
+        {
+            notebook.EraseHovered();
+            return;
+        }
         if (highlightedNote == null)
             return;
         mapPage.notes.Remove(highlightedNote);
@@ -716,11 +735,11 @@ public class MapScreen : MonoBehaviour
     /// Clicks on a corner hitbox always consume LMB so they never fall through to note placement (e.g. level 1 up arrow).</summary>
     private bool TryConsumeMapLevelCornerClick(Vector2 guiMouse)
     {
-        if (currentNote != null)
+        if (Writing)
             return false;
         if (MapLevelCornerRectUp().Contains(guiMouse))
         {
-            if (selectedPage > 1)
+            if (selectedPage > MapNotebook.Page)
             {
                 --selectedPage;
                 mapPage = mapPages[selectedPage];
@@ -748,6 +767,15 @@ public class MapScreen : MonoBehaviour
         FillCheatsTeleportTile();
 #endif
 
+        if (selectedPage == MapNotebook.Page)
+        {
+            if (QuillOnCloseButton())
+                awaitingCloseAButtonRelease = true;
+            else
+                notebook.PrimaryAction();
+            return;
+        }
+
         if (highlightedNote != null)
         {
             currentNote = highlightedNote;
@@ -771,10 +799,7 @@ public class MapScreen : MonoBehaviour
 
         if (currentNote == null)
         {
-            Rect closeButton = new Rect(269, 151, 37, 23);
-            int qx = quillX * 320 / Screen.width;
-            int qy = quillY * 200 / Screen.height;
-            if (closeButton.Contains(new Vector2(qx, qy)))
+            if (QuillOnCloseButton())
                 awaitingCloseAButtonRelease = true;
             else
             {
@@ -793,6 +818,30 @@ public class MapScreen : MonoBehaviour
             mapPage.notes.Remove(currentNote);
 
         currentNote = null;
+    }
+
+    /// <summary>The quill's tip on the page's Close button.</summary>
+    private bool QuillOnCloseButton()
+    {
+        Rect closeButton = new Rect(269, 151, 37, 23);
+        int qx = quillX * 320 / Screen.width;
+        int qy = quillY * 200 / Screen.height;
+        return closeButton.Contains(new Vector2(qx, qy));
+    }
+
+    /// <summary>The quill's tip in map pixels, 320 x 200 from the top left.</summary>
+    private Vector2 QuillOnMap()
+    {
+        return new Vector2(quillX * 320.0f / Screen.width, quillY * 200.0f / Screen.height);
+    }
+
+    /// <summary>The quill to a point of the page, in map pixels.</summary>
+    private void PutQuill(Vector2 mapPoint)
+    {
+        quillX = Mathf.Clamp(Mathf.RoundToInt(mapPoint.x * Screen.width / 320.0f), 0, Screen.width);
+        quillY = Mathf.Clamp(Mathf.RoundToInt(mapPoint.y * Screen.height / 200.0f), 0, Screen.height);
+        quillRestX = 0f;
+        quillRestY = 0f;
     }
     
 #if UNITY_EDITOR
@@ -823,11 +872,13 @@ public class MapScreen : MonoBehaviour
             quillX = Screen.width / 2;
             quillY = Screen.height / 2;
 
-            for (int i = 1; i < mapPages.Length; ++i)
+            // page 0 is the notebook's blank parchment
+            for (int i = 0; i < mapPages.Length; ++i)
             {
                 mapPages[i] = new MapPage();
                 mapPages[i].Init();
             }
+            notebook.font = font;
             selectedPage = LevelLoader.sLevelLoader.loadedLevel;
             mapPage = mapPages[selectedPage];
 
@@ -867,11 +918,32 @@ public class MapScreen : MonoBehaviour
         Map map = Inventory.sInv != null
             ? Inventory.sInv.FindObjectInInventory(EObjectType.Map) as Map
             : null;
+        // the notebook's key opens the map on its page, turns the open map to it, and closes it from there
+        bool notebookKey = GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Notebook);
+        bool notebookHeld = false;
+        if (notebookHeldSince >= 0f)
+        {
+            if (!GameActions.PadWorld.Notebook.IsPressed())
+            {
+                notebookHeldSince = -1f;
+            }
+            else if (Time.unscaledTime - notebookHeldSince >= NotebookHoldSeconds)
+            {
+                notebookHeld = true;
+                notebookHeldSince = -1f;
+            }
+        }
+        bool toNotebook = notebookKey || notebookHeld;
+        bool wasVisible = visible;
+        // on the notebook, the map's own key turns back to the level (the user's, 22 November 2026); Esc and the pad's
+        // Back still close
+        bool mapKey = GameActions.PadMap.Close.WasPressedThisFrame() || GameInput.KeyPressedThisFrame(GameActions.KeysMap.Close);
         if (!visible
             && !mapDisabled
             && (map != null || Cheats.sCheats.mapWithoutMap)
             && (GameActions.PadWorld.Map.WasPressedThisFrame()
                 || GameInput.KeyPressedThisFrame(GameActions.KeysWorld.Map)
+                || toNotebook
                 || (map != null && map.popUpMap)))
         {
             if (map != null)
@@ -888,16 +960,18 @@ public class MapScreen : MonoBehaviour
             // Switch to map music
             Music.EnterMapScreen();
             
-            selectedPage = LevelLoader.sLevelLoader.loadedLevel;
-            mapPage = mapPages[selectedPage];
-            
-            // move the quill near the player
-            float xScale = Screen.width / 320.0f;
-            float yScale = Screen.height / 200.0f;
-            quillX = (int) (xScale * (32 + PlayerObject.Player.transform.position.x));
-            quillY = Screen.height - (int) (yScale * (9 + PlayerObject.Player.transform.position.z));
-            quillRestX = 0f;
-            quillRestY = 0f;
+            if (toNotebook)
+            {
+                TurnToNotebook();
+            }
+            else
+            {
+                TurnToLevel();
+            }
+        }
+        else if (visible && !MapKeyboardOverlayActive() && mapKey && selectedPage == MapNotebook.Page)
+        {
+            TurnToLevel();
         }
         else if (visible
                  && !MapKeyboardOverlayActive()
@@ -908,9 +982,18 @@ public class MapScreen : MonoBehaviour
                      || (awaitingCloseAButtonRelease && GameActions.PadMap.Select.WasReleasedThisFrame())
                      || (awaitingCloseAButtonRelease
                          && GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard
-                         && (GameInput.CurrentMouse?.leftButton.wasReleasedThisFrame ?? false))))
+                         && (GameInput.CurrentMouse?.leftButton.wasReleasedThisFrame ?? false))
+                     || (notebookKey && selectedPage == MapNotebook.Page)))
         {
             CloseMapInternal();
+        }
+        else if (visible && !MapKeyboardOverlayActive() && toNotebook && selectedPage != MapNotebook.Page)
+        {
+            TurnToNotebook();
+        }
+        if (!wasVisible && GameActions.PadWorld.Notebook.WasPressedThisFrame())
+        {
+            notebookHeldSince = Time.unscaledTime;
         }
 
         if (visible)
@@ -938,15 +1021,29 @@ public class MapScreen : MonoBehaviour
                 quillY = Mathf.Clamp(quillY + dy, 0, Screen.height);
             }
 
-            if (currentNote == null && !MapKeyboardOverlayActive())
+            bool onNotebook = selectedPage == MapNotebook.Page;
+            if (onNotebook)
+            {
+                bool mouse = GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard && GameInput.CurrentMouse != null;
+                float wheel = mouse ? GameInput.CurrentMouse.scroll.ReadValue().y : 0f;
+                notebook.Update(QuillOnMap(), wheel, !mouse, Time.unscaledDeltaTime);
+            }
+
+            if (!MapKeyboardOverlayActive())
             {
                 if (GameActions.PadMap.NextNote.WasPressedThisFrame())
                 {
-                    JumpToNote(1);
+                    if (onNotebook)
+                        PutQuill(notebook.Jump(1, QuillOnMap()));
+                    else
+                        JumpToNote(1);
                 }
                 else if (GameActions.PadMap.PreviousNote.WasPressedThisFrame())
                 {
-                    JumpToNote(-1);
+                    if (onNotebook)
+                        PutQuill(notebook.Jump(-1, QuillOnMap()));
+                    else
+                        JumpToNote(-1);
                 }
             }
 
@@ -954,7 +1051,7 @@ public class MapScreen : MonoBehaviour
 
             bool keyboardActive = MapKeyboardOverlayActive();
 
-            if (!keyboardActive && highlightedNote != null && GameActions.PadMap.EraseNote.WasPressedThisFrame())
+            if (!keyboardActive && (highlightedNote != null || onNotebook) && GameActions.PadMap.EraseNote.WasPressedThisFrame())
                 TryEraseHighlightedMapNote();
 
             if (!keyboardActive && GameActions.PadMap.Select.WasPressedThisFrame())
@@ -981,7 +1078,11 @@ public class MapScreen : MonoBehaviour
                 currentNote.x = quillX * 320.0f / Screen.width - grabX;
                 currentNote.y = quillY * 200.0f / Screen.height - grabY;
             }
-            else if (GameActions.PadMap.PreviousPage.WasPressedThisFrame() && selectedPage > 1)
+            else if (notebook.Writing)
+            {
+                // the page stays while a line of the notebook is written
+            }
+            else if (GameActions.PadMap.PreviousPage.WasPressedThisFrame() && selectedPage > MapNotebook.Page)
             {
                 --selectedPage;
                 mapPage = mapPages[selectedPage];
@@ -996,13 +1097,36 @@ public class MapScreen : MonoBehaviour
         mapPages[LevelLoader.sLevelLoader.loadedLevel].Update(Cheats.sCheats.revealMap);
     }
 
+    /// <summary>The open map to the level the player is on, the quill near the player.</summary>
+    private void TurnToLevel()
+    {
+        selectedPage = LevelLoader.sLevelLoader.loadedLevel;
+        mapPage = mapPages[selectedPage];
+
+        // move the quill near the player
+        float xScale = Screen.width / 320.0f;
+        float yScale = Screen.height / 200.0f;
+        quillX = (int) (xScale * (32 + PlayerObject.Player.transform.position.x));
+        quillY = Screen.height - (int) (yScale * (9 + PlayerObject.Player.transform.position.z));
+        quillRestX = 0f;
+        quillRestY = 0f;
+    }
+
+    /// <summary>The open map to the notebook's page, the quill on its empty line, ready to write a new one.</summary>
+    private void TurnToNotebook()
+    {
+        selectedPage = MapNotebook.Page;
+        mapPage = mapPages[selectedPage];
+        PutQuill(notebook.AddLinePoint());
+    }
+
     /// <summary>Called when Esc/M requests closing the map from keyboard (same as gamepad close).</summary>
     /// <param name="ignoreMapNoteGuard">Use when forcing the map closed (e.g. stats pin) even during note edit.</param>
     public static void RequestCloseFromKeyboard(bool ignoreMapNoteGuard = false)
     {
         if (sMapScreen == null || !sMapScreen.visible)
             return;
-        if (!ignoreMapNoteGuard && sMapScreen.currentNote != null)
+        if (!ignoreMapNoteGuard && sMapScreen.Writing)
             return;
         if (KeyboardGUI.sKeyboard != null && KeyboardGUI.sKeyboard.IsVisible())
             return;
@@ -1026,6 +1150,7 @@ public class MapScreen : MonoBehaviour
             }
             currentNote = null;
         }
+        notebook.StopWriting();
         highlightedNote = null;
 
         PlayerObject.DisableControls(EControlMask.Map, false);
@@ -1087,10 +1212,11 @@ public class MapScreen : MonoBehaviour
         GameActions.PadMapActions m = GameActions.PadMap;
         Texture2D pages = legendIcons != null && legendIcons.Length == 4 ? legendIcons[2] : null;
         int line = 0;
-        DrawPadLegendLine(line++, "Make note", null, labelStyle, m.Select);
-        DrawPadLegendLine(line++, "Erase note", null, labelStyle, m.EraseNote);
-        DrawPadLegendLine(line++, "Next note", DPadPair(m.PreviousNote, m.NextNote, "left", "right", dPadLeftRightIcon), labelStyle,
-            m.PreviousNote, m.NextNote);
+        bool onNotebook = selectedPage == MapNotebook.Page;
+        DrawPadLegendLine(line++, onNotebook ? "Tick or write" : "Make note", null, labelStyle, m.Select);
+        DrawPadLegendLine(line++, onNotebook ? "Erase line" : "Erase note", null, labelStyle, m.EraseNote);
+        DrawPadLegendLine(line++, onNotebook ? "Next line" : "Next note",
+            DPadPair(m.PreviousNote, m.NextNote, "left", "right", dPadLeftRightIcon), labelStyle, m.PreviousNote, m.NextNote);
         DrawPadLegendLine(line++, "Change level", DPadPair(m.PreviousPage, m.NextPage, "up", "down", pages), labelStyle,
             m.PreviousPage, m.NextPage);
         DrawPadLegendLine(line, "Close map", null, labelStyle, m.Back);
@@ -1140,6 +1266,49 @@ public class MapScreen : MonoBehaviour
         GUI.Label(new Rect(x, y - k / 6, w, k), label, labelStyle);
     }
 
+    /// <summary>
+    /// Where the on-screen keyboard goes while a note or a line of the notebook is written, in screen pixels: near the
+    /// quill, on the other side of it from the middle of the screen, so that it does not cover what is written.
+    /// </summary>
+    private Vector2 KeyboardNearQuill()
+    {
+        float quillScreenX = quillX;
+        float quillScreenY = quillY;
+
+        float screenCenterX = Screen.width / 2.0f;
+        float screenCenterY = Screen.height / 2.0f;
+
+        // Keyboard panel dimensions, in reference pixels
+        float panelWidth = KeyboardGUI.PanelWidth;
+        float panelHeight = KeyboardGUI.PanelHeight;
+
+        // Position keyboard on opposite side of quill from center
+        float keyboardX, keyboardY;
+
+        if (quillScreenX < screenCenterX)
+        {
+            // Quill is left of center, position keyboard to the right of quill
+            keyboardX = quillScreenX + UiScale.S(50); // Offset to the right of quill
+        }
+        else
+        {
+            // Quill is right of center, position keyboard to the left of quill
+            keyboardX = quillScreenX - UiScale.S(panelWidth + 50); // Offset to the left of quill (the keyboard is at the interface scale)
+        }
+
+        if (quillScreenY < screenCenterY)
+        {
+            // Quill is above center, position keyboard below quill
+            keyboardY = quillScreenY + UiScale.S(50); // Offset below quill
+        }
+        else
+        {
+            // Quill is below center, position keyboard above quill
+            keyboardY = quillScreenY - UiScale.S(panelHeight + 50); // Offset above quill
+        }
+        return new Vector2(keyboardX, keyboardY);
+    }
+
     public void OnGUI()
     {
         GUI.depth = (int)EGUIDepth.Map;
@@ -1173,7 +1342,8 @@ public class MapScreen : MonoBehaviour
 
             GUIStyle style = new GUIStyle { font = font, normal = { textColor = textColor }, fontSize = 10 * Screen.height / 200, fontStyle = FontStyle.Italic };
 
-            GUI.Label(new Rect(255.0f / 320.0f * Screen.width, 7.0f / 200.0f * Screen.height, style.fontSize, style.fontSize), $"Level {selectedPage}", style);
+            string pageName = selectedPage == MapNotebook.Page ? "Notebook" : $"Level {selectedPage}";
+            GUI.Label(new Rect(255.0f / 320.0f * Screen.width, 7.0f / 200.0f * Screen.height, style.fontSize, style.fontSize), pageName, style);
 
             style.fontStyle = FontStyle.Normal;
             style.fontSize = 5 * Screen.height / 200;
@@ -1181,7 +1351,9 @@ public class MapScreen : MonoBehaviour
             {
                 if (GameInput.LastActiveDevice == GameInputDevice.MouseKeyboard)
                 {
-                    DrawLegend(mouseLegendIcons, new [] { "Make note", "Erase note", "Close map" }, style);
+                    DrawLegend(mouseLegendIcons, selectedPage == MapNotebook.Page
+                        ? new [] { "Tick or write", "Erase line", "Close map" }
+                        : new [] { "Make note", "Erase note", "Close map" }, style);
                 }
                 else if (currentNote != null)
                 {
@@ -1215,6 +1387,12 @@ public class MapScreen : MonoBehaviour
                 }
             }
             
+            if (selectedPage == MapNotebook.Page)
+            {
+                notebook.Draw(textColor, highlightedTextColor);
+                notebook.ShowKeyboard(KeyboardNearQuill());
+            }
+
             // Draw current note in highlight color while being edited
             if (currentNote != null)
             {
@@ -1227,43 +1405,6 @@ public class MapScreen : MonoBehaviour
                 // Show virtual keyboard if not already visible
                 if (KeyboardGUI.sKeyboard != null && !KeyboardGUI.sKeyboard.IsVisible())
                 {
-                    // Calculate keyboard position relative to quill
-                    // Position keyboard on opposite side of center from quill, but keep it close to quill
-                    float quillScreenX = quillX;
-                    float quillScreenY = quillY;
-                    
-                    float screenCenterX = Screen.width / 2.0f;
-                    float screenCenterY = Screen.height / 2.0f;
-                    
-                    // Keyboard panel dimensions, in reference pixels
-                    float panelWidth = KeyboardGUI.PanelWidth;
-                    float panelHeight = KeyboardGUI.PanelHeight;
-                    
-                    // Position keyboard on opposite side of quill from center
-                    float keyboardX, keyboardY;
-                    
-                    if (quillScreenX < screenCenterX)
-                    {
-                        // Quill is left of center, position keyboard to the right of quill
-                        keyboardX = quillScreenX + UiScale.S(50); // Offset to the right of quill
-                    }
-                    else
-                    {
-                        // Quill is right of center, position keyboard to the left of quill
-                        keyboardX = quillScreenX - UiScale.S(panelWidth + 50); // Offset to the left of quill (the keyboard is at the interface scale)
-                    }
-                    
-                    if (quillScreenY < screenCenterY)
-                    {
-                        // Quill is above center, position keyboard below quill
-                        keyboardY = quillScreenY + UiScale.S(50); // Offset below quill
-                    }
-                    else
-                    {
-                        // Quill is below center, position keyboard above quill
-                        keyboardY = quillScreenY - UiScale.S(panelHeight + 50); // Offset above quill
-                    }
-                    
                     KeyboardGUI.sKeyboard.Show(currentNote.note, (result) => {
                         if (result.Length == 0)
                         {
@@ -1290,7 +1431,7 @@ public class MapScreen : MonoBehaviour
                             currentNote.y = initialNoteY;
                         }
                         currentNote = null;
-                    }, new Vector2(keyboardX, keyboardY), "Note:", true, true); // isMapScreenKeyboard = true, allowCancel = true
+                    }, KeyboardNearQuill(), "Note:", true, true); // isMapScreenKeyboard = true, allowCancel = true
                 }
                 
                 // Update note text continuously while keyboard is visible
@@ -1352,6 +1493,8 @@ public class MapScreen : MonoBehaviour
     public MapSaveData SaveToData()
     {
         MapSaveData saveData = new MapSaveData();
+        saveData.notebookTodo = notebook.Todo;
+        saveData.notebookDone = notebook.Done;
         
         // Save all map pages (starting from index 1, since 0 is unused)
         for (int i = 1; i < mapPages.Length; i++)
@@ -1394,7 +1537,11 @@ public class MapScreen : MonoBehaviour
     
     public void LoadFromData(MapSaveData data)
     {
-        if (data == null || data.pages == null) return;
+        if (data == null) return;
+
+        notebook.Load(data.notebookTodo, data.notebookDone);
+
+        if (data.pages == null) return;
         
         // Restore map pages (starting from index 1)
         for (int i = 1; i < mapPages.Length && i - 1 < data.pages.Count; i++)

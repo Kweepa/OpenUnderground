@@ -90,6 +90,8 @@ public static class GameActions
         public readonly InputAction MagicPanel;
         public readonly InputAction Inventory;
         public readonly InputAction Map;
+        /// <summary>Held, not pressed: the map's notebook (MapScreen times the hold). On the Map's button, which it shares.</summary>
+        public readonly InputAction Notebook;
         /// <summary>Held, not pressed: the caller times the hold.</summary>
         public readonly InputAction Quicksave;
         /// <summary>Held, not pressed: the caller times the hold.</summary>
@@ -115,6 +117,7 @@ public static class GameActions
             MagicPanel = Button(map, "MagicPanel", "<Gamepad>/leftShoulder");
             Inventory = Button(map, "Inventory", "<Gamepad>/rightShoulder");
             Map = Button(map, "Map", "<Gamepad>/select");
+            Notebook = Button(map, "Notebook", "<Gamepad>/select");
             Quicksave = Button(map, "Quicksave", "<Gamepad>/rightStickPress");
             Sleep = Button(map, "Sleep", "<Gamepad>/dpad/left");
             Track = Button(map, "Track", "<Gamepad>/dpad/right");
@@ -142,6 +145,8 @@ public static class GameActions
         public readonly InputAction Inventory;
         public readonly InputAction Stats;
         public readonly InputAction Map;
+        /// <summary>The map opened on its notebook's page, the list of things to do (MapNotebook); there, the map closed.</summary>
+        public readonly InputAction Notebook;
         public readonly InputAction Quicksave;
         public readonly InputAction Sleep;
         /// <summary>The Track skill, on the original's key (UW.EXE 0x7ebb6).</summary>
@@ -187,6 +192,8 @@ public static class GameActions
             Inventory = Button(map, "Inventory", "<Keyboard>/e");
             Stats = Button(map, "Stats", "<Keyboard>/r");
             Map = Button(map, "Map", "<Keyboard>/tab");
+            // N, free on the default keys and on the Classic ones (the reference card has no N)
+            Notebook = Button(map, "Notebook", "<Keyboard>/n");
             Quicksave = Button(map, "Quicksave", "<Keyboard>/f5");
             Sleep = Button(map, "Sleep", "<Keyboard>/f10");
             Track = Button(map, "Track", "<Keyboard>/f9");

@@ -28,6 +28,7 @@ This project is a wrapper for the well-known 1992 dungeon crawler by Blue Sky Pr
   - every few seconds the Track skill tells you of creatures nearby, and in which direction
   - a history of the last two hundred messages, conversations included and kept in the save: Page Up and Page Down, or the d-pad, scroll back through what you missed
   - a list of the spells you know beside the magic panel, with their runes: those in the manual from the start, the others as you find them
+  - a notebook on the first page of the map, opened with N or by holding the pad's map button: a list of things to do, ticked off as you do them
   - a locked door unlocks by itself when you use it with the right key in your pack
   - display settings: monitor, display mode and resolution, field of view, camera bob, and how much the interface grows on large screens; it also fits small ones such as a Steam Deck
   - the gameplay helpers, such as automatic Search, Traps and Track reports, sprinting, and items hidden in debris, can be turned off in the game menu if you prefer the original experience

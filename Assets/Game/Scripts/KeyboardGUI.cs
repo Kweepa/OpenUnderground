@@ -33,9 +33,13 @@ public class KeyboardGUI : MonoBehaviour
     /// </remarks>
     private int maxLength;
 
-    private bool CanAppend()
+    /// <summary>Whether the field takes a text, beside its length: the notebook's line, as wide as the page. Set by Show.</summary>
+    private System.Func<string, bool> fits;
+
+    private bool CanAppend(string addition)
     {
-        return maxLength <= 0 || currentText == null || currentText.Length < maxLength;
+        string text = currentText ?? "";
+        return (maxLength <= 0 || text.Length < maxLength) && (fits == null || fits(text + addition));
     }
     private string contextLabel;
     private int cursorX, cursorY;
@@ -154,9 +158,11 @@ public class KeyboardGUI : MonoBehaviour
     }
     
     /// <param name="_maxLength">Most characters the field will take, or 0 for no limit.</param>
-    public void Show(string initialText, System.Action<string> _onComplete, System.Action _onCancel = null, Vector2? position = null, string _contextLabel = "", bool _isMapScreenKeyboard = false, bool _allowCancel = false, int _maxLength = 0)
+    /// <param name="_fits">Whether the field takes a text, for a limit that is not a count of characters; null for none.</param>
+    public void Show(string initialText, System.Action<string> _onComplete, System.Action _onCancel = null, Vector2? position = null, string _contextLabel = "", bool _isMapScreenKeyboard = false, bool _allowCancel = false, int _maxLength = 0, System.Func<string, bool> _fits = null)
     {
         maxLength = _maxLength;
+        fits = _fits;
         currentText = initialText ?? "";
         if (maxLength > 0 && currentText.Length > maxLength)
         {
@@ -418,7 +424,7 @@ public class KeyboardGUI : MonoBehaviour
         }
         else if (key == "Space")
         {
-            if (CanAppend())
+            if (CanAppend(" "))
             {
                 currentText += " ";
             }
@@ -447,7 +453,7 @@ public class KeyboardGUI : MonoBehaviour
         else
         {
             // Regular character key - use the key from the appropriate array
-            if (CanAppend())
+            if (CanAppend(key))
             {
                 currentText += key;
             }
@@ -539,7 +545,7 @@ public class KeyboardGUI : MonoBehaviour
                 }
                 else if (Event.current.character != 0 && !char.IsControl(Event.current.character))
                 {
-                    if (CanAppend())
+                    if (CanAppend(Event.current.character.ToString()))
                     {
                         currentText += Event.current.character;
                     }

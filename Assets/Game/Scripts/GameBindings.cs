@@ -193,6 +193,7 @@ public static class GameBindings
         KeyEntry(k.Inventory, EBindKind.Press, "Inventory");
         KeyEntry(k.Stats, EBindKind.Press, "Stats");
         KeyEntry(k.Map, EBindKind.Press, "Map", GameActions.KeysMap.Close);
+        KeyEntry(k.Notebook, EBindKind.Press, "Notebook");
         KeyEntry(k.Quicksave, EBindKind.Press, "Quicksave");
         KeyEntry(k.Sleep, EBindKind.Press, "Sleep");
         KeyEntry(k.Track, EBindKind.Press, "Track");
@@ -229,6 +230,8 @@ public static class GameBindings
         PadEntry(p.Inventory, EBindKind.Press, withPanels, "Inventory");
         // live with the panels open too: on a button of theirs it took their press, and on the d-pad their cursor (fix 458)
         PadEntry(p.Map, EBindKind.Press, withPanels | EPadPages.Map, "Map", GameActions.PadMap.Close);
+        // held on the Map's button, which it shares (MayShare): moving one moves the other, by the swap
+        PadEntry(p.Notebook, EBindKind.Press, withPanels, "Notebook (hold)");
         PadEntry(p.Quicksave, EBindKind.Press, withPanels, "Quicksave");
         PadEntry(p.Sleep, EBindKind.Press, walking, "Sleep");
         PadEntry(p.Track, EBindKind.Press, walking, "Track");
@@ -514,6 +517,7 @@ public static class GameBindings
             return;
         }
         string problem = null;
+        HashSet<BindEntry> named = new HashSet<BindEntry>();
         foreach (string line in text.Split('\n'))
         {
             if (line.Trim().Length == 0)
@@ -535,12 +539,72 @@ public static class GameBindings
                 break;
             }
             e.Current = binding;
+            named.Add(e);
+        }
+        if (problem == null && device == EBindDevice.Keyboard && Clash(device) != null)
+        {
+            GiveWayToSaved(named);
+        }
+        if (problem == null && device == EBindDevice.Gamepad)
+        {
+            FollowSavedPartner(named);
         }
         problem = problem ?? Clash(device);
         if (problem != null)
         {
             Debug.LogWarning($"[GameBindings] the saved {device} bindings do not check out ({problem}): the defaults are used.");
             ResetDevice(device);
+        }
+    }
+
+    /// <summary>
+    /// An action the saved bindings do not name - one added since they were written, as the Notebook on N - and whose key
+    /// the player gave to another: it starts with no key, rather than every binding the player made going back to its
+    /// default because the two clash. The player sees it unbound on the Controls tab and can give it a key.
+    /// </summary>
+    private static void GiveWayToSaved(HashSet<BindEntry> named)
+    {
+        foreach (BindEntry e in All)
+        {
+            if (e.Device != EBindDevice.Keyboard || named.Contains(e) || string.IsNullOrEmpty(e.Current))
+            {
+                continue;
+            }
+            foreach (BindEntry x in All)
+            {
+                if (x != e && x.Device == EBindDevice.Keyboard && named.Contains(x)
+                    && ((SameKey(e, x) && !MayShare(e, x)) || KeyClash(e, x) != null || KeyClash(x, e) != null))
+                {
+                    Debug.Log($"[GameBindings] {e.Label} starts with no key: {KeyLabel(e.Current)} is {x.Label} in the saved bindings.");
+                    e.Current = "";
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// A pad action the saved bindings do not name - one added since they were written, as the Notebook - whose partner
+    /// they do name goes where the partner is: the Notebook on the button the player gave the Map. The pad has no unbound
+    /// button to fall back on.
+    /// </summary>
+    private static void FollowSavedPartner(HashSet<BindEntry> named)
+    {
+        foreach (BindEntry e in All)
+        {
+            if (e.Device != EBindDevice.Gamepad || named.Contains(e))
+            {
+                continue;
+            }
+            foreach (BindEntry x in All)
+            {
+                if (x != e && x.Device == EBindDevice.Gamepad && named.Contains(x) && MayShare(e, x) && x.Current != e.Current)
+                {
+                    Debug.Log($"[GameBindings] {e.Label} goes with {x.Label} to {PadLabel(x.Current)}, as in the saved bindings.");
+                    e.Current = x.Current;
+                    break;
+                }
+            }
         }
     }
 
@@ -975,18 +1039,24 @@ public static class GameBindings
 
     private static string PadClash(BindEntry a, BindEntry b)
     {
-        return (a.Pages & b.Pages) != 0 && a.Current == b.Current
+        return (a.Pages & b.Pages) != 0 && a.Current == b.Current && !MayShare(a, b)
             ? $"{PadLabel(a.Current)} would be both {a.Label} and {b.Label}."
             : null;
     }
 
     /// <summary>
     /// Sprint and Look with the mouse share Left Shift by design: one walks, the other turns with a panel open. They are
-    /// the one pair that may share a key; any other two actions on one key are refused.
+    /// the one pair that may share a key; any other two actions on one key are refused. On the pad the Map and the
+    /// Notebook share a button the same way: a press opens the map, held it turns to the notebook.
     /// </summary>
     private static bool MayShare(BindEntry a, BindEntry b)
     {
-        return (a.Id == "Keys.World/Sprint" && b.Id == "Keys.World/MouseLook") || (a.Id == "Keys.World/MouseLook" && b.Id == "Keys.World/Sprint");
+        return Pair(a, b, "Keys.World/Sprint", "Keys.World/MouseLook") || Pair(a, b, "Pad.World/Map", "Pad.World/Notebook");
+    }
+
+    private static bool Pair(BindEntry a, BindEntry b, string first, string second)
+    {
+        return (a.Id == first && b.Id == second) || (a.Id == second && b.Id == first);
     }
 
     /// <summary>True when another keyboard action is on the same key as this one: Sprint and Look with the mouse, as they start.</summary>
