@@ -19,13 +19,13 @@ public class UnsettlingSpinner : MonoBehaviour
 
     [Header("Jump Rotation")]
     [Tooltip("The chance per second that a 'jump' rotation will occur (e.g., 0.5 = 50% chance per second).")]
-    public float jumpChancePerSecond = 0.5f;
+    public float jumpChancePerSecond = 0.3f;
 
     [Tooltip("The minimum angle (in degrees) for a random jump.")]
-    public float minJumpAngle = 30f;
+    public float minJumpAngle = 20f;
 
     [Tooltip("The maximum angle (in degrees) for a random jump.")]
-    public float maxJumpAngle = 90f;
+    public float maxJumpAngle = 30f;
 
     // A private offset for the Perlin noise to ensure 
     // different objects don't spin in sync.

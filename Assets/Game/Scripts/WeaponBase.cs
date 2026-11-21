@@ -41,8 +41,8 @@ public class WeaponBase : UUObject
         0.5f,
     };
 
-    public float attackTime = 0.1f;
-    public float hitPause = 0.3f;
+    public float attackTime = 0.1f; // 0 on the bows and the crossbow, 0.05 on the longsword
+    public float hitPause = 0.15f;
 
     public AudioClip swingSound;
     public AudioClip prepareSound;

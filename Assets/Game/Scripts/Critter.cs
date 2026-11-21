@@ -562,13 +562,13 @@ public class Critter : UUObject
     // Whether this creature is out of the pack alarm both ways (see deafToPackAlarm).
     private bool OutOfPackAlarm => honourDeafToPackAlarm && deafToPackAlarm;
 
-    public float walkSpeed = 1.0f;
+    public float walkSpeed = 1.0f; // 0.6 on the ghoul, 1.25 on the outcast
     public float confusedSpeed = 2.0f;
     public float runSpeed = 3.0f;
     public float fleeSpeed = 4.0f;
 
-    public float flyerBobMagnitude = 0.5f;
-    public float flyerBobSpeed = 1.0f;
+    public float flyerBobMagnitude = 0.5f; // 0.1 on the bats and the imp, 0.2 on the gazer, 0 on Tyball
+    public float flyerBobSpeed = 1.0f; // 3 on the bats and the imp, 4 on the gazer
 
     public int originalHp;
 
@@ -592,6 +592,7 @@ public class Critter : UUObject
     // from farther than alertRange starts it when it comes within it.
     private bool hasStartedAlertMusicForCurrentDetection;
 
+    // the lurker's prefab sets 90 for wander, approach, combat and flee, 60 and 360 for the two turn turns
     public float wanderTurnSpeed = 180.0f;
     public float approachTurnSpeed = 360.0f;
     public float combatTurnSpeed = 360.0f;
@@ -600,7 +601,7 @@ public class Critter : UUObject
     public float fleeTurnTurnSpeed = 540.0f;
     public float fleeTurnSpeed = 180.0f;
 
-    public float minCeilingDistance = 1.0f;
+    public float minCeilingDistance = 1.0f; // 1.5 on the gazer
 
     [Tooltip("Game objects to hide when dead (e.g., helmet, non-lootable items) to avoid confusion with loot")]
     public GameObject[] nonLoot;

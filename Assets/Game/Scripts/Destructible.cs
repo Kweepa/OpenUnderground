@@ -3,7 +3,7 @@ using UnityEngine;
 public class Destructible : MonoBehaviour
 {
     public bool breakImmediately;
-    public float chanceForChunkToSurvive = 0.5f;
+    public float chanceForChunkToSurvive = 0.5f; // 0.4 on the golems' deaths
 
     public void Start()
     {

@@ -33,7 +33,7 @@ public class Door : Lockable
     public GameObject door;
     public GameObject hinge;
     public float openAngle = 110.0f; // degrees
-    public float openDistance = 2.0f; // m
+    public float openDistance = 2.0f; // m; 2.35 on the portcullis
 
     private float openAmount;
     private bool opening;

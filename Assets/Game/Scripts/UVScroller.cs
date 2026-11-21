@@ -4,7 +4,7 @@ public class UVScroller : MonoBehaviour
 {
     public int materialIndex;
     public float scrollSpeedU;
-    public float scrollSpeedV = 0.1f;
+    public float scrollSpeedV = 1.0f;
     [Tooltip("The name of the texture property in the shader to modify (e.g., '_MainTex').")]
     public string textureName = "_MainTex";
 

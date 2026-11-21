@@ -8,7 +8,7 @@ public class PlayerEffectsController : MonoBehaviour
     public float drunkInterpolationTime = 2.0f;
 
     [Tooltip("How long it takes for the mushroom to 'kick in' after being eaten.")]
-    public float druggedDigestionTime = 3.0f;
+    public float druggedDigestionTime = 1.0f;
     
     [Tooltip("How much time (in seconds) is removed from the digestion phase if a second mushroom is eaten.")]
     public float druggedDigestionSpeedUp = 1.5f;
@@ -17,10 +17,10 @@ public class PlayerEffectsController : MonoBehaviour
     public float druggedFadeInTime = 1.0f;
     
     [Tooltip("The total duration of the mushroom trip before it starts to fade out.")]
-    public float druggedDuration = 30.0f;
+    public float druggedDuration = 20.0f;
 
     [Tooltip("How long it takes for the mushroom effect to fade out completely.")]
-    public float druggedFadeOutTime = 20.0f;
+    public float druggedFadeOutTime = 10.0f;
 
     // --- State Machine for Drugged Effect ---
     private enum DruggedState

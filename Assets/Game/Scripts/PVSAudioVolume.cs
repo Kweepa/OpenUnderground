@@ -13,11 +13,11 @@ public class PVSAudioVolume : MonoBehaviour
     
     [Tooltip("Volume when visible via PVS (0.0 to 1.0)")]
     [Range(0f, 1f)]
-    public float visibleVolume = 1.0f;
+    public float visibleVolume = 1.0f; // 0.5 on the fountain
     
     [Tooltip("Volume when not visible via PVS (0.0 to 1.0)")]
     [Range(0f, 1f)]
-    public float hiddenVolume = 0.2f;
+    public float hiddenVolume = 0.2f; // 0.1 on the fountain
     
     [Tooltip("Speed at which volume transitions (volume units per second)")]
     public float transitionSpeed = 1.0f;

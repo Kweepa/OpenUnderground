@@ -100,10 +100,10 @@ public class PlayerObject : MonoBehaviour
     public float cameraBobReturnSpeed = 0.4f;
 
     [Tooltip("Mouse look smoothing time (seconds). 0 = raw input. Gamepad is unaffected.")]
-    [SerializeField] private float mouseLookSmoothingTime = 0.04f;
+    [SerializeField] private float mouseLookSmoothingTime = 0.1f;
 
-    public float footstepMultiplier = 0.07f;
-    public float swimstepMultiplier = 0.1f;
+    public float footstepMultiplier = 0.028f;
+    public float swimstepMultiplier = 0.05f;
 
     private Vector3 flightVelocity;
     private float flightBobTime;
@@ -2256,7 +2256,7 @@ public class PlayerObject : MonoBehaviour
         cameraBobBlend = 0.0f;
     }
 
-    public float fade = 1.0f; // start faded out
+    public float fade = 0.0f; // clear until StartAfterLoad() fades the view in from black
     public bool fadeIn = true;
 
     /// <summary>

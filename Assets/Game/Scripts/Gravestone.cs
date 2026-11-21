@@ -37,8 +37,8 @@ public class Gravestone : UUObject
     /// <summary>Shown during grave camera skip prompt (gamepad).</summary>
     public Texture2D aButton;
     public Vector3 cameraOffset;
-    public float cameraTime = 60;
-    public float cameraCenterHeight = 0.5f;
+    public float cameraTime = 3;
+    public float cameraCenterHeight = 0.65f;
     public int graveId;
 
     public AudioClip buryClip;

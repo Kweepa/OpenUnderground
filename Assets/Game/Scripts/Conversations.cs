@@ -1733,8 +1733,8 @@ public class Conversations : MonoBehaviour
     public AudioClip moveSelection;
     public AudioClip makeSelection;
 
-    public float chatScrollWheelSpeed = 10f;
-    public float chatScrollStickSpeed = 600f;
+    public float chatScrollWheelSpeed = 40f;
+    public float chatScrollStickSpeed = 300f;
     public float chatScrollStickDeadZone = 0.1f;
 
     protected void Awake()

@@ -122,13 +122,13 @@ public class CutscenePlayer : MonoBehaviour
     [Tooltip("the NNN in csNNN")]
     public int sceneIndex;
     [Tooltip("how quickly to play back")]
-    public float frameDuration = 0.1667f;
+    public float frameDuration = 0.1667f; // 5 on the credits, grave and window cutscenes
     [Tooltip("font for subtitles")]
     public Font font;
     [Tooltip("how to fit the cutscene to the play window")]
     public CutsceneFitType fitType = CutsceneFitType.Spill;
     [Tooltip("Corner only: the rows of the frame below the view window. The death's frames sit two rows higher than the others")]
-    public int cornerBottom = 3;
+    public int cornerBottom = 3; // 5 on the death cutscene
     [Tooltip("whether to play to the end or stop a couple of frames before")]
     public bool playAllFrames;
     [Tooltip("if frameNum event issued, just show this frame. mainly for windows and gravestones")]

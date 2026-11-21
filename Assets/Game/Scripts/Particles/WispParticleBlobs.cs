@@ -26,19 +26,19 @@ public class WispParticleBlobs : MonoBehaviour
     BlobData[] blobData;
 
     [Header("Configuration")]
-    [Range(1, 20)] public int orbCount = 6;
+    [Range(1, 20)] public int orbCount = 7;
     
     [Header("Orbit Movement")]
-    public float minOrbitRadius = 0.4f;
-    public float maxOrbitRadius = 0.8f;
-    public float orbitSpeed = 2.0f;
-    public float axisDriftSpeed = 20.0f;
+    public float minOrbitRadius = 0.1f;
+    public float maxOrbitRadius = 0.3f;
+    public float orbitSpeed = 0.2f;
+    public float axisDriftSpeed = 1.0f;
 
     [Header("Size Throb")]
-    public float minSize = 0.1f;
-    public float maxSize = 0.3f;
-    public float minPulseSpeed = 2.0f;
-    public float maxPulseSpeed = 3.0f;
+    public float minSize = 0.8f;
+    public float maxSize = 1.2f;
+    public float minPulseSpeed = 1.0f;
+    public float maxPulseSpeed = 2.0f;
 
     [Header("Visuals")]
     public bool useSystemColor = true;

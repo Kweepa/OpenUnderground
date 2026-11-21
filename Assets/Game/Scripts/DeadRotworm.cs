@@ -3,7 +3,7 @@ using UnityEngine;
 public class DeadRotworm : Food
 {
     [SerializeField]
-    private int foodValue = 24;
+    private int foodValue = 20;
 
     public override EEquipAction Equip()
     {

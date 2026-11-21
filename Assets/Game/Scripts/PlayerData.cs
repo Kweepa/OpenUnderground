@@ -64,7 +64,8 @@ public class PlayerData : MonoBehaviour
     public int charLevel = 1;
     // One, not three: character creation writes a single point (UW.EXE 0x6c84e,
     // movb $0x1, 0x52(%bx), right beside the level being set to 1 and the experience
-    // tier high-water to 0).
+    // tier high-water to 0). World.unity holds 3, which only a Play in the Editor without
+    // making a character sees: CreateCharacter sets 1.
     public int skillPoints = 1;
     public int skillPointsXpTier; // high-water of displayXp/300 tiers already awarded
     public bool easy;
@@ -76,7 +77,7 @@ public class PlayerData : MonoBehaviour
     public int dexterity;
 
     public int poison;
-    public int hunger = 10;
+    public int hunger = 64;
     public int fatigue;
     public int drunkenness;
 

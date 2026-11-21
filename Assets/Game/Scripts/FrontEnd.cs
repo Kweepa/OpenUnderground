@@ -1024,8 +1024,8 @@ public class FrontEnd : MonoBehaviour
     private Color selectColor = new Color32(255, 213, 64, 255);
     private Color unselectColor = new Color32(187, 123, 1, 255);
 
-    public float subY = 37;
-    public int subSize = 160;
+    public float subY = 50;
+    public int subSize = 76;
 
     public Rect shinyLogoRect;
 

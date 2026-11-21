@@ -11,7 +11,7 @@ public class RangedWeapon : WeaponBase
     public float spawnForward;
     public float spawnOffset;
     [Tooltip("How far toward the weapon hand the missile leaves from, in metres.")]
-    public float spawnSide = 0.1f;
+    public float spawnSide = 0.1f; // 0.2 on the bows, 0.6 on the sling
 
     /// <summary>The farthest point along the view a missile is aimed at, in metres.</summary>
     private const float AimDistance = 40.0f;
