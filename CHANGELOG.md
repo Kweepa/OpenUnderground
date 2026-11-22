@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Character creation puts first the sex and the hand of the character you played last, right-handed if none, and your own choices when you go back or start over: it always proposed the left hand, and Female after you refused a character. Before a game starts, the pad's control map shows that hand's triggers, not always a left-handed one's.
+
 - The map has a notebook on its first page, before Level 1, opened with N or by holding the pad's map button: write the things you have to do, tick one off and it moves down to the Done list, untick it to bring it back. The list scrolls when it grows, and a save keeps it.
 
 - With the GUS soundfont the music plays the instruments it was written for: the timpani is a timpani instead of a carillon, the horns are horns, the orchestra hit is no longer the sound of the sea, the combat music's jungle tune no longer a pistol shot, and the bongos, maracas, claves and tambourine are drums again instead of an out-of-tune blur.

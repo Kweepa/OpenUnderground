@@ -763,9 +763,8 @@ public class SaveGameManager : MonoBehaviour
             // Restore player data
             LoadPlayerData(saveData.playerData);
             
-            // Save character sex to PlayerPrefs for frontend background display
-            PlayerPrefs.SetString("LastCharacterSex", PlayerData.sData.female ? "female" : "male");
-            PlayerPrefs.Save();
+            // the sex and the hand the next creation proposes first
+            CreateCharacter.RememberLastPlayed();
             
             // Restore world objects first so linked spells exist in objects[] before inventory
             // PostLoadInitialize (e.g. wands/sceptres recovering charges from a spell link).
