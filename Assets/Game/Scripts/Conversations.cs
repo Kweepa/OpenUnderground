@@ -50,6 +50,7 @@ public partial class Conversation
         // read the code
         code = stream.GetShortArray(numInstructions);
         ApplyConversation139JmpFix();
+        ApplyConversation3GiftFix();
 
 #if UNITY_EDITOR && false
         disassemble.AppendLine($"StringBlock {stringBlock}");
@@ -97,6 +98,25 @@ public partial class Conversation
         if (code[1424] == jmp && code[1425] == 1418)
         {
             code[1425] = 1426;
+        }
+    }
+
+    /// <summary>
+    /// conv 3 (Goldthirst): a bug of the original's script. "I bring thee this gift." after the
+    /// flattery (the menu at pc 968, option 3) calls the "goodly gift" reply at 1580 without reading
+    /// the trade area, so nothing given is thanked as a gift. Every other gift line calls 1356, which
+    /// weighs what is on the trade area; the call is pointed there.
+    /// </summary>
+    private void ApplyConversation3GiftFix()
+    {
+        if (conversationIndex != 3 || code == null || code.Length <= 1580)
+        {
+            return;
+        }
+
+        if (code[1053] == (short)EOp.Call && code[1054] == 1580)
+        {
+            code[1054] = 1356;
         }
     }
 
@@ -758,8 +778,14 @@ public partial class Conversation
                 break;
             case EOp.AddSP:
                 s0 = Pop();
-                // make sure we absolutely reserve enough space :)
-                for (int i = 0; i <= s0; ++i) Push(0);
+                // UW.EXE 0x68a2e (babl_run, BABL.C): the original only moves sp, so the
+                // count stays in the first reserved word. Goldthirst's hero visit
+                // (conversation 3, pc 2784) tests that word without ever writing it, and
+                // the count sends the gift to the nugget test, as in the original.
+                // One word more than the original reserves, for the arrays this VM keeps
+                // one word higher; the rest is zeroed.
+                Push(s0);
+                for (int i = 0; i < s0; ++i) Push(0);
                 break;
             case EOp.FetchM:
                 s0 = Pop();
