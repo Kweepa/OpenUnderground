@@ -45,6 +45,11 @@ public class CritterSaveData : UUObjectSaveData
     public bool playerAlly;
     public List<Vector3> path;
 
+    // The lists set_likes_dislikes gave this NPC in a conversation, as types and classes (1000 + type / 16): absent
+    // in an older save, so null.
+    public List<int> barterLikes;
+    public List<int> barterDislikes;
+
     // What the creature knows of the player (Critter.PerceivePlayer()): absent in an older save, so false.
     public bool awareOfPlayer;
     public bool alertedByPlayer;
@@ -7573,6 +7578,12 @@ public class Critter : UUObject
         {
             int s = Inventory.npcTradeIndices[i];
             int r = Random.Range(0, goodStuff.Count);
+            // What a slot holds goes back to the NPC first, as in UW.EXE 0x6a590 (setup_to_barter, BARTER.C): a second
+            // barter in one conversation used to lose it (fix 368).
+            if (Inventory.sInv.tradeSlots[s] != null)
+            {
+                loot.Add(Inventory.sInv.tradeSlots[s]);
+            }
             Inventory.sInv.tradeSlots[s] = goodStuff[r];
             loot.Remove(goodStuff[r]);
             goodStuff.RemoveAt(r);
@@ -7587,8 +7598,13 @@ public class Critter : UUObject
         return 0;
     }
 
+    // The trading temper, drawn when a conversation starts (StartConversation): the gain in % this trader wants from a
+    // trade, the bad offers it still takes (below 0 it is weary), the gain of the previous offer (0 for none), and how
+    // far off its valuations may be, in %.
+    private int tradeGreed;
     private int tradePatience;
-    private int tradeLastOfferValue;
+    private int tradeLastOffer;
+    public int TradeAssess { get; private set; }
 
     // these are in the order of the arguments to do_offer
     public enum ETradeResult
@@ -7596,63 +7612,75 @@ public class Critter : UUObject
         Undef,
         What, // nothing to trade
         Tired, // patience ran out
-        Bad, // bad deal
+        Bad, // worse than the previous offer
         No, // don't like deal
         Yes // deal done
     }
 
+    /// <summary>
+    /// An offer, as UW.EXE 0x6b69f (do_offer, BARTER.C) judges it: no dice. The trader values the player's selected items
+    /// with its likes and its own without, both blurred by its appraisal, and accepts a gain of at least its greed. A first
+    /// offer under half of greed costs 1 patience, a later one worse than the previous costs 2, any other later one 1.
+    /// </summary>
     public ETradeResult TryTrade()
     {
-        ETradeResult result = ETradeResult.Undef;
+        if (tradePatience < 0)
+        {
+            return ETradeResult.Tired;
+        }
 
         if (!Inventory.sInv.DealPossible())
         {
             return ETradeResult.What;
         }
 
-        int relativeValue = Inventory.sInv.GetRelativeValueOfTrade(true);
+        int playerValue = Inventory.sInv.GetValueOfPlayerTrade(true, TradeAssess);
+        int npcValue = Inventory.sInv.GetValueOfNpcTrade(false, TradeAssess);
+        int gain = npcValue > 0 ? (playerValue - npcValue) * 100 / npcValue : 100;
 
-        // just add in Charm. it's pretty useless otherwise so might as well give a big bonus here.
-        relativeValue -= Skills.GetSkill(ESkill.Charm);
-
-        // same as do_judgement
-        int appraiseSkill = stats.TradeAppraisal;
-        int appraiseVariance = (30 - appraiseSkill) / 3;
-        relativeValue += Random.Range(-appraiseVariance, appraiseVariance + 1);
-        int deal = relativeValue / 5;
-        if (deal < 0) // good+
+        ETradeResult result;
+        if (gain >= tradeGreed)
         {
             result = ETradeResult.Yes;
         }
-
-        // use stats.TradeThreshold here somehow
-        bool tookDeal = false;
-        if (deal == 0 || deal == 1) // even or poor
+        else if (tradeLastOffer == 0)
         {
-            // maybe take the deal
-            tookDeal = Random.value < 0.5f;
-            result = tookDeal ? ETradeResult.Yes : ETradeResult.No;
+            // The original says nothing to a first offer of half the greed or more, which costs nothing: the line of a
+            // refusal is said instead, still at no cost.
+            if (gain * 2 < tradeGreed)
+            {
+                --tradePatience;
+            }
+            result = ETradeResult.No;
         }
-        else if (deal > 1)
+        else if (gain < tradeLastOffer)
         {
+            tradePatience -= 2;
             result = ETradeResult.Bad;
         }
-
-        if (!tookDeal)
+        else
         {
-            if (++tradePatience >= stats.TradePatience)
+            // true for every offer not worse than the last, but for a gap of one point; then too the refusal is said
+            if ((tradeGreed - tradeLastOffer) * 3 / 2 > tradeGreed - gain)
             {
-                result = ETradeResult.Tired;
+                --tradePatience;
             }
+            result = ETradeResult.No;
         }
 
-        if (result == ETradeResult.Yes)
+        if (result != ETradeResult.Yes)
         {
-            // swap the items
+            tradeLastOffer = gain;
+        }
+        else
+        {
+            // swap the items; one the trader dislikes (or that is worthless) stays with the player, as in
+            // UW.EXE 0x6b497 (probablyTradeObjects, BARTER.C)
             List<int> itemsToTake = new List<int>();
             foreach (int i in Inventory.playerTradeIndices)
             {
-                if (Inventory.sInv.tradeSlotSelected[i])
+                if (Inventory.sInv.tradeSlotSelected[i] && Inventory.sInv.tradeSlots[i] != null
+                    && Inventory.NpcLikes(Inventory.sInv.tradeSlots[i]) != -1)
                 {
                     itemsToTake.Add(i);
                 }
@@ -7753,9 +7781,44 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// The trading temper, drawn when a conversation starts as UW.EXE 0x6a735 (barter_init, BARTER.C) draws it, from the
+    /// creature type's trade nibbles. The draws are seeded by the NPC's object index, so the same NPC has the same temper
+    /// in every conversation; Charm lowers greed by 2 a point and adds half a point of patience. Patience and the memory
+    /// of the last offer start again with every conversation.
+    /// </summary>
     public void StartConversation()
     {
-        tradePatience = 0;
+        uint seed = Inventory.BarterSeed(this);
+        int charm = Skills.GetSkill(ESkill.Charm);
+        tradeGreed = Inventory.BarterRange(ref seed, stats.TradeThreshold * 6, -25, 25) - 2 * charm;
+        tradePatience = Inventory.BarterRange(ref seed, stats.TradePatience, -20, 100) + charm / 2;
+        TradeAssess = Inventory.BarterRange(ref seed, (15 - stats.TradeAppraisal) * 6, -25, 50);
+        tradeLastOffer = 0;
+        // barter_init also clears the lists of set_likes_dislikes here, and Shak's script sets them only at the first
+        // meeting, so in the original he likes coins in that conversation and never again. The lists are kept instead,
+        // with the NPC and in the save: the script means them to last.
+    }
+
+    /// <summary>
+    /// Whether the NPC gives in to a demand for its selected items, as UW.EXE 0x6b84a (do_demand, BARTER.C) decides: no
+    /// dice. The player scores level + 1 + health + Charm / 6, the NPC its type's level + mood + health + the value
+    /// demanded / 10 (valued without likes), health being 2 - 2 * damage / average hit points; the player must score
+    /// more, or the NPC be an ally. <paramref name="attitude"/> is the conversation's npc_attitude.
+    /// </summary>
+    public bool GivesInToDemand(int attitude)
+    {
+        int vitality = PlayerData.sData.vitality;
+        int playerHealth = vitality > 0 ? 2 - (vitality - PlayerData.sData.hp) * 2 / vitality : 1;
+        // The original adds 1 while the player's weapon is drawn (bit 1 of P1[0x5f]); the remake has no such stance,
+        // and counts it always.
+        int playerScore = PlayerData.sData.charLevel + 1 + playerHealth + Skills.GetSkill(ESkill.Charm) / 6;
+
+        // the type's average hit points: an NPC with more than its type's average scores above 2
+        int npcHealth = stats.AvgHit > 0 ? 2 - (stats.AvgHit - hp) * 2 / stats.AvgHit : 1;
+        int mood = playerAlly ? -1 : attitude < 2 ? 1 : 0;
+        int npcScore = stats.TradeLevel + mood + npcHealth + Inventory.sInv.GetValueOfNpcTrade(false, TradeAssess) / 10;
+        return playerScore > npcScore || playerAlly;
     }
 
     public void EndConversation()
@@ -7947,6 +8010,8 @@ public class Critter : UUObject
             critterData.state = (int)state;
             critterData.stateTime = stateTime;
             critterData.playerAlly = playerAlly;
+            critterData.barterLikes = likes.ConvertAll(e => (int)e);
+            critterData.barterDislikes = dislikes.ConvertAll(e => (int)e);
             critterData.path = path != null ? new List<Vector3>(path) : null;
             critterData.awareOfPlayer = awareOfPlayer;
             critterData.alertedByPlayer = alertedByPlayer;
@@ -8052,6 +8117,14 @@ public class Critter : UUObject
             stateStartTime = Time.time;
             stateTime = critterData.stateTime;
             playerAlly = critterData.playerAlly;
+            if (critterData.barterLikes != null)
+            {
+                likes = critterData.barterLikes.ConvertAll(e => (EObjectType)e);
+            }
+            if (critterData.barterDislikes != null)
+            {
+                dislikes = critterData.barterDislikes.ConvertAll(e => (EObjectType)e);
+            }
             path = critterData.path != null ? new List<Vector3>(critterData.path) : null;
             awareOfPlayer = critterData.awareOfPlayer;
             alertedByPlayer = critterData.alertedByPlayer;

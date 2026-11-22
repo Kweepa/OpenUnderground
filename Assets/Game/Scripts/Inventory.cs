@@ -5516,7 +5516,119 @@ public class Inventory : MonoBehaviour
         }
     }
 
-    private int GetValueOfTradeItems(bool useLikesAndDislikes, int[] indices)
+    /// <summary>
+    /// The seed of an object's barter draws: the original seeds them with its object index, so one object always draws
+    /// the same number. A remake object made at run time has index 0, and takes its instance id instead.
+    /// </summary>
+    public static uint BarterSeed(LevelObject obj)
+    {
+        return (uint)(obj.objectIndex != 0 ? obj.objectIndex : obj.GetInstanceID());
+    }
+
+    /// <summary>
+    /// UW.EXE 0x6bd49 (range, BARTER.C): base plus a random min..max % of it (max excluded), the draw being the next of
+    /// Turbo C's rand() from <paramref name="seed"/>, which the original seeds before each barter draw.
+    /// </summary>
+    public static int BarterRange(ref uint seed, int baseValue, int min, int max)
+    {
+        seed = seed * 0x015A4E35u + 1;
+        int draw = (int)((seed >> 16) & 0x7fff);
+        int percent = min + (int)((long)draw * (max - min) / 0x8000);
+        return baseValue + baseValue * percent / 100;
+    }
+
+    /// <summary>
+    /// UW.EXE 0x6c53d (does_npc_like, BARTER.C): 1 when the NPC in the conversation likes an object, -1 when it dislikes
+    /// it or the object is worthless, else 0. Entries of 1000 and up name a class, 1000 + type / 16. A liked type
+    /// answers at once; a class only marks, and the dislikes, read after, override a liked class.
+    /// </summary>
+    public static int NpcLikes(UUObject obj)
+    {
+        if (DataLoader.sDataLoader.comObjProps[(int)obj.type].monetaryValue == 0)
+        {
+            return -1;
+        }
+
+        Critter npc = Conversations.runningConversation.npc;
+        int id = (int)obj.type;
+        int cls = 1000 + id / 16;
+        int liked = 0;
+        foreach (EObjectType entry in npc.likes)
+        {
+            int e = (int)entry;
+            if (e < 1000)
+            {
+                if (e == id)
+                {
+                    return 1;
+                }
+            }
+            else if (e == cls)
+            {
+                liked = 1;
+            }
+        }
+
+        foreach (EObjectType entry in npc.dislikes)
+        {
+            int e = (int)entry;
+            if (e < 1000)
+            {
+                if (e == id)
+                {
+                    return -1;
+                }
+            }
+            else if (e == cls)
+            {
+                liked = -1;
+            }
+        }
+
+        return liked;
+    }
+
+    /// <summary>
+    /// An object's value in a trade, as UW.EXE 0x6bc41 (assess_value, BARTER.C) works it out: the class value times the
+    /// quantity times quality / 64 (at least 1 when the quality is not 0), then blurred by up to
+    /// <paramref name="accuracy"/> % either way, the same each time for the same object. With
+    /// <paramref name="useLikes"/>, a liked object counts 1.5 times and a disliked one nothing.
+    /// </summary>
+    public static int AssessValue(UUObject obj, bool useLikes, int accuracy)
+    {
+        int value = DataLoader.sDataLoader.comObjProps[(int)obj.type].monetaryValue;
+        if (useLikes)
+        {
+            int disposition = NpcLikes(obj);
+            if (disposition == -1)
+            {
+                return 0;
+            }
+            if (disposition == 1)
+            {
+                value = value * 3 / 2;
+            }
+        }
+
+        value *= obj.quantity;
+        int quality = obj.quality & 63; // six bits in the original; a key of Tyball's carries 255 as a marker
+        if (value > 0)
+        {
+            if (quality > 0)
+            {
+                value = Mathf.Max(1, value * quality >> 6);
+            }
+            else
+            {
+                value = 0;
+            }
+        }
+
+        uint seed = BarterSeed(obj);
+        return BarterRange(ref seed, value, -accuracy, accuracy);
+    }
+
+    private int GetValueOfTradeItems(bool useLikes, int accuracy, int[] indices)
     {
         int totalValue = 0;
         foreach (int i in indices)
@@ -5524,37 +5636,21 @@ public class Inventory : MonoBehaviour
             UUObject obj = tradeSlots[i];
             if (tradeSlotSelected[i] && obj != null)
             {
-                int val = DataLoader.sDataLoader.comObjProps[(int)obj.type].monetaryValue * obj.quantity;
-                if (useLikesAndDislikes)
-                {
-                    if (Conversations.runningConversation.npc.likes.Contains(obj.type)
-                        || Conversations.runningConversation.npc.likes.Contains((EObjectType)(1000 + (int)obj.getClass)))
-                    {
-                        val *= 3;
-                        val /= 2;
-                    }
-                    else if (Conversations.runningConversation.npc.dislikes.Contains(obj.type)
-                             || Conversations.runningConversation.npc.dislikes.Contains((EObjectType)(1000 + (int)obj.getClass)))
-                    {
-                        val /= 2;
-                    }
-                }
-
-                totalValue += val;
+                totalValue += AssessValue(obj, useLikes, accuracy);
             }
         }
 
         return totalValue;
     }
 
-    public int GetValueOfNpcTrade(bool useLikesAndDislikes)
+    public int GetValueOfNpcTrade(bool useLikes, int accuracy)
     {
-        return GetValueOfTradeItems(useLikesAndDislikes, npcTradeIndices);
+        return GetValueOfTradeItems(useLikes, accuracy, npcTradeIndices);
     }
 
-    public int GetValueOfPlayerTrade(bool useLikesAndDislikes)
+    public int GetValueOfPlayerTrade(bool useLikes, int accuracy)
     {
-        return GetValueOfTradeItems(useLikesAndDislikes, playerTradeIndices);
+        return GetValueOfTradeItems(useLikes, accuracy, playerTradeIndices);
     }
 
     public int Conversation_identify_inv(int block, int slot, int addArticle, int loreResult)
@@ -5587,7 +5683,9 @@ public class Inventory : MonoBehaviour
                     StringLoader.SetString(block, 0, obj.singularName);
                 }
 
-                return DataLoader.sDataLoader.comObjProps[(int)obj.type].monetaryValue * obj.quantity;
+                // the item's value to the NPC: UW.EXE 0x6fb46 (conv_inv_name, CONVERSE.C) asks assess_value with likes,
+                // blurred by the NPC's appraisal
+                return AssessValue(obj, true, Conversations.runningConversation.npc.TradeAssess);
             }
         }
 
@@ -5605,11 +5703,6 @@ public class Inventory : MonoBehaviour
         return 0;
     }
 
-    public int GetRelativeValueOfTrade(bool useLikesAndDislikes)
-    {
-        return GetValueOfNpcTrade(useLikesAndDislikes) - GetValueOfPlayerTrade(useLikesAndDislikes);
-    }
-
     public bool DealPossible()
     {
         int mask = 0;
@@ -5624,18 +5717,33 @@ public class Inventory : MonoBehaviour
         return (mask & 0x33) > 0 && (mask & 0xcc) > 0;
     }
 
+    /// <summary>
+    /// The player's own appraisal of the offer, as UW.EXE 0x6ba6e (do_judgement, BARTER.C) makes it: both sides valued
+    /// without likes and blurred by 50 - Appraise * 1.5 % per item, the same each time for the same items, and the gain
+    /// in % read on eight bands, from a terrible deal (the player gives over 50 % more) to an excellent one (50 % less).
+    /// </summary>
     public string Conversation_do_judgement()
     {
-        int relativeValue = GetRelativeValueOfTrade(false);
         int appraiseSkill = Skills.GetSkill(ESkill.Appraise);
-        int appraiseVariance = (30 - appraiseSkill) / 3;
-        relativeValue += Random.Range(-appraiseVariance, appraiseVariance + 1);
+        int accuracy = 50 - appraiseSkill * 45 / 30;
+        int playerValue = GetValueOfPlayerTrade(false, accuracy);
+        int npcValue = GetValueOfNpcTrade(false, accuracy);
+        int evaluation = npcValue > 0 ? (playerValue - npcValue) * 100 / npcValue : 100;
+        int verdict = evaluation > 50 ? 0
+            : evaluation > 35 ? 1
+            : evaluation > 25 ? 2
+            : evaluation > 10 ? 3
+            : evaluation > -10 ? 4
+            : evaluation > -25 ? 5
+            : evaluation > -35 ? 6
+            : evaluation > -50 ? 7
+            : 8;
         // I guess...I know
         string message = "<color=#000000><i>" + StringLoader.GetString(7, Mathf.Clamp(3 + appraiseSkill / 6, 3, 7));
         // that I am getting
         message += StringLoader.GetString(7, 2);
-        // a <blah> deal
-        message += StringLoader.GetString(7, Mathf.Clamp(12 + relativeValue / 5, 8, 16)) + "</i></color>";
+        // a terrible deal...an excellent deal
+        message += StringLoader.GetString(7, 8 + verdict) + "</i></color>";
 
         return message;
     }
