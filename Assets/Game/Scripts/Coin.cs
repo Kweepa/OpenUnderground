@@ -155,11 +155,16 @@ public class Coin : UUObject
         }
     }
 
-    public override void PostLoadInitialize(bool restoredFromSave = false)
+    // A coin keeps its own quality, 40 for nearly every coin of the original's levels, since piles join within a
+    // band of qualities as the original's do (Inventory.SameStackMergeIdentity()): a trade values a coin by it
+    // (Inventory.AssessValue()). Saves made before that gave every coin 63, and they come back at 40.
+    protected override void RestoreFromSaveData(LevelObjectSaveData data)
     {
-        base.PostLoadInitialize(restoredFromSave);
-        // Coins have no meaningful quality variance; normalize so stacks always match.
-        quality = 63;
+        base.RestoreFromSaveData(data);
+        if (SaveGameManager.LoadingCoinsAtSixtyThree && quality == 63)
+        {
+            quality = 40;
+        }
     }
 
     public override void Update()

@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Piles join as in the original: two loaves or two piles of coins of close condition make one pile with weighted average value, and arrows, bolts and sling stones join whatever their condition; a pile holds up to 350, also on the trade table, where it stopped at 99. Coins keep their own condition, so their value is the same as in the original, and piles you kept apart in the pack stay apart after a load.
+
 - The coins around Goldthirst and in his treasure room are gold coins, not silver ones: the dwarf king loves gold and would not surround himself with silver. An addition of ours; they are worth the same.
 
 - Traders haggle as in the original: each wants its own margin over what it thinks the goods are worth, Shak about half again, less with Charm, and every item counts by its condition. The same offer always gets the same answer, so insisting no longer pays, and a trader weary of bad offers is fresh again the next time you talk to it.

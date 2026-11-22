@@ -9,6 +9,9 @@ using System.Collections.Generic;
 public class SaveGameManager : MonoBehaviour
 {
     public static SaveGameManager sInstance;
+
+    /// <summary>While a save made before coins kept their own quality is being restored: its coins are all 63.</summary>
+    public static bool LoadingCoinsAtSixtyThree { get; private set; }
     
     private string savesDirectoryPath;
 
@@ -656,6 +659,7 @@ public class SaveGameManager : MonoBehaviour
         SaveWorldObjects(saveData);
         SaveMapData(saveData);
         saveData.messageHistory = Messages.GetHistory(out saveData.messageHistoryKinds);
+        saveData.coinsKeepQuality = true;
         return saveData;
     }
 
@@ -768,10 +772,18 @@ public class SaveGameManager : MonoBehaviour
             
             // Restore world objects first so linked spells exist in objects[] before inventory
             // PostLoadInitialize (e.g. wands/sceptres recovering charges from a spell link).
-            LoadWorldObjects(saveData);
-            
-            // Restore inventory
-            LoadInventoryData(saveData.inventoryData);
+            LoadingCoinsAtSixtyThree = !saveData.coinsKeepQuality;
+            try
+            {
+                LoadWorldObjects(saveData);
+                
+                // Restore inventory
+                LoadInventoryData(saveData.inventoryData);
+            }
+            finally
+            {
+                LoadingCoinsAtSixtyThree = false;
+            }
             
             if (LevelLoader.sLevelLoader != null)
                 LevelLoader.sLevelLoader.TryRepairLevelObjects();
@@ -1662,8 +1674,8 @@ public class SaveGameManager : MonoBehaviour
             {
                 // Initialize the item and its contents (sets up renderer, loads names, etc.)
                 item.PostLoadInitialize(restoredFromSave: true);
-                // Add to inventory using the public Add method
-                Inventory.Add(item);
+                // into the pack as it was saved, its piles not joined
+                Inventory.RestoreToPack(item);
             }
         }
         
