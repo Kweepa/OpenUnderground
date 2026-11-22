@@ -176,6 +176,7 @@ public static class GameOptions
             EOptionKind.Slider, PlayerInput.DefaultEffectsVolume, 0f, 1f, 0.05f, storedAsFloat: true, format: Percent),
         new(EOptionSection.Audio, SoundFontKey, "Soundfont",
             "Chooses the soundfont the music is played with. Different soundfonts emulate classic sound cards such as the MT-32.\n"
+            + "<b>OPL2:</b> the music as the original played it on an AdLib or Sound Blaster, its own arrangements on an emulated FM chip.\n"
             + "<b>" + ExternalMidiName + ":</b> the music goes to a MIDI device instead, such as the Munt MT-32 emulator with its ROMs, which plays it as the original did on a Roland MT-32. Without one, there is no music.",
             EOptionKind.Choice, 0f, link: "https://sourceforge.net/projects/munt/", linkText: "Munt, the MT-32 emulator: sourceforge.net/projects/munt"),
         new(EOptionSection.Audio, MusicPageKey, "Music tracks...",
@@ -288,7 +289,7 @@ public static class GameOptions
 
     // The order of the list, the user's of 15 November 2026: the MT-32 soundfont, the MIDI device that
     // plays the MT-32 itself, then the other two cards; any other soundfont after them, by name.
-    private static readonly string[] MusicOutputOrder = { "MT32.sf2", ExternalMidiName, "OPL2.sf2", "GUS.sf2" };
+    private static readonly string[] MusicOutputOrder = { "MT32.sf2", ExternalMidiName, MusicPlayer.OplSoundFontName, "GUS.sf2" };
 
     /// <summary>
     /// The soundfonts found, named the way the options store them ("Soundfonts/x.sf2"), in the list's
@@ -303,6 +304,11 @@ public static class GameOptions
             names.Add(Path.GetFileName(f));
         }
         names.Add(ExternalMidiName);
+        // the OPL2 plays on its emulated chip, with or without a soundfont of that name
+        if (!names.Exists(n => string.Equals(n, MusicPlayer.OplSoundFontName, StringComparison.OrdinalIgnoreCase)))
+        {
+            names.Add(MusicPlayer.OplSoundFontName);
+        }
         names.Sort((a, b) =>
         {
             int ia = Array.FindIndex(MusicOutputOrder, n => string.Equals(n, a, StringComparison.OrdinalIgnoreCase));

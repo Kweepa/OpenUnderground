@@ -164,7 +164,10 @@ public class Credits : MonoBehaviour
             "freesound.org",
             "",
             "synth",
-            "meltysynth"
+            "meltysynth",
+            "",
+            "opl2 emulation",
+            "ymfm by aaron giles"
         },
         new []
         {

@@ -12,6 +12,12 @@ public partial class MusicPlayer : MonoBehaviour
 {
     private string soundFontFileName = "Soundfonts/MT32.sf2";
 
+    /// <summary>
+    /// The soundfont name the OPL2 choice keeps in the options. It plays on the emulated OPL2
+    /// (AilOplSynth), not through a soundfont: the name stays so that the choice is kept as it was.
+    /// </summary>
+    public const string OplSoundFontName = "OPL2.sf2";
+
     /// <summary>The soundfont the synthesizer was built with, so that a change of volume alone does not rebuild it.</summary>
     public string SoundFontFileName => soundFontFileName;
 
@@ -44,13 +50,13 @@ public partial class MusicPlayer : MonoBehaviour
     public static MusicPlayer Instance { get; private set; }
     
     // --- Audio System ---
-    private MeltySynth.Synthesizer synthesizer;
+    private IMusicSynth synthesizer;
     private XMISequencer sequencer;
     private ConcurrentQueue<MusicCommand> commandQueue;
 
     // A synthesizer built with another soundfont, waiting for the audio thread to take it up between
     // two buffers, so that the track carries on through the change instead of starting over.
-    private MeltySynth.Synthesizer pendingSynthesizer;
+    private IMusicSynth pendingSynthesizer;
 
     // What has been sent to the synthesizer on each channel, kept so that a new one can be put in
     // the same state: the controllers in the order they were last set (data entry only means
@@ -85,8 +91,11 @@ public partial class MusicPlayer : MonoBehaviour
     // main thread, read on the audio thread.
     private volatile bool mt32SoundFont;
     // True while the soundfont is a General MIDI one, played through GMPreset() and GMVolume(): any
-    // but MT32.sf2 and OPL2.sf2, which plays the programs as the tracks number them, for now.
+    // but MT32.sf2 and OPL2.sf2.
     private volatile bool gmSoundFont;
+    // True while the music plays on the emulated OPL2, the original's own FM music: its tracks'
+    // AdLib arrangements, with the programs, volumes and velocities as the tracks give them.
+    private volatile bool oplMusic;
     // Whether the soundfont's programs and levels are set per program, as for the two above.
     private bool TunedSoundFont => mt32SoundFont || gmSoundFont;
     private float lastBuiltVelocityCurveAmount = float.NaN;
@@ -99,6 +108,10 @@ public partial class MusicPlayer : MonoBehaviour
     // --- Track Management ---
     public string currentTrack = "";
     private string soundFolderPath;
+    // The file the XMI playing was read from: currentTrack's AdLib arrangement with the OPL2 music.
+    private string playingFile;
+    // How much louder the track playing is made than the synthesizer plays it: OplTrackGain().
+    private volatile float trackGain = 1f;
 
     // --- Recorded music: mp3, ogg and wav, the player's own tracks ---
     // Played by Unity's decoder on an AudioSource of their own. Not this object's: its
@@ -273,8 +286,28 @@ public partial class MusicPlayer : MonoBehaviour
             return;
         }
 
+        string soundFontName = Path.GetFileName(soundFontFileName);
+        if (soundFontName.Equals(OplSoundFontName, StringComparison.OrdinalIgnoreCase))
+        {
+            AilOplSynth opl = CreateOplSynth();
+            if (opl != null)
+            {
+                mt32SoundFont = false;
+                gmSoundFont = false;
+                oplMusic = true;
+                UseSynthesizer(opl);
+                return;
+            }
+        }
+
         // 1. Build the full, platform-specific path to the file
         string fullPath = Path.Combine(Application.streamingAssetsPath, soundFontFileName);
+        if (!File.Exists(fullPath) && soundFontName.Equals(OplSoundFontName, StringComparison.OrdinalIgnoreCase))
+        {
+            // the OPL2 could not start (it has no soundfont since mod 1600): the MT-32's
+            fullPath = Path.Combine(Application.streamingAssetsPath, "Soundfonts/MT32.sf2");
+            soundFontName = "MT32.sf2";
+        }
 
         // 2. Check if the file exists
         if (!File.Exists(fullPath))
@@ -284,19 +317,14 @@ public partial class MusicPlayer : MonoBehaviour
             return;
         }
 
-        string soundFontName = Path.GetFileName(soundFontFileName);
         mt32SoundFont = soundFontName.Equals("MT32.sf2", StringComparison.OrdinalIgnoreCase);
-        gmSoundFont = !mt32SoundFont && !soundFontName.Equals("OPL2.sf2", StringComparison.OrdinalIgnoreCase);
+        gmSoundFont = !mt32SoundFont && !soundFontName.Equals(OplSoundFontName, StringComparison.OrdinalIgnoreCase);
+        oplMusic = false;
 
         // 3. Load MeltySynth with performance-optimized settings
         var settings = new MeltySynth.SynthesizerSettings(SynthesisRate);
         settings.MaximumPolyphony = maximumPolyphony;  // Limit voices to prevent CPU overload
         var created = new MeltySynth.Synthesizer(fullPath, settings); 
-        
-        if (commandQueue == null)
-        {
-            commandQueue = new ConcurrentQueue<MusicCommand>();
-        }
 
         // Pre-initialize all channels to a moderate volume.
         // Note: actual volume will be scaled by masterVolumeScale during playback.
@@ -310,6 +338,40 @@ public partial class MusicPlayer : MonoBehaviour
             // Every channel's volume is VolumeHeadroom lower (SynthVolume()), so that a program can be
             // raised by up to that much; the master volume gives it back.
             created.MasterVolume *= Mathf.Pow(10f, VolumeHeadroom / 20f);
+        }
+        UseSynthesizer(new MeltySynthMusic(created));
+    }
+
+    /// <summary>
+    /// The emulated OPL2 with the timbres of the player's SOUND/UW.AD, or null with the reason logged
+    /// when they cannot be read.
+    /// </summary>
+    private AilOplSynth CreateOplSynth()
+    {
+        string timbres;
+        try
+        {
+            timbres = Path.Combine(GameDataPath.GetSoundPath(), "UW.AD");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Music: no sound folder for the OPL2 timbres: {e.Message}");
+            return null;
+        }
+        AilOplSynth opl = AilOplSynth.Create(timbres, SynthesisRate, out string error);
+        if (opl == null)
+        {
+            Debug.LogError($"Music: cannot read the OPL2 timbres in {timbres}: {error}");
+        }
+        return opl;
+    }
+
+    /// <summary>The synthesizer the music plays through from now on.</summary>
+    private void UseSynthesizer(IMusicSynth created)
+    {
+        if (commandQueue == null)
+        {
+            commandQueue = new ConcurrentQueue<MusicCommand>();
         }
 
         // With a track playing, the audio thread takes the new synthesizer up itself, after putting it
@@ -441,6 +503,63 @@ public partial class MusicPlayer : MonoBehaviour
             Debug.Log($"Synthesizer reloaded with sound font: {soundFontFileName}");
         }
         masterVolumeScale = musicVolume;
+        FollowArrangement();
+    }
+
+    /// <summary>
+    /// The file a track plays from. With the OPL2 music a track of the original's own, UWnn.XMI,
+    /// plays its AdLib arrangement AWnn.XMI from the same folder, as the original does on every FM
+    /// card (UW.EXE 0x1f3c5, load_new_music, SOUND.C): different notes on some tracks, and the
+    /// programs and levels its FM timbres were set for. Any other file plays as it is.
+    /// </summary>
+    private string ArrangementOf(string fullPath)
+    {
+        if (!oplMusic || ExternalMidiChosen)
+        {
+            return fullPath;
+        }
+        string name = Path.GetFileName(fullPath);
+        if (name.Length != 8 || !name.StartsWith("UW", StringComparison.OrdinalIgnoreCase)
+            || !char.IsDigit(name[2]) || !char.IsDigit(name[3])
+            || !name.EndsWith(".XMI", StringComparison.OrdinalIgnoreCase))
+        {
+            return fullPath;
+        }
+        string adlib = Path.Combine(Path.GetDirectoryName(fullPath), (char.IsLower(name[0]) ? "aw" : "AW") + name.Substring(2));
+        return File.Exists(adlib) ? adlib : fullPath;
+    }
+
+    /// <summary>
+    /// How much louder a track plays on the OPL2 than the original's own balance between tracks: the
+    /// title theme, AW01.XMI, 3 dB, which the user found too soft against the rest by ear (22 November
+    /// 2026); 1 for every other.
+    /// </summary>
+    private static float OplTrackGain(string fullPath)
+    {
+        return Path.GetFileName(fullPath).Equals("AW01.XMI", StringComparison.OrdinalIgnoreCase) ? Mathf.Pow(10f, 3f / 20f) : 1f;
+    }
+
+    /// <summary>
+    /// After a change of soundfont, the XMI playing starts again from the beginning in the other
+    /// arrangement if the change asks for it: to or from the OPL2 music.
+    /// </summary>
+    private void FollowArrangement()
+    {
+        if (sequencer == null || !sequencer.IsLoaded || string.IsNullOrEmpty(currentTrack) || soundFolderPath == null)
+        {
+            return;
+        }
+        string wanted = ArrangementOf(Path.Combine(soundFolderPath, currentTrack));
+        if (string.Equals(wanted, playingFile, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        bool loop = sequencer.Loop;
+        string track = currentTrack;
+        string follow = followTrack;
+        StopMusic();
+        SwitchTrack(track, loop);
+        followTrack = follow;
     }
 
     /// <summary>
@@ -494,7 +613,12 @@ public partial class MusicPlayer : MonoBehaviour
             return;
         }
 
-        LoadSong(fullPath, loop);
+        string arrangement = ArrangementOf(fullPath);
+        if (arrangement != fullPath)
+        {
+            Debug.Log($"Music: {Path.GetFileName(fullPath)} plays as {Path.GetFileName(arrangement)} on the OPL2");
+        }
+        LoadSong(arrangement, loop);
         currentTrack = fileName;
     }
     
@@ -690,6 +814,8 @@ public partial class MusicPlayer : MonoBehaviour
 
         // Create sequencer - TPQN will be auto-calculated from meta-events
         sequencer = new XMISequencer(fullPath, commandQueue, SynthesisRate, loop);
+        playingFile = fullPath;
+        trackGain = oplMusic ? OplTrackGain(fullPath) : 1f;
         if (!sequencer.IsLoaded)
         {
             sequencer = null;
@@ -723,7 +849,8 @@ public partial class MusicPlayer : MonoBehaviour
             }
         }
 
-        int remappedVelocity = velocityRemap[Mathf.Clamp(velocity, 0, 127)];
+        // the OPL2 takes the velocity as the track gives it, as the original's driver does
+        int remappedVelocity = oplMusic ? Mathf.Clamp(velocity, 1, 127) : velocityRemap[Mathf.Clamp(velocity, 0, 127)];
         if (TunedSoundFont && channel != 9)
         {
             int mt32Velocity = MT32Velocity(programs[channel], velocity);
@@ -966,7 +1093,7 @@ public partial class MusicPlayer : MonoBehaviour
 
         // A soundfont changed while a track was playing: take the new synthesizer up here, between
         // two buffers, where nothing else is using the old one.
-        MeltySynth.Synthesizer replacement = Interlocked.Exchange(ref pendingSynthesizer, null);
+        IMusicSynth replacement = Interlocked.Exchange(ref pendingSynthesizer, null);
         if (replacement != null)
         {
             synthesizer = replacement;
@@ -1065,7 +1192,7 @@ public partial class MusicPlayer : MonoBehaviour
             float mixedLeft = mono + (left - mono) * stereoWidth;
             float mixedRight = mono + (right - mono) * stereoWidth;
             
-            float vol = masterVolumeScale * duckMultiplier;
+            float vol = masterVolumeScale * duckMultiplier * trackGain;
             data[j++] = mixedLeft * vol;
             data[j++] = mixedRight * vol;
         }
