@@ -1087,17 +1087,16 @@ public partial class Conversation
             {
                 Critter.ETradeResult tradeResult = npc.TryTrade();
                 AddDelayedText(MakeSubstitutions(mem[Arg((int)tradeResult)]));
-                // Scripts treat result as 1 = leave barter, 0 = stay (uw-formats).
-                // Message selection uses the enum; Yes/Tired end the loop.
-                result = (tradeResult == Critter.ETradeResult.Yes
-                          || tradeResult == Critter.ETradeResult.Tired) ? 1 : 0;
+                // Scripts treat result as 1 = leave barter, 0 = stay (uw-formats). Only a deal made returns 1, as in
+                // UW.EXE 0x6b69f (do_offer, BARTER.C): a weary trader keeps the player in the barter, where every
+                // offer is refused but a demand or a decline is still possible.
+                result = tradeResult == Critter.ETradeResult.Yes ? 1 : 0;
             }
             break;
         case "do_demand":
             {
                 int deny = mem[Arg(1)];
                 int accept = mem[Arg(2)];
-                // determine whether the npc will just accept being robbed - depends, it seems
                 int attitude = (int)npc.attitude;
                 int attitudeId = 0;
                 foreach (var varImport in imports)
@@ -1109,19 +1108,11 @@ public partial class Conversation
                         break;
                     }
                 }
-                int playerScore
-                    = Skills.GetSkill(ESkill.Charm) / 6
-                      + PlayerData.sData.charLevel
-                      + 1 + (2 * PlayerData.sData.hp - 1) / PlayerData.sData.vitality;
-                int npcScore
-                    = Inventory.sInv.GetValueOfNpcTrade(true) / 10
-                      + attitude / 2
-                      + npc.critterLevel
-                      + 1 + (2 * npc.hp - 1) / npc.originalHp;
-                if (playerScore > npcScore)
+                if (npc.GivesInToDemand(attitude))
                 {
                     AddDelayedText(MakeSubstitutions(accept));
-                    if (attitude > 1)
+                    // one step down, to hostile at the lowest: UW.EXE 0x6b84a (do_demand, BARTER.C)
+                    if (attitude > 0)
                     {
                         SetNpcAttitude(attitudeId, (Critter.EAttitude)(--attitude));
                     }
@@ -1131,6 +1122,7 @@ public partial class Conversation
                 else
                 {
                     AddDelayedText(MakeSubstitutions(deny));
+                    // The original sets the NPC to attack the player (goal 5, target 1); the remake makes it hostile.
                     SetNpcAttitude(attitudeId, Critter.EAttitude.Hostile);
                     result = 0; // denied
                 }
@@ -1840,6 +1832,7 @@ public class Conversations : MonoBehaviour
             {
                 Messages.Clear();
                 runningConversation.npc = critter;
+                critter.StartConversation();
                 runningConversation.conversationIndex = conversationIndex;
                 runningConversation.StartConversation(npcName);
 

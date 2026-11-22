@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Traders haggle as in the original: each wants its own margin over what it thinks the goods are worth, Shak about half again, less with Charm, and every item counts by its condition. The same offer always gets the same answer, so insisting no longer pays, and a trader weary of bad offers is fresh again the next time you talk to it.
+
 - Goldthirst gives his ancestral axe for the large gold nugget when you hand it to him after the monster in the mines is dead, as in the original, instead of keeping it as treasure. And he no longer thanks you for a gift when you have given him nothing.
 
 - With OPL2 chosen as the soundfont the music sounds as it did on an AdLib or Sound Blaster: the game's own FM arrangements of the tracks, with their own instruments, played from your game files on an emulated FM chip. It used to play the MT-32 arrangements through a General MIDI bank, where the timpani was a tinkle bell and the orchestra hit the sound of the sea.
