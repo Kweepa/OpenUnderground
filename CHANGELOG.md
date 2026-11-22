@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Goldthirst gives his ancestral axe for the large gold nugget when you hand it to him after the monster in the mines is dead, as in the original, instead of keeping it as treasure. And he no longer thanks you for a gift when you have given him nothing.
+
 - With OPL2 chosen as the soundfont the music sounds as it did on an AdLib or Sound Blaster: the game's own FM arrangements of the tracks, with their own instruments, played from your game files on an emulated FM chip. It used to play the MT-32 arrangements through a General MIDI bank, where the timpani was a tinkle bell and the orchestra hit the sound of the sea.
 
 - Character creation puts first the sex and the hand of the character you played last, right-handed if none, and your own choices when you go back or start over: it always proposed the left hand, and Female after you refused a character. Before a game starts, the pad's control map shows that hand's triggers, not always a left-handed one's.
