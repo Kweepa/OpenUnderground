@@ -2274,6 +2274,9 @@ public class PlayerObject : MonoBehaviour
     /// <summary>Whether the player is made and its game not loaded or started yet: a black screen.</summary>
     public static bool GameStarting => Player != null && !Player.gameStarted;
 
+    /// <summary>Whether a game is loaded or started: a character is in play, not the title screen or its creation.</summary>
+    public static bool GameInPlay => Player != null && Player.gameStarted;
+
     /// <summary>The most the fade clears in one frame: a twentieth of a second.</summary>
     private const float MaxFadeStep = 0.05f;
 

@@ -71,6 +71,67 @@ public class CreateCharacter : MonoBehaviour
     /// </remarks>
     private const int MaxPlayerNameLength = 20;
 
+    // The sex and the hand each screen puts on top and lights first: those of the character played last (made or
+    // loaded), and once chosen in this creation, the choice, so that going back with Esc or answering "Keep this
+    // character? No" proposes them again (the user's, 22 November 2026; after No it lit Female, fix 590). With no
+    // character played yet, Male, the original's first answer, and Right, the more common hand, where the original
+    // proposes Left (the user's choice, 22 November 2026).
+    private bool femaleFirst;
+    private bool leftFirst;
+
+    /// <summary>The keys of the sex and the hand of the character played last, written at the end of a creation and at a load.</summary>
+    public const string LastSexKey = "LastCharacterSex";
+    public const string LastHandKey = "LastCharacterHand";
+
+    // the hand of the character played last: 1 left, 0 right, -1 not read yet
+    private static int lastPlayedLeft = -1;
+
+    /// <summary>
+    /// Whether the character played last was left-handed; right-handed when none was. Before a game is in play the
+    /// pad's triggers follow it too (GameBindings).
+    /// </summary>
+    public static bool LastPlayedLeftHanded
+    {
+        get
+        {
+            if (lastPlayedLeft < 0)
+            {
+                lastPlayedLeft = PlayerPrefs.GetString(LastHandKey, "right") == "left" ? 1 : 0;
+            }
+            return lastPlayedLeft == 1;
+        }
+    }
+
+    /// <summary>The sex and the hand of the character in play, as the character played last.</summary>
+    public static void RememberLastPlayed()
+    {
+        PlayerPrefs.SetString(LastSexKey, PlayerData.sData.female ? "female" : "male");
+        PlayerPrefs.SetString(LastHandKey, PlayerData.sData.leftHanded ? "left" : "right");
+        PlayerPrefs.Save();
+        lastPlayedLeft = PlayerData.sData.leftHanded ? 1 : 0;
+    }
+
+    /// <summary>A new creation, or one started again after No: the sex and the hand proposed first.</summary>
+    private void ProposeFirst()
+    {
+        PlayerData.sData.female = femaleFirst;
+        PlayerData.sData.leftHanded = leftFirst;
+    }
+
+    /// <summary>The sex chosen, kept to be proposed first if the creation goes back to it.</summary>
+    private void ChooseSex(bool female)
+    {
+        PlayerData.sData.female = female;
+        femaleFirst = female;
+    }
+
+    /// <summary>The hand chosen, kept to be proposed first if the creation goes back to it.</summary>
+    private void ChooseHand(bool left)
+    {
+        PlayerData.sData.leftHanded = left;
+        leftFirst = left;
+    }
+
     private void Start()
     {
         background = GraphicsLoader.ReadBYT("../Data/chargen.byt", 3);
@@ -100,10 +161,9 @@ public class CreateCharacter : MonoBehaviour
         }
 
         // reset character
-        // Initialize sex based on last played character (default to male for original game consistency)
-        string lastCharacterSex = PlayerPrefs.GetString("LastCharacterSex", "male");
-        PlayerData.sData.female = (lastCharacterSex == "female");
-        PlayerData.sData.leftHanded = true;
+        femaleFirst = PlayerPrefs.GetString(LastSexKey, "male") == "female";
+        leftFirst = LastPlayedLeftHanded;
+        ProposeFirst();
         PlayerData.sData.playerClass = EPlayerClass.Fighter;
         PlayerData.sData.strength = 0;
         PlayerData.sData.dexterity = 0;
@@ -294,6 +354,7 @@ public class CreateCharacter : MonoBehaviour
             }
             else if (accept)
             {
+                ChooseSex(PlayerData.sData.female);
                 Utils.PlayClip2d(makeSelection);
                 ++rollState;
             }
@@ -312,6 +373,7 @@ public class CreateCharacter : MonoBehaviour
             }
             else if (accept)
             {
+                ChooseHand(PlayerData.sData.leftHanded);
                 Utils.PlayClip2d(makeSelection);
                 ++rollState;
             }
@@ -490,8 +552,7 @@ public class CreateCharacter : MonoBehaviour
                     rollState = ERollState.Sex;
 
                     // reset character
-                    PlayerData.sData.female = true;
-                    PlayerData.sData.leftHanded = true;
+                    ProposeFirst();
                     PlayerData.sData.playerClass = EPlayerClass.Fighter;
                     for (int i = 0; i < 20; ++i)
                     {
@@ -519,9 +580,8 @@ public class CreateCharacter : MonoBehaviour
             {
                 Skills.ManaAdvanced(refill: true);
                 
-                // Save character sex to PlayerPrefs for frontend background display
-                PlayerPrefs.SetString("LastCharacterSex", PlayerData.sData.female ? "female" : "male");
-                PlayerPrefs.Save();
+                // the sex and the hand the next creation proposes first
+                RememberLastPlayed();
                 
                 wasCancelled = false; // Character creation completed successfully
                 Destroy(gameObject);
@@ -659,9 +719,8 @@ public class CreateCharacter : MonoBehaviour
         {
         case ERollState.Sex:
             GuiLabel(200, 75, "Choose character sex:", labelStyle);
-            // Display last played sex first
-            string lastCharacterSex = PlayerPrefs.GetString("LastCharacterSex", "male");
-            bool femaleOnTop = lastCharacterSex == "female";
+            // the sex proposed first on top
+            bool femaleOnTop = femaleFirst;
             if (PointerSelects(ButtonRect(207, 93), mouseGui))
                 PointerSelect(ref PlayerData.sData.female, femaleOnTop);
             else if (PointerSelects(ButtonRect(207, 113), mouseGui))
@@ -672,12 +731,13 @@ public class CreateCharacter : MonoBehaviour
             break;
         case ERollState.Handedness:
             GuiLabel(200, 75, "Select handedness:", labelStyle);
+            // the hand proposed first on top
             if (PointerSelects(ButtonRect(207, 93), mouseGui))
-                PointerSelect(ref PlayerData.sData.leftHanded, true);
+                PointerSelect(ref PlayerData.sData.leftHanded, leftFirst);
             else if (PointerSelects(ButtonRect(207, 113), mouseGui))
-                PointerSelect(ref PlayerData.sData.leftHanded, false);
-            GuiButton(207, 93, "Left", PlayerData.sData.leftHanded);
-            GuiButton(207, 113, "Right", !PlayerData.sData.leftHanded);
+                PointerSelect(ref PlayerData.sData.leftHanded, !leftFirst);
+            GuiButton(207, 93, leftFirst ? "Left" : "Right", PlayerData.sData.leftHanded == leftFirst);
+            GuiButton(207, 113, leftFirst ? "Right" : "Left", PlayerData.sData.leftHanded != leftFirst);
             GuiLabel(170, 160, 140, 40, "Determines which hand you use to hold your primary weapon, and which is your shield-hand.", descriptionStyle);
             break;
         case ERollState.Class:
@@ -876,53 +936,38 @@ public class CreateCharacter : MonoBehaviour
         {
         case ERollState.Sex:
             {
-                string last = PlayerPrefs.GetString("LastCharacterSex", "male");
-                Rect top = new Rect(screenX(207), screenY(93), screenX(67), screenY(16));
-                Rect bot = new Rect(screenX(207), screenY(113), screenX(67), screenY(16));
-                if (last == "female")
+                // the sex proposed first is on top
+                bool firstFemale = femaleFirst;
+                if (GuiInput.TryConsumeClickInRect(new Rect(screenX(207), screenY(93), screenX(67), screenY(16))))
                 {
-                    if (GuiInput.TryConsumeClickInRect(top))
-                    {
-                        PlayerData.sData.female = true;
-                        Utils.PlayClip2d(makeSelection);
-                        ++rollState;
-                    }
-                    else if (GuiInput.TryConsumeClickInRect(bot))
-                    {
-                        PlayerData.sData.female = false;
-                        Utils.PlayClip2d(makeSelection);
-                        ++rollState;
-                    }
+                    ChooseSex(firstFemale);
+                    Utils.PlayClip2d(makeSelection);
+                    ++rollState;
                 }
-                else
+                else if (GuiInput.TryConsumeClickInRect(new Rect(screenX(207), screenY(113), screenX(67), screenY(16))))
                 {
-                    if (GuiInput.TryConsumeClickInRect(top))
-                    {
-                        PlayerData.sData.female = false;
-                        Utils.PlayClip2d(makeSelection);
-                        ++rollState;
-                    }
-                    else if (GuiInput.TryConsumeClickInRect(bot))
-                    {
-                        PlayerData.sData.female = true;
-                        Utils.PlayClip2d(makeSelection);
-                        ++rollState;
-                    }
+                    ChooseSex(!firstFemale);
+                    Utils.PlayClip2d(makeSelection);
+                    ++rollState;
                 }
             }
             break;
         case ERollState.Handedness:
-            if (GuiInput.TryConsumeClickInRect(new Rect(screenX(207), screenY(93), screenX(67), screenY(16))))
             {
-                PlayerData.sData.leftHanded = true;
-                Utils.PlayClip2d(makeSelection);
-                ++rollState;
-            }
-            else if (GuiInput.TryConsumeClickInRect(new Rect(screenX(207), screenY(113), screenX(67), screenY(16))))
-            {
-                PlayerData.sData.leftHanded = false;
-                Utils.PlayClip2d(makeSelection);
-                ++rollState;
+                // the hand proposed first is on top
+                bool firstLeft = leftFirst;
+                if (GuiInput.TryConsumeClickInRect(new Rect(screenX(207), screenY(93), screenX(67), screenY(16))))
+                {
+                    ChooseHand(firstLeft);
+                    Utils.PlayClip2d(makeSelection);
+                    ++rollState;
+                }
+                else if (GuiInput.TryConsumeClickInRect(new Rect(screenX(207), screenY(113), screenX(67), screenY(16))))
+                {
+                    ChooseHand(!firstLeft);
+                    Utils.PlayClip2d(makeSelection);
+                    ++rollState;
+                }
             }
             break;
         case ERollState.Class:
@@ -1012,8 +1057,7 @@ public class CreateCharacter : MonoBehaviour
             {
                 Utils.PlayClip2d(cancelSelection);
                 rollState = ERollState.Sex;
-                PlayerData.sData.female = true;
-                PlayerData.sData.leftHanded = true;
+                ProposeFirst();
                 PlayerData.sData.playerClass = EPlayerClass.Fighter;
                 for (int i = 0; i < 20; ++i)
                     PlayerData.sData.skill[i] = 0;

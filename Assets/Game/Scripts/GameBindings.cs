@@ -350,9 +350,9 @@ public static class GameBindings
     public static void Refresh()
     {
         EnsureLoaded();
-        if (PlayerData.sData != null && PlayerData.sData.leftHanded != appliedLeftHanded)
+        if (CharacterLeftHanded != appliedLeftHanded)
         {
-            appliedLeftHanded = PlayerData.sData.leftHanded;
+            appliedLeftHanded = CharacterLeftHanded;
             Apply(EBindDevice.Gamepad);
         }
         bool keys = !GameInput.IsGameplayKeyboardInputBlocked();
@@ -496,6 +496,16 @@ public static class GameBindings
         yield return GameActions.KeysMap.Close.actionMap;
     }
 
+    /// <summary>
+    /// The weapon hand the triggers follow: the character's in play. With none - the title screen, character creation -
+    /// the hand of the character played last, which character creation also proposes first, right-handed if none (the
+    /// user's, 22 November 2026): until then the data is the World scene's PlayerData, left-handed (leftHanded: 1),
+    /// and the title screen's control map showed a left-handed pad whatever the player plays.
+    /// </summary>
+    private static bool CharacterLeftHanded => PlayerObject.GameInPlay
+        ? PlayerData.sData != null && PlayerData.sData.leftHanded
+        : CreateCharacter.LastPlayedLeftHanded;
+
     private static void EnsureLoaded()
     {
         if (loaded)
@@ -503,7 +513,7 @@ public static class GameBindings
             return;
         }
         loaded = true;
-        appliedLeftHanded = PlayerData.sData != null && PlayerData.sData.leftHanded;
+        appliedLeftHanded = CharacterLeftHanded;
         Load(EBindDevice.Keyboard, PlayerPrefs.GetString(KeyboardPrefsKey, ""));
         Load(EBindDevice.Gamepad, PlayerPrefs.GetString(GamepadPrefsKey, ""));
         Apply(EBindDevice.Keyboard);
