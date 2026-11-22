@@ -722,9 +722,19 @@ public class Inventory : MonoBehaviour
 
             if (inPack)
             {
-                // the product beside the pile
+                // the product joins a pile of its kind in the same list, which a drop of it there would do with the
+                // mouse; else it goes beside the pile
                 List<UUObject> list = FindObjectInInventory(held);
-                list.Insert(list.IndexOf(held) + 1, result);
+                UUObject pile = FindStackToJoin(list, result, result.quantity);
+                if (pile != null)
+                {
+                    JoinStack(pile, result, result.quantity);
+                    Utils.DestroyItem(result);
+                }
+                else
+                {
+                    list.Insert(list.IndexOf(held) + 1, result);
+                }
             }
             else
             {
@@ -735,8 +745,19 @@ public class Inventory : MonoBehaviour
         {
             if (inPack)
             {
-                // held from the pack (the pad): the product takes its place there
-                ReplaceItemInInventory(held, result);
+                // held from the pack (the pad): the product joins a pile of its kind in the same list, or else takes
+                // the held item's place there
+                UUObject pile = FindStackToJoin(FindObjectInInventory(held), result, result.quantity);
+                if (pile != null)
+                {
+                    JoinStack(pile, result, result.quantity);
+                    Utils.DestroyItem(result);
+                    RemoveItemFromInventory(held);
+                }
+                else
+                {
+                    ReplaceItemInInventory(held, result);
+                }
             }
             else
             {
@@ -866,8 +887,6 @@ public class Inventory : MonoBehaviour
 
     private void DoEquipFromWorldPickup(UUObject obj, int targetSlotIndex)
     {
-        List<UUObject> currentList = GetCurrentListInternal();
-
         if (obj.quantity > 1)
         {
             int quantityRemaining = obj.quantity - 1;
@@ -876,7 +895,9 @@ public class Inventory : MonoBehaviour
             newItem.quantity = quantityRemaining;
             CopyPeeledStackProperties(obj, newItem);
             newItem.PostLoadInitialize();
-            currentList.Add(newItem);
+            // by the containers' rules, as every other path adds: an open rune bag or map case refuses it, and it
+            // goes up to the list that takes it
+            AddRecursive(newItem);
         }
 
         if (obj.getClass == UUObject.EClass.Weapons && fist.isActiveAndEnabled)
@@ -1130,7 +1151,7 @@ public class Inventory : MonoBehaviour
         UUObject joined = FindStackToJoin(parentList, carried, carried.quantity);
         if (joined != null)
         {
-            joined.quantity += carried.quantity;
+            JoinStack(joined, carried, carried.quantity);
             Utils.DestroyItem(carried);
         }
         else
@@ -1958,6 +1979,16 @@ public class Inventory : MonoBehaviour
         sInv.AddRecursive(obj);
     }
 
+    /// <summary>
+    /// An item of the pack's top list back from a save, at the end of the list and joined to nothing: piles the
+    /// player kept apart stay apart, as Add() would not leave them.
+    /// </summary>
+    public static void RestoreToPack(UUObject obj)
+    {
+        ApplyItemGrantSideEffects(obj);
+        sInv.inventory.Add(obj);
+    }
+
     /// <summary>Fresh quest/script reward: mouse/kb cursor carry; gamepad direct stuff-list add.</summary>
     public static void GrantNewItemToMouseOrInventory(UUObject obj)
     {
@@ -2086,12 +2117,9 @@ public class Inventory : MonoBehaviour
             for (int i = 0; i < curList.Count; ++i)
             {
                 // TODO: check for enchanted etc
-                if (curList[i].type == obj.type
-                    && curList[i].stackable 
-                    && curList[i].quantity + obj.quantity < 368
-                    && SameStackMergeIdentity(curList[i], obj))
+                if (CanJoinStack(curList[i], obj, obj.quantity))
                 {
-                    curList[i].quantity += obj.quantity;
+                    JoinStack(curList[i], obj, obj.quantity);
                     Utils.DestroyItem(obj);
 
                     // scroll to show it
@@ -2821,7 +2849,10 @@ public class Inventory : MonoBehaviour
         {
             return false;
         }
-        if (a.quality != b.quality)
+        // UW.EXE 0x7b14f (AddTogether, INVPANEL.C): sling stones, bolts and arrows join at any quality, anything
+        // else within one band of 16 qualities (quality / 16), and a quality 0 only with another 0
+        bool missile = a.type is >= EObjectType.SlingStone and <= EObjectType.Arrow;
+        if (!missile && (a.quality >> 4 != b.quality >> 4 || (a.quality == 0) != (b.quality == 0)))
         {
             return false;
         }
@@ -2830,6 +2861,34 @@ public class Inventory : MonoBehaviour
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// The most a pile holds. The original joins two piles while their counts sum below 999 (UW.EXE 0x7b14f,
+    /// AddTogether, INVPANEL.C), but the remake keeps a pile's count in special, where 368 and above mean an
+    /// enchantment or a link (UUObject.stackable): the limit had to be a number below 368.
+    /// </summary>
+    public const int MaxStack = 350;
+
+    /// <summary>Whether <paramref name="howMany"/> of <paramref name="obj"/> can join the pile <paramref name="onto"/>.</summary>
+    private static bool CanJoinStack(UUObject onto, UUObject obj, int howMany)
+    {
+        return onto != null && onto != obj && onto.type == obj.type && onto.quantity + howMany <= MaxStack
+               && SameStackMergeIdentity(onto, obj);
+    }
+
+    /// <summary>
+    /// <paramref name="howMany"/> of <paramref name="obj"/> join the pile <paramref name="onto"/>, which takes the
+    /// average of the two qualities weighted by the counts, rounded, so that the pile is worth what its two parts were
+    /// (Inventory.AssessValue() counts quality / 64). The original takes the plain average, (a + b) / 2, in
+    /// UW.EXE 0x7b2bb (AddToOccupiedSlot, INVPANEL.C) and UW.EXE 0x77c3d (PutObjectInBag, BAGS.C): there 100 coins
+    /// of 40 and one of 63 make 101 of 51, worth a quarter more than before.
+    /// </summary>
+    private static void JoinStack(UUObject onto, UUObject obj, int howMany)
+    {
+        int total = onto.quantity + howMany;
+        onto.quality = (onto.quality * onto.quantity + obj.quality * howMany + total / 2) / total;
+        onto.quantity = total;
     }
 
     /// <summary>
@@ -2845,9 +2904,7 @@ public class Inventory : MonoBehaviour
 
         foreach (UUObject other in list)
         {
-            if (other != null && other != obj && other.type == obj.type
-                && other.quantity + howMany < 368
-                && SameStackMergeIdentity(other, obj))
+            if (CanJoinStack(other, obj, howMany))
             {
                 return other;
             }
@@ -3023,34 +3080,17 @@ public class Inventory : MonoBehaviour
             }
         }
 
-        // Custom TryCombine (oil→lantern, etc.) — independent of HowMany.howMany (often 0 until a dialog runs).
-        if (!CanCraftInInventory())
-        {
-            if (HowMany.sHowMany.howMany == 1)
-            {
-                NormalizeUnusedCombineHeldItem(true);
-                return;
-            }
-        }
-        else if (usingItem.TryCombine(currentList[index]))
-        {
-            // Partial consume left a cursor-held stack (e.g. multi oil flask); keep it on the mouse.
-            if (usingItem != null && FindObjectInInventory(usingItem) == null)
-            {
-                mouseCursorCarriedPortable = usingItem;
-            }
-            usingItem = null;
-            return;
-        }
-
         // stack/group — merge count must be usingItem.quantity; HowMany.sHowMany.howMany is unrelated (often still 0 before any dialog).
+        // Before the custom combinations, which are never between two objects of one type: in a conversation their
+        // refusal below read a How many? answer of 1 left by the last pile taken, and a coin taken off the trade
+        // table would not join its pile in the pack until the conversation was over.
         if (currentList[index].type == usingItem.type && usingItem.stackable && usingItem != currentList[index])
         {
             int howMany = usingItem.quantity;
-            if (SameStackMergeIdentity(currentList[index], usingItem) && currentList[index].quantity + howMany < 368)
+            if (CanJoinStack(currentList[index], usingItem, howMany))
             {
                 Utils.PlayClip2d(combine);
-                currentList[index].quantity += howMany;
+                JoinStack(currentList[index], usingItem, howMany);
                 if (howMany == usingItem.quantity)
                 {
                     Utils.DestroyItem(usingItem);
@@ -3071,6 +3111,26 @@ public class Inventory : MonoBehaviour
 
             usingItem = null;
 
+            return;
+        }
+
+        // Custom TryCombine (oil→lantern, etc.) — independent of HowMany.howMany (often 0 until a dialog runs).
+        if (!CanCraftInInventory())
+        {
+            if (HowMany.sHowMany.howMany == 1)
+            {
+                NormalizeUnusedCombineHeldItem(true);
+                return;
+            }
+        }
+        else if (usingItem.TryCombine(currentList[index]))
+        {
+            // Partial consume left a cursor-held stack (e.g. multi oil flask); keep it on the mouse.
+            if (usingItem != null && FindObjectInInventory(usingItem) == null)
+            {
+                mouseCursorCarriedPortable = usingItem;
+            }
+            usingItem = null;
             return;
         }
 
@@ -3213,7 +3273,7 @@ public class Inventory : MonoBehaviour
         UUObject joined = FindStackToJoin(targetContainer.contents, usingItem, howMany);
         if (joined != null)
         {
-            joined.quantity += howMany;
+            JoinStack(joined, usingItem, howMany);
             if (howMany == usingItem.quantity)
             {
                 Utils.DestroyItem(usingItem);
@@ -3269,6 +3329,31 @@ public class Inventory : MonoBehaviour
     public static int[] npcTradeIndices = { 0, 1, 4, 5 };
     public static int[] playerTradeIndices = { 2, 3, 6, 7 };
 
+    /// <summary>
+    /// <paramref name="obj"/>, an item of the open list, offered on the trade table: what a right click on a pile asks
+    /// How many? for. The selection is pointed at it first, since the box is answered later, when the selection is the
+    /// item last clicked or dragged, or none.
+    /// </summary>
+    public void PutInTradeTray(UUObject obj)
+    {
+        int at = GetCurrentListInternal().IndexOf(obj);
+        if (at < 0)
+        {
+            return;
+        }
+
+        int savedIndex = index;
+        index = at;
+        try
+        {
+            TryPutSelectionInTradeTray();
+        }
+        finally
+        {
+            index = savedIndex;
+        }
+    }
+
     public void TryPutSelectionInTradeTray()
     {
         List<UUObject> currentList = GetCurrentListInternal();
@@ -3281,19 +3366,17 @@ public class Inventory : MonoBehaviour
                 bool stacked = false;
                 foreach (int i in playerTradeIndices)
                 {
-                    if (tradeSlots[i] != null
-                        && tradeSlots[i].type == obj.type && obj.stackable && SameStackMergeIdentity(tradeSlots[i], obj)
-                        && tradeSlots[i].quantity + obj.quantity <= 99)
+                    if (tradeSlots[i] != null && obj.stackable && CanJoinStack(tradeSlots[i], obj, obj.quantity))
                     {
                         int howMany = HowMany.sHowMany.howMany;
                         if (howMany < obj.quantity)
                         {
-                            tradeSlots[i].quantity += howMany;
+                            JoinStack(tradeSlots[i], obj, howMany);
                             obj.quantity -= howMany;
                         }
                         else
                         {
-                            tradeSlots[i].quantity += obj.quantity;
+                            JoinStack(tradeSlots[i], obj, obj.quantity);
                             Utils.DestroyItem(obj);
                             obj = null;
                         }
@@ -3367,12 +3450,11 @@ public class Inventory : MonoBehaviour
 
         if (tradeSlots[slot] != null)
         {
-            if (tradeSlots[slot].type == obj.type && obj.stackable && SameStackMergeIdentity(tradeSlots[slot], obj)
-                && tradeSlots[slot].quantity + howManyCount <= 99)
+            if (obj.stackable && CanJoinStack(tradeSlots[slot], obj, howManyCount))
             {
                 // Stackable quantity uses special; getter returns max(special,1) so "empty" reads as 1 — cannot use obj.quantity <= 0 after subtract.
                 int qtyBeforeConsume = obj.quantity;
-                tradeSlots[slot].quantity += howManyCount;
+                JoinStack(tradeSlots[slot], obj, howManyCount);
                 obj.quantity -= howManyCount;
                 if (qtyBeforeConsume <= howManyCount)
                 {

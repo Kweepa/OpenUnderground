@@ -28,6 +28,9 @@ public class SaveGameData
     // none, and loads with the history empty.
     public List<string> messageHistory;
     public List<int> messageHistoryKinds;
+    // Coins keep their own quality since piles join within a band of qualities; an older save, where this
+    // reads false, gave every coin 63 (Coin.RestoreFromSaveData()). No initializer: a missing field must read false.
+    public bool coinsKeepQuality;
     
     public SaveGameData()
     {

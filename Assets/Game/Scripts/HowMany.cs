@@ -137,7 +137,7 @@ public class HowMany : MonoBehaviour
             }
             else
             {
-                Inventory.sInv.TryPutSelectionInTradeTray();
+                Inventory.sInv.PutInTradeTray(howManyItem);
             }
 
             howManyItem = null;

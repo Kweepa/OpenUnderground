@@ -29,12 +29,8 @@ public class Projectile : UUObject
     private Collider[] overlapCache = new Collider[8];
     private static readonly Collider[] burstCache = new Collider[32];
 
-    public override void PostLoadInitialize(bool restoredFromSave = false)
-    {
-        base.PostLoadInitialize(restoredFromSave);
-        // projectiles have no meaningful quality variance; normalize so stacks always match.
-        quality = 63;
-    }
+    // No quality is forced on missiles: sling stones, bolts and arrows join at any quality, as in the original
+    // (Inventory.SameStackMergeIdentity()).
 
     /// <summary>
     /// The sling stone's picture fills only the bottom rows of its frame, 11 to 15 of 16 in
