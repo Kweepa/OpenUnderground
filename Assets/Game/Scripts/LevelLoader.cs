@@ -401,6 +401,16 @@ public class LevelLoader : MonoBehaviour
         
         switch (loadedLevel)
         {
+        case 2:
+            // Ours, not the original's: the piles of coins around Goldthirst and in his treasure room, the one the golem
+            // guards, are gold coins instead of common ones. The dwarf king loves gold and would not keep silver about
+            // him. Same value (3) and the same counts, so nothing else changes.
+            if (objectIndex is >= 610 and <= 615 or 764 or 765 or 941 or 951 or 952 or 953 or 986
+                && (objData[0] & 0x1ff) == (int)EObjectType.Coin)
+            {
+                objData[0] = (ushort)((objData[0] & ~0x1ff) | (int)EObjectType.GoldCoin);
+            }
+            break;
         case 7:
             if (objectIndex is 567 or 564 or 568 or 563 or 557 or 552 or 918 or 545 or 549 or 546 or 547 or 550 or 551 or 548 or 559)
             {

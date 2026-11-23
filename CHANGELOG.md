@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The coins around Goldthirst and in his treasure room are gold coins, not silver ones: the dwarf king loves gold and would not surround himself with silver. An addition of ours; they are worth the same.
+
 - Traders haggle as in the original: each wants its own margin over what it thinks the goods are worth, Shak about half again, less with Charm, and every item counts by its condition. The same offer always gets the same answer, so insisting no longer pays, and a trader weary of bad offers is fresh again the next time you talk to it.
 
 - Goldthirst gives his ancestral axe for the large gold nugget when you hand it to him after the monster in the mines is dead, as in the original, instead of keeping it as treasure. And he no longer thanks you for a gift when you have given him nothing.
