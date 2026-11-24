@@ -51,25 +51,36 @@ public class Standard : UUObject
 
         if (Physics.Raycast(origin, direction, out RaycastHit hit, PlantRayLength, layerMask))
         {
-            if (hit.normal.y > 0.5f)
+            if (CanPlantAt(hit))
             {
                 Inventory.sInv.RemoveItemFromInventory(this);
 
+                // position the standard & don't add a rigid body
                 transform.position = hit.point;
-                if (TryDestroyTalisman(LevelLoader.GetClosestTile(hit.point)))
-                {
-                    SpawnSplash(DataLoader.sDataLoader.lavaSplash, DataLoader.sDataLoader.lavaSplashParticle, 10.0f * Vector3.up);
-                }
-                else
-                {
-                    // position the standard & don't add a rigid body
-                    LevelLoader.AddToWorld(this);
-                }
+                StandUpright();
+                LevelLoader.AddToWorld(this);
+                return true;
             }
         }
 
-        // don't allow the player to drop this just anywhere...
-        return true;
+        // No spot within reach to plant it: it is thrown like anything else. The original has no rule of its own
+        // for this item when it leaves the hand; what the ending asks of it is decided where it comes to rest
+        // (UW.EXE 0x2be7f, mob_to_static, OBJPHYS.C), as UUObject.OnCollisionEnter() does here.
+        return false;
+    }
+
+    /// <summary>
+    /// A standard thrown once keeps the Rigidbody the throw gave it, and may lie on its side: planted again, it
+    /// stands up and loses the body, or it would topple. It has none at load (isStatic), the state it starts in.
+    /// </summary>
+    private void StandUpright()
+    {
+        transform.rotation = Quaternion.AngleAxis(transform.eulerAngles.y, Vector3.up);
+        foreach (Rigidbody rb in GetComponentsInChildren<Rigidbody>())
+        {
+            rb.isKinematic = true;
+            Destroy(rb);
+        }
     }
 
     /// <summary>For inventory X hint when not using mouse UI — forward plant ray matches <see cref="Throw"/> on gamepad.</summary>
@@ -87,7 +98,18 @@ public class Standard : UUObject
             return false;
         }
 
-        return hit.normal.y > 0.5f;
+        return CanPlantAt(hit);
+    }
+
+    /// <summary>
+    /// A near-flat floor, and neither water nor lava, where it stood upright in the pool: there it is thrown
+    /// instead, and comes to rest like any object (UUObject.OnCollisionEnter()), which also destroys it in the
+    /// lava the ending asks for.
+    /// </summary>
+    private static bool CanPlantAt(RaycastHit hit)
+    {
+        ETerrainType terrain = LevelLoader.GetClosestTile(hit.point).GetFloorTerrain();
+        return hit.normal.y > 0.5f && terrain != ETerrainType.Water && terrain != ETerrainType.Lava;
     }
 
     public override string GetGamepadChargeThrowVerbOrNull()
