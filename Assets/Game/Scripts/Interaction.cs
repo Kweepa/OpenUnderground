@@ -431,6 +431,10 @@ public class Interaction : MonoBehaviour
 
             lookText += ".";
             Messages.Add(lookText);
+            if (IsWithinHandReach(centeredObject))
+            {
+                centeredObject.AddCloseLookLine();
+            }
 
             // The original's Look handler (UW.EXE 0x26e10) hands the look on after the
             // description, with the Look icon or without it and at any distance. In between, in

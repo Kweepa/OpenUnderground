@@ -1011,6 +1011,27 @@ public class UUObject : LevelObject
     public virtual void TryInventoryUse()
     {
         Messages.Add($"You see {GetLookName()}.");
+        AddCloseLookLine();
+    }
+
+    /// <summary>
+    /// A line a look adds after the description, at hand's reach or in the inventory, as UW.EXE
+    /// 0x7c621 (SpecialLook, LOOK.C) prints after LookAt's: the world's look passes it a detail of 1
+    /// within the pick range and 0 beyond (player_3dlook, INTERACT.C), the inventory's at least 1
+    /// (inv_look). Null when there is none; the bones' is whose they are (Bones).
+    /// </summary>
+    public virtual string GetCloseLookLine()
+    {
+        return null;
+    }
+
+    public void AddCloseLookLine()
+    {
+        string line = GetCloseLookLine();
+        if (!string.IsNullOrEmpty(line))
+        {
+            Messages.Add(line);
+        }
     }
 
     /// <summary>Inventory / paperdoll secondary action — mouse RMB; default none.</summary>

@@ -25,6 +25,11 @@ namespace Game.Scripts.CritterVariants
                 {
                     Instantiate(deathGolem, gameObject.transform.position, gameObject.transform.rotation);
                 }
+
+                // The golem falls apart into pieces of its own (deathGolem) and leaves no body: it goes
+                // now, leaving its rubble under them. Switched off, it never reached Dead, so the rubble
+                // came only when the player came back to the level.
+                CleanUpBody();
                 break;
             }
         }
