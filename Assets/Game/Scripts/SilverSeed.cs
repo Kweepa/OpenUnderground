@@ -27,8 +27,16 @@ public class SilverSeed : UUObject
 
     public override EEquipAction Equip()
     {
-        Inventory.sInv.TryThrow(this);
-        return EEquipAction.Consume;
+        if (Inventory.sInv.TryThrow(this))
+        {
+            return EEquipAction.Consume;
+        }
+
+        // No room around the player to let it go: it stays in the pack with the original's refusal, as when
+        // plant_seed finds no ground for it (UW.EXE 0x37ca4, UseMagic, USEITEMS.C). Consume removed it from the
+        // pack though it was never thrown, and the seed was lost.
+        Messages.Add(1, 10); // no space for roots
+        return EEquipAction.Nothing;
     }
 
     private bool ShouldPlantSeed(Vector3 pos)

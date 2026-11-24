@@ -2,6 +2,8 @@
 
 ## Next release
 
+- The Standard of Honor is thrown like anything else when there is no floor within reach to plant it, out of water and lava: aimed farther away, letting it go did nothing and it stayed in your hand, and in water or lava it was planted upright in it. And a silver seed used where there is no room around you to let it go stays in the pack, with its message, instead of vanishing.
+
 - Taking something that belongs to others makes it yours: drop it and pick it up again and its owners are no longer angered a second time. The name of an owned item is light orange while it is still out of reach, so you see whose it is before the click that takes it. Goods their owners have handed over to you no longer show as theirs.
 
 - Slain creatures leave their body where it fell for at least ten minutes, until you are ten tiles away and cannot see it, instead of vanishing as soon as you look away. When the body goes, it leaves what the original leaves: a pile of bones for a skeleton, rubble for a golem, wood chips for a reaper, and often a skull or a bone that tells whose it was.
