@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Taking something that belongs to others makes it yours: drop it and pick it up again and its owners are no longer angered a second time. The name of an owned item is light orange while it is still out of reach, so you see whose it is before the click that takes it. Goods their owners have handed over to you no longer show as theirs.
+
 - Slain creatures leave their body where it fell for at least ten minutes, until you are ten tiles away and cannot see it, instead of vanishing as soon as you look away. When the body goes, it leaves what the original leaves: a pile of bones for a skeleton, rubble for a golem, wood chips for a reaper, and often a skull or a bone that tells whose it was.
 
 - Piles join as in the original: two loaves or two piles of coins of close condition make one pile with weighted average value, and arrows, bolts and sling stones join whatever their condition; a pile holds up to 350, also on the trade table, where it stopped at 99. Coins keep their own condition, so their value is the same as in the original, and piles you kept apart in the pack stay apart after a load.

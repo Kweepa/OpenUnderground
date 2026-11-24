@@ -738,7 +738,9 @@ public class Interaction : MonoBehaviour
                     nameStyle.font = font;
                     nameStyle.fontSize = 16;
 
-                    // Owned portables in range show orange; other interactables yellow; out of range white.
+                    // Owned portables show orange, lighter out of range, so the warning comes before the click
+                    // that would take them; other interactables yellow; out of range white.
+                    // Not for an owner who would no longer care (Critter.TheftMatters).
                     bool isOwnedPortable = false;
                     if (centeredObject.isPortable && DataLoader.sDataLoader != null)
                     {
@@ -746,16 +748,16 @@ public class Interaction : MonoBehaviour
                         if (props.canBeOwned)
                         {
                             int ownerRace = centeredObject.ownerIndex & 31;
-                            if (ownerRace > 0 && ownerRace < 29)
+                            if (ownerRace > 0 && ownerRace < 29 && Critter.TheftMatters(centeredObject.ownerIndex & 63))
                             {
                                 isOwnedPortable = true;
                             }
                         }
                     }
 
-                    if (isInteractable && isOwnedPortable)
+                    if (isOwnedPortable)
                     {
-                        nameStyle.normal.textColor = new Color(1.0f, 0.6f, 0.1f);
+                        nameStyle.normal.textColor = isInteractable ? new Color32(0xff, 0x80, 0x12, 0xff) : new Color32(0xfd, 0xa0, 0x5c, 0xff);
                     }
                     else
                     {

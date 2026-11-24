@@ -6991,6 +6991,18 @@ public class Critter : UUObject
     public bool Bleeds => Utils.MapRemainsToParticleType(stats.Remains, blood) is EParticleType.BloodSplat or EParticleType.PoisonSplat;
 
     /// <summary>
+    /// Whether taking an object with this owner field can still anger anyone: not when it has no
+    /// owner, nor when the owner is 13 (the whole field, not the race bits) once quest variable 32 is
+    /// 3 or more (UW.EXE 0x7179b, critter_get_told, CRITTIME.C). The original does not clear those
+    /// owners; it ignores the theft.
+    /// </summary>
+    public static bool TheftMatters(int owner)
+    {
+        return owner != 0
+               && !(owner == 13 && PlayerData.GetQuestFlag(EQuestFlag.KnightOfCrux) >= 3);
+    }
+
+    /// <summary>
     /// The original's theft check (UW.EXE 0x7193c, its area walk 0x34d67 and the callback 0x71727):
     /// a creature of the owner's race takes the theft personally when it is within its own radius
     /// and can see the place. Run when the player takes an owned object, and by the do trap of
@@ -7016,7 +7028,7 @@ public class Critter : UUObject
     /// for the line of sight.</param>
     public static void TheftCheck(int owner, Vector3 point)
     {
-        if (owner == 0 || Magic.sMagic.IsSpellActive(Magic.ESpell.FreezeTime))
+        if (!TheftMatters(owner) || Magic.sMagic.IsSpellActive(Magic.ESpell.FreezeTime))
         {
             return;
         }
@@ -7033,8 +7045,7 @@ public class Critter : UUObject
                 || tile.x < tileX - 7 || tile.x > tileX + 8
                 || tile.y < tileY - 7 || tile.y > tileY + 8
                 || (critter.OutOfPackAlarm && (owner & 32) == 0)
-                || (owner == 32 && !critter.OutOfPackAlarm)
-                || (ownerRace == 13 && PlayerData.sData.questFlags[(int)EQuestFlag.KnightOfCrux] >= 3))
+                || (owner == 32 && !critter.OutOfPackAlarm))
             {
                 continue;
             }
