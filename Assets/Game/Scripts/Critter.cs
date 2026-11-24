@@ -864,6 +864,15 @@ public class Critter : UUObject
         {
             pendingAnimatorRestore = true;
         }
+
+        // A creature saved dying or dead comes back without what SetState() did on the way in - its
+        // CharacterController on over the body, a goblin's weapons back in its hand, a fire elemental
+        // crackling - so it goes at once and leaves its remains, as when the player comes back to its
+        // level (OnEnable()); from Update(), since the load walks the level's objects (fix 567)
+        if (restoredFromSave && state is EState.Die or EState.Dead)
+        {
+            SetState(EState.Cleanup);
+        }
     }
 
     private List<Vector3> path;
@@ -2417,6 +2426,18 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// A creature that goes at once, dying or dead: its death done if it was not, its remains left, and
+    /// it is gone for good, also from its level's list (activeInLevel).
+    /// </summary>
+    protected void CleanUpBody()
+    {
+        EnsureDeathProcessedOnce();
+        EnsureRemainsSpawnedOnce();
+        activeInLevel = false;
+        Utils.DestroyCritter(this);
+    }
+
     private void EnsureRemainsSpawnedOnce()
     {
         if (remainsSpawned)
@@ -2426,6 +2447,108 @@ public class Critter : UUObject
 
         remainsSpawned = true;
         SpawnRemains();
+    }
+
+    /// <summary>
+    /// How long a body lies, in seconds of play, and how far the player has to be from it, in tiles,
+    /// before it may go (the user's rule of 24 November 2026). It used to go as soon as it was out of
+    /// the camera's view, so a turn of the head took it away. Ours: the original leaves no body, only
+    /// the remains SpawnRemains() puts down, as the rotworm still does here (and a creature with no
+    /// animator, which no model of today is).
+    /// </summary>
+    private const float CorpseSeconds = 600.0f;
+    private const float CorpseTiles = 10.0f;
+    private const float CorpseCheckPeriod = 0.5f;
+    private static readonly Plane[] corpseFrustum = new Plane[6];
+    private float corpseCheckTime;
+
+    /// <summary>
+    /// A body lying where it fell: no collider, and an animator that stops when no one sees it, since
+    /// the death clip is over.
+    /// </summary>
+    private void LieDead()
+    {
+        if (cachedCharacterController != null)
+        {
+            cachedCharacterController.enabled = false;
+        }
+
+        if (cachedAnimator != null)
+        {
+            cachedAnimator.cullingMode = AnimatorCullingMode.CullCompletely;
+        }
+    }
+
+    /// <summary>
+    /// The body goes once it has lain CorpseSeconds of play (stateTime), the player is
+    /// CorpseTiles away, and he cannot see it: its tile is out of those he can see, or behind a closed
+    /// door, or it is out of the camera's view. Checked twice a second.
+    /// </summary>
+    private void UpdateCorpse(float squaredDistanceToPlayer, bool inPvs)
+    {
+        stateTime += Time.deltaTime;
+        corpseCheckTime -= Time.deltaTime;
+        if (corpseCheckTime > 0.0f)
+        {
+            return;
+        }
+
+        corpseCheckTime = CorpseCheckPeriod;
+        const float reach = CorpseTiles * Tile.xzScale;
+        if (stateTime < CorpseSeconds || squaredDistanceToPlayer < reach * reach)
+        {
+            return;
+        }
+
+        if (inPvs)
+        {
+            Camera mainCam = PlayerObject.Player.mainCamera;
+            if (mainCam == null)
+            {
+                return;
+            }
+
+            // a box around the body, wide enough for the mesh
+            GeometryUtility.CalculateFrustumPlanes(mainCam, corpseFrustum);
+            if (GeometryUtility.TestPlanesAABB(corpseFrustum, new Bounds(transform.position, Vector3.one * 3.0f)))
+            {
+                return;
+            }
+        }
+
+        EnsureRemainsSpawnedOnce();
+        if (gameObject.activeSelf)
+        {
+            gameObject.SetActive(false);
+        }
+        // make sure it doesn't come back (eg during level transition)
+        activeInLevel = false;
+        Utils.DestroyCritter(this);
+    }
+
+    private static readonly Collider[] nearBodyCache = new Collider[32];
+
+    /// <summary>
+    /// A dying creature drops its things from a metre up (UUObject.PositionPossessedObject()), and those
+    /// that fall on it come to rest on its CharacterController, which the layer Objects collides with,
+    /// and sleep there. When the body lies down (SetState(Dead)) the controller goes, and nothing wakes
+    /// them: they hung in the air until something touched them. Every rigidbody of a thing near the body
+    /// is woken, so it falls with it.
+    /// </summary>
+    private void WakeLootAroundBody()
+    {
+        int mask = (1 << LayerMask.NameToLayer("Objects")) | (1 << LayerMask.NameToLayer("NonBlockingObject"))
+            | (1 << LayerMask.NameToLayer("PhysicsDebris"));
+        int count = Physics.OverlapBoxNonAlloc(transform.position + 1.5f * Vector3.up, new Vector3(2.0f, 1.75f, 2.0f),
+            nearBodyCache, Quaternion.identity, mask, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < count; ++i)
+        {
+            Rigidbody rb = nearBodyCache[i].attachedRigidbody;
+            if (rb != null && !rb.isKinematic)
+            {
+                rb.WakeUp();
+            }
+        }
     }
 
     /// <summary>
@@ -2609,12 +2732,14 @@ public class Critter : UUObject
             EnsureDeathProcessedOnce();
             break;
         case EState.Dead:
-            cachedCharacterController.enabled = false;
+            LieDead();
+            WakeLootAroundBody();
+            // from here the seconds the body has lain (UpdateCorpse())
             stateTime = 0.0f;
-            EnsureRemainsSpawnedOnce();
-            // 3d critters wait until the body isn't being looked at to disappear
+            // 3d critters leave a body, which UpdateCorpse() takes away in time, and their remains with it
             if (cachedAnimator == null || type == EObjectType.Rotworm)
             {
+                EnsureRemainsSpawnedOnce();
                 Utils.DestroyCritter(this);
             }
             break;
@@ -3903,7 +4028,8 @@ public class Critter : UUObject
         KeepFlyerUnderLimit();
 
         // Check PVS visibility and update renderer visibility
-        if (LevelLoader.GetLevel().pvs.IsVisible(cachedCurrentTile) && !IsOccludedByDoor())
+        bool inPvs = LevelLoader.GetLevel().pvs.IsVisible(cachedCurrentTile) && !IsOccludedByDoor();
+        if (inPvs)
         {
             cachedVisibilityGroup.Show();
         }
@@ -3917,6 +4043,21 @@ public class Critter : UUObject
 
         // Above the early return below on purpose: being far away is the case this is about.
         UpdateEyeGlow(distanceToPlayer);
+
+        // A body only lies there, and it may go only when the player is far, beyond the wake-up
+        // range too, so it is looked after above that return.
+        if (state == EState.Dead)
+        {
+            UpdateCorpse(distanceToPlayer, inPvs);
+            return;
+        }
+
+        // and one that goes at once, after a load, wherever it is
+        if (state == EState.Cleanup)
+        {
+            CleanUpBody();
+            return;
+        }
 
         if (distanceToPlayer > kWakeUpRange * kWakeUpRange && LevelLoader.sLevelLoader.loadedLevel != 9)
         {
@@ -4715,46 +4856,8 @@ public class Critter : UUObject
                     SetState(EState.Dead);
                 }
                 break;
-            case EState.Dead:
-                stateTime += Time.deltaTime; // Accumulate time for periodic visibility check
-
-                // Check visibility periodically (every 0.5 seconds)
-                if (stateTime >= 0.5f)
-                {
-                    stateTime = 0.0f; // Reset timer for next check
-
-                    // Get camera frustum planes
-                    Camera mainCam = PlayerObject.Player.mainCamera;
-                    if (mainCam != null)
-                    {
-                        Plane[] planes = GeometryUtility.CalculateFrustumPlanes(mainCam);
-
-                        // Create bounds from a sphere around the character
-                        // Use a reasonable radius (e.g., 1.5 units) to account for mesh extent
-                        float sphereRadius = 1.5f;
-                        Bounds sphereBounds = new Bounds(transform.position, Vector3.one * sphereRadius * 2);
-
-                        // Test if bounds are outside frustum
-                        // TestPlanesAABB returns false if bounds are completely outside
-                        if (!GeometryUtility.TestPlanesAABB(planes, sphereBounds))
-                        {
-                            // Character is completely outside camera view, safe to delete
-                            if (gameObject.activeSelf)
-                            {
-                                gameObject.SetActive(false);
-                            }
-                            // make sure it doesn't come back (eg during level transition)
-                            activeInLevel = false;
-                            Utils.DestroyCritter(this);
-                        }
-                    }
-                }
-                break;
             case EState.Cleanup:
-                EnsureDeathProcessedOnce();
-                EnsureRemainsSpawnedOnce();
-                activeInLevel = false;
-                Utils.DestroyCritter(this);
+                CleanUpBody();
                 return;
             }
         }
@@ -7314,25 +7417,41 @@ public class Critter : UUObject
         }
     }
 
+    /// <summary>
+    /// What a creature leaves where it lay, as UW.EXE 0x15aa5 (build_corpse, PATHFIND.C) does. The corpse
+    /// field of its record, byte 8 bits 5-7, makes object 0xd8 + k on the spot, of quality 40: a dead
+    /// rotworm, rubble, wood chips, a pile of bones. Its remains field, byte 0x0a bits 2-4, makes object
+    /// 0xc0 + k near it 7 times in 16: a skull, a bone, a pile of bones, whose owner is the creature's
+    /// type, so that its description names it (Bones.NameEnchantment()). The corpse field's blood stains,
+    /// 5 to 7, are BloodStain.TrySpawnDeathStain()'s, at the moment of death. The rotworm, which leaves
+    /// no body, leaves the rest as it dies, as in the original; a body when it goes (UpdateCorpse(), or a
+    /// change of level), so that bones are not found under it.
+    /// </summary>
     void SpawnRemains()
     {
-        if (stats.Remains != 0)
+        if (stats.Remains is >= 1 and <= 4)
         {
-            UUObject remains = null;
-            switch (stats.Remains)
-            {
-            case 1:
-                remains = LevelLoader.CreateObjectOfType(EObjectType.DeadRotworm);
-                break;
-            }
-
+            UUObject remains = LevelLoader.CreateObjectOfType((EObjectType)(0xd8 + stats.Remains));
             if (remains != null)
             {
+                remains.quality = 40;
                 remains.PostLoadInitialize();
                 remains.WorldInitialize(transform.position);
                 // snap to the same spot as the dying critter
                 remains.transform.position = transform.position;
                 remains.transform.eulerAngles = transform.eulerAngles;
+            }
+        }
+
+        int bones = (stats.Passive >> 2) & 7;
+        if (bones != 0 && Random.Range(0, 16) < 7)
+        {
+            UUObject bone = LevelLoader.CreateObjectOfType((EObjectType)(0xc0 + bones));
+            if (bone != null)
+            {
+                bone.ownerIndex = typeNum - 64;
+                // the original drops it within half a tile either way (drop_around_place, COLLIDE.C)
+                PositionPossessedObject(bone, Random.Range(0.0f, 1.5f));
             }
         }
     }
@@ -7540,11 +7659,9 @@ public class Critter : UUObject
     {
         foreach (var lootObj in loot)
         {
+            // Loot bones keep owner 0, as the original's (generate_inventory); the bone that names its
+            // creature is the one SpawnRemains() leaves.
             PositionPossessedObject(lootObj);
-            if (lootObj.type is EObjectType.BoneA or EObjectType.BoneB or EObjectType.SkullA or EObjectType.SkullB or EObjectType.PileOfBonesA or EObjectType.PileOfBonesB)
-            {
-                lootObj.ownerIndex = typeNum - 64;
-            }
             // Mark keys spawned from Tyball as invulnerable to lava (using quality = 255 as marker)
             if (whoami == EWhoAmI.Tyball && lootObj is Key)
             {
