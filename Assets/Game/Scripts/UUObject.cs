@@ -752,6 +752,22 @@ public class UUObject : LevelObject
         }
     }
 
+    /// <summary>
+    /// What the player picks up belongs to nobody from then on, so dropping it and taking it
+    /// again is no second theft. The original clears the owner of an ownable object after the
+    /// theft check, whether or not anyone saw it, unless the owner's low five bits are above 27
+    /// (UW.EXE 0x719ca, player_grabbed, CRITTIME.C). Called on the part taken, so the rest of a
+    /// pile left on the floor keeps its owner, as the original's copy does (AskHowMany,
+    /// INVPANEL.C).
+    /// </summary>
+    protected void ForgetOwnerOnPickUp()
+    {
+        if (DataLoader.sDataLoader.comObjProps[(int)type].canBeOwned && (ownerIndex & 31) <= 27)
+        {
+            ownerIndex = 0;
+        }
+    }
+
     public virtual void TryInteract(UUObject originator, UUObject sender, EAction action)
     {
         if (sender == null && action == EAction.Use) // change to pickup...
@@ -778,6 +794,7 @@ public class UUObject : LevelObject
                             || Interaction.sInt.TryConsumeWorldPickupIntentForImmediatePickup()))
                     {
                         TryStolen();
+                        ForgetOwnerOnPickUp();
                         SendPickupToTrigger();
                         gameObject.SetActive(false);
                         LevelLoader.worldObj.Remove(this);
@@ -789,6 +806,7 @@ public class UUObject : LevelObject
                     }
 
                     TryStolen();
+                    ForgetOwnerOnPickUp();
                     SendPickupToTrigger();
             
                     gameObject.SetActive(false);
@@ -841,6 +859,7 @@ public class UUObject : LevelObject
         {
             if (howMany == quantity)
             {
+                ForgetOwnerOnPickUp();
                 gameObject.SetActive(false);
                 LevelLoader.worldObj.Remove(this);
                 RemoveFromLevelObjectsRecursive();
@@ -852,6 +871,7 @@ public class UUObject : LevelObject
                 Inventory.CopyPeeledStackProperties(this, obj);
                 obj.quantity = howMany;
                 obj.PostLoadInitialize();
+                obj.ForgetOwnerOnPickUp();
                 quantity -= howMany;
                 Inventory.sInv.BeginWorldPickupFromGround(obj);
             }
@@ -862,6 +882,7 @@ public class UUObject : LevelObject
         UUObject picked = this;
         if (howMany == quantity)
         {
+            ForgetOwnerOnPickUp();
             gameObject.SetActive(false);
             LevelLoader.worldObj.Remove(this);
             Inventory.Add(this);
@@ -873,6 +894,7 @@ public class UUObject : LevelObject
             Inventory.CopyPeeledStackProperties(this, obj);
             obj.quantity = howMany;
             obj.PostLoadInitialize();
+            obj.ForgetOwnerOnPickUp();
             Inventory.Add(obj);
             quantity -= howMany;
             picked = obj;
