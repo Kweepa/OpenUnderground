@@ -846,6 +846,79 @@ public partial class Conversation
         return exit;
     }
 
+    // The original hands every object from one built-in to the next as its object index, the slot in the level's
+    // object table (Obj_MemTPtr): show_inv and find_inv give one, x_obj_stuff, give_to_npc, set_inv_quality and the
+    // others take one, and a script may keep it in a variable for a later talk (Shak's repair: the item given in one
+    // talk, repaired and handed back in the next). The remake has no such index, and each handler had taken its own
+    // stand-in - a trade slot, a place in the speaker's loot, a place from the end of his contents - so where two met
+    // the object was the wrong one: the sword Shak forges was never marked identified, the mark went to a trade slot.
+    // Now an object gets a number the first time a script takes it, UUObject.conversationHandle, kept with it and saved,
+    // and a number is looked for where a conversation can reach: the trade tray, the speaker's inventory, the pack.
+    private short ObjectHandle(UUObject obj)
+    {
+        if (obj == null)
+        {
+            return 0;
+        }
+
+        if (obj.conversationHandle <= 0)
+        {
+            PlayerData.sData.lastConversationHandle = PlayerData.sData.lastConversationHandle >= short.MaxValue
+                ? 1 : PlayerData.sData.lastConversationHandle + 1;
+            obj.conversationHandle = PlayerData.sData.lastConversationHandle;
+        }
+
+        return (short)obj.conversationHandle;
+    }
+
+    private UUObject ObjectFromHandle(int handle)
+    {
+        if (handle <= 0)
+        {
+            return null;
+        }
+
+        Predicate<UUObject> match = o => o.conversationHandle == handle;
+        foreach (UUObject onTray in Inventory.sInv.tradeSlots)
+        {
+            if (onTray != null && onTray.conversationHandle == handle)
+            {
+                return onTray;
+            }
+        }
+
+        return FindIn(npc.loot, match) ?? FindIn(Inventory.GetAllItems(), match)
+               ?? FindIn(new List<UUObject>(Inventory.sInv.invSlotContents), match);
+    }
+
+    /// <summary>The first object in the list, or in a bag in it, that matches.</summary>
+    private static UUObject FindIn(List<UUObject> list, Predicate<UUObject> match)
+    {
+        if (list == null)
+        {
+            return null;
+        }
+
+        foreach (UUObject obj in list)
+        {
+            if (obj == null)
+            {
+                continue;
+            }
+            if (match(obj))
+            {
+                return obj;
+            }
+            UUObject inside = FindIn(obj.contents, match);
+            if (inside != null)
+            {
+                return inside;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// The script's contains: whether the word appears in the text as a whole word, bounded by the ends,
     /// white space or punctuation, ignoring case (UW.EXE 0x68194, StringContains, BABL.C). A plain substring
@@ -977,12 +1050,18 @@ public partial class Conversation
             break;
         case "show_inv":
             {
-                // the function copies the item positions and object ids of
-                // all visible items in the barter area to the array in arg1
-                // and arg2 (which needs at most 4 array values each)
-                int ptra = Arg(1) + 1; // pointer to array of positions
-                int ptrb = Arg(2) + 1; // point to array of items in barter area
-                result = Inventory.sInv.Conversation_show_inv(ref mem, ptra, ptrb);
+                // UW.EXE 0x6f675 (conv_check_inv, CONVERSE.C): the player's selected trade items, the objects in
+                // the array at arg1 and their types in the array at arg2, four entries; returns how many.
+                int ptra = Arg(1) + 1; // the objects
+                int ptrb = Arg(2) + 1; // their types
+                List<UUObject> offered = Inventory.sInv.SelectedPlayerTradeItems();
+                for (int i = 0; i < 4; ++i)
+                {
+                    UUObject obj = i < offered.Count ? offered[i] : null;
+                    mem[ptra + i] = ObjectHandle(obj);
+                    mem[ptrb + i] = (short)(obj != null ? (int)obj.type : 0);
+                }
+                result = offered.Count;
             }
             break;
         case "give_to_npc":
@@ -997,22 +1076,69 @@ public partial class Conversation
                 // The game scripts are inconsistent. Some pass the base pointer of the
                 // 1-indexed item array (Goldthirst), while others pre-calculate (using `offset`) and
                 // pass the pointer to the first element (Shak).
-                // If mem[ptra] == 0, we need to add 1 since 0 is not a valid player slot
+                // If mem[ptra] == 0, we need to add 1 since 0 is not a valid object
                 if (mem[ptra] == 0)
                 {
                     ++ptra;
                 }
-            
-                result = Inventory.sInv.Conversation_give_to_npc(npc, ref mem, ptra, count);
+
+                // All or nothing, as UW.EXE 0x6f8f5 (conv_give_inv, CONVERSE.C): every object asked for must still be
+                // among the player's selected trade items, or nothing is given and the script gets 0. An item taken
+                // back from the tray while a menu was up used to count as given.
+                List<UUObject> offered = Inventory.sInv.SelectedPlayerTradeItems();
+                List<UUObject> given = new List<UUObject>();
+                bool all = count <= offered.Count;
+                for (int i = 0; all && i < count; ++i)
+                {
+                    UUObject obj = ObjectFromHandle(mem[ptra + i]);
+                    all = obj != null && offered.Contains(obj) && !given.Contains(obj);
+                    given.Add(obj);
+                }
+
+                result = 0;
+                if (all)
+                {
+                    foreach (UUObject obj in given)
+                    {
+                        Inventory.sInv.TakeOffTradeTray(obj);
+                        npc.ConversationReceive(obj);
+                    }
+                    result = 1;
+                }
             }
             break;
         case "give_ptr_npc":
             {
-                // TODO: check this (might need +1 to listPos)
-                // e.g., giving Judy the pic of Tom
+                // UW.EXE 0x6f9dd (give_ptr_npc, CONVERSE.C): the object, from the trade tray if the player offers it,
+                // else from wherever it is in his pack, qty of a pile (all of it for a negative qty or a single object);
+                // nothing if he no longer carries it (Judy's picture of Tom, Marrowsuck's scales and thread).
                 int quantity = mem[Arg(1)];
-                int listPos = mem[Arg(2)];
-                result = Inventory.sInv.Conversation_give_ptr_npc(npc, ref mem, quantity, listPos);
+                UUObject obj = ObjectFromHandle(mem[Arg(2)]);
+                result = 0;
+                if (obj != null && Inventory.sInv.SelectedPlayerTradeItems().Contains(obj))
+                {
+                    Inventory.sInv.TakeOffTradeTray(obj);
+                    npc.ConversationReceive(obj);
+                    result = 1;
+                }
+                else if (obj != null && Inventory.sInv.FindObjectInInventory(obj) != null)
+                {
+                    if (quantity > 0 && obj.stackable && quantity < obj.quantity)
+                    {
+                        UUObject part = LevelLoader.CreateObjectOfType(obj.type);
+                        Inventory.CopyPeeledStackProperties(obj, part);
+                        part.quantity = quantity;
+                        part.PostLoadInitialize();
+                        obj.quantity -= quantity;
+                        npc.ConversationReceive(part);
+                    }
+                    else
+                    {
+                        Inventory.sInv.RemoveItemFromInventory(obj);
+                        npc.ConversationReceive(obj);
+                    }
+                    result = 1;
+                }
             }
             break;
         case "take_from_npc":
@@ -1067,26 +1193,25 @@ public partial class Conversation
             break;
         case "take_id_from_npc":
             {
-                int index = Arg(1);
-                result = Inventory.sInv.Conversation_take_id_from_npc(npc, index);
-            }
-            break;
-        case "take_from_npc_inv":
-            {
-                // moves object from npc to player inventory, by npc inventory index (#16, Ishtass)
-                int index = mem[Arg(1)];
-                if (index > 0 && index <= npc.loot.Count)
+                // UW.EXE 0x6c1d2 (npc_barter_give_id, BARTER.C): that object from the speaker's inventory to the
+                // player, into the pack here (Shak's repair, Ishtass's gift)
+                UUObject obj = ObjectFromHandle(mem[Arg(1)]);
+                result = 0;
+                if (obj != null && npc.loot.Remove(obj))
                 {
-                    UUObject obj = npc.loot[index - 1];
-                    npc.loot.RemoveAt(index - 1);
                     obj.PostLoadInitialize();
                     Inventory.Add(obj);
                     result = 1;
                 }
-                else
-                {
-                    result = 0;
-                }
+            }
+            break;
+        case "take_from_npc_inv":
+            {
+                // UW.EXE 0x69dd6 (take_from_npc_inv, BABLHACK.C): the object n links into the speaker's inventory
+                // (0 the first), or 0 past its end; nothing moves. Ishtass asks for 1, the second, and hands it over
+                // with take_id_from_npc.
+                int n = Mathf.Max(0, (int)mem[Arg(1)]);
+                result = n < npc.loot.Count ? ObjectHandle(npc.loot[n]) : 0;
             }
             break;
         case "identify_inv":
@@ -1102,8 +1227,8 @@ public partial class Conversation
                 int loreResult = mem[Arg(1)];
                 int addrName = Arg(2);
                 int addArticle = mem[Arg(3)];
-                int tradeSlot = mem[Arg(4)];
-                result = Inventory.sInv.Conversation_identify_inv(stringBlock, tradeSlot, addArticle, loreResult);
+                UUObject obj = ObjectFromHandle(mem[Arg(4)]);
+                result = Inventory.sInv.Conversation_identify_inv(stringBlock, obj, addArticle, loreResult);
                 mem[addrName] = 0;
             }
             break;
@@ -1154,25 +1279,35 @@ public partial class Conversation
             break;
         case "do_inv_create":
             {
+                // UW.EXE 0x6c327 (npc_inv_create, BARTER.C): the item is made at quality 63, the best, and joins a pile
+                // of its kind in the speaker's inventory, or goes to its head; the script gets the object, or 0 when it
+                // joined a pile. Shak's sword and Marrowsuck's boots came at 40.
                 EObjectType type = (EObjectType) mem[Arg(1)];
-                // create item in npc inventory
                 UUObject obj = LevelLoader.CreateObjectOfType(type);
+                obj.quality = 63;
                 obj.PostLoadInitialize();
-                npc.loot.Add(obj);
-                result = npc.loot.Count - 1;
+                if (Inventory.TryJoinStackIn(npc.loot, obj))
+                {
+                    result = 0;
+                }
+                else
+                {
+                    npc.loot.Insert(0, obj);
+                    result = ObjectHandle(obj);
+                }
             }
             break;
         case "do_inv_delete":
             {
                 // e.g., Marrowsuck - deleting the scales and thread when making the boots
+                // UW.EXE 0x6c48c (npc_inv_delete, BARTER.C): the first of the type in the speaker's inventory
                 EObjectType type = (EObjectType) mem[Arg(1)];
-                // delete item from npc inventory
                 result = 0;
-                for (int i = 0; i < npc.contents.Count; ++i)
+                for (int i = 0; i < npc.loot.Count; ++i)
                 {
-                    if (npc.contents[i].type == type)
+                    if (npc.loot[i].type == type)
                     {
-                        npc.contents.RemoveAt(i);
+                        npc.loot.RemoveAt(i);
                         result = 1;
                         break;
                     }
@@ -1181,23 +1316,28 @@ public partial class Conversation
             break;
         case "check_inv_quality":
             {
-                int itemPosition = mem[Arg(1)];
-                result = Inventory.sInv.Conversation_check_inv_quality(itemPosition);
+                // UW.EXE 0x6fd94 (check_inv_quality, CONVERSE.C): the object's quality
+                UUObject obj = ObjectFromHandle(mem[Arg(1)]);
+                result = obj != null ? obj.quality : 0;
             }
             break;
         case "set_inv_quality":
             {
-                int quality = mem[Arg(1)];
-                // Immediate NPC-inv position (Shak pushes 2), same convention as take_id_from_npc.
-                int itemIndex = Arg(2);
-                Inventory.sInv.Conversation_set_inv_quality(npc, itemIndex, quality);
-                result = 0; // no result.
+                // UW.EXE 0x6fdca (set_inv_quality, CONVERSE.C): the object's quality, six bits (Shak's repair, on the
+                // object the player gave him)
+                UUObject obj = ObjectFromHandle(mem[Arg(2)]);
+                if (obj != null)
+                {
+                    obj.quality = mem[Arg(1)] & 0x3f;
+                }
+                result = 1;
             }
             break;
         case "count_inv":
             {
-                int pos = mem[Arg(1)];
-                result = Inventory.sInv.Conversation_count_inv(pos);
+                // UW.EXE 0x6fd38 (count_inv, CONVERSE.C): how many of the object, 1 for a single one
+                UUObject obj = ObjectFromHandle(mem[Arg(1)]);
+                result = obj != null ? obj.quantity : 0;
             }
             break;
         case "setup_to_barter":
@@ -1303,19 +1443,33 @@ public partial class Conversation
             break;
         case "place_object":
             {
+                // UW.EXE 0x69bff (place_object, BABLHACK.C): the object, taken from the speaker, on tile (x, y), or at
+                // the player's feet for a negative x; 0 when the tile is off the map. (The original also gives 0 when
+                // the object finds no room on the tile; here it is placed anyway.)
                 int tileY = mem[Arg(1)];
                 int tileX = mem[Arg(2)];
-                int itemSlot = mem[Arg(3)]; // from do_inv_create
-                // place in world
-                UUObject obj = npc.loot[itemSlot];
-                npc.loot.RemoveAt(itemSlot);
-                Tile t = LevelLoader.GetTile(tileX, tileY);
-                obj.gameObject.SetActive(true);
-                obj.x = 3;
-                obj.y = 3;
-                obj.WorldInitialize(t, t.x, t.y);
-                obj.PostLoadInitialize();
-                result = 1;
+                UUObject obj = ObjectFromHandle(mem[Arg(3)]); // from do_inv_create
+                result = 0;
+                if (obj != null)
+                {
+                    if (tileX < 0)
+                    {
+                        Vector2Int feet = Critter.TileOf(PlayerObject.Player.transform.position);
+                        tileX = feet.x;
+                        tileY = feet.y;
+                    }
+                    if (tileX >= 1 && tileX < 64 && tileY >= 1 && tileY < 64)
+                    {
+                        npc.loot.Remove(obj);
+                        Tile t = LevelLoader.GetTile(tileX, tileY);
+                        obj.gameObject.SetActive(true);
+                        obj.x = 3;
+                        obj.y = 3;
+                        obj.WorldInitialize(t, t.x, t.y);
+                        obj.PostLoadInitialize();
+                        result = 1;
+                    }
+                }
             }
             break;
         case "remove_talker":
@@ -1373,56 +1527,60 @@ public partial class Conversation
         case "x_obj_stuff":
             {
                 // get or set properties of object
-                result = Inventory.sInv.Conversation_x_obj_stuff(ref mem, Arg(9), Arg(8), Arg(7), Arg(6), Arg(5), Arg(4), Arg(3),
+                result = Inventory.sInv.Conversation_x_obj_stuff(ref mem, ObjectFromHandle(mem[Arg(9)]), Arg(8), Arg(7), Arg(6), Arg(5), Arg(4), Arg(3),
                     Arg(2), Arg(1));
             }
             break;
         case "find_inv":
             {
-                result = 0;
+                // UW.EXE 0x6bf8d (npc_barter_find, BARTER.C): the first object of the type (from 1000 a class, item
+                // types (n - 1000) * 16 onwards), bags included, in the player's pack when arg1 is 1, else in the
+                // speaker's inventory; the script gets the object, or 0.
                 int inPlayerInv = mem[Arg(1)];
-                EObjectType itemId = (EObjectType)mem[Arg(2)];
-                if (inPlayerInv == 1)
-                {
-                    // search player for item
-                    if (Inventory.sInv.FindObjectInInventory(itemId) != null)
-                    {
-                        result = 1;
-                    }
-                }
-                else
-                {
-                    // search npc for item
-                    for (int i = 0; i < npc.loot.Count; ++i)
-                    {
-                        if (npc.loot[i].type == itemId)
-                        {
-                            result = i + 1;
-                            break;
-                        }
-                    }
-                }
+                int itemId = mem[Arg(2)];
+                Predicate<UUObject> wanted = o => itemId >= 1000 ? (int)o.type >> 4 == itemId - 1000 : (int)o.type == itemId;
+                result = ObjectHandle(FindIn(inPlayerInv != 0 ? Inventory.GetAllItems() : npc.loot, wanted));
             }
             break;
         case "find_barter":
             {
+                // UW.EXE 0x6f6fc (find_barter, CONVERSE.C): the first of the player's selected trade items of the type,
+                // or from 1000 of the class (types (n - 1000) * 16 onwards); the script gets the object, or 0
                 int itemId = mem[Arg(1)];
-                // searches for item in barter area
-                // returns pos in inventory object list, or 0
-                result = Inventory.sInv.Conversation_find_barter(itemId);
+                result = 0;
+                foreach (UUObject obj in Inventory.sInv.SelectedPlayerTradeItems())
+                {
+                    if (itemId >= 1000 ? (int)obj.type >> 4 == itemId - 1000 : (int)obj.type == itemId)
+                    {
+                        result = ObjectHandle(obj);
+                        break;
+                    }
+                }
             }
             break;
         case "find_barter_total":
             {
-                // ???
-                result = 0;
+                // UW.EXE 0x6f7aa (find_barter_total, CONVERSE.C): the player's selected trade items of the type, their
+                // objects in the array at arg2, how many in arg3, their total quantity in arg1; 1 when there is any.
+                // A class (1000 and up) finds nothing, in the original too.
                 int ptrToCount = Arg(1);
                 int ptrToSlots = Arg(2) + 1;
                 int ptrToSlotCount = Arg(3);
                 int itemId = mem[Arg(4)];
-
-                result = Inventory.sInv.Conversation_find_barter_total(itemId, ref mem, ptrToSlots, ptrToSlotCount);
-                mem[ptrToCount] = (short)result;
+                int matches = 0;
+                int total = 0;
+                foreach (UUObject obj in Inventory.sInv.SelectedPlayerTradeItems())
+                {
+                    if (itemId < 1000 && (int)obj.type == itemId)
+                    {
+                        mem[ptrToSlots + matches] = ObjectHandle(obj);
+                        ++matches;
+                        total += obj.quantity;
+                    }
+                }
+                mem[ptrToSlotCount] = (short)matches;
+                mem[ptrToCount] = (short)total;
+                result = total > 0 ? 1 : 0;
             }
             break;
         case "compare":

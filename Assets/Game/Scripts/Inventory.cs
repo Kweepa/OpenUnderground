@@ -5406,196 +5406,152 @@ public class Inventory : MonoBehaviour
         return false;
     }
 
-    public int Conversation_show_inv(ref short[] mem, int posPtr, int itemPtr)
+    /// <summary>
+    /// The player's selected trade items, in the order of his four slots: what the original's
+    /// player_barter_items (UW.EXE 0x6bd87, BARTER.C) hands the conversation built-ins.
+    /// </summary>
+    public List<UUObject> SelectedPlayerTradeItems()
     {
-        int num = 0;
+        List<UUObject> offered = new List<UUObject>();
         foreach (int i in playerTradeIndices)
         {
             if (tradeSlots[i] != null && tradeSlotSelected[i])
             {
-                mem[posPtr++] = (short)i;
-                mem[itemPtr++] = (short)tradeSlots[i].type;
-                ++num;
+                offered.Add(tradeSlots[i]);
             }
         }
 
-        for (int i = num; i < 4; ++i)
-        {
-            mem[posPtr++] = 0;
-            mem[itemPtr++] = 0;
-        }
-
-        return num;
+        return offered;
     }
 
-    public int Conversation_give_to_npc(Critter npc, ref short[] mem, int posPtr, int count)
+    /// <summary>Takes an object off the trade tray, for a conversation that gives it away; false if it is not there.</summary>
+    public bool TakeOffTradeTray(UUObject obj)
     {
-        for (int i = 0; i < count; ++i)
+        for (int i = 0; i < tradeSlots.Length; ++i)
         {
-            int slot = mem[posPtr++];
-            
-            npc.contents.Add(tradeSlots[slot]);
-            
-            tradeSlots[slot] = null; // remove item.
-            tradeSlotSelected[slot] = false;
+            if (obj != null && tradeSlots[i] == obj)
+            {
+                tradeSlots[i] = null;
+                tradeSlotSelected[i] = false;
+                return true;
+            }
         }
 
-        return count;
+        return false;
     }
 
-    public int Conversation_give_ptr_npc(Critter npc, ref short[] mem, int quantity, int listPos)
+    /// <summary>
+    /// The object joins a pile in <paramref name="list"/> by the pack's rule, and is destroyed; false, and nothing
+    /// done, when there is no pile it can join.
+    /// </summary>
+    public static bool TryJoinStackIn(List<UUObject> list, UUObject obj)
     {
-        // not sure what to do here
-        if (listPos > 0)
+        UUObject pile = FindStackToJoin(list, obj, obj.quantity);
+        if (pile == null)
         {
-            npc.contents.Add(tradeSlots[listPos]);
-            
-            tradeSlots[listPos] = null;
-            tradeSlotSelected[listPos] = false;
-            return 1;
+            return false;
         }
-        return 0;
+
+        JoinStack(pile, obj, obj.quantity);
+        Utils.DestroyItem(obj);
+        return true;
     }
 
-    public int Conversation_take_id_from_npc(Critter npc, int contentsIndex)
-    {
-        int i = npc.contents.Count - contentsIndex;
-        if (i >= 0 && i < npc.contents.Count)
-        {
-            UUObject obj = npc.contents[i];
-            Add(obj);
-            npc.contents.Remove(obj);
-            return 1;
-        }
-        return 0;
-    }
-
-    public int Conversation_x_obj_stuff(ref short[] mem, int pObjIndex, int pMode, int pIdentify, int pOwner,
+    /// <summary>
+    /// The script's x_obj_stuff (UW.EXE 0x6a0ca, BABLHACK.C) on any object the conversation has a handle for, not only
+    /// on the trade tray: the item a script makes or finds is marked identified, or given its text, before it is handed over.
+    /// </summary>
+    public int Conversation_x_obj_stuff(ref short[] mem, UUObject o, int pMode, int pIdentify, int pOwner,
         int pFlags, int pLink, int pFlag1, int pFlag0, int pQuality)
     {
-        int slot = mem[pObjIndex];
-        if (slot >= 0 && slot < 8)
+        if (o != null)
         {
-            UUObject o = tradeSlots[slot]; 
-            if (o != null)
+            if (mem[pMode] == 0)
             {
-                if (mem[pMode] == 0)
+                // get
+
+                if (mem[pIdentify] != -1)
                 {
-                    // get
-
-                    if (mem[pIdentify] != -1)
-                    {
-                        // used 0-7
-                        mem[pIdentify] = (short)(2 * (short)o.loreResult);
-                    }
-
-                    if (mem[pOwner] != -1)
-                    {
-                        mem[pOwner] = (short) o.ownerIndex;
-                    }
-
-                    if (mem[pFlags] != -1)
-                    {
-                        mem[pFlags] = (short)o.flags;
-                    }
-
-                    if (mem[pLink] != -1)
-                    {
-                        mem[pLink] = (short)(o.link & 0x1ff);
-                    }
-
-                    if (mem[pFlag1] != -1)
-                    {
-                        mem[pFlag1] = (short)((o.flags & 2) >> 1);
-                    }
-
-                    if (mem[pFlag0] != -1)
-                    {
-                        mem[pFlag0] = (short)(o.flags & 1);
-                    }
-
-                    if (mem[pQuality] != -1)
-                    {
-                        mem[pQuality] = (short)o.quality;
-                    }
+                    // used 0-7
+                    mem[pIdentify] = (short)(2 * (short)o.loreResult);
                 }
-                else
+
+                if (mem[pOwner] != -1)
                 {
-                    // set
-                    if (mem[pIdentify] != -1)
-                    {
-                        // used 0-7
-                        o.loreResult = (Skills.ESkillTestResult)(mem[pIdentify] / 2);
-                    }
+                    mem[pOwner] = (short) o.ownerIndex;
+                }
 
-                    if (mem[pOwner] != -1)
-                    {
-                        o.ownerIndex = mem[pOwner];
-                    }
-                    
-                    if (mem[pFlags] != -1)
-                    {
-                        o.flags = mem[pFlags];
-                    }
+                if (mem[pFlags] != -1)
+                {
+                    mem[pFlags] = (short)o.flags;
+                }
 
-                    if (mem[pLink] != -1)
-                    {
-                        o.link = mem[pLink];
-                    }
+                if (mem[pLink] != -1)
+                {
+                    mem[pLink] = (short)(o.link & 0x1ff);
+                }
 
-                    if (mem[pFlag1] != -1)
-                    {
-                        o.flags &= ~2;
-                        o.flags |= mem[pFlag1] != 0 ? 2 : 0;
-                    }
+                if (mem[pFlag1] != -1)
+                {
+                    mem[pFlag1] = (short)((o.flags & 2) >> 1);
+                }
 
-                    if (mem[pFlag0] != -1)
-                    {
-                        o.flags &= ~1;
-                        o.flags |= mem[pFlag0] != 0 ? 1 : 0;
-                    }
+                if (mem[pFlag0] != -1)
+                {
+                    mem[pFlag0] = (short)(o.flags & 1);
+                }
 
-                    if (mem[pQuality] != -1)
-                    {
-                        o.quality = mem[pQuality];
-                    }
+                if (mem[pQuality] != -1)
+                {
+                    mem[pQuality] = (short)o.quality;
+                }
+            }
+            else
+            {
+                // set
+                if (mem[pIdentify] != -1)
+                {
+                    // used 0-7
+                    o.loreResult = (Skills.ESkillTestResult)(mem[pIdentify] / 2);
+                }
+
+                if (mem[pOwner] != -1)
+                {
+                    o.ownerIndex = mem[pOwner];
+                }
+                
+                if (mem[pFlags] != -1)
+                {
+                    o.flags = mem[pFlags];
+                }
+
+                if (mem[pLink] != -1)
+                {
+                    // with bit 9 set, as the original writes it: a book's or a scroll's text is its link less 512
+                    o.link = 512 | (mem[pLink] & 0x1ff);
+                }
+
+                if (mem[pFlag1] != -1)
+                {
+                    o.flags &= ~2;
+                    o.flags |= mem[pFlag1] != 0 ? 2 : 0;
+                }
+
+                if (mem[pFlag0] != -1)
+                {
+                    o.flags &= ~1;
+                    o.flags |= mem[pFlag0] != 0 ? 1 : 0;
+                }
+
+                if (mem[pQuality] != -1)
+                {
+                    o.quality = mem[pQuality];
                 }
             }
         }
 
         // not important
         return 0;
-    }
-
-    public int Conversation_check_inv_quality(int slotIndex)
-    {
-        UUObject obj = tradeSlots[slotIndex];
-        if (obj != null)
-        {
-            return obj.quality;
-        }
-        return 0;
-    }
-
-    public void Conversation_set_inv_quality(Critter npc, int itemIndex, int quality)
-    {
-        // since the item isn't put in the trade slot, this must be a modification of something in contents
-        // for now just assume the last item taken is the one we want to modify
-        // it's also possible it's a 1-indexed offset from the top of contents - i.e. npc.Contents.Count - (itemIndex - 1)
-        // let's try that :)
-        int contentsIndex = npc.contents.Count - (itemIndex - 1);
-        if (contentsIndex < 0 || contentsIndex >= npc.contents.Count)
-        {
-            contentsIndex = npc.contents.Count - 1;
-        }
-        if (contentsIndex >= 0 && contentsIndex < npc.contents.Count)
-        {
-            UUObject obj = npc.contents[contentsIndex];
-            if (obj != null)
-            {
-                obj.quality = quality;
-            }
-        }
     }
 
     /// <summary>
@@ -5735,51 +5691,37 @@ public class Inventory : MonoBehaviour
         return GetValueOfTradeItems(useLikes, accuracy, playerTradeIndices);
     }
 
-    public int Conversation_identify_inv(int block, int slot, int addArticle, int loreResult)
+    public int Conversation_identify_inv(int block, UUObject obj, int addArticle, int loreResult)
     {
-        if (tradeSlotSelected[slot])
-        {
-            UUObject obj = tradeSlots[slot];
-            if (obj != null)
-            {
-                // TODO: depending on who calls this, identify differently
-                // really just comes down to Dominus and Shak
-                
-                // shak: *pUnk1=0; *pUnk2=1; *pUnk3=2 (definitely trade slot, as I moved it and it moved)
-                // dominus: *pUnk1=3; *pUnk2=1
-                // goldthirst: *pUnk1=0; *pUnk2=0
-                // guard: *pUnk1=0; *pUnk2=0
-                // so I think unk1 is the lore result, unk2 is whether to write to a string, and unk3 is the trade slot
-
-                if (loreResult == 3)
-                {
-                    obj.loreResult = (Skills.ESkillTestResult)loreResult;
-                    StringLoader.SetString(block, 0, obj.GetLookName());
-                }
-                else if (addArticle > 0)
-                {
-                    StringLoader.SetString(block, 0, obj.GetNonMagicalName());
-                }
-                else
-                {
-                    StringLoader.SetString(block, 0, obj.singularName);
-                }
-
-                // the item's value to the NPC: UW.EXE 0x6fb46 (conv_inv_name, CONVERSE.C) asks assess_value with likes,
-                // blurred by the NPC's appraisal
-                return AssessValue(obj, true, Conversations.runningConversation.npc.TradeAssess);
-            }
-        }
-
-        return 0;
-    }
-
-    public int Conversation_count_inv(int pos)
-    {
-        UUObject obj = tradeSlots[pos];
         if (obj != null)
         {
-            return obj.quantity;
+            // TODO: depending on who calls this, identify differently
+            // really just comes down to Dominus and Shak
+            
+            // shak: *pUnk1=0; *pUnk2=1; *pUnk3=2 (definitely trade slot, as I moved it and it moved)
+            // dominus: *pUnk1=3; *pUnk2=1
+            // goldthirst: *pUnk1=0; *pUnk2=0
+            // guard: *pUnk1=0; *pUnk2=0
+            // so I think unk1 is the lore result, unk2 is whether to write to a string, and unk3 is the trade slot
+            // (unk3 is the object, as every built-in passes one: its handle, Conversation.ObjectFromHandle())
+
+            if (loreResult == 3)
+            {
+                obj.loreResult = (Skills.ESkillTestResult)loreResult;
+                StringLoader.SetString(block, 0, obj.GetLookName());
+            }
+            else if (addArticle > 0)
+            {
+                StringLoader.SetString(block, 0, obj.GetNonMagicalName());
+            }
+            else
+            {
+                StringLoader.SetString(block, 0, obj.singularName);
+            }
+
+            // the item's value to the NPC: UW.EXE 0x6fb46 (conv_inv_name, CONVERSE.C) asks assess_value with likes,
+            // blurred by the NPC's appraisal
+            return AssessValue(obj, true, Conversations.runningConversation.npc.TradeAssess);
         }
 
         return 0;
@@ -5828,45 +5770,6 @@ public class Inventory : MonoBehaviour
         message += StringLoader.GetString(7, 8 + verdict) + "</i></color>";
 
         return message;
-    }
-
-    public int Conversation_find_barter(int type)
-    {
-        foreach (int i in playerTradeIndices)
-        {
-            if (tradeSlotSelected[i] && tradeSlots[i] != null)
-            {
-                if (type >= 1000)
-                {
-                    if ((int)tradeSlots[i].type / 16 == type - 1000)
-                    {
-                        return i;
-                    }
-                }
-                else if ((int)tradeSlots[i].type == type)
-                {
-                    return i;
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    public int Conversation_find_barter_total(int type, ref short[] mem, int ptrToSlots, int ptrToSlotCount)
-    {
-        mem[ptrToSlotCount] = 0;
-        int count = 0;
-        foreach (int i in playerTradeIndices)
-        {
-            if (tradeSlotSelected[i] && tradeSlots[i] != null && (int)tradeSlots[i].type == type)
-            {
-                ++mem[ptrToSlotCount];
-                mem[ptrToSlots++] = (short)i;
-                count += tradeSlots[i].quantity;
-            }
-        }
-        return count;
     }
 
     public UUObject GetCurrentItemIfInventoryActive()

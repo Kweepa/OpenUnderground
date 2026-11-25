@@ -31,6 +31,7 @@ public class UUObjectSaveData : LevelObjectSaveData
     public bool alignToFloor;
     public int loreResult;
     public int loreResultLoreLevel;
+    public int conversationHandle;
     public string enchantmentName;
     public int quantity;
     public List<ObjectSaveData> contents;
@@ -94,6 +95,9 @@ public class UUObject : LevelObject
 
     public Skills.ESkillTestResult loreResult; // success = magical?, critical success = identified
     public int loreResultLoreLevel = -1; // the lore skill level at which you obtained the loreResult
+    // The number a conversation knows this object by, the original's object index (Conversation.ObjectHandle()): 0 until
+    // a script first takes the object, then kept and saved, since a script keeps it in its variables from one talk to the next.
+    [System.NonSerialized] public int conversationHandle;
     
     // Precached StringBuilder for building lookat names and object descriptions
     private static readonly StringBuilder lookNameBuilder = new StringBuilder(128);
@@ -2032,6 +2036,7 @@ public class UUObject : LevelObject
             ApplyLoreSkillCatchUpIfNeeded();
             uuData.objectType = (int)type;
             uuData.typeNum = typeNum;
+            uuData.conversationHandle = conversationHandle;
             uuData.option = option;
             uuData.flags = flags;
             uuData.isEnchanted = isEnchanted;
@@ -2106,6 +2111,7 @@ public class UUObject : LevelObject
             alignToFloor = uuData.alignToFloor;
             loreResult = (Skills.ESkillTestResult)uuData.loreResult;
             loreResultLoreLevel = uuData.loreResultLoreLevel;
+            conversationHandle = uuData.conversationHandle;
             // The saved name is kept as a fallback for anything UpdateEnchantmentState() does not
             // cover; where it does, the name it derives wins, and the saved one is never consulted.
             enchantmentName = uuData.enchantmentName;
