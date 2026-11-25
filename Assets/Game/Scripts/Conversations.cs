@@ -379,7 +379,9 @@ public partial class Conversation
                 case "npc_arms": // ?
                     break;
                 case "npc_health":
-                    npc.hp = val;
+                    // Not written back: it comes after npc_hp and undid a script's heal (slot 22 sets
+                    // npc_hp to 125). The original reads it out and never back (UW.EXE 0x70892,
+                    // update_converse_data, CONVVARS.C).
                     break;
                 case "npc_hunger":
                     npc.hunger = val;
@@ -419,13 +421,6 @@ public partial class Conversation
             npc.charGlobals[i] = mem[i];
         }
         
-        // copy globalVars back
-        for (int i = 0; i < 11; ++i)
-        {
-            // not sure this can possibly be correct...
-            PlayerData.sData.globalVars[i] = mem[i];
-        }
-
         // move contents of trade tray back to the player
         Inventory.sInv.TryTakeAllFromTradeTray();
         
@@ -540,8 +535,6 @@ public partial class Conversation
     public bool babl_get_input;
     public string babl_input = "";
     
-    private readonly Collider[] sphereOverlapCache = new Collider[32];
-
     private enum EOp
     {
         Nop,
@@ -853,6 +846,31 @@ public partial class Conversation
         return exit;
     }
 
+    /// <summary>
+    /// The script's contains: whether the word appears in the text as a whole word, bounded by the ends,
+    /// white space or punctuation, ignoring case (UW.EXE 0x68194, StringContains, BABL.C). A plain substring
+    /// let a keyword match inside a longer word of the player's answer.
+    /// </summary>
+    private static bool ContainsWord(string text, string word)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(word))
+        {
+            return false;
+        }
+
+        for (int at = text.IndexOf(word, StringComparison.CurrentCultureIgnoreCase); at >= 0;
+             at = text.IndexOf(word, at + 1, StringComparison.CurrentCultureIgnoreCase))
+        {
+            int end = at + word.Length;
+            if ((at == 0 || !char.IsLetterOrDigit(text[at - 1])) && (end >= text.Length || !char.IsLetterOrDigit(text[end])))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private short Pop()
     {
         return mem[sp--];
@@ -923,7 +941,9 @@ public partial class Conversation
 #endif
             break;
         case "random":
-            result = Random.Range(1, mem[Arg(1)]);
+            // 1 to n, both included: UW.EXE 0x67d0d (BabRand, BABL.C), rand() * n / 0x8000 + 1.
+            // Random.Range(1, n) left n out, so Gulik's and Judy's random(2) always gave 1.
+            result = (int)((long)Random.Range(0, 0x8000) * mem[Arg(1)] / 0x8000) + 1;
             break;
         case "print":
             AddDelayedText($"<color=#000000><i>{MakeSubstitutions(mem[Arg(1)])}</i></color>");
@@ -999,19 +1019,23 @@ public partial class Conversation
             {
                 bool npcHadItem = false;
                 int itemId = mem[Arg(1)];
-                if (itemId > 1000)
+                if (itemId >= 1000)
                 {
+                    // One item of the class, the first in the speaker's inventory, as UW.EXE 0x6c041
+                    // (npc_barter_give, BARTER.C): a class is item types (n - 1000) * 16 onwards, read
+                    // straight from the type, so the launchers stay in class 1 as GetClass() would not.
+                    // It goes into the pack, not the hand or a trade slot: the remake's pack has no limit.
                     int category = itemId - 1000;
-                    // copy all of this category from loot to player
-                    for (int i = npc.loot.Count - 1; i >= 0; --i)
+                    for (int i = 0; i < npc.loot.Count; ++i)
                     {
                         UUObject obj = npc.loot[i];
-                        if ((int)UUObject.GetClass(obj.type) == category)
+                        if ((int)obj.type >> 4 == category)
                         {
                             npc.loot.RemoveAt(i);
                             obj.PostLoadInitialize();
                             Inventory.Add(obj);
                             npcHadItem = true;
+                            break;
                         }
                     }
                 }
@@ -1219,25 +1243,30 @@ public partial class Conversation
             break;
         case "gronk_door":
             {
-                int varPtr = Arg(1);
-                int doorX = mem[varPtr - 2];
-                int doorY = mem[varPtr - 1];
-                int close = mem[varPtr];
+                // UW.EXE 0x69fc9 (gronk_door, BABLHACK.C): the door at tile (arg3, arg2), each argument
+                // through its variable; 0 opens, 1 closes, 2 toggles, anything else does nothing.
+                // The lock is left alone: OpenDoor (UW.EXE 0x387c6, USEITEMS.C) never looks at it, so
+                // a door a character opens is locked again once the player closes it (Dorna's armory,
+                // Rawstag's door, Goldthirst's treasure chamber). A door on the move is still the
+                // tile's door here, and Open() and Close() turn it round, as the original does.
+                int doorX = mem[Arg(3)];
+                int doorY = mem[Arg(2)];
+                int mode = mem[Arg(1)];
 
                 Door door = LevelLoader.GetTile(doorX, doorY).door;
                 if (door != null)
                 {
-                    if (close == 1)
+                    switch (mode)
                     {
-                        door.Close();
-                    }
-                    else
-                    {
-                        if (door.type != EObjectType.Portcullis)
-                        {
-                            door.Unlock();
-                        }
+                    case 0:
                         door.Open();
+                        break;
+                    case 1:
+                        door.Close();
+                        break;
+                    case 2:
+                        door.Toggle();
+                        break;
                     }
                     result = 1;
                 }
@@ -1249,15 +1278,23 @@ public partial class Conversation
             break;
         case "set_race_attitude":
             {
-                float range = 4.0f * Mathf.Max(1, mem[Arg(1)]);
-                Critter.EAttitude attitude = (Critter.EAttitude) mem[Arg(2)];
+                // UW.EXE 0x699dc (set_race_attitude, BABLHACK.C): every creature of the speaker's own
+                // type and of the race, not a loner, in the square of range tiles around the speaker's
+                // tile, clipped to 1..63, takes the attitude. A loner (byte 0xa bit 7, deafToPackAlarm)
+                // is always skipped here, whatever the pack alarm's switch says: the user's choice.
+                int range = mem[Arg(1)];
+                Critter.EAttitude attitude = (Critter.EAttitude)(mem[Arg(2)] & 3);
                 int race = mem[Arg(3)];
-                // sets attitude for all nearby critters of the same race
-                int numOverlaps = Physics.OverlapSphereNonAlloc(npc.transform.position, range, sphereOverlapCache, 1 << LayerMask.NameToLayer("Characters"));
-                for (int i = 0; i < numOverlaps; ++i)
+                Vector2Int home = Critter.TileOf(npc.transform.position);
+                int x0 = Mathf.Max(1, home.x - range);
+                int y0 = Mathf.Max(1, home.y - range);
+                int x1 = home.x + range >= 64 ? 63 : home.x + range;
+                int y1 = home.y + range >= 64 ? 63 : home.y + range;
+                foreach (Critter crit in UnityEngine.Object.FindObjectsByType<Critter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
                 {
-                    Critter crit = sphereOverlapCache[i].transform.root.gameObject.GetComponent<Critter>();
-                    if (crit != null && crit.race == race)
+                    Vector2Int tile = Critter.TileOf(crit.transform.position);
+                    if (crit.IsAlive && crit.type == npc.type && crit.race == race && !crit.deafToPackAlarm
+                        && tile.x >= x0 && tile.x <= x1 && tile.y >= y0 && tile.y <= y1)
                     {
                         crit.attitude = attitude;
                     }
@@ -1404,7 +1441,7 @@ public partial class Conversation
                 int b = mem[Arg(2)];
                 string stringA = StringLoader.GetString(stringBlock, a);
                 string stringB = StringLoader.GetString(stringBlock, b);
-                result = stringA.Contains(stringB, StringComparison.CurrentCultureIgnoreCase) ? 1 : 0;
+                result = ContainsWord(stringA, stringB) ? 1 : 0;
             }
             break;
         case "length":

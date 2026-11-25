@@ -97,43 +97,95 @@ public class Door : Lockable
                 door.transform.localPosition = new Vector3(0.0f, openDistance * openAmount, 0.0f);
             }
 
-            KeepTheTombRoomOpen();
+            KeepTheRoomOpen();
         }
     }
     
     /// <summary>
-    /// Level 4: the door of the room at 13,44 will not shut with the player inside it.
+    /// The doors that will not shut with the player inside their room: each is locked, something other than the player
+    /// opens it - a switch out in the corridor, a character in a conversation - and once shut the room has no other way out
+    /// and nothing to open it with, no key and a lock the player cannot pick. The original shuts it on whoever is inside:
+    /// the lock stays as it was when the door opened (OpenDoor, UW.EXE 0x387c6, USEITEMS.C, never looks at it), and the
+    /// player can close an open door whatever its lock (UseRect, USEITEMS.C), as he did in the original on 26 November
+    /// 2026 at Steeltoe's and Rawstag's doors. Here the door opens again while the player is in the room or the doorway,
+    /// the answer kept to these four rather than given to every door in the game, the user's choice of 26 November 2026.
     /// </summary>
     /// <remarks>
-    /// It is the one door in the game that can wall somebody in. Both switches that work it are
-    /// out in the corridor, on the east side of the threshold, and the door is locked - closing
-    /// it does not unlock it - so a player inside with the door shut has nothing to open it with
-    /// and nothing to walk out through. The original will not close a door on you at all: it
-    /// moves a little towards shut and opens again by itself. This is that answer, kept to the
-    /// one place where being shut in has no way out rather than changed for every door in the
-    /// game, which is where a change like this could do harm.
-    /// The room is the floor west of the door, x 10 to 12, y 43 to 45, plus the doorway itself;
-    /// the corridor and its two switches are east of it, so operating them still closes the door
-    /// behind you when you are out there.
+    /// Each room is the floor behind the door with no other way out, found from the level's map with the other locked
+    /// doors shut, plus the doorway when the door stands in the middle of its tile; a rectangle may take in solid rock,
+    /// never floor outside the room.
+    ///
+    /// Left as the original, and why:
+    /// - level 1, the door at 33,8, which a pull chain outside opens: the room has a way round, through the door at 9,10,
+    ///   which can be broken;
+    /// - level 1, the portcullis at 56,49, and level 5, the portcullis at 3,27: they are puzzles;
+    /// - level 7, the guard room's two gates, 21,56 and 27,54: the jailor who carries their key, 23, and the gate guards
+    ///   are in the room itself;
+    /// - the doors whose own control is inside the room: Drog's and Eb's portcullises (level 1), Brawnclan's (level 2),
+    ///   Dorna's armory (level 4);
+    /// - every door the player opens with his key or his pick: he can do it again.
     /// </remarks>
-    private void KeepTheTombRoomOpen()
+    private sealed class RoomKeptOpen
     {
-        if (originalLevel != 4 || objectIndex != 748 || opening || openAmount <= 0.1f
-            || PlayerObject.Player == null)
+        public readonly int level;
+        public readonly int doorIndex;
+        public readonly RectInt[] room;
+
+        public RoomKeptOpen(int level, int doorIndex, params RectInt[] room)
+        {
+            this.level = level;
+            this.doorIndex = doorIndex;
+            this.room = room;
+        }
+    }
+
+    private static readonly RoomKeptOpen[] RoomsKeptOpen =
+    {
+        // level 1, the rooms behind 46,8: a button at 49,2, in the corridor, opens the door; the lock is never picked
+        new RoomKeptOpen(1, 984, new RectInt(41, 9, 11, 16), new RectInt(46, 8, 1, 1)),
+        // level 2, Goldthirst's treasure chamber behind 11,13: Steeltoe opens it for the password; the lock wants Pick
+        // Lock against 30, out of almost every character's reach
+        new RoomKeptOpen(2, 983, new RectInt(0, 17, 13, 9), new RectInt(11, 12, 5, 7)),
+        // level 4, the tomb room at 13,44: both switches that work the door are in the corridor; the lock is never picked
+        new RoomKeptOpen(4, 748, new RectInt(10, 43, 4, 3)),
+        // level 4, Rawstag's room behind 61,5: he opens it for a gift he likes; the lock is never picked. The door stands on
+        // the tile's south edge, so its own tile is outside, where the player stands to close it
+        new RoomKeptOpen(4, 883, new RectInt(59, 2, 3, 3)),
+    };
+
+    private void KeepTheRoomOpen()
+    {
+        if (opening || openAmount <= 0.1f || PlayerObject.Player == null)
         {
             return;
         }
 
-        Tile playerTile = LevelLoader.GetTile(PlayerObject.Player.transform.position);
-        if (playerTile == null
-            || playerTile.x < 10 || playerTile.x > 13
-            || playerTile.y < 43 || playerTile.y > 45)
+        foreach (RoomKeptOpen kept in RoomsKeptOpen)
         {
+            if (originalLevel != kept.level || objectIndex != kept.doorIndex)
+            {
+                continue;
+            }
+
+            Tile playerTile = LevelLoader.GetTile(PlayerObject.Player.transform.position);
+            if (playerTile == null)
+            {
+                return;
+            }
+
+            Vector2Int at = new Vector2Int(playerTile.x, playerTile.y);
+            foreach (RectInt part in kept.room)
+            {
+                if (part.Contains(at))
+                {
+                    PlayerObject.Rumble(0.2f, 0.2f, 0.2f);
+                    opening = true;
+                    return;
+                }
+            }
+
             return;
         }
-
-        PlayerObject.Rumble(0.2f, 0.2f, 0.2f);
-        opening = true;
     }
 
     private void CheckForPlayerAndReverseDirection()
