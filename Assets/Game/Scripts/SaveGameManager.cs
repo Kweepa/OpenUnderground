@@ -1244,6 +1244,7 @@ public class SaveGameManager : MonoBehaviour
         // Achievement-related progress (per save slot)
         data.numRepairs = playerData.numRepairs;
         data.numFishCaught = playerData.numFishCaught;
+        data.lastConversationHandle = playerData.lastConversationHandle;
         data.booksRead = playerData.booksRead;
         data.mapTilesRevealed = playerData.mapTilesRevealed;
         data.gateTravelDistance = playerData.gateTravelDistance;
@@ -1435,6 +1436,7 @@ public class SaveGameManager : MonoBehaviour
         // Restore achievement-related progress (per save slot)
         playerData.numRepairs = data.numRepairs;
         playerData.numFishCaught = data.numFishCaught;
+        playerData.lastConversationHandle = data.lastConversationHandle;
         playerData.booksRead = data.booksRead;
         playerData.mapTilesRevealed = data.mapTilesRevealed;
         playerData.gateTravelDistance = data.gateTravelDistance;

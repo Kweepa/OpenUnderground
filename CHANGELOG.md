@@ -2,6 +2,8 @@
 
 ## Next release
 
+- What you give a character in a conversation stays with him, so he can sell it back and drops it if he dies, and an item taken back from the trade table before he takes it no longer counts as given. What a character makes for you comes in perfect condition, and what the original hands over already identified now is, as Shak's shiny sword and Ironwit's green potion.
+
 - Conversations follow more of the original's rules: a line chosen at random can be any of them (Gulik greeted every stranger with the same question), a door a character opens for you is locked again once you close it (the few that would shut you in for good, like Rawstag's, stay open while you are inside), a character asked for a kind of item hands over one instead of all he has, and a typed answer must hold the whole word, so *doors* is not *door*. A creature healed by its own conversation keeps the healing.
 
 - Every save now records the version of the game that wrote it, so a save attached to a bug report tells which version made it.

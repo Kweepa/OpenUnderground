@@ -7469,6 +7469,21 @@ public class Critter : UUObject
 
     public List<UUObject> loot = new List<UUObject>();
 
+    /// <summary>
+    /// What the player gives the creature in a conversation joins its inventory, at the head, and gold coins a pile of
+    /// them it has, as the original's npc_inv_add (UW.EXE 0x6bdea, BARTER.C): so it offers the item in a barter and drops
+    /// it at its death. It used to go to UUObject.contents, which neither reads.
+    /// </summary>
+    public void ConversationReceive(UUObject obj)
+    {
+        if (obj == null || (obj.type == EObjectType.GoldCoin && Inventory.TryJoinStackIn(loot, obj)))
+        {
+            return;
+        }
+
+        loot.Insert(0, obj);
+    }
+
     // The original makes the loot in UW.EXE 0x83a16, at the start of a conversation or at death,
     // whichever comes first; the remake makes it once, when the creature first runs, which no
     // player can tell apart. Nothing is made if the level data says it already was.
@@ -8314,6 +8329,21 @@ public class Critter : UUObject
 
                 // Ensure containers in restored loot have their contents filled
                 FillLootContainerContents();
+            }
+
+            // What a conversation gave this creature used to be kept in contents, read by no barter
+            // and no death: it joins the inventory, as ConversationReceive() puts it there now.
+            if (contents != null && contents.Count > 0)
+            {
+                foreach (UUObject given in contents)
+                {
+                    if (given != null)
+                    {
+                        given.gameObject.SetActive(false);
+                        loot.Add(given);
+                    }
+                }
+                contents.Clear();
             }
 
             // Restore conversation state

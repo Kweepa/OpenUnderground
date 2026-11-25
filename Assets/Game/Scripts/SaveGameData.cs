@@ -180,6 +180,7 @@ public class PlayerSaveData
     public bool[] openedChest;
     public int numFishCaught;
     public int booksRead;
+    public int lastConversationHandle;
     public int mapTilesRevealed;
     public float gateTravelDistance;
     public int waterWalkSteps;

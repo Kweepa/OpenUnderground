@@ -141,6 +141,8 @@ public class PlayerData : MonoBehaviour
     // Sseetharee's talk freed the prisoner, which the player can reach only in the lizardmen's
     // tongue; opening his cell by hand frees him too, but proves nothing.
     public bool freedMurgoByTrade;
+    // The last number given to an object by a conversation (UUObject.conversationHandle)
+    [System.NonSerialized] public int lastConversationHandle;
     public bool[] hadConversation = new bool[320];
     public bool[] openedChest = new bool[5];
     public int numFishCaught;
