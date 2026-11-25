@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Conversations follow more of the original's rules: a line chosen at random can be any of them (Gulik greeted every stranger with the same question), a door a character opens for you is locked again once you close it (the few that would shut you in for good, like Rawstag's, stay open while you are inside), a character asked for a kind of item hands over one instead of all he has, and a typed answer must hold the whole word, so *doors* is not *door*. A creature healed by its own conversation keeps the healing.
+
 - Every save now records the version of the game that wrote it, so a save attached to a bug report tells which version made it.
 
 - Drowning works as in the original: every twenty seconds or so a Swimming roll, harder the more you carry, may sink you a little lower in the water, until you begin to drown. With a good Swimming skill and a light pack you can swim as long as you like, with a poor one and a full pack you go under in about a minute. A splash tells you each time you sink, the water hurts with a gulp instead of the grunt and the shake of a blow, which made it feel like an unseen attack, and you climb out by yourself onto any bank no more than a step high, getting your breath back over half a minute.
