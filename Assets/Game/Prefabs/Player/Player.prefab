@@ -482,6 +482,11 @@ MonoBehaviour:
   - {fileID: 8300000, guid: b4733bc3e248f9e4ca10c12d06d9fe91, type: 3}
   - {fileID: 8300000, guid: 7adb4bb088ca2994bb6ee89cd5f86abf, type: 3}
   - {fileID: 8300000, guid: 238885500e4545b4b82ab1f4cfa14a14, type: 3}
+  sinkingSound: {fileID: 8300000, guid: ddd5a5b0dd808f44d909f07150b38729, type: 3}
+  drowningSounds:
+  - {fileID: 8300000, guid: f5d55d8b74aec8641969ded3efb8246c, type: 3}
+  - {fileID: 8300000, guid: 1205a4d2ad27f5449bceb8f07d5d4bdc, type: 3}
+  - {fileID: 8300000, guid: 13a97e75efa606c43825f6443c35ba13, type: 3}
   font: {fileID: 12800000, guid: b076bf70fcd082c4580e929de642e84c, type: 3}
   endGame: {fileID: 7414349609104435342, guid: 3d8ca0b949886a04b9e4ec6ba57390a9, type: 3}
   cachedCharacterController: {fileID: 0}
