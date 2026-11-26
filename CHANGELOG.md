@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Drowning works as in the original: every twenty seconds or so a Swimming roll, harder the more you carry, may sink you a little lower in the water, until you begin to drown. With a good Swimming skill and a light pack you can swim as long as you like, with a poor one and a full pack you go under in about a minute. A splash tells you each time you sink, the water hurts with a gulp instead of the grunt and the shake of a blow, which made it feel like an unseen attack, and you climb out by yourself onto any bank no more than a step high, getting your breath back over half a minute.
+
 - The Standard of Honor is thrown like anything else when there is no floor within reach to plant it, out of water and lava: aimed farther away, letting it go did nothing and it stayed in your hand, and in water or lava it was planted upright in it. And a silver seed used where there is no room around you to let it go stays in the pack, with its message, instead of vanishing.
 
 - Taking something that belongs to others makes it yours: drop it and pick it up again and its owners are no longer angered a second time. The name of an owned item is light orange while it is still out of reach, so you see whose it is before the click that takes it. Goods their owners have handed over to you no longer show as theirs.

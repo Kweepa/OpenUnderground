@@ -1026,20 +1026,6 @@ public class PlayerObject : MonoBehaviour
         if (isInWater)
         {
             moveSpeed /= 2.0f;
-            timeInWater += Time.deltaTime;
-            if (timeInWater > 30.0f + 2.0f * Skills.GetSkill(ESkill.Swimming))
-            {
-                timeToNextWaterDamage -= Time.deltaTime;
-                if (timeToNextWaterDamage < 0.0f)
-                {
-                    timeToNextWaterDamage = 10.0f;
-                    Damage(Skills.ESkillTestResult.Success, Random.Range(3, 5), EDamageType.Drowning);
-                }
-            }
-        }
-        else
-        {
-            timeInWater = 0.0f;
         }
 
         if (!cachedCharacterController.isGrounded && leapMoveSpeed > 0.0f)
@@ -1137,8 +1123,17 @@ public class PlayerObject : MonoBehaviour
         Tile t = LevelLoader.GetTile((int)(transform.position.x / Tile.xzScale),
             (int)(transform.position.z / Tile.xzScale));
         
-        touchingWater = TouchingTerrain(ETerrainType.Water, t);
-        isInWater = !Magic.sMagic.IsSpellActive(Magic.ESpell.WaterWalk) && touchingWater;
+        // Paused (the map, the game menu, a conversation), the controller touches nothing and the water would seem
+        // gone for as long: the drowning counter would start over and the view come back up. The water stays as it was.
+        if (Time.deltaTime > 0.0f)
+        {
+            touchingWater = TouchingTerrain(ETerrainType.Water, t);
+            isInWater = !Magic.sMagic.IsSpellActive(Magic.ESpell.WaterWalk) && touchingWater;
+            if (isInWater)
+            {
+                TryClimbOut(t);
+            }
+        }
 
         // The dragon skin boots keep lava off whatever else is worn (DS:0x1b01 in the original), and
         // so does Flameproof in the original. Ours, with PlayerInput.PartialResistances: Flameproof
@@ -1689,6 +1684,17 @@ public class PlayerObject : MonoBehaviour
                 }
             }
 
+            // Drowning runs from the world tick, whose pace does not depend on when the player went in.
+            timeToNextSwimCheck -= Time.deltaTime;
+            if (timeToNextSwimCheck <= 0.0f)
+            {
+                timeToNextSwimCheck = Mathf.Max(timeToNextSwimCheck + WorldTickSeconds, 0.0f);
+                if (swimCount > SwimCountSinking)
+                {
+                    Sink();
+                }
+            }
+
             PlayerData.sData.gameTime += Time.deltaTime;
             PlayerData.sData.playTime += Time.deltaTime;
             Repopulation.Update();
@@ -1708,6 +1714,7 @@ public class PlayerObject : MonoBehaviour
                 NormalMovement();
             }
 
+            UpdateSwimCount();
             UpdateNoise(flying && remainingCarryWeight >= 0);
 
             GameObject cam = gameObject.transform.GetChild(0).gameObject;
@@ -1742,9 +1749,9 @@ public class PlayerObject : MonoBehaviour
             }
 
             float cameraYTarget = transform.position.y;
-            if (isInWater)
+            if (isInWater && swimCount > SwimCountSinking)
             {
-                cameraYTarget += -0.2f + swimBob * Mathf.Sin(Time.time);
+                cameraYTarget = SwimEyeY(swimBob * Mathf.Sin(Time.time));
                 cam.transform.localEulerAngles = new Vector3(cam.transform.localEulerAngles.x, 0.0f,
                     swimSway * Mathf.Sin(2.0f * Time.time));
             }
@@ -1826,6 +1833,9 @@ public class PlayerObject : MonoBehaviour
         data.timeToNextHungerDamage = timeToNextHungerDamage;
         data.timeToNextFatigueDamage = timeToNextFatigueDamage;
         data.poisonClock = poisonClock.Save();
+        data.swimCount = swimCount;
+        data.timeToNextSwimCheck = timeToNextSwimCheck;
+        data.breathLost = breathLost;
     }
 
     /// <summary>
@@ -1845,6 +1855,11 @@ public class PlayerObject : MonoBehaviour
             {
                 poisonClock.Load(data.poisonClock);
             }
+
+            // A save of a build without the drowning counter has 0 and 0: the counter starts over and the tick is due.
+            swimCount = Mathf.Clamp(data.swimCount, 0, 255);
+            timeToNextSwimCheck = Mathf.Clamp(data.timeToNextSwimCheck, 0.0f, WorldTickSeconds);
+            breathLost = Mathf.Clamp(data.breathLost, 0.0f, 255.0f);
         }
         else
         {
@@ -1853,11 +1868,201 @@ public class PlayerObject : MonoBehaviour
             timeToNextHungerDamage = HungerDamageSeconds;
             timeToNextFatigueDamage = FatigueDamageSeconds;
             poisonClock.Reset();
+            swimCount = 0;
+            timeToNextSwimCheck = WorldTickSeconds;
+            breathLost = 0.0f;
         }
     }
 
-    private float timeInWater;
-    private float timeToNextWaterDamage;
+    /// <summary>
+    /// The drowning counter, the original's swim_count (P1[0xb9]): 96 on the way into water and 0 out of it. While it is
+    /// above 80 every world tick rolls Swimming against the load; a failure sinks the player by 3d4, 4d4 on a critical
+    /// failure, up to 140, and above 120 a second roll hurts. It is also how far the eye goes down, in the original's
+    /// units of an eye height of 164, so the player sees himself sink before the first damage (UW.EXE 0x2b02e
+    /// (sink_sink_sink, PLAYTIME.C), 0x1c5db (water_set, PHYSICS.C), 0x314fd (parse_effect, PLAYMOVE.C)).
+    /// </summary>
+    private int swimCount;
+    private float timeToNextSwimCheck = WorldTickSeconds;
+    private const int SwimCountEntry = 0x60;
+    private const int SwimCountSinking = 0x50;
+    private const int SwimCountHurt = 0x78;
+    private const int SwimCountCap = 0x8C;
+    private const float OriginalEyeHeight = 164.0f;
+
+    /// <summary>The world tick: the original counts its seconds and runs the tick when the count passes 20 (display_scr, INTERACT.C).</summary>
+    private const float WorldTickSeconds = 21.0f;
+
+    [Tooltip("What the player hears when the water hurts: one of these, never the same twice in a row.")]
+    public AudioClip[] drowningSounds;
+
+    [Tooltip("What the player hears when a failed Swimming roll sinks the player lower in the water.")]
+    public AudioClip sinkingSound;
+
+    /// <summary>Ours: how far above the water the eye is at the deepest.</summary>
+    private const float LowestEyeAboveWater = 0.08f;
+    private int lastDrowningSound = -1;
+
+    /// <summary>
+    /// The drowning counter follows the water: 96 on the way in, kept while in it, 0 out of it. Ours: the original gives
+    /// all the breath back at once on any footing out of water, and by a bank while still swimming (set_resterr, MOTION.C); here
+    /// what was lost, the counter above 96, comes back over BreathRecoverySeconds out of the water, and going back in
+    /// starts from what is still missing. Nor does the original's reset at every change of the equipment
+    /// (FixPlayerEquips() ends with a forced fizix_update(), UW.EXE 0x1d355, PHYSICS.C) happen here.
+    /// </summary>
+    private void UpdateSwimCount()
+    {
+        if (isInWater)
+        {
+            if (swimCount == 0)
+            {
+                swimCount = SwimCountEntry + Mathf.CeilToInt(breathLost);
+                breathLost = 0.0f;
+            }
+            return;
+        }
+
+        if (swimCount > 0)
+        {
+            breathLost = Mathf.Max(0, swimCount - SwimCountEntry);
+            swimCount = 0;
+        }
+
+        breathLost = Mathf.Max(0.0f, breathLost - Time.deltaTime * (SwimCountCap - SwimCountEntry) / BreathRecoverySeconds);
+    }
+
+    /// <summary>Ours: how long it takes out of the water to get back the breath of a player sunk to the counter's cap.</summary>
+    private const float BreathRecoverySeconds = 30.0f;
+
+    /// <summary>The breath still missing out of the water, in units of the drowning counter above 96 (UpdateSwimCount()).</summary>
+    private float breathLost;
+
+    /// <summary>
+    /// One world tick in water (UW.EXE 0x2b02e, sink_sink_sink, PLAYTIME.C). The load is the weight carried in 32nds of
+    /// what can be carried; a Swimming roll against it that fails sinks the player, and above 120 a second roll hurts:
+    /// 2d3 on a success, 2d4 on a failure, 2d5 on a critical failure, nothing on a critical success. The original
+    /// flashes the view blue and nothing else: no resistance, no halving on Easy, no wear, no grunt, no shake. Ours: a
+    /// sound with the flash.
+    /// </summary>
+    private void Sink()
+    {
+        int capacity = 2 * PlayerData.sData.strength;
+        int load = capacity > 0 ? Mathf.FloorToInt(Inventory.sInv.GetInventoryWeight() * 32.0f / capacity) : 0;
+        int swimming = Skills.GetSkill(ESkill.Swimming);
+
+        Skills.ESkillTestResult sink = Skills.GetResult(swimming, load);
+        if (sink <= Skills.ESkillTestResult.Failure && swimCount < SwimCountCap)
+        {
+            swimCount += Utils.DiceRoll(4, sink == Skills.ESkillTestResult.CriticalFailure ? 4 : 3);
+            // Ours: a splash each time the player sinks a little lower.
+            if (sinkingSound != null && !PlayerData.sData.dead)
+            {
+                Utils.PlayClip2d(sinkingSound);
+            }
+        }
+
+        if (swimCount > SwimCountHurt)
+        {
+            Skills.ESkillTestResult hurt = Skills.GetResult(swimming, load);
+            if (hurt != Skills.ESkillTestResult.CriticalSuccess)
+            {
+                int sides = hurt == Skills.ESkillTestResult.Success ? 3 : hurt == Skills.ESkillTestResult.Failure ? 4 : 5;
+                PlayDrowningSound();
+                Damage(Skills.ESkillTestResult.Success, Utils.DiceRoll(sides, 2), EDamageType.Drowning, 0, false, false);
+            }
+        }
+    }
+
+    private void PlayDrowningSound()
+    {
+        if (drowningSounds == null || drowningSounds.Length == 0 || PlayerData.sData.dead)
+        {
+            return;
+        }
+
+        int i = Random.Range(0, drowningSounds.Length);
+        if (i == lastDrowningSound && drowningSounds.Length > 1)
+        {
+            i = (i + 1) % drowningSounds.Length;
+        }
+
+        lastDrowningSound = i;
+        Utils.PlayClip2d(drowningSounds[i]);
+    }
+
+    /// <summary>
+    /// Out of the water onto a bank. In the original a bank no more than one step above the water lifts the swimmer onto
+    /// it as soon as a corner of the footprint, a quarter of a tile out, is over it (UW.EXE 0x2d782, set_resterr, MOTION.C,
+    /// and the lift of get_pcoll); walls, banks two steps up and water never do, and a slope counts by its height at that
+    /// point: one whose high end faces the water is two steps high where it is met. Ours: only the bank the
+    /// player is heading for, and the player is put right onto it, standing.
+    /// </summary>
+    private void TryClimbOut(Tile water)
+    {
+        Vector3 heading = new Vector3(cachedMoveDirection.x, 0.0f, cachedMoveDirection.z);
+        if (water == null || heading.sqrMagnitude < 0.01f)
+        {
+            return;
+        }
+
+        heading.Normalize();
+        const float reach = 0.25f * Tile.xzScale;
+        Vector3 p = transform.position;
+        Tile bank = LevelLoader.GetTile(p + heading * reach);
+        if (bank == null || bank == water || bank.type == 0 || bank.GetFloorTerrain() == ETerrainType.Water)
+        {
+            return;
+        }
+
+        // how far ahead the bank begins
+        float along = 0.0f;
+        while (along < reach && LevelLoader.GetTile(p + heading * along) != bank)
+        {
+            along += 0.05f;
+        }
+
+        // The bank's height where it is met, not its tile's: a slope is as high as its edge on the water's side.
+        // The original reads the floor's height at each corner of the footprint (UW.EXE 0x28494, GetHgt, COLLIDE.C).
+        Vector3 edge = p + heading * along;
+        if (bank.GetFloorY(edge.x, edge.z) - water.GetFloorY(p.x, p.z) > Tile.yScale + 0.01f)
+        {
+            return;
+        }
+
+        CharacterController c = cachedCharacterController;
+        float feet = p.y + c.center.y - 0.5f * c.height;
+        float rise = bank.GetFloorY(edge.x, edge.z) - feet + c.skinWidth + 0.02f;
+        if (rise > 0.0f)
+        {
+            c.Move(rise * Vector3.up);
+        }
+
+        c.Move(heading * (along + c.radius + c.skinWidth));
+        yVelocity = 0.0f;
+    }
+
+    /// <summary>
+    /// The eye's height in water, plus <paramref name="bob"/>. Going in, it is the original's first dip, 96 of an eye height
+    /// of 164 (parse_effect, PLAYMOVE.C, UW.EXE 0x314fd), above the water's surface; then it goes down with the counter.
+    /// Ours: the original lowers it by the counter itself, to 13 of 164 at the deepest; here it reaches 8 cm above the
+    /// water at the counter's cap, 140, and stays there.
+    /// </summary>
+    private float SwimEyeY(float bob)
+    {
+        Tile t = LevelLoader.GetTile(transform.position);
+        float surface = t != null
+            ? t.GetFloorY(transform.position.x, transform.position.z)
+            : transform.position.y + cachedCharacterController.center.y - 0.5f * cachedCharacterController.height;
+        float first = EyeAboveFeet() * (OriginalEyeHeight - SwimCountEntry) / OriginalEyeHeight;
+        float above = Mathf.Lerp(first, LowestEyeAboveWater, Mathf.InverseLerp(SwimCountEntry, SwimCountCap, swimCount));
+        return surface + Mathf.Max(LowestEyeAboveWater, above + bob);
+    }
+
+    /// <summary>How high the eye is above the feet, out of water.</summary>
+    private float EyeAboveFeet()
+    {
+        CharacterController c = cachedCharacterController;
+        return c != null ? cameraOffset - (c.center.y - 0.5f * c.height) : cameraOffset;
+    }
 
     private float timeToNextLightSourceDecay = 20.0f;
 
@@ -2227,8 +2432,9 @@ public class PlayerObject : MonoBehaviour
     /// None of these is in a save, and before this they carried over from the game left behind:
     /// falling to your death and loading a save put you on the saved spot still falling at the
     /// same speed, and the landing killed you there too. A game loaded starts from rest, as a
-    /// fresh one does: no fall, no drift, no jump or flight under way, the time spent under water
-    /// and on lava counted from zero, and no noise for the creatures to hear.
+    /// fresh one does: no fall, no drift, no jump or flight under way, the time spent on lava
+    /// counted from zero, and no noise for the creatures to hear. The drowning counter is in the
+    /// save, with the clocks (LoadClocks()).
     /// </remarks>
     public void ResetMotionAfterLoad()
     {
@@ -2237,8 +2443,6 @@ public class PlayerObject : MonoBehaviour
         cachedMoveDirection = Vector3.zero;
         flightVelocity = Vector3.zero;
         leapMoveSpeed = 0.0f;
-        timeInWater = 0.0f;
-        timeToNextWaterDamage = 0.0f;
         timeToNextLavaDamage = 0.0f;
         poisonClock.Reset();
         NoiseLevel = 0;

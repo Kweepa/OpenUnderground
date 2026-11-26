@@ -156,6 +156,10 @@ public class PlayerSaveData
     public float timeToNextHungerDamage;
     public float timeToNextFatigueDamage;
     public PoisonClockData poisonClock;
+    // The drowning counter and the time to the next world tick (mod 13): a save in water keeps the breath it had.
+    public int swimCount;
+    public float timeToNextSwimCheck;
+    public float breathLost;
     
     // Encountered critters for summon spell
     public List<EncounteredCritterEntry> encounteredCritters;
