@@ -31,7 +31,12 @@ public class SaveGameData
     // Coins keep their own quality since piles join within a band of qualities; an older save, where this
     // reads false, gave every coin 63 (Coin.RestoreFromSaveData()). No initializer: a missing field must read false.
     public bool coinsKeepQuality;
-    
+    // The build that wrote the save: the version on the title screen (FrontEnd.DisplayVersion) and
+    // Unity's id of the build, so a save attached to a report says which version made it. An older
+    // save has neither and reads them empty.
+    public string gameVersion;
+    public string buildGuid;
+
     public SaveGameData()
     {
         playerData = new PlayerSaveData();
@@ -65,6 +70,9 @@ public class SaveSlotHeader
     public int playerClass;
     public string inGameTime;
     public int charLevel;
+    // The same two as SaveGameData's, readable without unpacking the save.
+    public string gameVersion;
+    public string buildGuid;
 }
 
 [System.Serializable]
