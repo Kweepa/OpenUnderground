@@ -654,6 +654,8 @@ public class SaveGameManager : MonoBehaviour
         saveData.slotName = slotName;
         saveData.displayName = displayName ?? slotName;
         saveData.savedAtIso = System.DateTime.UtcNow.ToString("o");
+        saveData.gameVersion = FrontEnd.DisplayVersion;
+        saveData.buildGuid = Application.buildGUID;
         SavePlayerData(saveData.playerData);
         SaveInventoryData(saveData.inventoryData);
         SaveWorldObjects(saveData);
@@ -691,7 +693,9 @@ public class SaveGameManager : MonoBehaviour
                 xp = saveData.playerData?.xp ?? 0,
                 playerClass = saveData.playerData?.playerClass ?? 0,
                 inGameTime = FormatInGameTime(saveData.playerData?.gameTime ?? 0.0),
-                charLevel = saveData.playerData?.charLevel ?? 1
+                charLevel = saveData.playerData?.charLevel ?? 1,
+                gameVersion = saveData.gameVersion,
+                buildGuid = saveData.buildGuid
             };
             string headerJson = JsonUtility.ToJson(header, prettyPrint: false);
             File.WriteAllText(headerFilePath, headerJson);
@@ -731,6 +735,9 @@ public class SaveGameManager : MonoBehaviour
                     return;
                 }
             }
+            Debug.Log(string.IsNullOrEmpty(saveData.gameVersion)
+                ? $"Slot '{slotName}' was written by an older build, which did not record its version"
+                : $"Slot '{slotName}' was written by {saveData.gameVersion} (build {saveData.buildGuid}); this is {FrontEnd.DisplayVersion} (build {Application.buildGUID})");
             
             // The messages of the game being left go, the scrollback with them, and the save's
             // history takes its place
