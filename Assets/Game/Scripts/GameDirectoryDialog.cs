@@ -682,15 +682,15 @@ public class GameDirectoryDialog : MonoBehaviour
     {
         foreach (string name in DiscImageNames)
         {
-            string gogFile = Path.Combine(directory, name);
-            if (!File.Exists(gogFile) || !InspectGogFile(gogFile))
+            string gogFile = GameDataPath.FindChild(directory, name);
+            if (gogFile == null || !InspectGogFile(gogFile))
             {
                 continue;
             }
             string extractedPath = ExtractGogFile(gogFile);
             // Verify extraction was successful. The two fields are set only then: after an image that failed, the
             // search may still find loose files, which must not be named as unpacked from it.
-            if (!string.IsNullOrEmpty(extractedPath) && File.Exists(Path.Combine(extractedPath, "Sound", "UW01.XMI")))
+            if (!string.IsNullOrEmpty(extractedPath) && GameDataPath.HasLooseMusic(extractedPath))
             {
                 lastFoundPathUsedGogExtract = true;
                 lastImageFile = gogFile;
@@ -822,12 +822,31 @@ public class GameDirectoryDialog : MonoBehaviour
     private static List<SearchRoot> FixedSearchRoots()
     {
         var roots = new List<SearchRoot>();
+#if UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+        string macHome = Environment.GetEnvironmentVariable("HOME");
+        AddRoot(roots, "/Applications", 4);
+        if (!string.IsNullOrEmpty(macHome))
+        {
+            AddRoot(roots, Path.Combine(macHome, "Applications"), 4);
+            AddRoot(roots, Path.Combine(macHome, "Games"), 4);
+            AddRoot(roots, Path.Combine(macHome, "Downloads"), 3);
+            AddRoot(roots, Path.Combine(macHome, "DOSBox"), 4);
+            AddRoot(roots, Path.Combine(macHome, "Library/Application Support/GOG.com/Galaxy/Games"), 4);
+            AddRoot(roots, Path.Combine(macHome, "Library/Application Support/GOG.com/Galaxy/applications"), 4);
+            // CrossOver and Whisky keep a Windows install under drive_c, several folders down.
+            AddRoot(roots, Path.Combine(macHome, "Library/Application Support/CrossOver/Bottles"), 6);
+            AddRoot(roots, Path.Combine(macHome, "Library/Application Support/Whisky"), 6);
+            AddRoot(roots, Path.Combine(macHome, "Library/Containers/com.isaacmarovitz.Whisky/Bottles"), 6);
+        }
+        AddRoot(roots, "/Users/Shared", 4);
+#else
         AddRoot(roots, @"C:\GOG Games", 4);
         AddRoot(roots, @"C:\Games", 4);
         AddRoot(roots, @"C:\UW", 4);
         AddRoot(roots, @"C:\DOSBox", 4);
         AddRoot(roots, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), 4);
         AddRoot(roots, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), 4);
+#endif
         AddRoot(roots, Environment.GetFolderPath(Environment.SpecialFolder.Desktop), 4);
         AddRoot(roots, Directory.GetCurrentDirectory(), 4);
         AddRoot(roots, Path.GetDirectoryName(Directory.GetCurrentDirectory()), 4);
@@ -844,7 +863,7 @@ public class GameDirectoryDialog : MonoBehaviour
     /// </summary>
     private static void AddRoot(List<SearchRoot> roots, string folder, int depth)
     {
-        if (string.IsNullOrEmpty(folder))
+        if (string.IsNullOrEmpty(folder) || !IsSearchableRoot(folder))
         {
             return;
         }
@@ -855,6 +874,52 @@ public class GameDirectoryDialog : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// A launched .app has its working directory at the filesystem root. Searching that, or /System, walks the
+    /// whole machine. Those are not places the game is installed.
+    /// </summary>
+    private static bool IsSearchableRoot(string folder)
+    {
+        string full;
+        try
+        {
+            full = Path.GetFullPath(folder);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        full = full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (full.Length == 0)
+        {
+            return false;
+        }
+
+        if (Path.DirectorySeparatorChar == '/')
+        {
+            switch (full)
+            {
+                case "/":
+                case "/System":
+                case "/Library":
+                case "/private":
+                case "/usr":
+                case "/bin":
+                case "/sbin":
+                case "/Volumes":
+                case "/dev":
+                case "/etc":
+                case "/var":
+                case "/opt":
+                case "/tmp":
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>A folder Auto Search looks in, and how many levels of it (the folder itself is the first).</summary>
     private struct SearchRoot
     {
@@ -893,6 +958,9 @@ public class GameDirectoryDialog : MonoBehaviour
         };
         if (!string.IsNullOrEmpty(home))
         {
+#if UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+            steamFolders.Add(Path.Combine(home, "Library/Application Support/Steam"));
+#endif
             steamFolders.Add(FromUnixPath(home + "/.local/share/Steam"));
             steamFolders.Add(FromUnixPath(home + "/.steam/steam"));
             steamFolders.Add(FromUnixPath(home + "/.var/app/com.valvesoftware.Steam/.local/share/Steam"));
@@ -1103,8 +1171,7 @@ public class GameDirectoryDialog : MonoBehaviour
         try
         {
             // Check if SOUND/UW01.XMI exists in this directory (loose files)
-            string soundFile = Path.Combine(directory, "Sound", "UW01.XMI");
-            if (File.Exists(soundFile))
+            if (GameDataPath.HasLooseMusic(directory))
             {
                 return directory;
             }
@@ -1152,7 +1219,10 @@ public class GameDirectoryDialog : MonoBehaviour
             {
                 // joliet: false = standard ISO9660
                 CDReader reader = new CDReader(isoStream, false);
-                return reader.FileExists(@"\UW\SOUND\UW01.XMI;1");
+                return reader.FileExists(@"\UW\SOUND\UW01.XMI;1")
+                    || reader.FileExists(@"UW\SOUND\UW01.XMI;1")
+                    || reader.FileExists(@"/UW/SOUND/UW01.XMI;1")
+                    || reader.FileExists(@"UW/SOUND/UW01.XMI;1");
             }
         }
         catch (Exception ex)
@@ -1228,8 +1298,8 @@ public class GameDirectoryDialog : MonoBehaviour
                     {
                         cleanFile = cleanFile.Substring(0, cleanFile.Length - 2);
                     }
-                    // Strip leading backslashes to prevent absolute path issues
-                    cleanFile = cleanFile.TrimStart('\\');
+                    // Normalize directory separators for cross-platform (macOS/Linux POSIX vs Windows)
+                    cleanFile = cleanFile.Replace('\\', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
                     string destinationPath = Path.Combine(looseDataPath, cleanFile);
                     string destinationDir = Path.GetDirectoryName(destinationPath);
                     

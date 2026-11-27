@@ -57,7 +57,7 @@ public static class GameDataPath
             // Fallback to old behavior
             return Path.Combine(Application.dataPath, "../Data");
         }
-        return Path.Combine(root, "Data");
+        return ChildOr(root, "Data");
     }
     
     /// <summary>
@@ -71,7 +71,7 @@ public static class GameDataPath
             // Fallback to old behavior
             return Path.Combine(Application.dataPath, "../Crit");
         }
-        return Path.Combine(root, "Crit");
+        return ChildOr(root, "Crit");
     }
     
     /// <summary>
@@ -85,7 +85,7 @@ public static class GameDataPath
             // Fallback to old behavior
             return Path.Combine(Application.dataPath, "../Sound");
         }
-        return Path.Combine(root, "Sound");
+        return ChildOr(root, "Sound");
     }
     
     /// <summary>
@@ -99,7 +99,7 @@ public static class GameDataPath
             // Fallback to old behavior
             return Path.Combine(Application.dataPath, "../Cuts");
         }
-        return Path.Combine(root, "Cuts");
+        return ChildOr(root, "Cuts");
     }
     
     /// <summary>
@@ -113,9 +113,8 @@ public static class GameDataPath
             return null;
         }
         
-        // Check if SOUND/UW01.XMI exists directly
-        string soundPath = Path.Combine(path, "Sound", "UW01.XMI");
-        if (File.Exists(soundPath))
+        // SOUND/UW01.XMI, accepting the uppercase names an ISO9660 image extracts.
+        if (HasLooseMusic(path))
         {
             return path;
         }
@@ -126,8 +125,7 @@ public static class GameDataPath
             string[] subdirs = Directory.GetDirectories(path);
             foreach (string subdir in subdirs)
             {
-                string testPath = Path.Combine(subdir, "Sound", "UW01.XMI");
-                if (File.Exists(testPath))
+                if (HasLooseMusic(subdir))
                 {
                     return subdir;
                 }
@@ -138,8 +136,7 @@ public static class GameDataPath
                     string[] nestedDirs = Directory.GetDirectories(subdir);
                     foreach (string nestedDir in nestedDirs)
                     {
-                        string nestedTestPath = Path.Combine(nestedDir, "Sound", "UW01.XMI");
-                        if (File.Exists(nestedTestPath))
+                        if (HasLooseMusic(nestedDir))
                         {
                             return nestedDir;
                         }
@@ -159,6 +156,53 @@ public static class GameDataPath
         }
         
         return null;
+    }
+
+    /// <summary>True when this folder itself holds the game's music file, SOUND/UW01.XMI.</summary>
+    public static bool HasLooseMusic(string directory)
+    {
+        string sound = FindChild(directory, "Sound");
+        return sound != null && FindChild(sound, "UW01.XMI") != null;
+    }
+
+    /// <summary>
+    /// A file or folder directly inside <paramref name="directory"/> named <paramref name="name"/>.
+    /// The exact name wins; otherwise the first entry that matches ignoring case, which is how an
+    /// ISO9660 extract (SOUND) meets the names the game uses (Sound) on a case-sensitive volume.
+    /// </summary>
+    public static string FindChild(string directory, string name)
+    {
+        if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(name) || !Directory.Exists(directory))
+        {
+            return null;
+        }
+
+        string direct = Path.Combine(directory, name);
+        if (File.Exists(direct) || Directory.Exists(direct))
+        {
+            return direct;
+        }
+
+        try
+        {
+            foreach (string entry in Directory.GetFileSystemEntries(directory))
+            {
+                if (string.Equals(Path.GetFileName(entry), name, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry;
+                }
+            }
+        }
+        catch (System.Exception)
+        {
+        }
+
+        return null;
+    }
+
+    private static string ChildOr(string directory, string name)
+    {
+        return FindChild(directory, name) ?? Path.Combine(directory, name);
     }
 }
 

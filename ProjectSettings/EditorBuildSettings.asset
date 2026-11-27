@@ -7,7 +7,7 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/Game/Scenes/GameDirectoryDialog.unity
-    guid: 00000000000000000000000000000000
+    guid: 2dbc6eecb509f5345b53a9d0a8ae29de
   - enabled: 1
     path: Assets/Game/Scenes/Logos.unity
     guid: ce4755fd56748484dbaf16147f24c836
