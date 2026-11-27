@@ -2723,7 +2723,14 @@ public class Critter : UUObject
             slot = 12;
             ChangeAnimation("Death");
             stateTime = 0.0f;
-            Music.EnemyDied();
+            // The victory fanfare is the player's kill only: the original asks for it in the kill's
+            // experience, reached only when the player struck the last blow, his missiles and spells
+            // included (UW.EXE 0x25b35, player_killed_a, COMBAT.C, from 0x1c2d2, damage_critter, AI.C).
+            // A death by another creature, a trap, lava or a fall plays nothing.
+            if (lastBlowByPlayer)
+            {
+                Music.EnemyDied();
+            }
             if (cachedCharacterController != null)
             {
                 // prevent the dead character from stepping up onto spawned inventory
@@ -4942,6 +4949,11 @@ public class Critter : UUObject
             break;
         case EState.Initialize:
             break;
+        case EState.Cleanup:
+            // A body already on its way out, as a load leaves one on a level the player is not on:
+            // Update() takes it away. Sent to Enable it stood up dead and died again, death clip and
+            // victory fanfare and all, each time its level was entered.
+            break;
         default:
             SetState(EState.Enable);
             break;
@@ -5824,7 +5836,6 @@ public class Critter : UUObject
     private void Drown()
     {
         SpawnSplash(DataLoader.sDataLoader.splash, DataLoader.sDataLoader.waterSplashParticle, 5.0f * Vector3.down);
-        Music.EnemyDied();
         hp = 0;
         EnsureDeathProcessedOnce(drowned: true);
         Utils.DestroyCritter(this);
@@ -6359,7 +6370,8 @@ public class Critter : UUObject
     /// The player has struck this creature, with a blow, a missile or a spell, or swung at it and missed:
     /// for two seconds those of its race around it answer (HearPackAlarm()), at the attitude the attack
     /// left it in. The original records the fight when the attacker is the player and the blow lands
-    /// (UW.EXE 0x1c2d2); whether its spells count as his is not determined. Called after TryDamage().
+    /// (UW.EXE 0x1c2d2), and his missiles and spells count as his (UW.EXE 0x27ef1 and 0x35017). Called after
+    /// TryDamage().
     /// </summary>
     public void StruckByPlayer()
     {
