@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Moving is closer to the original: you swim and fly as fast as there and levitate as slowly, wade through lava at half your walk, sprint up to the original's walking pace, step sideways and back at about half your forward speed, Ctrl slows every direction, in flight too, and a jump keeps its take-off speed even if you swing. In water the view sways with your strokes as in the original.
+
 - The victory fanfare plays only when you make the kill, as in the original: a creature drowning or burning in lava somewhere on the level no longer starts it. A creature you killed before a save no longer stands up and dies again, fanfare and all, when you come back to its level.
 
 - What you give a character in a conversation stays with him, so he can sell it back and drops it if he dies, and an item taken back from the trade table before he takes it no longer counts as given. What a character makes for you comes in perfect condition, and what the original hands over already identified now is, as Shak's shiny sword and Ironwit's green potion.
