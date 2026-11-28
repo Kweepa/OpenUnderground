@@ -21,8 +21,6 @@ public class PlayerObject : MonoBehaviour
     public float groundSpeed = 6.0f;
     public float encumberedSpeed = 1.0f;
     public float combatSpeed = 3.0f;
-    [Tooltip("Sprint speed multiplier (1.5 = 50% faster).")]
-    public float sprintSpeedMultiplier = 1.5f;
     [Tooltip("Stamina: 0 = empty, 1 = full. Drains over 10s when sprinting, recovers over 20s when not.")]
     [Range(0f, 1f)]
     public float stamina = 1.0f;
@@ -88,8 +86,6 @@ public class PlayerObject : MonoBehaviour
 
     public bool controlsActive => controlsDisabled == 0;
 
-    public float swimBob = 0.1f;
-    public float swimSway = 3.0f;
     public float flightBobSpeed = 2.0f;
     public float flightBobScale = 0.001f;
 
@@ -109,6 +105,9 @@ public class PlayerObject : MonoBehaviour
     private float flightBobTime;
 
     private float leapMoveSpeed;
+
+    // The speed of the last frame on the ground, held in the air (fix 290).
+    private float airMoveSpeed;
 
     public static PlayerObject Player { get; private set; }
 
@@ -570,23 +569,127 @@ public class PlayerObject : MonoBehaviour
 
     /// <summary>
     /// The slow walk, with Ctrl held on the keyboard: the original's S key, 12/32 of the top speed against
-    /// the 28/32 of its W (UW.EXE 0x30d9a), so every direction at 12/28 of its speed and never more than
-    /// that of the walking speed of the ground or the water. Forward the noise's speed term is -2, as there,
-    /// sideways -3 and back -4. Fix 327; Ctrl is the user's choice, 11 October 2026.
+    /// the 28/32 of its W (UW.EXE 0x30d9a), so 12/28 of the speed in every direction, on foot and in flight
+    /// (fix 327; Ctrl is the user's choice, 11 October 2026; every direction and flight, the user's table of
+    /// 28 November 2026).
     /// </summary>
-    private void LimitToSlowWalk(float moveSpeed)
+    private void SlowWalk()
     {
         cachedMoveDirection *= slowWalkFraction;
-        float limit = slowWalkFraction * (isInWater ? 0.5f * groundSpeed : groundSpeed);
-        float asked = cachedMoveDirection.magnitude * moveSpeed;
-        if (asked > limit)
-        {
-            cachedMoveDirection *= limit / asked;
-        }
     }
 
     // floor(10 * f * 28 / 32) - 5 is -2 at f = 12/28 (UpdateNoise()).
     private const float slowWalkFraction = 12.0f / 28.0f;
+
+    /// <summary>
+    /// The ways of moving. The original (newFPS, PHYSICS.C, UW.EXE 0x1d3dc) scales its top 940, aside 235 and back
+    /// 188 by tenths, 10 on foot, 3 in water, 5 on lava, 1 levitating, 7 flying, and its forward with W or the mouse
+    /// is 28/32 of the top (do_player_input, PHYSICS.C, UW.EXE 0x1d1bc); a speed v is v / 256 tiles a second
+    /// (space_to_motion, MOTION.C, UW.EXE 0x2c9a0). The speeds here are the user's table of 28 November 2026
+    /// (fixes 80, 135, 418 and 444): forward the remake's own walk on the ground and half of it on lava, the
+    /// original's swim, Fly and Levitate; the sprint at the original's walk; aside and back the same share of
+    /// forward everywhere.
+    /// </summary>
+    private enum EMoveMode
+    {
+        Ground,
+        Water,
+        Lava,
+        Fly,
+        Levitate,
+    }
+
+    // The original's walk with W, 940 * 28 / 32, and its speed units in a tile.
+    private const float OriginalWalk = 822.0f;
+    private const float OriginalUnitsPerTile = 256.0f;
+
+    /// <summary>Aside and back against forward, twice the original's 235 and 188 of 822 (the user's table).</summary>
+    private const float AsideRate = 2.0f * 235.0f / OriginalWalk;
+    private const float BackRate = 2.0f * 188.0f / OriginalWalk;
+
+    /// <summary>The original's own aside and back against forward, which the noise keeps (UpdateNoise()).</summary>
+    private const float OriginalAsideRate = 235.0f / OriginalWalk;
+    private const float OriginalBackRate = 188.0f / OriginalWalk;
+
+    /// <summary>
+    /// Fly up and Fly down, the original's E and Q: 141 for Levitate and Fly alike (UW.EXE 0x1d1bc), a height moving
+    /// by vz * dt / 2048 z units with dt in 1/256 s (full_move, MOTION.C, UW.EXE 0x2d56f), at 3/32 m a z unit:
+    /// 1.65 m a second.
+    /// </summary>
+    private const float FlyVerticalSpeed = 141.0f * 256.0f / 2048.0f * 3.0f / 32.0f;
+
+    /// <summary>Forward with W, in units a second.</summary>
+    private float ModeForwardSpeed(EMoveMode mode)
+    {
+        switch (mode)
+        {
+            case EMoveMode.Water: return 246.0f / OriginalUnitsPerTile * Tile.xzScale;
+            case EMoveMode.Lava: return 411.0f / OriginalWalk * groundSpeed;
+            case EMoveMode.Fly: return 575.0f / OriginalUnitsPerTile * Tile.xzScale;
+            case EMoveMode.Levitate: return 82.0f / OriginalUnitsPerTile * Tile.xzScale;
+            default: return groundSpeed;
+        }
+    }
+
+    /// <summary>
+    /// The sprint against the walk: its top is the original's walk, 3.21 tiles a second on the ground and its half on
+    /// lava (the user's table of 28 November 2026).
+    /// </summary>
+    private float SprintMultiplier()
+    {
+        return OriginalWalk / OriginalUnitsPerTile * Tile.xzScale / groundSpeed;
+    }
+
+    /// <summary>The way of moving on foot: water unless Water Walk, then lava whatever protects from it.</summary>
+    private EMoveMode FootMode()
+    {
+        return isInWater ? EMoveMode.Water : touchingLava ? EMoveMode.Lava : EMoveMode.Ground;
+    }
+
+    /// <summary>The walk forward of the ground, the water or the lava, in units a second.</summary>
+    private float ModeWalkSpeed()
+    {
+        return ModeForwardSpeed(FootMode());
+    }
+
+    /// <summary>
+    /// The direction asked by the stick or the keys, as a share of the forward speed: aside at
+    /// <paramref name="aside"/>, back at <paramref name="back"/>; a diagonal goes at the speed of its forward or back
+    /// part (W and D at the forward speed, S and D at the back one: the original takes one key at a time, and has no
+    /// diagonal), with the share running from aside to that between the side and the diagonal, so a stick turns
+    /// smoothly.
+    /// </summary>
+    private static Vector3 RatedDirection(float aside, float back, Vector2 control, Vector3 right, Vector3 forward)
+    {
+        float x = Utils.DeadZone(control.x);
+        float y = Utils.DeadZone(control.y);
+        float ax = Mathf.Abs(x);
+        float ay = Mathf.Abs(y);
+        if (ax + ay <= 0.0f)
+        {
+            return Vector3.zero;
+        }
+
+        float axis = y > 0.0f ? 1.0f : back;
+        float rate = Mathf.Lerp(aside, axis, Mathf.Min(1.0f, 2.0f * ay / (ax + ay)));
+        float deflection = Mathf.Min(1.0f, new Vector2(x, y).magnitude);
+        return (aside * x * right + axis * y * forward).normalized * (rate * deflection);
+    }
+
+    /// <summary>
+    /// How much quieter or louder the direction asked is than the same at the original's own aside and back rates:
+    /// the noise keeps the original's share for each direction (set_sound, PLAYMOVE.C), whatever speed the remake
+    /// gives it.
+    /// </summary>
+    private static float DirectionNoiseScale(Vector2 control)
+    {
+        Vector3 ours = RatedDirection(AsideRate, BackRate, control, Vector3.right, Vector3.forward);
+        Vector3 original = RatedDirection(OriginalAsideRate, OriginalBackRate, control, Vector3.right, Vector3.forward);
+        return ours.sqrMagnitude > 0.0f ? original.magnitude / ours.magnitude : 1.0f;
+    }
+
+    // The direction's noise scale of the last frame on the ground, held in the air with the speed.
+    private float directionNoiseScale = 1.0f;
 
     /// <summary>
     /// The standing long jump's speed against the walk's: half the top, 16/32, against W's 28/32 (UW.EXE 0x1d1bc's
@@ -1023,15 +1126,8 @@ public class PlayerObject : MonoBehaviour
             ? encumberedSpeed
             : IsWeaponBlockingSprint() ? combatSpeed : groundSpeed;
 
-        if (isInWater)
-        {
-            moveSpeed /= 2.0f;
-        }
-
-        if (!cachedCharacterController.isGrounded && leapMoveSpeed > 0.0f)
-        {
-            moveSpeed = leapMoveSpeed;
-        }
+        // In water the original's swim, on lava half the walk (fixes 80 and 135).
+        moveSpeed *= ModeWalkSpeed() / groundSpeed;
 
         if (Magic.sMagic.IsSpellActive(Magic.ESpell.Speed))
         {
@@ -1062,7 +1158,7 @@ public class PlayerObject : MonoBehaviour
                           && !IsWeaponBlockingSprint();
         if (wantsSprint)
         {
-            moveSpeed *= sprintSpeedMultiplier;
+            moveSpeed *= SprintMultiplier();
             stamina -= Time.deltaTime / SprintDrainTime();
             if (stamina <= 0f)
             {
@@ -1086,13 +1182,19 @@ public class PlayerObject : MonoBehaviour
         
         if (cachedCharacterController.isGrounded)
         {
-            // left/right at 75%, backward at 50% of forward speed
-            cachedMoveDirection = 0.75f * Utils.DeadZone(moveControl.x) * transform.right +
-                                  (moveControl.y > 0.0f ? 1.0f : 0.5f) * Utils.DeadZone(moveControl.y) * transform.forward;
+            // In the air the speed of the take-off holds to the landing: the original reads no input then
+            // (set_player_phys_params, PHYSICS.C, UW.EXE 0x1cbb3), so a swing does not shorten a jump (fix 290).
+            // But not the sprint's: a sprint jump flies at the walk, as on main, or it went too far (the user,
+            // 28 November 2026; the jump's length is fix 442's).
+            airMoveSpeed = wantsSprint ? moveSpeed / SprintMultiplier() : moveSpeed;
+
+            // aside and back as a share of forward (fix 418)
+            cachedMoveDirection = RatedDirection(AsideRate, BackRate, moveControl, transform.right, transform.forward);
+            directionNoiseScale = DirectionNoiseScale(moveControl);
 
             if (slowWalk)
             {
-                LimitToSlowWalk(moveSpeed);
+                SlowWalk();
             }
 
             if (longJumpStarting)
@@ -1107,12 +1209,15 @@ public class PlayerObject : MonoBehaviour
         else
         {
             longJumpStarting = false;
+            moveSpeed = leapMoveSpeed > 0.0f
+                ? leapMoveSpeed * (Magic.sMagic.IsSpellActive(Magic.ESpell.Speed) ? 2.0f : 1.0f)
+                : airMoveSpeed;
         }
-        
-        // The speed asked for, against the walking speed of the ground or the water: what the noise is
-        // made from, like the original's DS:0x2794 against DS:0x2496.
+
+        // The speed asked for, against the walking speed of the ground, the water or the lava: what the noise
+        // is made from, like the original's DS:0x2794 against DS:0x2496, aside and back at the original's share.
         Vector3 horizontal = new Vector3(cachedMoveDirection.x, 0.0f, cachedMoveDirection.z);
-        noiseSpeedFraction = horizontal.magnitude * moveSpeed / (isInWater ? 0.5f * groundSpeed : groundSpeed);
+        noiseSpeedFraction = horizontal.magnitude * moveSpeed / ModeWalkSpeed() * directionNoiseScale;
 
         float stepOffset = cachedCharacterController.stepOffset;
         Vector3 walk = KeepOutOfCreatures(cachedMoveDirection * (moveSpeed * Time.deltaTime), out float stepLimit);
@@ -1420,25 +1525,29 @@ public class PlayerObject : MonoBehaviour
     private void Flight()
     {
         bool allowMove = controlsActive || (controlsDisabled & ~(EControlMask.Magic | EControlMask.Inventory)) == 0;
-        Vector2 moveControl = allowMove ? ReadMoveVectorConsideringPanels(out _) : Vector2.zero;
-        Vector3 desiredFlightVelocity = Utils.DeadZone(moveControl.x) * mainCamera.transform.right
-                                        + Utils.DeadZone(moveControl.y) * mainCamera.transform.forward;
-        if (!Magic.sMagic.IsSpellActive(Magic.ESpell.Fly))
+        bool usingKeyboardMove = false;
+        Vector2 moveControl = allowMove ? ReadMoveVectorConsideringPanels(out usingKeyboardMove) : Vector2.zero;
+        // Along the camera, as the remake flies (the user's, 4 November 2026), at the original's Fly and Levitate
+        // forward, aside and back as on foot, the climb along the look included (fix 444). Speeds as shares of
+        // groundSpeed, the unit the move below multiplies by.
+        float forward = ModeForwardSpeed(Magic.sMagic.IsSpellActive(Magic.ESpell.Fly) ? EMoveMode.Fly : EMoveMode.Levitate)
+            / groundSpeed;
+        Vector3 desiredFlightVelocity = forward
+            * RatedDirection(AsideRate, BackRate, moveControl, mainCamera.transform.right, mainCamera.transform.forward);
+        // The slow walk flies slowly too, as the original's S does (the user's table of 28 November 2026).
+        if (usingKeyboardMove && (GameActions.KeysWorld.WalkQuietly.IsPressed() || PlayerInput.WalkSlowlyHeld()))
         {
-            // limit the xz movement for levitation
-            desiredFlightVelocity.x *= 0.2f;
-            desiredFlightVelocity.z *= 0.2f;
+            desiredFlightVelocity *= slowWalkFraction;
         }
-        // Fly up and Fly down, the original's E and Q (mod 1080, fix 441): held, the climb or the descent at the
-        // flight's top, whatever the look; both held, none. The flight along the camera stays as it was (the user's,
-        // 4 November 2026); the original's slower 1.65 m/s is fix 444's.
+        // Fly up and Fly down, the original's E and Q (mod 1080, fix 441): held, the climb or the descent at
+        // FlyVerticalSpeed, whatever the look; both held, none.
         if (allowMove)
         {
             bool up = GameActions.KeysWorld.FlyUp.IsPressed();
             bool down = GameActions.KeysWorld.FlyDown.IsPressed();
             if (up || down)
             {
-                desiredFlightVelocity.y = (up ? 1.0f : 0.0f) - (down ? 1.0f : 0.0f);
+                desiredFlightVelocity.y = FlyVerticalSpeed / groundSpeed * ((up ? 1.0f : 0.0f) - (down ? 1.0f : 0.0f));
             }
         }
         flightVelocity = Utils.DampedApproach(flightVelocity, desiredFlightVelocity, 1.0f);
@@ -1450,9 +1559,9 @@ public class PlayerObject : MonoBehaviour
 
         cachedMoveDirection = flightVelocity;
 
-        // Against the top of the flight, which Levitate cuts to a fifth.
+        // Against the forward flight of the spell in force, aside and back at the original's share.
         Vector3 horizontal = new Vector3(flightVelocity.x, 0.0f, flightVelocity.z);
-        noiseSpeedFraction = horizontal.magnitude / (Magic.sMagic.IsSpellActive(Magic.ESpell.Fly) ? 1.0f : 0.2f);
+        noiseSpeedFraction = horizontal.magnitude / forward * DirectionNoiseScale(moveControl);
     }
     
     private Vector3 CalculateLeapUpVelocity(Vector3 startPoint, Vector3 targetPoint, float maxApex)
@@ -1751,13 +1860,19 @@ public class PlayerObject : MonoBehaviour
             float cameraYTarget = transform.position.y;
             if (isInWater && swimCount > SwimCountSinking)
             {
-                cameraYTarget = SwimEyeY(swimBob * Mathf.Sin(Time.time));
-                cam.transform.localEulerAngles = new Vector3(cam.transform.localEulerAngles.x, 0.0f,
-                    swimSway * Mathf.Sin(2.0f * Time.time));
+                Vector3 tilt = SwimSway(out float bob);
+                cameraYTarget = SwimEyeY(bob);
+                cam.transform.localEulerAngles = new Vector3(cameraLookUp + tilt.x, tilt.y, tilt.z);
+                swimSwayShown = true;
             }
             else
             {
                 cameraYTarget += cameraOffset;
+                if (swimSwayShown)
+                {
+                    cam.transform.localEulerAngles = Vector3.right * cameraLookUp;
+                    swimSwayShown = false;
+                }
             }
 
             // Walk bob: Abs(Cos) troughs at footstep. Blend weight eases in/out so start/stop don't snap.
@@ -2056,6 +2171,73 @@ public class PlayerObject : MonoBehaviour
         float above = Mathf.Lerp(first, LowestEyeAboveWater, Mathf.InverseLerp(SwimCountEntry, SwimCountCap, swimCount));
         return surface + Mathf.Max(LowestEyeAboveWater, above + bob);
     }
+
+    /// <summary>
+    /// The swimmer's sway, from parse_effect (PLAYMOVE.C, UW.EXE 0x314fd), while the counter is above 0x50: a wave of
+    /// one second on the clock in the original (rorEffect, a triangle of 4 over sixteen steps of 1/16 s, from tsteps),
+    /// here of SwimWaveSeconds, its size growing with the speed, amp = speed * 4 / (top / 2) - 3 and at least 1: 3
+    /// swimming forward, 1 aside, back or still. Moving, the view rolls amp * wave * 64 (4.2 degrees forward); still, the roll is random, up to 1.4
+    /// degrees; either way the eye rises and falls by wave * 2 * amp of the eye's 164 (a quarter of a metre forward),
+    /// an eighth of the wave ahead, and the heading and the pitch shake by up to amp * 0.35 degrees. Returns the
+    /// pitch, heading and roll in degrees, and the eye's rise in <paramref name="bob"/>, in units. The original draws
+    /// its random terms every frame; here it draws them once every SwimTrembleSeconds and glides from one draw to the
+    /// next: at one frame, and at three, the tremble looked too quick and unpleasant, and a draw a second would jump
+    /// (the user, 27 and 28 November 2026).
+    /// </summary>
+    private Vector3 SwimSway(out float bob)
+    {
+        // the original's units: a turn is 0x10000; the swim's top 282 and forward 246 (newFPS)
+        const float degrees = 360.0f / 65536.0f;
+        if (Time.deltaTime <= 0.0f)
+        {
+            // paused: the view holds, as the original's, whose effects run only on the play screen
+            bob = swimSwayBob;
+            return swimSwayTilt;
+        }
+
+        swimSwayClock += Time.deltaTime;
+        swimSwayRedraw -= Time.deltaTime;
+        if (swimSwayRedraw <= 0.0f)
+        {
+            swimSwayRedraw = Mathf.Max(swimSwayRedraw + SwimTrembleSeconds, 0.0f);
+            swimSwayFrom = swimSwayTo;
+            swimSwayTo = new Vector3(Random.Range(-0x40, 0x40), Random.Range(-0x40, 0x40), Random.Range(-0x100, 0x100));
+        }
+
+        // pitch, heading and the still roll, gliding from the last draw to the next
+        Vector3 tremble = Vector3.Lerp(swimSwayFrom, swimSwayTo, Mathf.SmoothStep(0.0f, 1.0f, 1.0f - swimSwayRedraw / SwimTrembleSeconds));
+
+        Vector3 velocity = cachedCharacterController.velocity;
+        float share = new Vector2(velocity.x, velocity.z).magnitude / ModeWalkSpeed();
+        int speed = Mathf.RoundToInt(share * (282 * 28 / 32));
+        int amp = Mathf.Max(speed * 4 / (282 >> 1) - 3, 1);
+        float phase = 16.0f * swimSwayClock / SwimWaveSeconds;
+        float roll = speed == 0 ? tremble.z : amp * SwimWave(phase) * 64.0f;
+        bob = swimSwayBob = EyeAboveFeet() * SwimWave(phase + 2.0f) * 2.0f * amp / OriginalEyeHeight;
+        return swimSwayTilt = new Vector3(amp * tremble.x, amp * tremble.y, roll) * degrees;
+    }
+
+    /// <summary>The original's rorEffect, -4, -3 ... 4 ... -3 over 16 steps, read between its steps.</summary>
+    private static float SwimWave(float phase)
+    {
+        float u = Mathf.Repeat(phase, 16.0f);
+        return u <= 8.0f ? u - 4.0f : 12.0f - u;
+    }
+
+    // How often the sway's random terms are drawn again: a second, the user's choice of 28 November 2026.
+    // The wave's length: the original's second looked too quick, 5 s too slow; 2.5 s, a little quicker than main's
+    // sway (the user, 28 November 2026).
+    private const float SwimWaveSeconds = 2.5f;
+
+    private const float SwimTrembleSeconds = 1.0f;
+
+    private float swimSwayClock;
+    private float swimSwayRedraw;
+    private Vector3 swimSwayFrom;
+    private Vector3 swimSwayTo;
+    private bool swimSwayShown;
+    private float swimSwayBob;
+    private Vector3 swimSwayTilt;
 
     /// <summary>How high the eye is above the feet, out of water.</summary>
     private float EyeAboveFeet()
@@ -2443,6 +2625,7 @@ public class PlayerObject : MonoBehaviour
         cachedMoveDirection = Vector3.zero;
         flightVelocity = Vector3.zero;
         leapMoveSpeed = 0.0f;
+        airMoveSpeed = 0.0f;
         timeToNextLavaDamage = 0.0f;
         poisonClock.Reset();
         NoiseLevel = 0;
